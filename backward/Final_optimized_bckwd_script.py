@@ -10,7 +10,7 @@ start_time=time.time()  #to show the computational time
 # command for formatting of the printed output
 np.set_printoptions(suppress=True, precision=4, linewidth= 150 )
 
-#----------------------------------Mathematical functions----------------------------
+#-------------------------------------------------------Mathematical functions---------------------------------------------------------------
 
 def fun_gaussian(x, sigma):
     """Gaussian function centered at zero"""
