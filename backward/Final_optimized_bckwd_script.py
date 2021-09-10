@@ -379,7 +379,7 @@ def correct_for_multiple_scattering(ws_name, sample_properties, transmission_gue
 
 #--------------------------------------------------Functions that act in y space---------------------------------------------
 
-def subtract_other_masses(ws, ncp_all_m):
+def subtract_other_masses(ws, ncp_all_m):   #I tested this function but not throughouly, so could have missed something
     """Input: workspace from last iteration, ncp for all masses
        Output: workspace with all the ncp subtracted except for the first mass"""
 
@@ -438,20 +438,54 @@ def normalise_workspace(ws_name):
     Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
     DeleteWorkspace("tmp_norm")
 
-# #-------------------------------------------------------Input parameters-------------------------------------------------------------
+    
+######################################################################################################################################
+######################################################                      ##########################################################
+######################################################     USER SECTION     ##########################################################
+######################################################                      ##########################################################
+######################################################################################################################################
 
-par     = ( 1,           18.22,       0.       )
-bounds  = ((0, None),   (17,20),    (-30., 30.))     
-par    += ( 1,           22.5,        0.       )
-bounds += ((0, None),   (20,25),    (-30., 30.))
-par    += ( 1,           15.4,        0.       )
-bounds += ((0, None),   (12.2,18),  (-10., 10.))
-par    += ( 1,           9.93,        0.       )
-bounds += ((0, None),   (9.8,10),   (-10., 10.))
+'''
+The user section is composed of an initialisation section, an iterative analysis/reduction section
+of the spectra in the time-of-flight domain, and a final section where the analysis of the corrected
+hydrogen neutron Compton profile is possible in the Y-space domain.
+
+The fit procedure in the time-of-flight domain is  based on the scipy.minimize.optimize() tool,
+used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
+
+The Y-space analysis is, at present, performed on a single spectrum, being the result of
+the sum of all the corrected spectra, subsequently symmetrised and unit-area normalised.
+
+The Y-space fit is performed using the Mantid minimiser and average Mantid resolution function, using
+a Gauss-Hermite expansion including H0 and H4 at present, while H3 (proportional to final-state effects)
+is not needed as a result of the symmetrisation.
+'''
+
+# #----------------------------------------------Initial fitting parameters and constraints---------------------------------------------------
+# Elements                                                             Cerium     Platinum     Germanium    Aluminium
+# Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
+# Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A 
+
+#Parameters:   Intensity,   NCP Width,    NCP centre
+par     =      ( 1,           18.22,       0.       )     #Cerium
+bounds  =      ((0, None),   (17,20),    (-30., 30.))     
+par    +=      ( 1,           22.5,        0.       )     #Platinum
+bounds +=      ((0, None),   (20,25),    (-30., 30.))
+par    +=      ( 1,           15.4,        0.       )
+bounds +=      ((0, None),   (12.2,18),  (-10., 10.))     #Germanium
+par    +=      ( 1,           9.93,        0.       )
+bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     #Aluminium
+
+# Intensity Constraints
+# CePt4Ge12 in Al can
+#  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn   
+#  Pt cross section * stoichiometry = 11.71 * 4 = 46.84  barn  
+#  Ge cross section * stoichiometry = 8.6 * 12 = 103.2   barn
 
 constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
 
-masses=np.array([140.1,195.1,72.6,27]).reshape(4, 1, 1)
+#------------------------------------------------------------- Inputs ---------------------------------------------------------------------
+masses=np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
 ip_path = r'C:\Users\guijo\Desktop\Work\ip2018.par'   #needs to be raw string
 
 number_of_iterations = 4                      # This is the number of iterations for the reduction analysis in time-of-flight.
@@ -461,16 +495,15 @@ spectra='3-134'                               # Spectra to be analysed
 first_spec, last_spec = 3, 134                #3, 134
 tof_binning='275.,1.,420'                             # Binning of ToF spectra
 mode='DoubleDifference'
-ipfile='ip2018.par'                                   # Optional instrument parameter file
-detectors_masked=[18,34,42,43,59,60,62,118,119,133]   # Optional spectra to be masked
+ipfile='ip2018.par' # Optional instrument parameter file
 
+detectors_masked=[18,34,42,43,59,60,62,118,119,133]   # Optional spectra to be masked
 detectors_masked = np.array(detectors_masked)
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
 
 name='CePtGe12_100K_DD_'  
 
-# #-----------------------Load workspace - since I do not have the path for Vesuvio, load files from my path-------------------------------
-
+# #------------------------- Load workspace - since I do not have the path for Vesuvio, load files from my path-------------------------------
 if (name+'raw' not in mtd):
     print ('\n', 'Loading the sample runs: ', runs, '\n')
     Load(Filename= r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_raw.nxs", OutputWorkspace="CePtGe12_100K_DD_raw")
@@ -487,26 +520,29 @@ if (name+'empty' not in mtd):
     Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
     
 # #-------------------------Parameters for the multiple-scattering correction, including the shape of the sample----------------------
-transmission_guess = 0.98                               #experimental value from VesuvioTransmission
+transmission_guess = 0.98                     #experimental value from VesuvioTransmission
 multiple_scattering_order, number_of_events = 2, 1.e5
-hydrogen_peak=False                                     # hydrogen multiple scattering
-hydrogen_to_mass0_ratio = 0                             # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+hydrogen_peak=False                          # hydrogen multiple scattering
+hydrogen_to_mass0_ratio = 0                  # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in meters
 create_slab_geometry(name,vertical_width, horizontal_width, thickness)
 
 # #-----------------------------------------------------------Run the code------------------------------------------------------------
-#Crop Workspace 
+# Crop Workspace 
 spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()  
 first_idx, last_idx = first_spec - spec_offset, last_spec - spec_offset
 CropWorkspace(InputWorkspace=name, StartWorkspaceIndex = first_idx, EndWorkspaceIndex = last_idx, OutputWorkspace=name) #for MS correction
 spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()  
 
-#generate arrays where we are going to store the data for each iteration
-all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
+# Generate arrays where we are going to store the data for each iteration
+# Main array with all the best fit parameters
 all_spec_best_par_chi_nit = np.zeros((number_of_iterations, last_spec-first_spec+1, len(masses)*3+3))
+# Mean widths and intensities arrays
+all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
+# DataY from workspace to be fitted at each iteration
 all_fit_workspaces = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize())) 
 
-#main iterative procedure
+# Main iterative procedure
 ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  #initialize ws for the first fit
 for iteration in range(number_of_iterations):
     
@@ -514,7 +550,7 @@ for iteration in range(number_of_iterations):
     MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary
     all_fit_workspaces[iteration] = ws_to_be_fitted.extractY()                    #records the dataY matrix at each iteration
     
-    mean_widths, mean_intensity_ratios, spec_best_par_chi_nit, ncp_all_m = block_fit_ncp(ws_to_be_fitted)
+    mean_widths, mean_intensity_ratios, spec_best_par_chi_nit, ncp_all_m = block_fit_ncp(ws_to_be_fitted)     #main fit
     
     all_mean_widths[iteration] = mean_widths                           #record all of the other important parameters
     all_mean_intensities[iteration] = mean_intensity_ratios
@@ -532,6 +568,7 @@ for iteration in range(number_of_iterations):
 # dataX_sub_m, dataY_sub_m, dataE_sub_m = ws_sub_m.extractX(), ws_sub_m.extractY(), ws_sub_m.extractE() 
 
 #-------------------------------------------test for ncp workspaces-----------------------------------------------
+#  Records the data of the ncp workspaces
 all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
 all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
                        
@@ -547,7 +584,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
                 
                       
-#----------------------------------------------store data for testing---------------------------------------------------------
+#----------------------------------------------------store data for testing---------------------------------------------------------
 savepath = r"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\optimized_6.0_with_mulscat\opt_spec3-134_iter4_ncp_nightlybuild"
 # np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
 #                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
