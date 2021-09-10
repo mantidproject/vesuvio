@@ -488,11 +488,11 @@ constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] }, 
 masses=np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
 ip_path = r'C:\Users\guijo\Desktop\Work\ip2018.par'   #needs to be raw string
 
-number_of_iterations = 4                      # This is the number of iterations for the reduction analysis in time-of-flight.
+number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
 runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
 empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
 spectra='3-134'                               # Spectra to be analysed
-first_spec, last_spec = 3, 134                #3, 134
+first_spec, last_spec = 3, 7               #3, 134
 tof_binning='275.,1.,420'                             # Binning of ToF spectra
 mode='DoubleDifference'
 ipfile='ip2018.par' # Optional instrument parameter file
@@ -533,18 +533,27 @@ first_idx, last_idx = first_spec - spec_offset, last_spec - spec_offset
 CropWorkspace(InputWorkspace=name, StartWorkspaceIndex = first_idx, EndWorkspaceIndex = last_idx, OutputWorkspace=name) #for MS correction
 spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()  
 
+#-------------------------------------------------- Choose which workspace to fit--------------------------------------------------------------
+#--------- Uncoment to change input workspace to synthetic ncp ----------------
+opt = np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz")
+dataY = opt["all_tot_ncp"][0, first_idx : last_idx+1]               #Now the data to be fitted will be the ncp of first iteration
+dataX = mtd[name].extractX()[:, :-1]                                #cut last collumn to match ncp length
+ws_to_be_fitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), OutputWorkspace=name+"0")
+
+#-------------------Uncoment for Normal input workspace ------------------------
+#ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  #initialize ws for the first fit
+
 # #---------------------------------Generate arrays where we are going to store the data for each iteration-----------------------------
 # Main array with all the best fit parameters
-all_spec_best_par_chi_nit = np.zeros((number_of_iterations, last_spec-first_spec+1, len(masses)*3+3))
+all_spec_best_par_chi_nit = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), len(masses)*3+3))
 # NCP arrays
-all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
+all_tot_ncp = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), ws_to_be_fitted.blocksize()-1))
 # Mean widths and intensities arrays
 all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
 # DataY from workspace to be fitted at each iteration
-all_fit_workspaces = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize())) 
+all_fit_workspaces = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), ws_to_be_fitted.blocksize())) 
 
 # #-------------------------------------------------- Main iterative procedure ---------------------------------------------------------
-ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  #initialize ws for the first fit
 for iteration in range(number_of_iterations):
     
     ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
@@ -587,7 +596,7 @@ for iteration in range(number_of_iterations):
 #                 
                       
 #----------------------------------------------------store data for testing---------------------------------------------------------
-savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_run1"
+savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic_fit"
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
                    all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
