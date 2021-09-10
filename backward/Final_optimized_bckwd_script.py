@@ -527,22 +527,23 @@ hydrogen_to_mass0_ratio = 0                  # hydrogen-to-mass[0] ratio obtaien
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in meters
 create_slab_geometry(name,vertical_width, horizontal_width, thickness)
 
-# #-----------------------------------------------------------Run the code------------------------------------------------------------
-# Crop Workspace 
+# #--------------------------------------------------------- Crop workspace ------------------------------------------------------------
 spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()  
 first_idx, last_idx = first_spec - spec_offset, last_spec - spec_offset
 CropWorkspace(InputWorkspace=name, StartWorkspaceIndex = first_idx, EndWorkspaceIndex = last_idx, OutputWorkspace=name) #for MS correction
 spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()  
 
-# Generate arrays where we are going to store the data for each iteration
+# #---------------------------------Generate arrays where we are going to store the data for each iteration-----------------------------
 # Main array with all the best fit parameters
 all_spec_best_par_chi_nit = np.zeros((number_of_iterations, last_spec-first_spec+1, len(masses)*3+3))
+# NCP arrays
+all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
 # Mean widths and intensities arrays
 all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
 # DataY from workspace to be fitted at each iteration
 all_fit_workspaces = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize())) 
 
-# Main iterative procedure
+# #-------------------------------------------------- Main iterative procedure ---------------------------------------------------------
 ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  #initialize ws for the first fit
 for iteration in range(number_of_iterations):
     
@@ -555,6 +556,7 @@ for iteration in range(number_of_iterations):
     all_mean_widths[iteration] = mean_widths                           #record all of the other important parameters
     all_mean_intensities[iteration] = mean_intensity_ratios
     all_spec_best_par_chi_nit[iteration] = spec_best_par_chi_nit
+    all_tot_ncp[iteration] = np.sum(ncp_all_m, axis=0)
 
     if (iteration < number_of_iterations - 1):   #if not at the last iteration, evaluate multiple scattering correction
         sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering")
@@ -569,30 +571,27 @@ for iteration in range(number_of_iterations):
 
 #-------------------------------------------test for ncp workspaces-----------------------------------------------
 #  Records the data of the ncp workspaces
-all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
-all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
-                       
-for i in range(number_of_iterations):
-    ncp_ws_name = name + str(i)
-    ncp_tot = mtd[ncp_ws_name + "_tof_fitted_profiles"]
-    ncp_tot_dataY = ncp_tot.extractY()
-    all_tot_ncp[i] = ncp_tot_dataY
-    
-    for m in range(len(masses)):
-        ncp_m = mtd[ncp_ws_name + "_tof_fitted_profile_" + str(m+1)]
-        ncp_m_dataY = ncp_m.extractY()
-        all_indiv_ncp[i, m] = ncp_m_dataY
-                
+# all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
+# all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
+#                        
+# for i in range(number_of_iterations):
+#     ncp_ws_name = name + str(i)
+#     ncp_tot = mtd[ncp_ws_name + "_tof_fitted_profiles"]
+#     ncp_tot_dataY = ncp_tot.extractY()
+#     all_tot_ncp[i] = ncp_tot_dataY
+#     
+#     for m in range(len(masses)):
+#         ncp_m = mtd[ncp_ws_name + "_tof_fitted_profile_" + str(m+1)]
+#         ncp_m_dataY = ncp_m.extractY()
+#         all_indiv_ncp[i, m] = ncp_m_dataY
+#                 
                       
 #----------------------------------------------------store data for testing---------------------------------------------------------
-savepath = r"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\optimized_6.0_with_mulscat\opt_spec3-134_iter4_ncp_nightlybuild"
-# np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
-#                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
-#                    dataX_sub_m = dataX_sub_m, dataY_sub_m = dataY_sub_m, dataE_sub_m = dataE_sub_m, ncp_all_m = ncp_all_m)
+savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_run1"
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
                    all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
-                   all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp)
+                   all_tot_ncp = all_tot_ncp)
 
 end_time = time.time()
 print("running time: ", end_time-start_time, " seconds")
