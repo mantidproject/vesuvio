@@ -243,10 +243,15 @@ def create_ncp_workspaces(ncp_all_m_reshaped, ws):
     
     ncp_total = np.sum(ncp_all_m_reshaped, axis=1)     #shape(no of spec, len of spec)
     ncp_all_m = reshape_yspace(ncp_all_m_reshaped)     #same operation as we did for y spaces ie exchange of first two indices
-    dataX = ws.extractX()[:, :-1]            #cut last collumn to match ncp length
+    dataX = ws.extractX()                              
+    
+    hist_widths = dataX[:, 1:] - dataX[:, :-1]
+    dataX = dataX[:, :-1]                              #cut last column to match ncp length
+    dataY = ncp_total * hist_widths
+
     
     #spec_nos = str(range(first_spec, last_spec+1))    #correct numbers of spectrums, currently not working
-    CreateWorkspace(DataX=dataX.flatten(), DataY=ncp_total.flatten(), Nspec=len(dataX), OutputWorkspace=ws.name()+"_tof_fitted_profiles")
+    CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), OutputWorkspace=ws.name()+"_tof_fitted_profiles")
     for i, ncp_m in enumerate(ncp_all_m):
         CreateWorkspace(DataX=dataX.flatten(), DataY=ncp_m.flatten(), Nspec=len(dataX),\
                         OutputWorkspace=ws.name()+"_tof_fitted_profile_"+str(i+1))
@@ -288,15 +293,20 @@ def block_fit_ncp(ws):     #Need to change main procedure
     all_yspaces = convert_to_y_space(dataX, masses, delta_Q, delta_E)        #shape(134, 4, 144)
     res_pars = load_resolution_parameters(data_ip)                           #shape(134,-)
     
+    scaling_factor = 100 / np.sum(dataY, axis=1).reshape(len(dataY), 1)      #no justification for factor of 100, currently arbitrary
+    dataY *= scaling_factor
+    #print(np.sum(dataY, axis=1).reshape(len(dataY), 1))   #to confirm that it is normalizing to a hundred
     #--------------------------Fitting----------------------------------
     par_chi_nit = list(map(fit_ncp, dataX, dataY, dataE, all_yspaces, res_pars, data_ip, v0, E0, delta_E, delta_Q))
     par_chi_nit = np.array(par_chi_nit)    
     
     spec = data_ip[:, 0, np.newaxis]   #shape (no of specs, 1)
     spec_par_chi_nit = np.append(spec, par_chi_nit, axis=1)    #ie includes the chi2 and nit values as an additional column
+    
+    spec_par_chi_nit[:, 1:-2 :3] /= scaling_factor 
     print("[spec_no ------------------------best fit par-----------------------chi2 nit]:\n\n", spec_par_chi_nit)
         
-    all_best_par = np.array(spec_par_chi_nit)[:, 1:-2]
+    all_best_par = np.array(spec_par_chi_nit)[:, 1:-2] 
 
     #-----------------second map to build ncp data----------------------
     #print(v0.shape, E0.shape, delta_E.shape, delta_Q.shape)
@@ -304,11 +314,12 @@ def block_fit_ncp(ws):     #Need to change main procedure
     ncp_all_m = np.array(ncp_all_m)    #reminder that ncp_all_m comes in shape (134, 4, 144)
     
     ncp_all_m, ncp_total = create_ncp_workspaces(ncp_all_m, ws)   #ncp_all_m now has shape (4, 134, 144)
+    #ncp_total /= scaling_factor
 
     #---------------from best fit parameters, build intensities, mass and width arrays, fitted profiles-----------------
     intensities, widths, positions = all_best_par[:, 0::3].T, all_best_par[:, 1::3].T, all_best_par[:, 2::3].T     #shape (4,134)
     mean_widths, mean_intensity_ratios = calculate_mean_widths_and_intensities(widths, intensities)
-    return mean_widths, mean_intensity_ratios, spec_par_chi_nit, ncp_all_m
+    return mean_widths, mean_intensity_ratios, spec_par_chi_nit, ncp_total
 
 #---------------------------------------------Correct for Multiple Scattering---------------------------------------------------
 
@@ -492,7 +503,7 @@ number_of_iterations = 1                      # This is the number of iterations
 runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
 empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
 spectra='3-134'                               # Spectra to be analysed
-first_spec, last_spec = 3, 7               #3, 134
+first_spec, last_spec = 3, 134               #3, 134
 tof_binning='275.,1.,420'                             # Binning of ToF spectra
 mode='DoubleDifference'
 ipfile='ip2018.par' # Optional instrument parameter file
@@ -535,14 +546,15 @@ spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()
 
 #-------------------------------------------------- Choose which workspace to fit--------------------------------------------------------------
 #--------- Uncoment to change input workspace to synthetic ncp ----------------
-opt = np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz")
-dataY = opt["all_tot_ncp"][0, first_idx : last_idx+1]               #Now the data to be fitted will be the ncp of first iteration
-dataX = mtd[name].extractX()[:, :-1]                                #cut last collumn to match ncp length
-ws_to_be_fitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), OutputWorkspace=name+"0")
+synthetic = True
+ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  #initialize ws for the first fit
+if synthetic == True:
+    opt = np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz")
+    dataY = opt["all_tot_ncp"][0, first_idx : last_idx+1]               #Now the data to be fitted will be the ncp of first iteration
+    dataX = mtd[name].extractX()[:, :-1]                                #cut last collumn to match ncp length
+    ws_to_be_fitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), OutputWorkspace=name+"0")
 
-#-------------------Uncoment for Normal input workspace ------------------------
-#ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  #initialize ws for the first fit
-
+    print("ws_to_be_fitted shape: ", dataX.shape, dataY.shape)
 # #---------------------------------Generate arrays where we are going to store the data for each iteration-----------------------------
 # Main array with all the best fit parameters
 all_spec_best_par_chi_nit = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), len(masses)*3+3))
@@ -557,15 +569,15 @@ all_fit_workspaces = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHi
 for iteration in range(number_of_iterations):
     
     ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
-    MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary
+    #MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary
     all_fit_workspaces[iteration] = ws_to_be_fitted.extractY()                    #records the dataY matrix at each iteration
     
-    mean_widths, mean_intensity_ratios, spec_best_par_chi_nit, ncp_all_m = block_fit_ncp(ws_to_be_fitted)     #main fit
+    mean_widths, mean_intensity_ratios, spec_best_par_chi_nit, ncp_total = block_fit_ncp(ws_to_be_fitted)     #main fit
     
     all_mean_widths[iteration] = mean_widths                           #record all of the other important parameters
     all_mean_intensities[iteration] = mean_intensity_ratios
     all_spec_best_par_chi_nit[iteration] = spec_best_par_chi_nit
-    all_tot_ncp[iteration] = np.sum(ncp_all_m, axis=0)
+    all_tot_ncp[iteration] = ncp_total
 
     if (iteration < number_of_iterations - 1):   #if not at the last iteration, evaluate multiple scattering correction
         sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering")
