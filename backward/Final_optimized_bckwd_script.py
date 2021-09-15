@@ -607,7 +607,7 @@ else:
 #---------------------- Select Spectra to fit --------------------
 
 number_of_iterations = 2                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 5               #3, 134
+first_spec, last_spec = 3, 10               #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 
 
