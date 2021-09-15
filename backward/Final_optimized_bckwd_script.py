@@ -575,8 +575,8 @@ else:
     loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
 
 #---------------------- Select Spectra to fit --------------------
-number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 134               #3, 134
+number_of_iterations = 2                     # This is the number of iterations for the reduction analysis in time-of-flight.
+first_spec, last_spec = 3, 5              #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 
 
@@ -657,7 +657,7 @@ for iteration in range(number_of_iterations):
                       
 #----------------------------------------------------store data for testing---------------------------------------------------------
 #savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic_fit"
-savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_test"
+savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_test1"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
