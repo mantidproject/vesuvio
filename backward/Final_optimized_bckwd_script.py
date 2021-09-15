@@ -53,7 +53,7 @@ def fun_derivative3(x, fun):
 
 #------------------------------------------Creating Matrix Arrays Outside Fitting--------------------------------------------
 
-def load_workspace_into_array(ws, first_spec, last_spec):   
+def load_workspace_into_array(ws):   
     """Input: Workspace to extract data from
        Output: dataY, dataX and dataE as arrays and converted to point data"""
 
@@ -66,10 +66,7 @@ def load_workspace_into_array(ws, first_spec, last_spec):
     dataE = dataE[:, :-1] / hist_widths
     dataX = (dataX[:, 1:] + dataX[:, :-1]) / 2
     
-    spec_offset = ws.getSpectrum(0).getSpectrumNo()  
-    start = first_spec - spec_offset
-    end = last_spec - spec_offset + 1 
-    return dataY[start:end, :], dataX[start:end, :], dataE[start:end, :]  #even if ws is cropped, still works
+    return dataY, dataX, dataE   
 
 def load_constants():
     """Output: the mass of the neutron, final energy of neutrons (selected by gold foil),
@@ -288,13 +285,16 @@ def block_fit_ncp(ws):     #Need to change main procedure
     """Runs the main procedure for the fitting of the input workspace ws"""
     
     #--------------Prepare all matrices before fitting-------------------
-    dataY, dataX, dataE = load_workspace_into_array(ws, first_spec, last_spec)    #shape(134, 144)
+    dataY, dataX, dataE = load_workspace_into_array(ws)                      #shape(134, 144)
     data_ip = load_ip_file_into_array(ip_path, first_spec, last_spec)        #shape(134,-)
     v0, E0, delta_E, delta_Q = calculate_kinematics_arrays(dataX, data_ip)   #shape(134, 144)
     all_yspaces = convert_to_y_space(dataX, masses, delta_Q, delta_E)        #shape(134, 4, 144)
     res_pars = load_resolution_parameters(data_ip)                           #shape(134,-)
     
-    scaling_factor = 100 / np.sum(dataY, axis=1).reshape(len(dataY), 1)      #no justification for factor of 100, currently arbitrary
+    scaling_factor = 1
+    if scaleDataY:
+        scaling_factor = 100 / np.sum(dataY, axis=1).reshape(len(dataY), 1)      #no justification for factor of 100, currently arbitrary
+        
     dataY *= scaling_factor
     #print(np.sum(dataY, axis=1).reshape(len(dataY), 1))   #to confirm that it is normalizing to a hundred
     #--------------------------Fitting----------------------------------
@@ -451,11 +451,26 @@ def normalise_workspace(ws_name):
     Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
     DeleteWorkspace("tmp_norm")
     
-def load_raw_and_empty_workspaces():
-    """Loads the raw and empty ws from either a user specified path or from vesuvio path"""
+def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath):
+    """Loads the raw and empty ws from either a user specified path"""
     
-    user_raw_path = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_raw.nxs"
-    user_empty_path = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_empty.nxs"
+    tof_binning='275.,1.,420'                             # Binning of ToF spectra
+    runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
+    empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
+
+    print ('\n', 'Loading the sample runs: ', runs, '\n')
+    Load(Filename = userRawPath, OutputWorkspace= name+"raw")
+    Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
+    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+    
+    print ('\n', 'Loading the empty runs: ', empty_runs, '\n')
+    Load(Filename = userEmptyPath, OutputWorkspace= name+"empty")
+    Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty')     
+    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
+    
+    
+def LoadRawAndEmptyWsVesuvio():
+    """Loads the raw and empty workspaces with Vesuvio parameters"""
     
     runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
@@ -465,45 +480,38 @@ def load_raw_and_empty_workspaces():
     ipfile='ip2018.par'
     
     print ('\n', 'Loading the sample runs: ', runs, '\n')
-    print ('\n', 'Loading the empty runs: ', empty_runs, '\n')
-
-    if load_vesuvio_files:       
-        LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile, OutputWorkspace=name+'raw')    
-        LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile, OutputWorkspace=name+'empty') 
-    else:
-        Load(Filename = user_raw_path, OutputWorkspace= name+"raw")
-        Load(Filename = user_empty_path, OutputWorkspace= name+"empty")
-
+    LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile, OutputWorkspace=name+'raw')  
     Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
     SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+    
+    print ('\n', 'Loading the empty runs: ', empty_runs, '\n')
+    LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile, OutputWorkspace=name+'empty') 
     Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty')     
     Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
 
-def load_workspace_for_synthetic_fit():
-    """Loads the synthetic ncp workspace from previous fit results"""
+def loadSyntheticNcpWorkspace(syntheticResultsPath):
+    """Loads the synthetic ncp workspace from previous fit results"""    
     
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()
-    first_idx = first_spec - spec_offset
-    last_idx = last_spec - spec_offset
-    
-    results_path = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
-    results = np.load(results_path)
+    results = np.load(syntheticResultsPath)
     dataY = results["all_tot_ncp"][0, first_idx : last_idx+1]               #Now the data to be fitted will be the ncp of first iteration
-    dataX = mtd[name].extractX()[:, :-1]                                #cut last collumn to match ncp length
+    dataX = mtd[name].extractX()[first_idx : last_idx+1, :-1]                                #cut last collumn to match ncp length 
+    
     ws_to_be_fitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), OutputWorkspace=name+"0")
     print(dataY.shape, dataX.shape)
     return ws_to_be_fitted
 
-def prepare_workspace_for_normal_fit():
-    """Crops the normal workspace and returns a copy with changed name"""
-    
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()  
-    first_idx = first_spec - spec_offset
-    last_idx = last_spec - spec_offset
-    
+def cropAndCloneMainWorkspace():
+    """Crops the main workspace and returns a copy with changed name"""   
     CropWorkspace(InputWorkspace=name, StartWorkspaceIndex = first_idx, EndWorkspaceIndex = last_idx, OutputWorkspace=name)
     ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  
     return ws_to_be_fitted
+    
+def convertFirstAndLastSpecToIdx(first_spec, last_spec):
+    """Used because idexes remain consistent between different workspaces, which might not be the case for spec numbers"""
+    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
+    first_idx = first_spec - spec_offset
+    last_idx = last_spec - spec_offset
+    return first_idx, last_idx
     
 
 ######################################################################################################################################
@@ -552,23 +560,30 @@ bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     #Aluminium
 constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
 
 #------------------------------------------------------------- Inputs ---------------------------------------------------------------------
+name='CePtGe12_100K_DD_'  
 masses=np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
-
 ip_path = r'C:\Users\guijo\Desktop\Work\ip2018.par'   #needs to be raw string
 
+
+#----------------------- Load main unaltered workspaces -------------------------
+loadVesuvioWs = False
+if loadVesuvioWs:
+    loadRawAndEmptyWsVesuvio()
+else:
+    userRawPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_raw.nxs"
+    userEmptyPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_empty.nxs"
+    loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
+
+#---------------------- Select Spectra to fit --------------------
 number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
 first_spec, last_spec = 3, 134               #3, 134
+first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 
 
 detectors_masked = [18,34,42,43,59,60,62,118,119,133]   # Optional spectra to be masked
 detectors_masked = np.array(detectors_masked)
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
-
-name='CePtGe12_100K_DD_'  
-
-#-------------- Load workspaces --------------
-load_vesuvio_files = False
-load_raw_and_empty_workspaces()
+  
     
 # #-------------------------Parameters for the multiple-scattering correction, including the shape of the sample----------------------
 transmission_guess = 0.98                     #experimental value from VesuvioTransmission
@@ -578,14 +593,16 @@ hydrogen_to_mass0_ratio = 0                  # hydrogen-to-mass[0] ratio obtaien
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in meters
 create_slab_geometry(name,vertical_width, horizontal_width, thickness)
 
-#----------- Choose which workspace to fit-----------------------------
-synthetic_workspace = True
+#-------------------- Choose and prepare main workspace for fitting-------------------------
+synthetic_workspace = False
 
 if synthetic_workspace:
-    ws_to_be_fitted = load_workspace_for_synthetic_fit()
+    syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
+    ws_to_be_fitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
 else:
-    ws_to_be_fitted = prepare_workspace_for_normal_fit()
-    
+    ws_to_be_fitted = cropAndCloneMainWorkspace()
+
+scaleDataY = False
 # #---------------------------------Generate arrays where we are going to store the data for each iteration-----------------------------
 # Main array with all the best fit parameters
 all_spec_best_par_chi_nit = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), len(masses)*3+3))
@@ -639,7 +656,9 @@ for iteration in range(number_of_iterations):
 #                 
                       
 #----------------------------------------------------store data for testing---------------------------------------------------------
-savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic_fit"
+#savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic_fit"
+savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_test"
+
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
                    all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
