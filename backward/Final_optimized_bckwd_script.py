@@ -34,6 +34,7 @@ def fun_pseudo_voigt(x, sigma, gamma):
     return pseudo_voigt#/np.abs(norm)
 
 def fun_derivative3(x, fun):
+    """Numerical approximation for the third derivative"""
     
     k6 = ( - fun[:, 12:  ] + fun[:,  :-12] ) * 1
     k5 = ( + fun[:, 11:-1] - fun[:, 1:-11] ) * 24
@@ -121,7 +122,7 @@ def convert_to_y_space(dataX, masses, delta_Q, delta_E):    #inputs have shape (
     return reshaped_yspaces
 
 def reshape_yspace(A):
-    """Exchanges the first two indices of A, used to rearrange yspace for map in main fitting procedure"""
+    """Exchanges the first two indices of an array A, used to rearrange yspace for map in main fitting procedure"""
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 def load_resolution_parameters(data_ip):   
@@ -617,8 +618,8 @@ else:
     loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
 
 #---------- Select Spectra to fit ----------
-number_of_iterations = 4                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 134                #3, 134
+number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
+first_spec, last_spec = 3, 5                #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   # Optional spectra to be masked
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
@@ -629,7 +630,7 @@ vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001         #expressed
 create_slab_geometry(name, vertical_width, horizontal_width, thickness)
 
 #-----Option to test fit with synthetic ncp-------
-synthetic_workspace = False            
+synthetic_workspace = True          
 if synthetic_workspace:
     syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
     ws_to_be_fitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
@@ -637,9 +638,9 @@ else:
     ws_to_be_fitted = cropAndCloneMainWorkspace()
 
 #-----Option to scale dataY before fit---------
-scaleDataY = False
+scaleDataY = True
 #----------Path to save results-----------
-savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_clean"
+savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
 def main():         
     thisScriptResults = resultsObject()       #generate arrays to store script results 
