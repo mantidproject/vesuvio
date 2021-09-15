@@ -610,8 +610,7 @@ first_spec, last_spec = 3, 5               #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 
 
-detectors_masked = [18,34,42,43,59,60,62,118,119,133]   # Optional spectra to be masked
-detectors_masked = np.array(detectors_masked)
+detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   # Optional spectra to be masked
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
   
     
@@ -623,7 +622,7 @@ hydrogen_peak = False                          # hydrogen multiple scattering
 hydrogen_to_mass0_ratio = 0             # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
 
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in meters
-create_slab_geometry(name,vertical_width, horizontal_width, thickness)
+create_slab_geometry(name, vertical_width, horizontal_width, thickness)
 
 #-------------------- Choose and prepare main workspace for fitting-------------------------
 synthetic_workspace = False
