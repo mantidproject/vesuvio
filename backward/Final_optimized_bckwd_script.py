@@ -283,6 +283,7 @@ def calculate_mean_widths_and_intensities(widths, intensities): #spectra and ver
 
 def block_fit_ncp(ws):     #Need to change main procedure
     """Runs the main procedure for the fitting of the input workspace ws"""
+    ws_dataY = ws.extractY()
     
     #--------------Prepare all matrices before fitting-------------------
     dataY, dataX, dataE = load_workspace_into_array(ws)                      #shape(134, 144)
@@ -320,7 +321,7 @@ def block_fit_ncp(ws):     #Need to change main procedure
     #---------------from best fit parameters, build intensities, mass and width arrays, fitted profiles-----------------
     intensities, widths, positions = all_best_par[:, 0::3].T, all_best_par[:, 1::3].T, all_best_par[:, 2::3].T     #shape (4,134)
     mean_widths, mean_intensity_ratios = calculate_mean_widths_and_intensities(widths, intensities)
-    return mean_widths, mean_intensity_ratios, spec_par_chi_nit, ncp_total
+    return [mean_widths, mean_intensity_ratios, spec_par_chi_nit, ncp_total, ws_dataY]
 
 #---------------------------------------------Correct for Multiple Scattering---------------------------------------------------
 
@@ -366,8 +367,7 @@ def calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, mode
     print ("\n The sample properties for ", mode, " are: ", sample_properties)
     return sample_properties
 
-def correct_for_multiple_scattering(ws_name, sample_properties, transmission_guess, \
-                                    multiple_scattering_order, number_of_events):
+def correct_for_multiple_scattering(ws_name, sample_properties, transmission_guess, multiple_scattering_order, number_of_events):
     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
      
     print("Evaluating the Multiple Scattering Correction.")    
@@ -513,6 +513,36 @@ def convertFirstAndLastSpecToIdx(first_spec, last_spec):
     last_idx = last_spec - spec_offset
     return first_idx, last_idx
     
+class resultsObject:
+    def __init__(self):
+        """Initialized all zeros arrays to be used for storing fitting results"""
+        
+        noOfSpec = ws_to_be_fitted.getNumberHistograms()
+        lenOfSpec = ws_to_be_fitted.blocksize()
+        noOfMasses = len(masses)
+
+        all_fit_workspaces = np.zeros((number_of_iterations, noOfSpec, lenOfSpec))
+        all_spec_best_par_chi_nit = np.zeros((number_of_iterations, noOfSpec, noOfMasses*3+3))
+        all_tot_ncp = np.zeros((number_of_iterations, noOfSpec, lenOfSpec - 1))
+        all_mean_widths = np.zeros((number_of_iterations, noOfMasses))
+        all_mean_intensities = np.zeros(all_mean_widths.shape)
+        
+        resultsList = [all_mean_widths, all_mean_intensities, all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces]
+        self.resultsList = resultsList
+        
+    def append(self, mulscatIter, resultsToAppend):
+        for i, resultArray in enumerate(resultsToAppend):
+            self.resultsList[i][mulscatIter] = resultsToAppend[i]
+    
+    def save(self, savePath):
+        all_mean_widths, all_mean_intensities, all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces = self.resultsList
+        np.savez(savePath,
+                 all_fit_workspaces = all_fit_workspaces,
+                 all_spec_best_par_chi_nit = all_spec_best_par_chi_nit,
+                 all_mean_widths = all_mean_widths, 
+                 all_mean_intensities = all_mean_intensities,
+                 all_tot_ncp = all_tot_ncp)
+                 
 
 ######################################################################################################################################
 ######################################################                      ##########################################################
@@ -575,8 +605,8 @@ else:
     loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
 
 #---------------------- Select Spectra to fit --------------------
-number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 134               #3, 134
+number_of_iterations = 2                      # This is the number of iterations for the reduction analysis in time-of-flight.
+first_spec, last_spec = 3, 5               #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 
 
@@ -586,10 +616,12 @@ detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detector
   
     
 # #-------------------------Parameters for the multiple-scattering correction, including the shape of the sample----------------------
+
 transmission_guess = 0.98                     #experimental value from VesuvioTransmission
 multiple_scattering_order, number_of_events = 2, 1.e5
-hydrogen_peak=False                          # hydrogen multiple scattering
-hydrogen_to_mass0_ratio = 0                  # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+hydrogen_peak = False                          # hydrogen multiple scattering
+hydrogen_to_mass0_ratio = 0             # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in meters
 create_slab_geometry(name,vertical_width, horizontal_width, thickness)
 
@@ -603,37 +635,28 @@ else:
     ws_to_be_fitted = cropAndCloneMainWorkspace()
 
 scaleDataY = False
-# #---------------------------------Generate arrays where we are going to store the data for each iteration-----------------------------
-# Main array with all the best fit parameters
-all_spec_best_par_chi_nit = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), len(masses)*3+3))
-# NCP arrays
-all_tot_ncp = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), ws_to_be_fitted.blocksize()-1))
-# Mean widths and intensities arrays
-all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
-# DataY from workspace to be fitted at each iteration
-all_fit_workspaces = np.zeros((number_of_iterations, ws_to_be_fitted.getNumberHistograms(), ws_to_be_fitted.blocksize())) 
+
+# --------Generate arrays where we are going to store the data for each iteration-------------       
+            
+thisScriptResults = resultsObject()
 
 # #-------------------------------------------------- Main iterative procedure ---------------------------------------------------------
 for iteration in range(number_of_iterations):
     
     ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
-    #MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary
-    all_fit_workspaces[iteration] = ws_to_be_fitted.extractY()                    #records the dataY matrix at each iteration
+    MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary
     
-    mean_widths, mean_intensity_ratios, spec_best_par_chi_nit, ncp_total = block_fit_ncp(ws_to_be_fitted)     #main fit
+    fittedNcpResults = block_fit_ncp(ws_to_be_fitted)     #main fit
     
-    all_mean_widths[iteration] = mean_widths                           #record all of the other important parameters
-    all_mean_intensities[iteration] = mean_intensity_ratios
-    all_spec_best_par_chi_nit[iteration] = spec_best_par_chi_nit
-    all_tot_ncp[iteration] = ncp_total
+    thisScriptResults.append(iteration, fittedNcpResults)
+    mean_widths, mean_intensity_ratios = fittedNcpResults[:2]
 
     if (iteration < number_of_iterations - 1):   #if not at the last iteration, evaluate multiple scattering correction
         sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering")
-        #next step creates _Mulscattering and _TotScattering workspaces
-        correct_for_multiple_scattering(name, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)
+        correct_for_multiple_scattering(name, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)    
         #create corrected workspace to be used in the subsquent iteration
         Minus(LHSWorkspace= name, RHSWorkspace = name+"_MulScattering", OutputWorkspace = name+str(iteration+1))
-        
+
 #----------------------------------------test for sub masses function----------------------------------------------
 # ws_sub_m = subtract_other_masses(mtd[name+str(number_of_iterations-1)], ncp_all_m)
 # dataX_sub_m, dataY_sub_m, dataE_sub_m = ws_sub_m.extractX(), ws_sub_m.extractY(), ws_sub_m.extractE() 
@@ -657,12 +680,9 @@ for iteration in range(number_of_iterations):
                       
 #----------------------------------------------------store data for testing---------------------------------------------------------
 #savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic_fit"
-savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_test"
+savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_clean"
 
-np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
-                   all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
-                   all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
-                   all_tot_ncp = all_tot_ncp)
+thisScriptResults.save(savePath)
 
 end_time = time.time()
 print("running time: ", end_time-start_time, " seconds")
