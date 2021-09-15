@@ -337,10 +337,11 @@ def create_slab_geometry(ws_name,vertical_width, horizontal_width, thickness):  
         CreateSampleShape(ws_name, xml_str)
         return
 
-def calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, mode):
+def calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, mode, mulscatPars):
     """returns the one of the inputs necessary for the VesuvioCalculateGammaBackground
     or VesuvioCalculateMS"""
     masses = masses.reshape(4)
+    hydrogen_peak, hydrogen_to_mass0_ratio = mulscatPars[:2]
     
     if mode == "GammaBackground":      #Not used for backscattering
         profiles = ""
@@ -367,10 +368,11 @@ def calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, mode
     print ("\n The sample properties for ", mode, " are: ", sample_properties)
     return sample_properties
 
-def correct_for_multiple_scattering(ws_name, sample_properties, transmission_guess, multiple_scattering_order, number_of_events):
+def correct_for_multiple_scattering(ws_name, sample_properties, mulscatPars):
     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
      
     print("Evaluating the Multiple Scattering Correction.")    
+    transmission_guess, multiple_scattering_order, number_of_events = mulscatPars[2:]
     MS_masses = sample_properties[::3]        #selects only the masses, every 3 numbers
     MS_amplitudes = sample_properties[1::3]   #same as above, but starts at first intensity
     
@@ -542,8 +544,19 @@ class resultsObject:
                  all_mean_widths = all_mean_widths, 
                  all_mean_intensities = all_mean_intensities,
                  all_tot_ncp = all_tot_ncp)
-                 
 
+def loadMSPars():
+    transmission_guess = 0.98                     #experimental value from VesuvioTransmission
+    multiple_scattering_order, number_of_events = 2, 1.e5
+    hydrogen_peak = False                          # hydrogen multiple scattering
+    hydrogen_to_mass0_ratio = 0             # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+    return [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
+                
+def createWorkspacesForMSCorrection(mean_widths, mean_intensity_ratios, mulscatPars): 
+    """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
+    sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", mulscatPars)
+    correct_for_multiple_scattering(name, sample_properties, mulscatPars) 
+    
 ######################################################################################################################################
 ######################################################                      ##########################################################
 ######################################################     USER SECTION     ##########################################################
@@ -589,13 +602,12 @@ bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     #Aluminium
 
 constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
 
-#------------------------------------------------------------- Inputs ---------------------------------------------------------------------
+#--------------------------------------------------===------- Inputs -----------------------------------------------------------------
 name='CePtGe12_100K_DD_'  
-masses=np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
+masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
 ip_path = r'C:\Users\guijo\Desktop\Work\ip2018.par'   #needs to be raw string
 
-
-#----------------------- Load main unaltered workspaces -------------------------
+#----- Load main unaltered workspaces ------
 loadVesuvioWs = False
 if loadVesuvioWs:
     loadRawAndEmptyWsVesuvio()
@@ -604,64 +616,57 @@ else:
     userEmptyPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_empty.nxs"
     loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
 
-#---------------------- Select Spectra to fit --------------------
-
-number_of_iterations = 2                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 10               #3, 134
+#---------- Select Spectra to fit ----------
+number_of_iterations = 4                      # This is the number of iterations for the reduction analysis in time-of-flight.
+first_spec, last_spec = 3, 134                #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
-
-
 detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   # Optional spectra to be masked
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
-  
-    
-# #-------------------------Parameters for the multiple-scattering correction, including the shape of the sample----------------------
 
-transmission_guess = 0.98                     #experimental value from VesuvioTransmission
-multiple_scattering_order, number_of_events = 2, 1.e5
-hydrogen_peak = False                          # hydrogen multiple scattering
-hydrogen_to_mass0_ratio = 0             # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-
-vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in meters
+#-----------Initial MS parameters-----------
+mulscatPars = loadMSPars()              
+vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001         #expressed in meters
 create_slab_geometry(name, vertical_width, horizontal_width, thickness)
 
-#-------------------- Choose and prepare main workspace for fitting-------------------------
-synthetic_workspace = False
-
+#-----Option to test fit with synthetic ncp-------
+synthetic_workspace = False            
 if synthetic_workspace:
     syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
     ws_to_be_fitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
 else:
     ws_to_be_fitted = cropAndCloneMainWorkspace()
 
+#-----Option to scale dataY before fit---------
 scaleDataY = False
+#----------Path to save results-----------
+savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_clean"
 
-# --------Generate arrays where we are going to store the data for each iteration-------------       
-            
-thisScriptResults = resultsObject()
-
-# #-------------------------------------------------- Main iterative procedure ---------------------------------------------------------
-for iteration in range(number_of_iterations):
+def main():         
+    thisScriptResults = resultsObject()       #generate arrays to store script results 
     
-    ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
-    MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary
-    
-    fittedNcpResults = block_fit_ncp(ws_to_be_fitted)     #main fit
-    
-    thisScriptResults.append(iteration, fittedNcpResults)
-    mean_widths, mean_intensity_ratios = fittedNcpResults[:2]
+    for iteration in range(number_of_iterations):       #main iterative procedure   
+        ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
+        MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary  
+        
+        fittedNcpResults = block_fit_ncp(ws_to_be_fitted)     #main fit   
+        thisScriptResults.append(iteration, fittedNcpResults)             
+        if (iteration < number_of_iterations - 1):   #evaluate MS correction except at last iteration      
+            mean_widths, mean_intensity_ratios = fittedNcpResults[:2]
+            createWorkspacesForMSCorrection(mean_widths, mean_intensity_ratios, mulscatPars)    #creates _Mulscattering ws
+            Minus(LHSWorkspace= name, RHSWorkspace = name+"_MulScattering", OutputWorkspace = name+str(iteration+1))   #creates corrected ws           
+    thisScriptResults.save(savePath)
 
-    if (iteration < number_of_iterations - 1):   #if not at the last iteration, evaluate multiple scattering correction
-        sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering")
-        correct_for_multiple_scattering(name, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)    
-        #create corrected workspace to be used in the subsquent iteration
-        Minus(LHSWorkspace= name, RHSWorkspace = name+"_MulScattering", OutputWorkspace = name+str(iteration+1))
+main()
+end_time = time.time()
+print("running time: ", end_time-start_time, " seconds")
 
-#----------------------------------------test for sub masses function----------------------------------------------
+#----------------------------------------------Old code used for some tests--------------------------------------------------
+
+#--------------------test for sub masses function-----------------------------
 # ws_sub_m = subtract_other_masses(mtd[name+str(number_of_iterations-1)], ncp_all_m)
 # dataX_sub_m, dataY_sub_m, dataE_sub_m = ws_sub_m.extractX(), ws_sub_m.extractY(), ws_sub_m.extractE() 
 
-#-------------------------------------------test for ncp workspaces-----------------------------------------------
+#----------------------test for ncp workspaces----------------------------------
 #  Records the data of the ncp workspaces
 # all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
 # all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[name].getNumberHistograms(), mtd[name].blocksize()-1))
@@ -676,13 +681,3 @@ for iteration in range(number_of_iterations):
 #         ncp_m = mtd[ncp_ws_name + "_tof_fitted_profile_" + str(m+1)]
 #         ncp_m_dataY = ncp_m.extractY()
 #         all_indiv_ncp[i, m] = ncp_m_dataY
-#                 
-                      
-#----------------------------------------------------store data for testing---------------------------------------------------------
-#savepath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic_fit"
-savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_clean"
-
-thisScriptResults.save(savePath)
-
-end_time = time.time()
-print("running time: ", end_time-start_time, " seconds")
