@@ -649,7 +649,8 @@ def main():
         ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
         MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary  
         
-        fittedNcpResults = block_fit_ncp(ws_to_be_fitted)     #main fit   
+        fittedNcpResults = block_fit_ncp(ws_to_be_fitted)     #main fit  
+        
         thisScriptResults.append(iteration, fittedNcpResults)             
         if (iteration < number_of_iterations - 1):   #evaluate MS correction except at last iteration      
             mean_widths, mean_intensity_ratios = fittedNcpResults[:2]
