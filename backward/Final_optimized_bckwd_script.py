@@ -187,43 +187,92 @@ def calculate_ncp(par, masses, datax, yspace, res_pars, data_ip, v0, E0, delta_e
     return ncp_all_m, ncp
 
 def calculate_resolution_all_masses(res_pars, centers, masses, yspace, data_ip, v0, E0, delta_e, delta_q):    
-    """Calculates the resolution widths in y-space, from the individual resolutions in the following parameters:
-       Gaussian dist (std): L0, theta, L1, TOF and E1
-       Lorentzian dist (HWHM): E1
-       input: for each spectrum, centers and yspace have shape (4,1), the rest are row for each spectrum
-       output: gaussian and lorenztian widths for each mass, shape (4,1), to be propagated through J(y)"""
+    """Calculates the gaussian and lorentzian resolution
+    output: two column vectors, each row corresponds to each mass"""
     
-    det, plick, angle, T0, L0, L1 = data_ip           #each is of len(dataX) 
-    dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = res_pars
-    mN, Ef, en_to_vel, vf, hbar = load_constants()
+    v0, E0, delta_E, delta_Q = kinematicsAtYCenters(yspace, centers, v0, E0, delta_e, delta_q)
     
-    #resolution is evaluated at the peak of J(y) i.e. when y=center
+    gaussianResWidth = calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, res_pars, data_ip)
+    lorentzianResWidth = calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, res_pars, data_ip)
+    return gaussianResWidth, lorentzianResWidth
+
+def kinematicsAtYCenters(yspace, centers, v0, E0, deltaE, deltaQ):
     ypeaks = np.abs(yspace - centers).min(axis=1).reshape(len(yspace), 1)    #Find minimums of each row and reshape to broadcast
     ypeaks_mask = np.abs(yspace - centers)==ypeaks            #bolean matrix that selects the bins of the peaks, need to compare absolute values!
-    #expand kinematics arrays to be the same shape as ypeaks_mask
-    v0, E0, delta_E, delta_Q = v0*np.ones(ypeaks.shape), E0*np.ones(ypeaks.shape), delta_e*np.ones(ypeaks.shape), delta_q*np.ones(ypeaks.shape)
-    v0, E0, delta_E, delta_Q = v0[ypeaks_mask], E0[ypeaks_mask], delta_E[ypeaks_mask], delta_Q[ypeaks_mask] 
-    v0, E0, delta_E, delta_Q = v0.reshape(ypeaks.shape), E0.reshape(ypeaks.shape), delta_E.reshape(ypeaks.shape), delta_Q.reshape(ypeaks.shape)
     
+    def selectYPeaksInKinematicArray(A):
+        broadcastedA = A * np.ones(ypeaks.shape)
+        selectPeaks = broadcastedA[ypeaks_mask]
+        return selectPeaks.reshape(ypeaks.shape)
+    
+    v0 = selectYPeaksInKinematicArray(v0)
+    E0 = selectYPeaksInKinematicArray(E0)
+    deltaE = selectYPeaksInKinematicArray(deltaE)
+    deltaQ = selectYPeaksInKinematicArray(deltaQ)
+    return v0, E0, deltaE, deltaQ
+  
     dW2 = (1. + (E0 / Ef)**1.5 * (L1 / L0))**2 * dE1**2 + (2.*E0*v0 / L0)**2 * dTOF**2   \
            + (2. * E0**1.5 / Ef**0.5 / L0)**2 * dL1**2 + (2. * E0 / L0)**2 * dL0**2
     dQ2 =  (1. - (E0 / Ef)**1.5 * L1/L0 - np.cos(angle/180.*np.pi) * ((E0 / Ef )**0.5 - L1/L0 * E0/Ef))**2 * dE1**2    \
            + ((2.*E0 * v0/L0 )**2 * dTOF**2 + (2.*E0**1.5 / L0 / Ef**0.5)**2 *dL1**2 + (2.*E0 / L0)**2 * dL0**2) * np.abs(Ef/E0 * np.cos(angle/180.*np.pi)-1) \
            + (2. * np.sqrt(E0 * Ef)* np.sin(angle/180.*np.pi))**2 * dTheta**2
 
-    dW2 *= ( masses / hbar**2 /delta_Q )**2              # conversion from meV^2 to A^-2, dydW = (M/q)^2
-    dQ2 *= ( mN / hbar**2 /delta_Q )**2
-    gaussian_res_width =   np.sqrt( dW2 + dQ2 ) # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
+#     dW2 *= ( masses / hbar**2 /delta_Q )**2              # conversion from meV^2 to A^-2, dydW = (M/q)^2
+#     dQ2 *= ( mN / hbar**2 /delta_Q )**2
+#     gaussian_res_width =   np.sqrt( dW2 + dQ2 ) # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
 
     #Same procedure for lorentzian component in meV
+#     dWdE1_lor = (1. + (E0/Ef)**1.5 * (L1/L0))**2         # is it - or +?
+#     dQdE1_lor =  (1. - (E0/Ef)**1.5 * L1/L0 - np.cos(angle/180.*np.pi) * ((E0/Ef)**0.5 + L1/L0 * E0/Ef)) **2
+
+#     dWdE1_lor *= ( masses / hbar**2 /delta_Q )**2      # conversion from meV^2 to A^-2
+#     dQdE1_lor *= ( mN / hbar**2 /delta_Q )**2
+#     lorentzian_res_width = np.sqrt( dWdE1_lor + dQdE1_lor ) * dE1_lorz   # in A-1     #same as dy^2 = (dw/dE1)^2*dE1^2 + (dq/dE1)^2*dE1^2
+
+def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, res_pars, data_ip):
+    det, plick, angle, T0, L0, L1 = data_ip         
+    dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = res_pars
+    mN, Ef, en_to_vel, vf, hbar = load_constants()
+    
+    angle = angle * np.pi / 180
+    
+    dWdE1 = 1. + (E0 / Ef)**1.5 * (L1 / L0)
+    dWdTOF = 2.*E0*v0 / L0
+    dWdL1 = 2. * E0**1.5 / Ef**0.5 / L0
+    dWdL0 = 2. * E0 / L0
+    
+    dW2 = dWdE1**2*dE1**2 + dWdTOF**2*dTOF**2 + dWdL1**2*dL1**2 + dWdL0**2*dL0**2
+    dW2 *= ( masses / hbar**2 / delta_Q )**2              # conversion from meV^2 to A^-2, dydW = (M/q)^2
+    
+    dQdE1 = 1. - (E0 / Ef)**1.5 * L1/L0 - np.cos(angle) * ((E0 / Ef )**0.5 - L1/L0 * E0/Ef)
+    dQdTOF = 2.*E0 * v0/L0
+    dQdL1 = 2.*E0**1.5 / L0 / Ef**0.5
+    dQdL0 = 2.*E0 / L0
+    dQdTheta = 2. * np.sqrt(E0 * Ef)* np.sin(angle)
+    
+    dQ2 =  dQdE1**2*dE1**2 + (dQdTOF**2*dTOF**2 + dQdL1**2*dL1**2 + dQdL0**2*dL0**2) * np.abs(Ef/E0*np.cos(angle)-1) + dQdTheta**2*dTheta**2
+    dQ2 *= ( mN / hbar**2 /delta_Q )**2
+    
+    gaussianResWidth =   np.sqrt( dW2 + dQ2 ) # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
+    return gaussianResWidth
+
+def calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, res_pars, data_ip):
+    det, plick, angle, T0, L0, L1 = data_ip           
+    dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = res_pars
+    mN, Ef, en_to_vel, vf, hbar = load_constants()
+    
+    angle = angle * np.pi / 180
+    
     dWdE1_lor = (1. + (E0/Ef)**1.5 * (L1/L0))**2         # is it - or +?
-    dQdE1_lor =  (1. - (E0/Ef)**1.5 * L1/L0 - np.cos(angle/180.*np.pi) * ((E0/Ef)**0.5 + L1/L0 * E0/Ef)) **2
+    dWdE1_lor *= ( masses / hbar**2 /delta_Q )**2     # conversion from meV^2 to A^-2
 
-    dWdE1_lor *= ( masses / hbar**2 /delta_Q )**2      # conversion from meV^2 to A^-2
+    dQdE1_lor =  (1. - (E0/Ef)**1.5 * L1/L0 - np.cos(angle) * ((E0/Ef)**0.5 + L1/L0 * E0/Ef))**2 
     dQdE1_lor *= ( mN / hbar**2 /delta_Q )**2
-    lorentzian_res_width = np.sqrt( dWdE1_lor + dQdE1_lor ) * dE1_lorz   # in A-1     #same as dy^2 = (dw/dE1)^2*dE1^2 + (dq/dE1)^2*dE1^2
+    
+    lorentzianResWidth = np.sqrt(dWdE1_lor + dQdE1_lor) * dE1_lorz   # in A-1   
+    return lorentzianResWidth
 
-    return gaussian_res_width, lorentzian_res_width  #shape (4,1) for each
+    
     
 #-----------------------------------Extract data from best fit params and create matrices and workspaces----------------------------
 
@@ -619,7 +668,7 @@ else:
 
 #---------- Select Spectra to fit ----------
 number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 5                #3, 134
+first_spec, last_spec = 3, 134                #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   # Optional spectra to be masked
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
@@ -630,7 +679,7 @@ vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001         #expressed
 create_slab_geometry(name, vertical_width, horizontal_width, thickness)
 
 #-----Option to test fit with synthetic ncp-------
-synthetic_workspace = True          
+synthetic_workspace = False    
 if synthetic_workspace:
     syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
     ws_to_be_fitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
@@ -638,7 +687,7 @@ else:
     ws_to_be_fitted = cropAndCloneMainWorkspace()
 
 #-----Option to scale dataY before fit---------
-scaleDataY = True
+scaleDataY = False
 #----------Path to save results-----------
 savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
