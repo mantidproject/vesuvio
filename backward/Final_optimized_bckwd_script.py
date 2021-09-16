@@ -619,7 +619,7 @@ else:
 
 #---------- Select Spectra to fit ----------
 number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 5                #3, 134
+first_spec, last_spec = 3, 134                #3, 134
 first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
 detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   # Optional spectra to be masked
 detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
@@ -630,7 +630,7 @@ vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001         #expressed
 create_slab_geometry(name, vertical_width, horizontal_width, thickness)
 
 #-----Option to test fit with synthetic ncp-------
-synthetic_workspace = True          
+synthetic_workspace = False         
 if synthetic_workspace:
     syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
     ws_to_be_fitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
@@ -638,7 +638,7 @@ else:
     ws_to_be_fitted = cropAndCloneMainWorkspace()
 
 #-----Option to scale dataY before fit---------
-scaleDataY = True
+scaleDataY = False
 #----------Path to save results-----------
 savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
