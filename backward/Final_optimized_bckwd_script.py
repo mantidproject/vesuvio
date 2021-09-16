@@ -211,11 +211,11 @@ def kinematicsAtYCenters(yspace, centers, v0, E0, deltaE, deltaQ):
     deltaQ = selectYPeaksInKinematicArray(deltaQ)
     return v0, E0, deltaE, deltaQ
   
-    dW2 = (1. + (E0 / Ef)**1.5 * (L1 / L0))**2 * dE1**2 + (2.*E0*v0 / L0)**2 * dTOF**2   \
-           + (2. * E0**1.5 / Ef**0.5 / L0)**2 * dL1**2 + (2. * E0 / L0)**2 * dL0**2
-    dQ2 =  (1. - (E0 / Ef)**1.5 * L1/L0 - np.cos(angle/180.*np.pi) * ((E0 / Ef )**0.5 - L1/L0 * E0/Ef))**2 * dE1**2    \
-           + ((2.*E0 * v0/L0 )**2 * dTOF**2 + (2.*E0**1.5 / L0 / Ef**0.5)**2 *dL1**2 + (2.*E0 / L0)**2 * dL0**2) * np.abs(Ef/E0 * np.cos(angle/180.*np.pi)-1) \
-           + (2. * np.sqrt(E0 * Ef)* np.sin(angle/180.*np.pi))**2 * dTheta**2
+#     dW2 = (1. + (E0 / Ef)**1.5 * (L1 / L0))**2 * dE1**2 + (2.*E0*v0 / L0)**2 * dTOF**2   \
+#            + (2. * E0**1.5 / Ef**0.5 / L0)**2 * dL1**2 + (2. * E0 / L0)**2 * dL0**2
+#     dQ2 =  (1. - (E0 / Ef)**1.5 * L1/L0 - np.cos(angle/180.*np.pi) * ((E0 / Ef )**0.5 - L1/L0 * E0/Ef))**2 * dE1**2    \
+#            + ((2.*E0 * v0/L0 )**2 * dTOF**2 + (2.*E0**1.5 / L0 / Ef**0.5)**2 *dL1**2 + (2.*E0 / L0)**2 * dL0**2) * np.abs(Ef/E0 * np.cos(angle/180.*np.pi)-1) \
+#            + (2. * np.sqrt(E0 * Ef)* np.sin(angle/180.*np.pi))**2 * dTheta**2
 
 #     dW2 *= ( masses / hbar**2 /delta_Q )**2              # conversion from meV^2 to A^-2, dydW = (M/q)^2
 #     dQ2 *= ( mN / hbar**2 /delta_Q )**2
@@ -237,7 +237,7 @@ def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, res_pars, data_ip):
     angle = angle * np.pi / 180
     
     dWdE1 = 1. + (E0 / Ef)**1.5 * (L1 / L0)
-    dWdTOF = 2.*E0*v0 / L0
+    dWdTOF = 2.* E0 * v0 / L0
     dWdL1 = 2. * E0**1.5 / Ef**0.5 / L0
     dWdL0 = 2. * E0 / L0
     
