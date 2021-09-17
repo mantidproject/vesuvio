@@ -22,9 +22,16 @@ The fit procedure in the time-of-flight domain is  based on the scipy.minimize.o
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
 '''
 
-def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath):
-    """Loads the raw and empty ws from either a user specified path""" 
-    
+def loadRawAndEmptyWorkspaces(loadVesuvioWs):
+    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
+    if loadVesuvioWs:
+        loadRawAndEmptyWsVesuvio()
+    else:
+        userRawPath = r".\input_ws\CePtGe12_100K_DD_raw.nxs"
+        userEmptyPath = r".\input_ws\CePtGe12_100K_DD_empty.nxs"
+        loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
+
+def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath):    
     tof_binning='275.,1.,420'                     # Binning of ToF spectra
     runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
@@ -39,9 +46,7 @@ def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath):
     Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty')     
     Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
     
-def LoadRawAndEmptyWsVesuvio():
-    """Loads the raw and empty workspaces with Vesuvio parameters"""
-    
+def LoadRawAndEmptyWsVesuvio():    
     runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
     spectra='3-134'                               # Spectra to be analysed
@@ -67,6 +72,11 @@ def convertFirstAndLastSpecToIdx(firstSpec, lastSpec):
     lastIdx = lastSpec - spec_offset
     return firstIdx, lastIdx
 
+def loadMaskedDetectors(firstSpec, lastSpec):
+    detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   
+    detectors_masked = detectors_masked[(detectors_masked >= firstSpec) & (detectors_masked <= lastSpec)] 
+    return detectors_masked
+
 def loadMSPars():
     transmission_guess = 0.98                               #experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5
@@ -86,6 +96,14 @@ def createSlabGeometry(ws_name,vertical_width, horizontal_width, thickness):  #D
     + "</cuboid>"
     CreateSampleShape(ws_name, xml_str)
     return
+
+def chooseWorkspaceToBeFitted(synthetic_workspace):
+    if synthetic_workspace:
+        syntheticResultsPath = r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz"
+        wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
+    else:
+        wsToBeFitted = cropAndCloneMainWorkspace()
+    return wsToBeFitted
 
 def loadSyntheticNcpWorkspace(syntheticResultsPath):
     """Loads a synthetic ncp workspace from previous fit results path"""       
@@ -127,42 +145,27 @@ constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] },
                 {'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
 
 name='CePtGe12_100K_DD_'  
-masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
-InstrParsPath = r'C:\Users\guijo\Desktop\Work\ip2018.par'   #needs to be raw string
+masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)     
+InstrParsPath = r'.\ip2018.par'  
 
-#----- Load main unaltered workspaces ------
 loadVesuvioWs = False
-if loadVesuvioWs:
-    loadRawAndEmptyWsVesuvio()
-else:
-    userRawPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_raw.nxs"
-    userEmptyPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_empty.nxs"
-    loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
+loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
-#---------- Select Spectra to fit ----------
 noOfMSIterations = 1                      
 firstSpec, lastSpec = 3, 134                #3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
-detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   
-detectors_masked = detectors_masked[(detectors_masked >= firstSpec) & (detectors_masked <= lastSpec)]   
+detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
-#-----------Initial MS parameters-----------
 mulscatPars = loadMSPars()              
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001          #expressed in meters
 createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 
-#-----Option to test fit with synthetic ncp-------
-synthetic_workspace = False    
-if synthetic_workspace:
-    syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
-    wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
-else:
-    wsToBeFitted = cropAndCloneMainWorkspace()
+synthetic_workspace = False 
+wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
     
-#-----Option to scale dataY before fit---------
 scaledataY = False
-#----------Path to save results-----------
-savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
+
+savePath = r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
                 
 def main():
     
