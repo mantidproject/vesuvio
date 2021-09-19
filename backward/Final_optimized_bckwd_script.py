@@ -1,5 +1,4 @@
 import numpy as np
-#import matplotlib.pyplot as plt
 import mantid                          
 from mantid.simpleapi import *
 from scipy import optimize
@@ -368,7 +367,8 @@ def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars,
     
     v0, E0, deltaE, deltaQ = kineArraysV0E0dWdQ
     
-    gaussRes, lorzRes = caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ)
+    gaussRes, lorzRes = caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, 
+                                                      resolutionPars, instrPars, kineArraysV0E0dWdQ)
     
     totalGaussWidth = np.sqrt(widthsForEachMass**2 + gaussRes**2)                 
     
