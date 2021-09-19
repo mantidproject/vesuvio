@@ -151,7 +151,7 @@ loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1                      
-firstSpec, lastSpec = 3, 134                #3, 134
+firstSpec, lastSpec = 3, 5                #3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -225,8 +225,9 @@ class resultsObject:
 
 def fitNcpToWorkspace(ws):
     wsDataY = ws.extractY()       #DataY from workspace unaltered
-    dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
-    resolutionPars, instrPars, kineMatricesV0E0dWdQ, ySpacesForEachMass = prepareFitArgs(dataX)
+    dataY, dataX, dataE = loadWorkspaceIntoArrays(ws) 
+    instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)        #shape(134,-)
+    resolutionPars = loadResolutionPars(instrPars)
     
     scalingFactor = 1
     if scaledataY:
@@ -234,7 +235,7 @@ def fitNcpToWorkspace(ws):
     dataY *= scalingFactor
     
     #----------Fit all spectrums----------
-    fitParsChiNit = map(fitNcpToSingleSpec, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kineMatricesV0E0dWdQ)
+    fitParsChiNit = map(fitNcpToSingleSpec, dataX, dataY, dataE, resolutionPars, instrPars)
     fitParsChiNit = np.array(list(fitParsChiNit))    
     
     specs = instrPars[:, 0, np.newaxis]                           #shape (no of specs, 1)
@@ -244,7 +245,7 @@ def fitNcpToWorkspace(ws):
     fitPars  = np.array(specFitParsChiNit)[:, 1:-2] 
 
     #----------Create ncpTotal workspaces---------
-    ncpForEachMass = list(map(buildNcpFromSpec, fitPars , ySpacesForEachMass, resolutionPars, instrPars, kineMatricesV0E0dWdQ))
+    ncpForEachMass = list(map(buildNcpFromSpec, fitPars , dataX, resolutionPars, instrPars))
     ncpForEachMass = np.array(ncpForEachMass)                             
     ncpForEachMass, ncpTotal = createNcpWorkspaces(ncpForEachMass, ws)  
 
@@ -265,17 +266,17 @@ def loadWorkspaceIntoArrays(ws):
     dataX = (dataX[:, 1:] + dataX[:, :-1]) / 2  
     return dataY, dataX, dataE    
 
-def prepareFitArgs(dataX):
-    instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)        #shape(134,-)
-    resolutionPars = loadResolutionPars(instrPars)                           #shape(134,-)        
+# def prepareFitArgs(dataX):
+#     instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)        #shape(134,-)
+#     resolutionPars = loadResolutionPars(instrPars)                           #shape(134,-)        
 
-    v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   #shape(134, 144)
-    kineMatrices = np.array([v0, E0, delta_E, delta_Q])
-    kineMatrices = reshapeArrayPerSpectrum(kineMatrices)
+#     v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   #shape(134, 144)
+#     kineMatrices = np.array([v0, E0, delta_E, delta_Q])
+#     kineMatrices = reshapeArrayPerSpectrum(kineMatrices)
 
-    ySpacesForEachMass = convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E)        #shape(134, 4, 144)
-    ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
-    return resolutionPars, instrPars, kineMatrices, ySpacesForEachMass
+#     ySpacesForEachMass = convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E)        #shape(134, 4, 144)
+#     ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
+#     return resolutionPars, instrPars, kineMatrices, ySpacesForEachMass
 
 def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):  
     """Loads instrument parameters into array, from the file in the specified path"""
@@ -305,50 +306,52 @@ def loadResolutionPars(instrPars):
     resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()  #store all parameters in a matrix
     return resolutionPars 
 
-def calculateKinematicsArrays(dataX, instrPars):          
-    """kinematics quantities calculated from TOF data"""   
-    mN, Ef, en_to_vel, vf, hbar = loadConstants()    
-    det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)     #each is of len(dataX)
-    t_us = dataX - T0                                         #T0 is electronic delay due to instruments
-    v0 = vf * L0 / ( vf * t_us - L1 )
-    E0 =  np.square( v0 / en_to_vel )            #en_to_vel is a factor used to easily change velocity to energy and vice-versa
+# def calculateKinematicsArrays(dataX, instrPars):          
+#     """kinematics quantities calculated from TOF data"""   
+#     mN, Ef, en_to_vel, vf, hbar = loadConstants()    
+#     det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)     #each is of len(dataX)
+#     t_us = dataX - T0                                         #T0 is electronic delay due to instruments
+#     v0 = vf * L0 / ( vf * t_us - L1 )
+#     E0 =  np.square( v0 / en_to_vel )            #en_to_vel is a factor used to easily change velocity to energy and vice-versa
     
-    delta_E = E0 - Ef  
-    delta_Q2 = 2. * mN / hbar**2 * ( E0 + Ef - 2. * np.sqrt(E0*Ef) * np.cos(angle/180.*np.pi) )
-    delta_Q = np.sqrt( delta_Q2 )
-    return v0, E0, delta_E, delta_Q              #shape(no_spectrums, len_spec)
+#     delta_E = E0 - Ef  
+#     delta_Q2 = 2. * mN / hbar**2 * ( E0 + Ef - 2. * np.sqrt(E0*Ef) * np.cos(angle/180.*np.pi) )
+#     delta_Q = np.sqrt( delta_Q2 )
+#     return v0, E0, delta_E, delta_Q              #shape(no_spectrums, len_spec)
 
-def reshapeArrayPerSpectrum(A):
-    """Exchanges the first two indices of an array A ie rearranges matrices per spectrum for iteration of main fitting procedure"""
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
+# def reshapeArrayPerSpectrum(A):
+#     """Exchanges the first two indices of an array A ie rearranges matrices per spectrum for iteration of main fitting procedure"""
+#     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
-def convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E):   
-    dataX, delta_Q, delta_E = dataX[np.newaxis, :, :],  delta_Q[np.newaxis, :, :], delta_E[np.newaxis, :, :]   #prepare arrays to broadcast
-    mN, Ef, en_to_vel, vf, hbar = loadConstants()
+# def convertDataXToySpaces(dataX, masses, delta_Q, delta_E):   
+#     dataX, delta_Q, delta_E = dataX[np.newaxis, :, :],  delta_Q[np.newaxis, :, :], delta_E[np.newaxis, :, :]   #prepare arrays to broadcast
+#     mN, Ef, en_to_vel, vf, hbar = loadConstants()
     
-    energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
-    ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
-    return ySpacesForEachMass
+#     energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
+#     ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
+#     return ySpacesForEachMass
 
-def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ):
+def fitNcpToSingleSpec(dataX, dataY, dataE, resolutionPars, instrPars):
     """Fits the NCP and returns the best fit parameters for each row of data"""
     
     if np.all(dataY == 0):           #if all zeros, then parameters are all nan, so they are ignored later down the line
         return np.full(len(par)+2, np.nan)
-    
-    result = optimize.minimize(errorFunction, 
-                               par[:], 
-                               args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ),
-                               method='SLSQP', 
-                               bounds = bounds, 
-                               constraints=constraints)
+     
+    result = optimize.minimize(
+        errorFunction, 
+        par[:], 
+        args=(masses, dataX, dataY, dataE, resolutionPars, instrPars),
+        method='SLSQP', 
+        bounds = bounds, 
+        constraints=constraints
+        )
     noDegreesOfFreedom = len(dataY) - len(par)
     return np.append(result["x"], [result["fun"] / noDegreesOfFreedom, result["nit"]])     
 
-def errorFunction(par, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ):
+def errorFunction(par, masses, dataX, dataY, dataE, resolutionPars, instrPars):
     """Error function to be minimized, operates in TOF space"""
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ)
+    ncpForEachMass, ncpTotal = calculateNcpSpec(par, masses, dataX, resolutionPars, instrPars)
     
     if (np.sum(dataE) > 0):    #don't understand this conditional statement
         chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
@@ -356,7 +359,7 @@ def errorFunction(par, masses, dataY, dataE, ySpacesForEachMass, resolutionPars,
         chi2 =  (ncpTotal - dataY)**2
     return np.sum(chi2)
 
-def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ):    
+def calculateNcpSpec(par, masses, dataX, resolutionPars, instrPars):    
     """Creates a synthetic C(t) to be fitted to TOF values, from J(y) and resolution functions
        shapes: par (1, 12), masses (4,1,1), datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n)"""
     
@@ -365,10 +368,10 @@ def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars,
     widthsForEachMass = par[1::3].reshape(masses.shape)
     centersForEachMass = par[2::3].reshape(masses.shape)
     
-    v0, E0, deltaE, deltaQ = kineArraysV0E0dWdQ
-    
-    gaussRes, lorzRes = caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, 
-                                                      resolutionPars, instrPars, kineArraysV0E0dWdQ)
+    v0, E0, deltaE, deltaQ = calculateKinematicsArrays(dataX, instrPars)
+    ySpacesForEachMass = convertDataXToySpaces(dataX, masses, deltaQ, deltaE)
+   
+    gaussRes, lorzRes = caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, dataX, instrPars, resolutionPars)
     
     totalGaussWidth = np.sqrt(widthsForEachMass**2 + gaussRes**2)                 
     
@@ -380,32 +383,48 @@ def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars,
     ncpTotal = np.sum(ncpForEachMass, axis=0)
     return ncpForEachMass, ncpTotal
 
-def caculateResolutionForEachMass(masses, ySpacesForEachMass, centers, resolutionPars, instrPars, kineArraysV0E0dWdQ):    
+def calculateKinematicsArrays(dataX, instrPars):          
+    """kinematics quantities calculated from TOF data"""   
+    mN, Ef, en_to_vel, vf, hbar = loadConstants()    
+    det, plick, angle, T0, L0, L1 = instrPars     #each is of len(dataX)
+    t_us = dataX - T0                                         #T0 is electronic delay due to instruments
+    v0 = vf * L0 / ( vf * t_us - L1 )
+    E0 =  np.square( v0 / en_to_vel )            #en_to_vel is a factor used to easily change velocity to energy and vice-versa
+    
+    delta_E = E0 - Ef  
+    delta_Q2 = 2. * mN / hbar**2 * ( E0 + Ef - 2. * np.sqrt(E0*Ef) * np.cos(angle/180.*np.pi) )
+    delta_Q = np.sqrt( delta_Q2 )
+    return v0, E0, delta_E, delta_Q              #shape(no_spectrums, len_spec)
+
+def convertDataXToySpaces(dataX, masses, delta_Q, delta_E):   
+    dataX, delta_Q, delta_E = dataX[np.newaxis, :, :],  delta_Q[np.newaxis, :, :], delta_E[np.newaxis, :, :]   #prepare arrays to broadcast
+    mN, Ef, en_to_vel, vf, hbar = loadConstants()
+    
+    energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
+    ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
+    return ySpacesForEachMass
+
+def caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, dataX, instrPars, resolutionPars):    
     """Calculates the gaussian and lorentzian resolution
     output: two column vectors, each row corresponds to each mass"""
     
-    v0, E0, delta_E, delta_Q = kinematicsAtYCenters(ySpacesForEachMass, centers, kineArraysV0E0dWdQ)
+    v0, E0, delta_E, delta_Q = kinematicsAtYCenters(ySpacesForEachMass, centersForEachMass, dataX, instrPars)
     
     gaussianResWidth = calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars)
     lorentzianResWidth = calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars)
     return gaussianResWidth, lorentzianResWidth
 
-def kinematicsAtYCenters(ySpacesForEachMass, centers, kineArraysV0E0dWdQ):
+def kinematicsAtYCenters(ySpacesForEachMass, centersForEachMass, dataX, instrPars):
     """v0, E0, deltaE, deltaQ at the center of the ncpTotal for each mass"""
-    
     noOfMasses = len(ySpacesForEachMass)
-    noOfKineArrays = len(kineArraysV0E0dWdQ)
+    dataXBroadcast = dataX * np.ones((noOfMasses, 1))
+
+    absDiffYSpacesAndCenters = np.abs(ySpacesForEachMass - centersForEachMass)
+    minDiffYSpacesAndCenters = absDiffYSpacesAndCenters.min(axis=1).reshape(noOfMasses, 1)
+    yPeaksMask = absDiffYSpacesAndCenters == minDiffYSpacesAndCenters
     
-    broadcastKineArrays = kineArraysV0E0dWdQ[np.newaxis, :, :] * np.ones((noOfMasses, 1, 1))
-    broadcastySpacesForEachMass = ySpacesForEachMass[:, np.newaxis, :] * np.ones((1, noOfKineArrays, 1)) 
-    broadcastCenters = centers[:, np.newaxis, :] * np.ones((1, noOfKineArrays, 1))
-    
-    absDiffySpacesForEachMassAndCenters = np.abs(broadcastySpacesForEachMass - broadcastCenters)
-    yClosestToCenters = absDiffySpacesForEachMassAndCenters.min(axis=2).reshape(noOfMasses, noOfKineArrays, 1)
-    selectYPeaksMask = absDiffySpacesForEachMassAndCenters == yClosestToCenters
-    
-    kinematicsAtYPeaks = broadcastKineArrays[selectYPeaksMask].reshape(noOfMasses, noOfKineArrays)
-    v0, E0, deltaE, deltaQ = np.hsplit(kinematicsAtYPeaks, noOfKineArrays)
+    dataXAtPeaks = dataXBroadcast[yPeaksMask]
+    v0, E0, deltaE, deltaQ = calculateKinematicsArrays(dataXAtPeaks, instrPars)
     return v0, E0, deltaE, deltaQ
     
 def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
@@ -499,14 +518,14 @@ def numericalThirdDerivative(x, fun):
     derivative[:, 6:-6] = dev                   #need to pad with zeros left and right to return array with same shape
     return derivative
 
-def buildNcpFromSpec(par, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ):
+def buildNcpFromSpec(par, ySpacesForEachMass, resolutionPars, instrPars):
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
     
     if np.all(np.isnan(par)):
         return np.full(ySpacesForEachMass.shape, np.nan)
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kineArraysV0E0dWdQ)        
+    ncpForEachMass, ncpTotal = calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars)        
     return ncpForEachMass
 
 def createNcpWorkspaces(ncp_all_m_reshaped, ws):
@@ -671,213 +690,6 @@ def normalise_workspace(ws_name):
     Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
     DeleteWorkspace("tmp_norm")
     
-<<<<<<< HEAD
-def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath):
-    """Loads the raw and empty ws from either a user specified path"""
-    
-    tof_binning='275.,1.,420'                             # Binning of ToF spectra
-    runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-
-    print ('\n', 'Loading the sample runs: ', runs, '\n')
-    Load(Filename = userRawPath, OutputWorkspace= name+"raw")
-    Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-    
-    print ('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    Load(Filename = userEmptyPath, OutputWorkspace= name+"empty")
-    Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty')     
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
-    
-    
-def LoadRawAndEmptyWsVesuvio():
-    """Loads the raw and empty workspaces with Vesuvio parameters"""
-    
-    runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-    spectra='3-134'                               # Spectra to be analysed
-    tof_binning='275.,1.,420'                             # Binning of ToF spectra
-    mode='DoubleDifference'
-    ipfile='ip2018.par'
-    
-    print ('\n', 'Loading the sample runs: ', runs, '\n')
-    LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile, OutputWorkspace=name+'raw')  
-    Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-    
-    print ('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile, OutputWorkspace=name+'empty') 
-    Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty')     
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
-
-def loadSyntheticNcpWorkspace(syntheticResultsPath):
-    """Loads the synthetic ncp workspace from previous fit results"""    
-    
-    results = np.load(syntheticResultsPath)
-    dataY = results["all_tot_ncp"][0, first_idx : last_idx+1]               #Now the data to be fitted will be the ncp of first iteration
-    dataX = mtd[name].extractX()[first_idx : last_idx+1, :-1]                                #cut last collumn to match ncp length 
-    
-    ws_to_be_fitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), OutputWorkspace=name+"0")
-    print(dataY.shape, dataX.shape)
-    return ws_to_be_fitted
-
-def cropAndCloneMainWorkspace():
-    """Crops the main workspace and returns a copy with changed name"""   
-    CropWorkspace(InputWorkspace=name, StartWorkspaceIndex = first_idx, EndWorkspaceIndex = last_idx, OutputWorkspace=name)
-    ws_to_be_fitted = CloneWorkspace(InputWorkspace = name, OutputWorkspace = name+"0")  
-    return ws_to_be_fitted
-    
-def convertFirstAndLastSpecToIdx(first_spec, last_spec):
-    """Used because idexes remain consistent between different workspaces, which might not be the case for spec numbers"""
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-    first_idx = first_spec - spec_offset
-    last_idx = last_spec - spec_offset
-    return first_idx, last_idx
-    
-class resultsObject:
-    def __init__(self):
-        """Initialized all zeros arrays to be used for storing fitting results"""
-        
-        noOfSpec = ws_to_be_fitted.getNumberHistograms()
-        lenOfSpec = ws_to_be_fitted.blocksize()
-        noOfMasses = len(masses)
-
-        all_fit_workspaces = np.zeros((number_of_iterations, noOfSpec, lenOfSpec))
-        all_spec_best_par_chi_nit = np.zeros((number_of_iterations, noOfSpec, noOfMasses*3+3))
-        all_tot_ncp = np.zeros((number_of_iterations, noOfSpec, lenOfSpec - 1))
-        all_mean_widths = np.zeros((number_of_iterations, noOfMasses))
-        all_mean_intensities = np.zeros(all_mean_widths.shape)
-        
-        resultsList = [all_mean_widths, all_mean_intensities, all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces]
-        self.resultsList = resultsList
-        
-    def append(self, mulscatIter, resultsToAppend):
-        for i, resultArray in enumerate(resultsToAppend):
-            self.resultsList[i][mulscatIter] = resultsToAppend[i]
-    
-    def save(self, savePath):
-        all_mean_widths, all_mean_intensities, all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces = self.resultsList
-        np.savez(savePath,
-                 all_fit_workspaces = all_fit_workspaces,
-                 all_spec_best_par_chi_nit = all_spec_best_par_chi_nit,
-                 all_mean_widths = all_mean_widths, 
-                 all_mean_intensities = all_mean_intensities,
-                 all_tot_ncp = all_tot_ncp)
-
-def loadMSPars():
-    transmission_guess = 0.98                     #experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5
-    hydrogen_peak = False                          # hydrogen multiple scattering
-    hydrogen_to_mass0_ratio = 0             # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-    return [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
-                
-def createWorkspacesForMSCorrection(mean_widths, mean_intensity_ratios, mulscatPars): 
-    """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
-    sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", mulscatPars)
-    correct_for_multiple_scattering(name, sample_properties, mulscatPars) 
-    
-######################################################################################################################################
-######################################################                      ##########################################################
-######################################################     USER SECTION     ##########################################################
-######################################################                      ##########################################################
-######################################################################################################################################
-
-'''
-The user section is composed of an initialisation section, an iterative analysis/reduction section
-of the spectra in the time-of-flight domain, and a final section where the analysis of the corrected
-hydrogen neutron Compton profile is possible in the Y-space domain.
-
-The fit procedure in the time-of-flight domain is  based on the scipy.minimize.optimize() tool,
-used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
-
-The Y-space analysis is, at present, performed on a single spectrum, being the result of
-the sum of all the corrected spectra, subsequently symmetrised and unit-area normalised.
-
-The Y-space fit is performed using the Mantid minimiser and average Mantid resolution function, using
-a Gauss-Hermite expansion including H0 and H4 at present, while H3 (proportional to final-state effects)
-is not needed as a result of the symmetrisation.
-'''
-
-# #----------------------------------------------Initial fitting parameters and constraints---------------------------------------------------
-# Elements                                                             Cerium     Platinum     Germanium    Aluminium
-# Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
-# Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A 
-
-#Parameters:   Intensity,   NCP Width,    NCP centre
-par     =      ( 1,           18.22,       0.       )     #Cerium
-bounds  =      ((0, None),   (17,20),    (-30., 30.))     
-par    +=      ( 1,           22.5,        0.       )     #Platinum
-bounds +=      ((0, None),   (20,25),    (-30., 30.))
-par    +=      ( 1,           15.4,        0.       )
-bounds +=      ((0, None),   (12.2,18),  (-10., 10.))     #Germanium
-par    +=      ( 1,           9.93,        0.       )
-bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     #Aluminium
-
-# Intensity Constraints
-# CePt4Ge12 in Al can
-#  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn   
-#  Pt cross section * stoichiometry = 11.71 * 4 = 46.84  barn  
-#  Ge cross section * stoichiometry = 8.6 * 12 = 103.2   barn
-
-constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
-
-#--------------------------------------------------===------- Inputs -----------------------------------------------------------------
-name='CePtGe12_100K_DD_'  
-masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)
-ip_path = r'C:\Users\guijo\Desktop\Work\ip2018.par'   #needs to be raw string
-
-#----- Load main unaltered workspaces ------
-loadVesuvioWs = False
-if loadVesuvioWs:
-    loadRawAndEmptyWsVesuvio()
-else:
-    userRawPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_raw.nxs"
-    userEmptyPath = r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_empty.nxs"
-    loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
-
-#---------- Select Spectra to fit ----------
-number_of_iterations = 1                      # This is the number of iterations for the reduction analysis in time-of-flight.
-first_spec, last_spec = 3, 134                #3, 134
-first_idx, last_idx = convertFirstAndLastSpecToIdx(first_spec, last_spec)
-detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   # Optional spectra to be masked
-detectors_masked = detectors_masked[(detectors_masked >= first_spec) & (detectors_masked <= last_spec)]   #detectors within spectrums
-
-#-----------Initial MS parameters-----------
-mulscatPars = loadMSPars()              
-vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001         #expressed in meters
-create_slab_geometry(name, vertical_width, horizontal_width, thickness)
-
-#-----Option to test fit with synthetic ncp-------
-synthetic_workspace = False         
-if synthetic_workspace:
-    syntheticResultsPath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild.npz"
-    ws_to_be_fitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
-else:
-    ws_to_be_fitted = cropAndCloneMainWorkspace()
-
-#-----Option to scale dataY before fit---------
-scaleDataY = False
-#----------Path to save results-----------
-savePath = r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\runs_data\opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
-
-def main():         
-    thisScriptResults = resultsObject()       #generate arrays to store script results 
-    
-    for iteration in range(number_of_iterations):       #main iterative procedure   
-        ws_to_be_fitted = mtd[name+str(iteration)]                                    #picks up workspace from previous iteration
-        MaskDetectors(Workspace = ws_to_be_fitted, SpectraList = detectors_masked)    #this line is probably not necessary  
-        
-        fittedNcpResults = block_fit_ncp(ws_to_be_fitted)     #main fit  
-        
-        thisScriptResults.append(iteration, fittedNcpResults)             
-        if (iteration < number_of_iterations - 1):   #evaluate MS correction except at last iteration      
-            mean_widths, mean_intensity_ratios = fittedNcpResults[:2]
-            createWorkspacesForMSCorrection(mean_widths, mean_intensity_ratios, mulscatPars)    #creates _Mulscattering ws
-            Minus(LHSWorkspace= name, RHSWorkspace = name+"_MulScattering", OutputWorkspace = name+str(iteration+1))   #creates corrected ws           
-    thisScriptResults.save(savePath)
-=======
->>>>>>> cleaningWorkSecondTry
-
 main()
 end_time = time.time()
 print("running time: ", end_time-start_time, " seconds")
