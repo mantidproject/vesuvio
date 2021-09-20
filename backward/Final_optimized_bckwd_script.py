@@ -3,8 +3,8 @@ import mantid
 from mantid.simpleapi import *
 from scipy import optimize
 import time
-
 from pathlib import Path
+
 start_time=time.time()  
 np.set_printoptions(suppress=True, precision=4, linewidth= 150 )     #format print output of arrays
 
@@ -153,7 +153,7 @@ InstrParsPath = repoPath / "ip2018.par"
 loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
-noOfMSIterations = 4                      
+noOfMSIterations = 1                      
 firstSpec, lastSpec = 3, 134                #3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
