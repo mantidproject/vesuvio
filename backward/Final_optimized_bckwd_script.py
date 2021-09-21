@@ -452,12 +452,6 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
 
     v0, E0, deltaE, deltaQ = kinematicArrays
 
-    # def selectValuesAtYCenter(kineArray):
-    #     kineArray = kineArray * np.ones(shapeOfArrays)
-    #     return kineArray[yCentersMask].reshape(shapeOfArrays)
-    
-    # v0, E0, deltaE, deltaQ = [selectValuesAtYCenter(A) for A in (v0, E0, deltaE, deltaQ)]
-
     # Expand arrays to match shape of yCentersMask
     v0 = v0 * np.ones(shapeOfArrays)
     E0 = E0 * np.ones(shapeOfArrays)
@@ -468,6 +462,12 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
     E0 = E0[yCentersMask].reshape(shapeOfArrays)
     deltaE = deltaE[yCentersMask].reshape(shapeOfArrays)
     deltaQ = deltaQ[yCentersMask].reshape(shapeOfArrays)
+
+    # # Could also do it like this, but it's probably even slower
+    # def selectValuesAtYCenter(kineArray):
+    #     kineArray = kineArray * np.ones(shapeOfArrays)
+    #     return kineArray[yCentersMask].reshape(shapeOfArrays)
+    # v0, E0, deltaE, deltaQ = [selectValuesAtYCenter(A) for A in (v0, E0, deltaE, deltaQ)]
     return v0, E0, deltaE, deltaQ
 
 
