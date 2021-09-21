@@ -159,7 +159,7 @@ bounds +=      ((0, None),   (12.2,18),  (-10., 10.))
 par    +=      ( 1,           9.93,        0.       )     #Aluminium
 bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     
 
-# intensities Constraints
+# Intensities Constraints
 # CePt4Ge12 in Al can
 #  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn
 #  Pt cross section * stoichiometry = 11.71 * 4 = 46.84  barn
@@ -310,6 +310,17 @@ def loadWorkspaceIntoArrays(ws):
     dataX = (dataX[:, 1:] + dataX[:, :-1]) / 2
     return dataY, dataX, dataE
 
+def prepareFitArgs(dataX):
+    instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)        #shape(134,-)
+    resolutionPars = loadResolutionPars(instrPars)                           #shape(134,-)        
+
+    v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   #shape(134, 144)
+    kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
+    ySpacesForEachMass = convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E)        #shape(134, 4, 144)
+    
+    kinematicArrays = reshapeArrayPerSpectrum(kinematicArrays)
+    ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
+    return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
 
 def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
     """Loads instrument parameters into array, from the file in the specified path"""
