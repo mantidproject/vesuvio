@@ -13,6 +13,11 @@ selected = arrayA.flatten() * np.ones((3,1)) [False, False, True]
 print(selected)
 
 #%%
+import sys
+for p in sys.path:
+    print(p)
+
+#%%
 %load_ext snakeviz
 %snakeviz import Final_optimized_bckwd_script
 
