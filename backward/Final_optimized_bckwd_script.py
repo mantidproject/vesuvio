@@ -277,7 +277,7 @@ def fitNcpToWorkspace(ws):
         scalingFactor = 100 / np.sum(dataY, axis=1).reshape(len(dataY), 1)
     dataY *= scalingFactor
     
-    #----------Fit all spectrums----------
+    #-------------Fit all spectrums----------
     fitParsChiNit = map(fitNcpToSingleSpec, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     fitParsChiNit = np.array(list(fitParsChiNit))    
     fitParsChiNit[:, :-2:3] /= scalingFactor
@@ -419,7 +419,8 @@ def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars,
     
     v0, E0, deltaE, deltaQ = kinematicArrays
     
-    gaussRes, lorzRes = caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, resolutionPars, instrPars, kinematicArrays)
+    gaussRes, lorzRes = caculateResolutionForEachMass(masses, ySpacesForEachMass, centersForEachMass, 
+                                                      resolutionPars, instrPars, kinematicArrays)
     
     totalGaussWidth = np.sqrt(widthsForEachMass**2 + gaussRes**2)                 
     
@@ -472,6 +473,8 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
 
 
 def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
+    """Currently the function that takes the most time in the fitting"""
+
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
     mN, Ef, en_to_vel, vf, hbar = loadConstants()
@@ -487,8 +490,7 @@ def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, ins
     # conversion from meV^2 to A^-2, dydW = (M/q)^2
     dW2 *= (masses / hbar**2 / delta_Q)**2
 
-    dQdE1 = 1. - (E0 / Ef)**1.5 * L1/L0 - np.cos(angle) * \
-        ((E0 / Ef)**0.5 - L1/L0 * E0/Ef)
+    dQdE1 = 1. - (E0 / Ef)**1.5 * L1/L0 - np.cos(angle) * ((E0 / Ef)**0.5 - L1/L0 * E0/Ef)
     dQdTOF = 2.*E0 * v0/L0
     dQdL1 = 2.*E0**1.5 / L0 / Ef**0.5
     dQdL0 = 2.*E0 / L0
@@ -614,7 +616,6 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-# spectra and verbose not used
 def calculateMeanWidthsAndIntensities(widths, intensities):
     """calculates the mean widths and intensities of the Compton profile J(y) for each mass"""
     noOfMasses = len(masses)
@@ -623,9 +624,9 @@ def calculateMeanWidthsAndIntensities(widths, intensities):
     meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
     stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
 
-    # subtraction row by row
+    # Subtraction row by row
     width_deviation = np.abs(widths - meanWidths)
-    # where True, replace by nan
+    # Where True, replace by nan
     better_widths = np.where(width_deviation > stdWidths, np.nan, widths)
     better_intensities = np.where(width_deviation > stdWidths, np.nan, intensities)
 
@@ -718,6 +719,7 @@ def createMulScatWorkspaces(ws_name, sample_properties, mulscatPars):
     DeleteWorkspaces(
         [data_normalisation, simulation_normalisation, trans, dens])
   # The only remaining workspaces are the _MulScattering and _TotScattering
+
 
 # -------------- Other functions not used yet on main()--------------
 
