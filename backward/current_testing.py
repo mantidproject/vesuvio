@@ -43,7 +43,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
 
-syn = np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
+syn = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
 
 ws = syn["all_fit_workspaces"][0, :, :-1]
 ncp = syn["all_tot_ncp"][0]
@@ -63,3 +63,5 @@ plt.title("Comparison between ws and ncp")
 plt.xlabel("TOF")
 plt.ylabel("spectrums")
 plt.show()
+
+# %%

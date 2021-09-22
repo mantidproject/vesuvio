@@ -8,6 +8,7 @@ from pathlib import Path
 start_time = time.time()
 # format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=150)
+repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 #######################################################################################################################################
 #######################################################                      ##########################################################
@@ -116,7 +117,7 @@ def createSlabGeometry(ws_name,vertical_width, horizontal_width, thickness):  #D
 
 def chooseWorkspaceToBeFitted(synthetic_workspace):
     if synthetic_workspace:
-        syntheticResultsPath = r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz"
+        syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
         wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
     else:
         wsToBeFitted = cropAndCloneMainWorkspace()
@@ -171,14 +172,13 @@ constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.94/46.84*par[3]},
 name = 'CePtGe12_100K_DD_'
 masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
 
-repoPath = Path(__file__).absolute().parent  # Path to the repository
 InstrParsPath = repoPath / "ip2018.par"
 
 loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 134  # 3, 134
+firstSpec, lastSpec = 3, 5  # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -186,12 +186,12 @@ mulscatPars = loadMSPars()
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # expressed in meters
 createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 
-synthetic_workspace = False
+synthetic_workspace = True
 wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
-scaledataY = False
+scaledataY = True 
 
-savePath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_cleanest"
+savePath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
 
 def main():
