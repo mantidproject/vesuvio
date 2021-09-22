@@ -8,6 +8,8 @@ from pathlib import Path
 start_time = time.time()
 # format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=150)
+repoPath = Path(__file__).absolute().parent  # Path to the repository
+
 
 #######################################################################################################################################
 #######################################################                      ##########################################################
@@ -59,7 +61,7 @@ def loadRawAndEmptyWsVesuvio():
     spectra='3-134'                               # Spectra to be analysed
     tof_binning='275.,1.,420'                     # Binning of ToF spectra
     mode='DoubleDifference'
-    ipfile='ip2018.par'
+    ipfile='ip2018.initPars'
     
     print('\n', 'Loading the sample runs: ', runs, '\n')
     LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode,
@@ -116,7 +118,7 @@ def createSlabGeometry(ws_name,vertical_width, horizontal_width, thickness):  #D
 
 def chooseWorkspaceToBeFitted(synthetic_workspace):
     if synthetic_workspace:
-        syntheticResultsPath = r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz"
+        syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
         wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
     else:
         wsToBeFitted = cropAndCloneMainWorkspace()
@@ -150,35 +152,35 @@ def cropAndCloneMainWorkspace():
 # Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A
 
 #Parameters:   intensities,   NCP Width,    NCP centre
-par     =      ( 1,           18.22,       0.       )     #Cerium
+initPars     =      ( 1,           18.22,       0.       )     #Cerium
 bounds  =      ((0, None),   (17,20),    (-30., 30.))     
-par    +=      ( 1,           22.5,        0.       )     #Platinum
+initPars    +=      ( 1,           22.5,        0.       )     #Platinum
 bounds +=      ((0, None),   (20,25),    (-30., 30.))
-par    +=      ( 1,           15.4,        0.       )     #Germanium
+initPars    +=      ( 1,           15.4,        0.       )     #Germanium
 bounds +=      ((0, None),   (12.2,18),  (-10., 10.))     
-par    +=      ( 1,           9.93,        0.       )     #Aluminium
+initPars    +=      ( 1,           9.93,        0.       )     #Aluminium
 bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     
 
+initPars = np.array(initPars)
 # Intensities Constraints
 # CePt4Ge12 in Al can
 #  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn
 #  Pt cross section * stoichiometry = 11.71 * 4 = 46.84  barn
 #  Ge cross section * stoichiometry = 8.6 * 12 = 103.2   barn
 
-constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.94/46.84*par[3]},
-               {'type': 'eq', 'fun': lambda par:  par[0] - 2.94/103.2*par[6]})
+constraints = ({'type': 'eq', 'fun': lambda initPars:  initPars[0] - 2.94/46.84*initPars[3]},
+               {'type': 'eq', 'fun': lambda initPars:  initPars[0] - 2.94/103.2*initPars[6]})
 
 name = 'CePtGe12_100K_DD_'
 masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
 
-repoPath = Path(__file__).absolute().parent  # Path to the repository
 InstrParsPath = repoPath / "ip2018.par"
 
 loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 134  # 3, 134
+firstSpec, lastSpec = 3, 5  # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -186,10 +188,10 @@ mulscatPars = loadMSPars()
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # expressed in meters
 createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 
-synthetic_workspace = False
+synthetic_workspace = True
 wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
-scaledataY = False
+scaleParams = True
 
 savePath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_cleanest"
 
@@ -271,16 +273,9 @@ def fitNcpToWorkspace(ws):
     dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(dataX)
     
-    scalingFactor = 1
-    if scaledataY:
-        # No justification for factor of 100 yet
-        scalingFactor = 100 / np.sum(dataY, axis=1).reshape(len(dataY), 1)
-    dataY *= scalingFactor
-    
     #-------------Fit all spectrums----------
     fitParsChiNit = map(fitNcpToSingleSpec, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     fitParsChiNit = np.array(list(fitParsChiNit))    
-    fitParsChiNit[:, :-2:3] /= scalingFactor
     
     specs = instrPars[:, 0, np.newaxis]                        
     specFitParsChiNit = np.append(specs, fitParsChiNit, axis=1)    
@@ -384,22 +379,26 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
     if np.all(dataY == 0):  # If all zeros, then parameters are all nan, so they are ignored later down the line
-        return np.full(len(par)+2, np.nan)
+        return np.full(len(initPars)+2, np.nan)
     
+    normPars = np.ones(initPars.shape)
     result = optimize.minimize(errorFunction, 
-                               par[:], 
+                               normPars, 
                                args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
                                method='SLSQP', 
                                bounds = bounds, 
                                constraints=constraints)
+    normFitPars = result["x"]
+    fitPars = normFitPars * initPars
 
-    noDegreesOfFreedom = len(dataY) - len(par)
-    return np.append(result["x"], [result["fun"] / noDegreesOfFreedom, result["nit"]])
+    noDegreesOfFreedom = len(dataY) - len(fitPars)
+    return np.append(fitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
 
-def errorFunction(par, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
+def errorFunction(normPars, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Error function to be minimized, operates in TOF space"""
+    pars = normPars * initPars
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
+    ncpForEachMass, ncpTotal = calculateNcpSpec(pars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     
     if (np.sum(dataE) > 0):    #don't understand this conditional statement
         chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
@@ -407,15 +406,15 @@ def errorFunction(par, masses, dataY, dataE, ySpacesForEachMass, resolutionPars,
         chi2 = (ncpTotal - dataY)**2
     return np.sum(chi2)
 
-def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
+def calculateNcpSpec(initPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
     """Creates a synthetic C(t) to be fitted to TOF values, from J(y) and resolution functions
-       shapes: par (1, 12), masses (4,1,1), datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n)"""
+       shapes: initPars (1, 12), masses (4,1,1), datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n)"""
     
     shapeOfArrays = (len(masses), 1)
     masses = masses.reshape(shapeOfArrays)    
-    intensitiesForEachMass = par[::3].reshape(shapeOfArrays)
-    widthsForEachMass = par[1::3].reshape(shapeOfArrays)
-    centersForEachMass = par[2::3].reshape(shapeOfArrays)
+    intensitiesForEachMass = initPars[::3].reshape(shapeOfArrays)
+    widthsForEachMass = initPars[1::3].reshape(shapeOfArrays)
+    centersForEachMass = initPars[2::3].reshape(shapeOfArrays)
     
     v0, E0, deltaE, deltaQ = kinematicArrays
     
@@ -577,14 +576,14 @@ def numericalThirdDerivative(x, fun):
     derivative[:, 6:-6] = dev
     return derivative
 
-def buildNcpFromSpec(par, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
+def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
 
-    if np.all(np.isnan(par)):
+    if np.all(np.isnan(initPars)):
         return np.full(ySpacesForEachMass.shape, np.nan)
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
 
 
