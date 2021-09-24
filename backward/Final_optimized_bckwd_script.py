@@ -189,7 +189,7 @@ createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 synthetic_workspace = True
 wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
-scaledataY = True 
+scaledataY = False
 
 savePath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
@@ -391,7 +391,8 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
                                args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
                                method='SLSQP', 
                                bounds = bounds, 
-                               constraints=constraints)
+                               constraints=constraints,
+                               options={"disp":True})
 
     noDegreesOfFreedom = len(dataY) - len(par)
     return np.append(result["x"], [result["fun"] / noDegreesOfFreedom, result["nit"]])
