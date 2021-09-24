@@ -405,7 +405,7 @@ def errorFunction(par, masses, dataY, dataE, ySpacesForEachMass, resolutionPars,
     if (np.sum(dataE) > 0):    #don't understand this conditional statement
         chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
     else:
-        chi2 = (ncpTotal - dataY)**2
+        chi2 = ((ncpTotal - dataY)/dataY)**2   
     return np.sum(chi2)
 
 def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
