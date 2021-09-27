@@ -162,6 +162,15 @@ initPars    +=      ( 1,           9.93,        0.       )     #Aluminium
 bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     
 
 initPars = np.array(initPars)
+bounds = np.array(bounds)
+
+# Make initial positions non zero
+initPars[2::3] = np.ones(4)
+#print("Initial parameters used for scaling: ", initPars)
+#print("bounds array: ", bounds)
+bounds = np.where(bounds == None, np.nan, bounds)
+normbounds = bounds / initPars[:, np.newaxis]
+#print("normalized bounds: ", normbounds)
 # Intensities Constraints
 # CePt4Ge12 in Al can
 #  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn
@@ -180,7 +189,7 @@ loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 5  # 3, 134
+firstSpec, lastSpec = 3, 134  # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -191,9 +200,10 @@ createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 synthetic_workspace = True
 wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
-scaleParams = True
+#scaleParams = True
 
-savePath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_cleanest"
+savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters"
+#repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
 
 def main():
@@ -204,7 +214,7 @@ def main():
         # Workspace from previous iteration
         wsToBeFitted = mtd[name+str(iteration)]
         # This line is probably not necessary
-        MaskDetectors(Workspace=wsToBeFitted, SpectraList=detectors_masked)
+        # MaskDetectors(Workspace=wsToBeFitted, SpectraList=detectors_masked)
 
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
@@ -382,12 +392,14 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
         return np.full(len(initPars)+2, np.nan)
     
     normPars = np.ones(initPars.shape)
-    result = optimize.minimize(errorFunction, 
-                               normPars, 
-                               args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
-                               method='SLSQP', 
-                               bounds = bounds, 
-                               constraints=constraints)
+    result = optimize.minimize(
+        errorFunction, 
+        normPars, 
+        args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
+        method='SLSQP', 
+        bounds = normbounds, 
+        constraints=constraints
+        )
     normFitPars = result["x"]
     fitPars = normFitPars * initPars
 
@@ -403,7 +415,7 @@ def errorFunction(normPars, masses, dataY, dataE, ySpacesForEachMass, resolution
     if (np.sum(dataE) > 0):    #don't understand this conditional statement
         chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
     else:
-        chi2 = (ncpTotal - dataY)**2
+        chi2 = ((ncpTotal - dataY)/dataY)**2
     return np.sum(chi2)
 
 def calculateNcpSpec(initPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    

@@ -43,14 +43,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
 
-syn = np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
+syn = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters.npz")
+#np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
 
 ws = syn["all_fit_workspaces"][0, :, :-1]
 ncp = syn["all_tot_ncp"][0]
 
+meanChi2 = np.nanmean(ws[:, -2])
+print("Mean Chi2 for 134 spectrums is: ", meanChi2)
+
 x = np.linspace(0, 1, len(ncp[0]))
 plt.figure(3)
-spec_idx = 1
+spec_idx = 0
 plt.plot(x, ws[spec_idx], label="synthetic ncp", linewidth = 2)
 plt.plot(x, ncp[spec_idx], "--", label="fitted ncp", linewidth = 2)
 plt.legend()
@@ -63,3 +67,10 @@ plt.title("Comparison between ws and ncp")
 plt.xlabel("TOF")
 plt.ylabel("spectrums")
 plt.show()
+
+# %%
+import numpy as np
+
+A = np.arange(12)
+B = np.ones(A.shape)
+print(A*B)
