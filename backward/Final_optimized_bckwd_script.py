@@ -386,13 +386,15 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
     if np.all(dataY == 0):  # If all zeros, then parameters are all nan, so they are ignored later down the line
         return np.full(len(par)+2, np.nan)
     
-    result = optimize.minimize(errorFunction, 
-                               par[:], 
-                               args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
-                               method='SLSQP', 
-                               bounds = bounds, 
-                               constraints=constraints,
-                               options={"disp":True})
+    result = optimize.minimize(
+        errorFunction, 
+        par, 
+        args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
+        method='SLSQP', 
+        bounds = bounds, 
+        constraints=constraints,
+        options={"disp":True}
+        )
 
     noDegreesOfFreedom = len(dataY) - len(par)
     return np.append(result["x"], [result["fun"] / noDegreesOfFreedom, result["nit"]])
