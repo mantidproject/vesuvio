@@ -178,7 +178,7 @@ loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 5  # 3, 134
+firstSpec, lastSpec = 3, 10   # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -191,7 +191,8 @@ wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
 scaledataY = False
 
-savePath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
+savePath = r"C:/Users/guijo/Desktop/optimizations/scipy_optimization_test"
+#repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
 
 def main():
@@ -202,7 +203,7 @@ def main():
         # Workspace from previous iteration
         wsToBeFitted = mtd[name+str(iteration)]
         # This line is probably not necessary
-        MaskDetectors(Workspace=wsToBeFitted, SpectraList=detectors_masked)
+        #MaskDetectors(Workspace=wsToBeFitted, SpectraList=detectors_masked)
 
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
@@ -383,7 +384,7 @@ def convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E):
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
-    if np.all(dataY == 0):  # If all zeros, then parameters are all nan, so they are ignored later down the line
+    if np.all(dataY == 0) | np.all(np.isnan(dataY)): 
         return np.full(len(par)+2, np.nan)
     
     result = optimize.minimize(
@@ -393,7 +394,7 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
         method='SLSQP', 
         bounds = bounds, 
         constraints=constraints,
-        options={"disp":True}
+        options={"disp":False}
         )
 
     noDegreesOfFreedom = len(dataY) - len(par)
