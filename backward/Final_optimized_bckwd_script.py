@@ -89,9 +89,11 @@ def convertFirstAndLastSpecToIdx(firstSpec, lastSpec):
 
 
 def loadMaskedDetectors(firstSpec, lastSpec):
-    detectors_masked = np.array([18,34,42,43,59,60,62,118,119,133])   
-    detectors_masked = detectors_masked[(detectors_masked >= firstSpec) & (detectors_masked <= lastSpec)] 
-    return detectors_masked
+    maskedSpecNo = np.array([18,34,42,43,59,60,62,118,119,133])   
+    maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
+    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
+    maskedDetectorsIdx = maskedSpecNo - spec_offset
+    return maskedDetectorsIdx
 
 
 def loadMSPars():
@@ -191,7 +193,7 @@ loadRawAndEmptyWorkspaces(loadVesuvioWs)
 noOfMSIterations = 1
 firstSpec, lastSpec = 3, 134  # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
-detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
+maskedDetectorIdx = loadMaskedDetectors(firstSpec, lastSpec)
 
 mulscatPars = loadMSPars()
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # expressed in meters
@@ -200,9 +202,7 @@ createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 synthetic_workspace = True
 wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
-#scaleParams = True
-
-savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters"
+savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
 #repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
 
@@ -213,8 +213,8 @@ def main():
     for iteration in range(noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[name+str(iteration)]
-        # This line is probably not necessary
-        # MaskDetectors(Workspace=wsToBeFitted, SpectraList=detectors_masked)
+
+        MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=maskedDetectorIdx)
 
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
@@ -388,7 +388,7 @@ def convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E):
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
-    if np.all(dataY == 0):  # If all zeros, then parameters are all nan, so they are ignored later down the line
+    if np.all(dataY == 0) | np.all(np.isnan(dataY)): 
         return np.full(len(initPars)+2, np.nan)
     
     normPars = np.ones(initPars.shape)
