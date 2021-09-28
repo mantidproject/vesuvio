@@ -48,17 +48,16 @@ syn = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved
 
 ws = syn["all_fit_workspaces"][0, :, :-1]
 ncp = syn["all_tot_ncp"][0]
+par = syn["all_spec_best_par_chi_nit"][0]
 
-ws = np.where(ws == 0, np.nan, ws)
-meanChi2 = np.nanmean(ws[:, -2])
-print("Mean Chi2 for 134 spectrums is: ", meanChi2)
+meanChi2 = np.nanmean(par[:, -2])
+print("Mean Chi2 for spectrums is: ", meanChi2)
 
 x = np.linspace(0, 1, len(ncp[0]))
 plt.figure(3)
 spec_idx = 1
-print("first values ws: ", ws[spec_idx, :5])
-print("first values ncp: ", ncp[spec_idx, :5])
-
+# print("first values ws: ", ws[spec_idx, :5])
+# print("first values ncp: ", ncp[spec_idx, :5])
 plt.plot(x, ws[spec_idx], label="synthetic ncp", linewidth = 2)
 plt.plot(x, ncp[spec_idx], "--", label="fitted ncp", linewidth = 2)
 plt.legend()

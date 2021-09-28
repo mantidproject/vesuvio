@@ -118,8 +118,8 @@ def createSlabGeometry(ws_name,vertical_width, horizontal_width, thickness):  #D
     return
 
 
-def chooseWorkspaceToBeFitted(synthetic_workspace):
-    if synthetic_workspace:
+def chooseWorkspaceToBeFitted(fitSyntheticWorkspace):
+    if fitSyntheticWorkspace:
         syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
         wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
     else:
@@ -164,10 +164,10 @@ def cropAndCloneMainWorkspace():
 # bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     
 
 initPars = np.array([   # Centers changed to one because of the scaling
-    1, 18.22, 1,
-    1, 22.5, 1,
-    1, 15.4, 1,
-    1, 9.93, 1
+    1, 18.22, 0,
+    1, 22.5, 0,
+    1, 15.4, 0,
+    1, 9.93, 0
 ])
 
 bounds = np.array([
@@ -177,44 +177,42 @@ bounds = np.array([
     [0, np.nan], [9.8, 10], [-10, 10]
 ])
 
-# initPars = np.array(initPars)
-# bounds = np.array(bounds)
+scalingFactors = np.ones(initPars.shape)
+scaleParameters = False 
+if scaleParameters:
+    noOfMasses = int(len(initPars)/3)
+    initPars[2::3] = np.full((1, noOfMasses), 1)  # Can experiment with other starting points
+    scalingFactors = 1 / initPars
 
-# Make initial positions non zero
-#initPars[2::3] = np.ones(4)
-#print("Initial parameters used for scaling: ", initPars)
-#print("bounds array: ", bounds)
-#bounds = np.where(bounds == None, np.nan, bounds)
-#normbounds = bounds / initPars[:, np.newaxis]
-#print("normalized bounds: ", normbounds)
+statisticalWeightChi2 = False
+
 # Intensities Constraints
 # CePt4Ge12 in Al can
 #  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn
 #  Pt cross section * stoichiometry = 11.71 * 4 = 46.84  barn
 #  Ge cross section * stoichiometry = 8.6 * 12 = 103.2   barn
 
-constraints = ({'type': 'eq', 'fun': lambda initPars:  initPars[0] - 2.94/46.84*initPars[3]},
-               {'type': 'eq', 'fun': lambda initPars:  initPars[0] - 2.94/103.2*initPars[6]})
+constraints = ({'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/46.84*pars[3]},
+               {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
 
 name = 'CePtGe12_100K_DD_'
 masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
-
 InstrParsPath = repoPath / "ip2018.par"
 
 loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 134  # 3, 134
+firstSpec, lastSpec = 3, 134 # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 maskedDetectorIdx = loadMaskedDetectors(firstSpec, lastSpec)
 
 mulscatPars = loadMSPars()
-vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # expressed in meters
+vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 
-synthetic_workspace = True
-wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
+fitSyntheticWorkspace = False 
+wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWorkspace)
 
 savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
 #repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
@@ -379,6 +377,7 @@ def loadWorkspaceIntoArrays(ws):
     dataX = (dataX[:, 1:] + dataX[:, :-1]) / 2
     return dataY, dataX, dataE
 
+
 def prepareFitArgs(dataX):
     instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)        #shape(134,-)
     resolutionPars = loadResolutionPars(instrPars)                           #shape(134,-)        
@@ -390,6 +389,7 @@ def prepareFitArgs(dataX):
     kinematicArrays = reshapeArrayPerSpectrum(kinematicArrays)
     ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
     return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
+
 
 def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
     """Loads instrument parameters into array, from the file in the specified path"""
@@ -455,43 +455,46 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
     if np.all(dataY == 0) | np.all(np.isnan(dataY)): 
         return np.full(len(initPars)+3, np.nan)
     
-    normPars = np.ones(initPars.shape)
-    normbounds = bounds / initPars[:, np.newaxis]
+    scaledPars = initPars * scalingFactors
+    scaledBounds = bounds * scalingFactors[:, np.newaxis]
 
     result = optimize.minimize(
         errorFunction, 
-        normPars, 
+        scaledPars, 
         args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
         method='SLSQP', 
-        bounds = normbounds, 
+        bounds = scaledBounds, 
         constraints=constraints
         )
 
-    normFitPars = result["x"]
-    fitPars = normFitPars * initPars
+    fitScaledPars = result["x"]
+    fitPars = fitScaledPars / scalingFactors
 
     noDegreesOfFreedom = len(dataY) - len(fitPars)
     specFitPars = np.append(instrPars[0], fitPars)
     return np.append(specFitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
 
 
-def errorFunction(normPars, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
+def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Error function to be minimized, operates in TOF space"""
 
-    scaledPars = normPars * initPars
-    ncpForEachMass, ncpTotal = calculateNcpSpec(scaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
+    unscaledPars = scaledPars / scalingFactors
+    ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     
-    chi2 = ((ncpTotal - dataY)/dataY)**2
+    if statisticalWeightChi2:
+        chi2 = ((ncpTotal - dataY)/dataY)**2
+    else:
+        chi2 = (ncpTotal - dataY)**2
     return np.sum(chi2)
     # if (np.sum(dataE) > 0):    #don't understand this conditional statement
     #     chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
 
 
-def calculateNcpSpec(initPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
+def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
     """Creates a synthetic C(t) to be fitted to TOF values, from J(y) and resolution functions
        shapes: initPars (1, 12), masses (4,1,1), datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n)"""
     
-    masses, intensities, widths, centers = prepareArraysFromPars(masses, initPars) 
+    masses, intensities, widths, centers = prepareArraysFromPars(masses, unscaledPars) 
     v0, E0, deltaE, deltaQ = kinematicArrays
     
     gaussRes, lorzRes = caculateResolutionForEachMass(
