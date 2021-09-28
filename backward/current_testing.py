@@ -3,27 +3,29 @@
 
 #%%
 import numpy as np
+np.set_printoptions(suppress=True, precision=4, linewidth=150)
 
-arrayA = np.arange(12)
-shapeOfA = (3,4)
-arrayA = arrayA.reshape(shapeOfA)
-print(arrayA)
+newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
+oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 
-selected = arrayA.flatten() * np.ones((3,1)) [False, False, True]
-print(selected)
+newPars = newResults["all_spec_best_par_chi_nit"][0]
+oldPars = oldResults["all_spec_best_par_chi_nit"][0]
+print(newPars[:3])
+print(oldPars[:3])
 
-#%%
-import sys
-for p in sys.path:
-    print(p)
 
-#%%
-%load_ext snakeviz
-%snakeviz import Final_optimized_bckwd_script
+totalMask = np.isclose(newPars, oldPars, rtol=0.01, equal_nan = True)
+plt.figure(0)
+plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
+plt.title("Comparison orginal par and new par")
+plt.xlabel("pars")
+plt.ylabel("spectrums")
+plt.show()
+
 
 # %%
 import numpy as np
-newResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_cleanest.npz")
+newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
 oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 
 #np.testing.assert_allclose(newResults["all_mean_intensities"], oldResults["all_mean_intensities"])
@@ -31,12 +33,12 @@ oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 for key in oldResults:
     try:
         print("\nevaluating: ",key)
-        np.testing.assert_allclose(newResults[key][0], oldResults[key][0], rtol=1e-4)            
+        np.testing.assert_allclose(newResults[key][0], oldResults[key][0], rtol=1e-2)            
         print("shape: ", newResults[key].shape)
     except KeyError:
         print("KeyError: one of the results doesnt have this key")
-    except AssertionError:
-        print("Assertion Error")
+    # except AssertionError:
+    #     print("Assertion Error")
 
 # %%
 import numpy as np
@@ -55,7 +57,7 @@ print("Mean Chi2 for spectrums is: ", meanChi2)
 
 x = np.linspace(0, 1, len(ncp[0]))
 plt.figure(3)
-spec_idx = 1
+spec_idx = 0
 # print("first values ws: ", ws[spec_idx, :5])
 # print("first values ncp: ", ncp[spec_idx, :5])
 plt.plot(x, ws[spec_idx], label="synthetic ncp", linewidth = 2)
@@ -63,7 +65,7 @@ plt.plot(x, ncp[spec_idx], "--", label="fitted ncp", linewidth = 2)
 plt.legend()
 plt.show()
 
-ncp_mask = np.isclose(ws, ncp, rtol=0.01, equal_nan = True)
+ncp_mask = np.isclose(ws, ncp, rtol=0.001, equal_nan = True)
 plt.figure(0)
 plt.imshow(ncp_mask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
 plt.title("Comparison between ws and ncp")
@@ -72,8 +74,3 @@ plt.ylabel("spectrums")
 plt.show()
 
 # %%
-import numpy as np
-
-A = np.arange(12)
-B = np.ones(A.shape)
-print(A*B)
