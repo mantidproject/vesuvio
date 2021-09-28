@@ -3,6 +3,9 @@
 
 #%%
 import numpy as np
+import matplotlib.pyplot as plt
+plt.style.use('dark_background')
+
 np.set_printoptions(suppress=True, precision=4, linewidth=150)
 
 newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
@@ -10,11 +13,9 @@ oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 
 newPars = newResults["all_spec_best_par_chi_nit"][0]
 oldPars = oldResults["all_spec_best_par_chi_nit"][0]
-print(newPars[:3])
-print(oldPars[:3])
 
 
-totalMask = np.isclose(newPars, oldPars, rtol=0.01, equal_nan = True)
+totalMask = np.isclose(newPars, oldPars, rtol=0.00001, equal_nan = True)
 plt.figure(0)
 plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
 plt.title("Comparison orginal par and new par")
@@ -33,12 +34,12 @@ oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 for key in oldResults:
     try:
         print("\nevaluating: ",key)
-        np.testing.assert_allclose(newResults[key][0], oldResults[key][0], rtol=1e-2)            
+        np.testing.assert_allclose(newResults[key][0], oldResults[key][0], rtol=1e-4)            
         print("shape: ", newResults[key].shape)
     except KeyError:
         print("KeyError: one of the results doesnt have this key")
-    # except AssertionError:
-    #     print("Assertion Error")
+    except AssertionError:
+        print("Assertion Error")
 
 # %%
 import numpy as np
@@ -54,6 +55,7 @@ par = syn["all_spec_best_par_chi_nit"][0]
 
 meanChi2 = np.nanmean(par[:, -2])
 print("Mean Chi2 for spectrums is: ", meanChi2)
+print("specNo18: ", ncp[15, :5])
 
 x = np.linspace(0, 1, len(ncp[0]))
 plt.figure(3)

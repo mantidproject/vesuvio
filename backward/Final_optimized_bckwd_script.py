@@ -203,7 +203,7 @@ loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 5 # 3, 134
+firstSpec, lastSpec = 3, 134 # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 maskedDetectorIdx = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -479,13 +479,15 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     unscaledPars = scaledPars / scalingFactors
     ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     
+    weight = 1
     if statisticalWeightChi2:
-        chi2 = ((ncpTotal - dataY)/dataY)**2
+        weight = dataY**2
+
+    if (np.sum(dataE) > 0):    #don't understand this conditional statement
+        chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2 / weight    #weighted fit
     else:
-        chi2 = (ncpTotal - dataY)**2
+        chi2 = (ncpTotal - dataY)**2 / weight
     return np.sum(chi2)
-    # if (np.sum(dataE) > 0):    #don't understand this conditional statement
-    #     chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
 
 
 def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
