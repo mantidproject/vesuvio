@@ -178,7 +178,7 @@ loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 10   # 3, 134
+firstSpec, lastSpec = 3, 134   # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 detectors_masked = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -186,12 +186,12 @@ mulscatPars = loadMSPars()
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # expressed in meters
 createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 
-synthetic_workspace = True
+synthetic_workspace = False
 wsToBeFitted = chooseWorkspaceToBeFitted(synthetic_workspace)
 
 scaledataY = False
 
-savePath = r"C:/Users/guijo/Desktop/optimizations/scipy_optimization_test"
+savePath = r"C:/Users/guijo/Desktop/optimizations/main_script"
 #repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
 
 
@@ -408,7 +408,7 @@ def errorFunction(par, masses, dataY, dataE, ySpacesForEachMass, resolutionPars,
     if (np.sum(dataE) > 0):    #don't understand this conditional statement
         chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    #weighted fit
     else:
-        chi2 = ((ncpTotal - dataY)/dataY)**2   
+        chi2 = (ncpTotal - dataY)**2   
     return np.sum(chi2)
 
 def calculateNcpSpec(par, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
