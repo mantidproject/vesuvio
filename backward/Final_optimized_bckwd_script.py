@@ -203,7 +203,7 @@ loadVesuvioWs = False
 loadRawAndEmptyWorkspaces(loadVesuvioWs)
 
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 134 # 3, 134
+firstSpec, lastSpec = 3, 5 # 3, 134
 firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
 maskedDetectorIdx = loadMaskedDetectors(firstSpec, lastSpec)
 
@@ -319,8 +319,6 @@ class fitParameters:
     """Stores the fitted parameters from map and defines methods to extract information"""
 
     def __init__(self, fitPars):
-        noOfMasses = len(masses)
-
         self.spec = fitPars[:, 0][:, np.newaxis]
         self.chi2 = fitPars[:, -2][:, np.newaxis]
         self.nit = fitPars[:, -1][:, np.newaxis]
