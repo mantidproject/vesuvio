@@ -3,28 +3,30 @@
 
 #%%
 import numpy as np
-import scipy
+import matplotlib.pyplot as plt
+plt.style.use('dark_background')
 
-arrayA = np.arange(12)
-shapeOfA = (3,4)
-arrayA = arrayA.reshape(shapeOfA)
-print(arrayA)
+np.set_printoptions(suppress=True, precision=4, linewidth=150)
 
-selected = arrayA.flatten() * np.ones((3,1)) [False, False, True]
-print(selected)
+newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
+oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 
-#%%
-import sys
-for p in sys.path:
-    print(p)
+newPars = newResults["all_spec_best_par_chi_nit"][0]
+oldPars = oldResults["all_spec_best_par_chi_nit"][0]
 
-#%%
-%load_ext snakeviz
-%snakeviz import Final_optimized_bckwd_script
+
+totalMask = np.isclose(newPars, oldPars, rtol=0.00001, equal_nan = True)
+plt.figure(0)
+plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
+plt.title("Comparison orginal par and new par")
+plt.xlabel("pars")
+plt.ylabel("spectrums")
+plt.show()
+
 
 # %%
 import numpy as np
-newResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_cleanest.npz")
+newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
 oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
 
 #np.testing.assert_allclose(newResults["all_mean_intensities"], oldResults["all_mean_intensities"])
@@ -44,104 +46,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
 
-syn = np.load(r"C:/Users/guijo/Desktop/optimizations/scipy_optimization_test.npz")
-#np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
+syn = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
+#np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
 
 ws = syn["all_fit_workspaces"][0, :, :-1]
 ncp = syn["all_tot_ncp"][0]
+par = syn["all_spec_best_par_chi_nit"][0]
+
+meanChi2 = np.nanmean(par[:, -2])
+print("Mean Chi2 for spectrums is: ", meanChi2)
+print("specNo18: ", ncp[15, :5])
 
 x = np.linspace(0, 1, len(ncp[0]))
 plt.figure(3)
-spec_idx = 5
+spec_idx = 0
 plt.plot(x, ws[spec_idx], label="synthetic ncp", linewidth = 2)
 plt.plot(x, ncp[spec_idx], "--", label="fitted ncp", linewidth = 2)
 plt.legend()
 plt.show()
 
-ncp_mask = np.isclose(ws, ncp, rtol=0.01, equal_nan = True)
+ncp_mask = np.isclose(ws, ncp, rtol=0.001, equal_nan = True)
 plt.figure(0)
 plt.imshow(ncp_mask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
 plt.title("Comparison between ws and ncp")
 plt.xlabel("TOF")
 plt.ylabel("spectrums")
 plt.show()
-
-# %%
-# Comparing the three different approaches of optimization
-
-scalePars = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters.npz")
-partLSQ = np.load(r"C:/Users/guijo/Desktop/optimizations/partitioned_least_squares.npz")
-scipyOpt = np.load(r"C:/Users/guijo/Desktop/optimizations/scipy_optimization.npz")
-
-print(partLSQ["all_spec_best_par_chi_nit"].shape)
-for key in scalePars:
-    print(key)
-
-for file in [scalePars, partLSQ, scipyOpt]:
-    pars = file["all_spec_best_par_chi_nit"].reshape(132, 15)
-    chi2 = pars[:, -2]
-    print(np.nanmax(chi2))
-    maxMask = chi2 == np.nanmax(chi2)
-    print("nit max:", pars[:, -1][maxMask])
-    specMax = np.argwhere(maxMask)
-    print("specMax: ", specMax)
-    meanChi2 = np.nansum(chi2)
-    print("The mean Chi2 is ", meanChi2)
-    widths = file["all_mean_widths"]
-    intensities = file["all_mean_intensities"]
-    print(widths, "\n", intensities)
-
-#%%
-# Investigating the spectrums that are badly fit
-
-scalePars = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters.npz")
-partLSQ = np.load(r"C:/Users/guijo/Desktop/optimizations/partitioned_least_squares.npz")
-scipyOpt = np.load(r"C:/Users/guijo/Desktop/optimizations/scipy_optimization.npz")
-
-for file in [scalePars, scipyOpt]:
-    ws = file["all_fit_workspaces"][0, :, :-1]
-    ncp = file["all_tot_ncp"][0, :]
-
-    x = np.linspace(0, 1, len(ncp[0]))
-    plt.figure()
-    spec_idx = 15
-    plt.plot(x, ws[spec_idx], label="synthetic ncp", linewidth = 2)
-    plt.plot(x, ncp[spec_idx], "--", label="fitted ncp", linewidth = 2)
-    plt.legend()
-    plt.show()
-
-    ncp_mask = np.isclose(ws, ncp, rtol=0.01, equal_nan = True)
-    plt.figure()
-    plt.imshow(ncp_mask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
-    plt.title("Comparison between synthetic and fitted ncp")
-    plt.xlabel("TOF")
-    plt.ylabel("spectra")
-    plt.show()
-
-    # Take out spectra that have a bad fit
-    badFitMask = ncp_mask[:, 20] # At this bin there isnt noise
-    print("No of good spec: ", badFitMask.sum())
-    ws = ws[badFitMask, :]
-    ncp = ncp[badFitMask, :]
-    print("one of the masked spectrum:\n", ws[15, :5])
-
-
-    ncp_mask = np.isclose(ws, ncp, rtol=0.01, equal_nan = True)
-    plt.figure()
-    plt.imshow(ncp_mask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
-    plt.title("Comparison between synthetic and fitted ncp")
-    plt.xlabel("TOF")
-    plt.ylabel("spectra")
-    plt.show()   
-
-    pars = file["all_spec_best_par_chi_nit"][0]
-    print("Bad spectrums: ", pars[~badFitMask, 0])
-    goodPars = pars[badFitMask, :]
-    totalMean = np.nanmean(goodPars, axis=0)
-    print("All means:\n", totalMean)
-
-
-
-
 
 # %%
