@@ -177,13 +177,13 @@ bounds = np.array([
 ])
 
 scalingFactors = np.ones(initPars.shape)
-scaleParameters = False 
+scaleParameters = False
 if scaleParameters:
     noOfMasses = int(len(initPars)/3)
     initPars[2::3] = np.full((1, noOfMasses), 1)  # Can experiment with other starting points
     scalingFactors = 1 / initPars
 
-statisticalWeightChi2 = False
+statisticalWeightChi2 = False 
 
 # Intensities Constraints
 # CePt4Ge12 in Al can
@@ -482,8 +482,8 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     if statisticalWeightChi2:
         weight = dataY**2
 
-    if (np.sum(dataE) > 0):    #don't understand this conditional statement
-        chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2 / weight    #weighted fit
+    if (np.sum(dataE) > 0):    # Don't understand this conditional statement
+        chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
     else:
         chi2 = (ncpTotal - dataY)**2 / weight
     return np.sum(chi2)

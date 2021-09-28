@@ -50,6 +50,7 @@ syn = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved
 #np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
 
 ws = syn["all_fit_workspaces"][0, :, :-1]
+ws = np.where(ws==0, np.nan, ws)
 ncp = syn["all_tot_ncp"][0]
 par = syn["all_spec_best_par_chi_nit"][0]
 
@@ -65,7 +66,7 @@ plt.plot(x, ncp[spec_idx], "--", label="fitted ncp", linewidth = 2)
 plt.legend()
 plt.show()
 
-ncp_mask = np.isclose(ws, ncp, rtol=0.001, equal_nan = True)
+ncp_mask = np.isclose(ws, ncp, rtol=0.01, equal_nan = True)
 plt.figure(0)
 plt.imshow(ncp_mask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
 plt.title("Comparison between ws and ncp")
