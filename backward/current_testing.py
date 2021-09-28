@@ -55,7 +55,7 @@ print("Mean Chi2 for 134 spectrums is: ", meanChi2)
 
 x = np.linspace(0, 1, len(ncp[0]))
 plt.figure(3)
-spec_idx = 15
+spec_idx = 1
 print("first values ws: ", ws[spec_idx, :5])
 print("first values ncp: ", ncp[spec_idx, :5])
 
