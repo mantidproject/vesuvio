@@ -202,13 +202,14 @@ slabPars = [name, vertical_width, horizontal_width, thickness]
 
 # Frequently changed conditions
 noOfMSIterations = 1
-firstSpec, lastSpec = 3, 5  # 3, 134
+firstSpec, lastSpec = 3, 134  # 3, 134
+userPathInitWsFlag = True
 scaleParsFlag = False
 statisticalWeightChi2Flag = False 
-userPathInitWsFlag = True
 fitSyntheticWsFlag = False 
 # Path to save the results of teh script
-savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
+savePath = repoPath / "tests" / "runs_for_testing" / "opt_run_vs_original" 
+#r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
 
 loadRawAndEmptyWorkspaces(userPathInitWsFlag, userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)
 scalingFactors = prepareScalingFactors(scaleParsFlag, initPars)
