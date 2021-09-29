@@ -208,7 +208,7 @@ scaleParsFlag = False
 statisticalWeightChi2Flag = False 
 fitSyntheticWsFlag = False 
 # Path to save the results of teh script
-savePath = repoPath / "tests" / "runs_for_testing" / "opt_run_vs_original" 
+savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
 #r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
 
 loadRawAndEmptyWorkspaces(userPathInitWsFlag, userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)

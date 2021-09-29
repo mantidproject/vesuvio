@@ -5,11 +5,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
-
 np.set_printoptions(suppress=True, precision=4, linewidth=150)
 
-newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
-oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
+newPath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz"
+oldPath = r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz"
+
+newResults = np.load(newPath)
+oldResults = np.load(oldPath)
 
 newPars = newResults["all_spec_best_par_chi_nit"][0]
 oldPars = oldResults["all_spec_best_par_chi_nit"][0]
@@ -26,28 +28,11 @@ plt.show()
 
 # %%
 import numpy as np
-newResults = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
-oldResults = np.load(r".\script_runs\opt_spec3-134_iter4_ncp_nightlybuild.npz")
-
-#np.testing.assert_allclose(newResults["all_mean_intensities"], oldResults["all_mean_intensities"])
-
-for key in oldResults:
-    try:
-        print("\nevaluating: ",key)
-        np.testing.assert_allclose(newResults[key][0], oldResults[key][0], rtol=1e-4)            
-        print("shape: ", newResults[key].shape)
-    except KeyError:
-        print("KeyError: one of the results doesnt have this key")
-    except AssertionError:
-        print("Assertion Error")
-
-# %%
-import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('dark_background')
 
-syn = np.load(r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz")
-#np.load(r"C:\Users\guijo\Desktop\work_repos\scatt_scripts\backward\script_runs\opt_spec3-134_iter4_ncp_nightlybuild_synthetic.npz")
+syntheticFitPath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved.npz"
+syn = np.load(syntheticFitPath)
 
 ws = syn["all_fit_workspaces"][0, :, :-1]
 ws = np.where(ws==0, np.nan, ws)
