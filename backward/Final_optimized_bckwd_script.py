@@ -210,20 +210,14 @@ fitSyntheticWsFlag = False
 # Path to save the results of teh script
 savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
 
+loadRawAndEmptyWorkspaces(userPathInitWsFlag, userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)
+scalingFactors = prepareScalingFactors(scaleParsFlag, initPars)
+firstIdx, lastIdx = convertFirstAndLastSpecToIdx(name, firstSpec, lastSpec)
+wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx)
+maskedDetectorIdx = calculateMaskedDetectIdx(maskedSpecNo, firstSpec, lastSpec)
+createSlabGeometry(slabPars)
 
 def main():
-
-    loadRawAndEmptyWorkspaces(userPathInitWsFlag, userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)
-
-    scalingFactors = prepareScalingFactors(scaleParsFlag, initPars)
-
-    createSlabGeometry(slabPars)
-
-    firstIdx, lastIdx = convertFirstAndLastSpecToIdx(name, firstSpec, lastSpec)
-    wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx)
-    maskedDetectorIdx = calculateMaskedDetectIdx(maskedSpecNo, firstSpec, lastSpec)
-
-
     # Initialize arrays to store script results
     thisScriptResults = resultsObject()
 
