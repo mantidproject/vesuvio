@@ -93,8 +93,11 @@ main()
 #%%
 
 class someObj:
+    name = "some_name"
+    city = name + "_andACity"
     def __init__(self):
         self.no = 3
+        self.nameAndNo = str(self.no) + self.name 
 
 def main():
 
@@ -103,5 +106,8 @@ def main():
     def func():
         a.no += 1
         print(a.no)
+        print(a.name)
+        print(a.nameAndNo)
+        print(a.city)
     func()
 main()

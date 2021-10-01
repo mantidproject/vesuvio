@@ -39,12 +39,12 @@ def prepareScalingFactors(scaleParsFlag, initPars):
     return scalingFactors
 
 
-# def loadRawAndEmptyWorkspaces(userPathInitWsFlag, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
-#     """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-#     if userPathInitWsFlag:
-#         loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
-#     else:
-#         loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
+def loadRawAndEmptyWorkspaces(userPathInitWsFlag, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
+    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
+    if userPathInitWsFlag:
+        loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
+    else:
+        loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
 
 
 def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
@@ -92,12 +92,12 @@ def convertFirstAndLastSpecToIdx(name, firstSpec, lastSpec):
     return firstIdx, lastIdx
 
 
-# def calculateMaskedDetectIdx(maskedSpecNo, firstSpec, lastSpec):
-#     maskedSpecNo = np.array(maskedSpecNo)   
-#     maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
-#     spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-#     maskedDetectorsIdx = maskedSpecNo - spec_offset
-#     return maskedDetectorsIdx
+def calculateMaskedDetectIdx(maskedSpecNo, name,  firstSpec, lastSpec):
+    maskedSpecNo = np.array(maskedSpecNo)   
+    maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
+    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
+    maskedDetectorsIdx = maskedSpecNo - spec_offset
+    return maskedDetectorsIdx
 
 
 def createSlabGeometry(slabPars):
@@ -114,13 +114,13 @@ def createSlabGeometry(slabPars):
     return
 
 
-# def chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx):
-#     if fitSyntheticWsFlag:
-#         syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
-#         wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx)
-#     else:
-#         wsToBeFitted = cropAndCloneMainWorkspace(name, firstIdx, lastIdx)
-#     return wsToBeFitted
+def chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx):
+    if fitSyntheticWsFlag:
+        syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
+        wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx)
+    else:
+        wsToBeFitted = cropAndCloneMainWorkspace(name, firstIdx, lastIdx)
+    return wsToBeFitted
 
 
 def loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx):
@@ -145,72 +145,76 @@ def cropAndCloneMainWorkspace(name, firstIdx, lastIdx):
         InputWorkspace=name, OutputWorkspace=name+"0")
     return wsToBeFitted
 
+class InitialConditions:
 # Parameters for Raw and Empty Workspaces
-userWsRawPath = r"./input_ws/CePtGe12_100K_DD_raw.nxs"
-userWsEmptyPath = r"./input_ws/CePtGe12_100K_DD_empty.nxs"
-name = 'CePtGe12_100K_DD_'
+    name = 'CePtGe12_100K_DD_'
+    userWsRawPath = r"./input_ws/CePtGe12_100K_DD_raw.nxs"
+    userWsEmptyPath = r"./input_ws/CePtGe12_100K_DD_empty.nxs"
 
-runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
-empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-spectra='3-134'                               # Spectra to be analysed
-tof_binning='275.,1.,420'                     # Binning of ToF spectra
-mode='DoubleDifference'
-ipfile='ip2018.initPars'
-rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
+    runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
+    empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
+    spectra='3-134'                               # Spectra to be analysed
+    tof_binning='275.,1.,420'                     # Binning of ToF spectra
+    mode='DoubleDifference'
+    ipfile='ip2018.initPars'
+    rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
 
-# Masses, instrument parameters and initial fitting parameters
-masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
-InstrParsPath = repoPath / "ip2018.par"
+    # Masses, instrument parameters and initial fitting parameters
+    masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
+    InstrParsPath = repoPath / "ip2018.par"
 
-# Elements                                                             Cerium     Platinum     Germanium    Aluminium
-# Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
-# Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A
-# Intensities Constraints:
-# CePt4Ge12 in Al can                 Cerium                  Platinum                  Germanium
-# Cross section * Stoichiometry:      2.94*1 = 2.94           11.71*4 = 46.84           8.6*12 = 103.2        barn
+    # Elements                                                             Cerium     Platinum     Germanium    Aluminium
+    # Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
+    # Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A
+    # Intensities Constraints:
+    # CePt4Ge12 in Al can                 Cerium                  Platinum                  Germanium
+    # Cross section * Stoichiometry:      2.94*1 = 2.94           11.71*4 = 46.84           8.6*12 = 103.2        barn
 
-initPars = np.array([ 
-# Intensities, NCP widths, NCP centers
-    1, 18.22, 0,   # Cerium
-    1, 22.5, 0,    # Platinum
-    1, 15.4, 0,    # Germanium
-    1, 9.93, 0     # Aluminium
-])
-bounds = np.array([
-    [0, np.nan], [17, 20], [-30, 30],
-    [0, np.nan], [20, 25], [-30, 30],
-    [0, np.nan], [12.2, 18], [-10, 10],
-    [0, np.nan], [9.8, 10], [-10, 10]
-])
-constraints = ({'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/46.84*pars[3]},
-               {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
+    initPars = np.array([ 
+    # Intensities, NCP widths, NCP centers
+        1, 18.22, 0,   # Cerium
+        1, 22.5, 0,    # Platinum
+        1, 15.4, 0,    # Germanium
+        1, 9.93, 0     # Aluminium
+    ])
+    bounds = np.array([
+        [0, np.nan], [17, 20], [-30, 30],
+        [0, np.nan], [20, 25], [-30, 30],
+        [0, np.nan], [12.2, 18], [-10, 10],
+        [0, np.nan], [9.8, 10], [-10, 10]
+    ])
+    constraints = ({'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/46.84*pars[3]},
+                {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
 
-# Masked detectors
-maskedSpecNo = [18,34,42,43,59,60,62,118,119,133]
+    # Masked detectors
+    maskedSpecNo = [18,34,42,43,59,60,62,118,119,133]
 
-# Multiscaterring Correction Parameters
-transmission_guess = 0.98        # Experimental value from VesuvioTransmission
-multiple_scattering_order, number_of_events = 2, 1.e5   
-hydrogen_peak = False                 # Hydrogen multiple scattering
-hydrogen_to_mass0_ratio = 0
-# Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-mulscatPars = [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
+    # Multiscaterring Correction Parameters
+    transmission_guess = 0.98        # Experimental value from VesuvioTransmission
+    multiple_scattering_order, number_of_events = 2, 1.e5   
+    hydrogen_peak = False                 # Hydrogen multiple scattering
+    hydrogen_to_mass0_ratio = 0
+    # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+    mulscatPars = [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
 
-# Sample slab parameters
-vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-slabPars = [name, vertical_width, horizontal_width, thickness]
+    # Sample slab parameters
+    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+    slabPars = [name, vertical_width, horizontal_width, thickness]
 
-# Frequently changed conditions
-# noOfMSIterations = 1
-# firstSpec, lastSpec = 3, 134  # 3, 134
-# userPathInitWsFlag = True
-# scaleParsFlag = False
-# statisticalWeightChi2Flag = False 
-# fitSyntheticWsFlag = False 
-# Path to save the results of teh script
-savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
-#r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
+    savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
 
+    def __init__(self, initialConditionsDict):
+        
+        D = initialConditionsDict
+        self.noOfMSIterations = D["noOfMSIterations"]
+        self.firstSpec = D["firstSpec"]
+        self.lastSpec = D["lastSpec"]
+        self.userpathInitWsFlag = D["userPathInitWsFlag"]
+        self.scaleParsFlag = D["scaleParsFlag"]
+        self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
+        self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
+
+    
 initialConditionsDict = {
     "noOfMSIterations" : 1, 
     "firstSpec" : 3, 
@@ -221,54 +225,18 @@ initialConditionsDict = {
     "fitSyntheticWsFlag" : False   
 }
 
-class InitialConditions:
-    def __init__(self, initialConditionsDict):
-        D = initialConditionsDict
-        self.noOfMSIterations = D["noOfMSIterations"]
-        self.firstSpec = D["firstSpec"]
-        self.lastSpec = D["lastSpec"]
-        self.userpathInitWsFlag = D["userPathInitWsFlag"]
-        self.scaleParsFlag = D["scaleParsFlag"]
-        self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
-        self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
-
-        firstIdx, lastIdx = convertFirstAndLastSpecToIdx(name, self.firstSpec, self.lastSpec)
-        self.firstIdx = firstIdx
-        self.lastIdx = lastIdx
-
-    def calculateMaskedDetectIdx(self, maskedSpecNo):
-        maskedSpecNo = np.array(maskedSpecNo)   
-        maskedSpecNo = maskedSpecNo[(maskedSpecNo >= self.firstSpec) & (maskedSpecNo <= self.lastSpec)] 
-        spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-        maskedDetectorsIdx = maskedSpecNo - spec_offset
-        return maskedDetectorsIdx
-
-    def loadRawAndEmptyWorkspaces(self, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
-        """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-        if self.userPathInitWsFlag:
-            loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
-        else:
-            loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
-
-    def chooseWorkspaceToBeFitted(self):
-        if self.fitSyntheticWsFlag:
-            syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
-            wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, self.firstIdx, self.lastIdx)
-        else:
-            wsToBeFitted = cropAndCloneMainWorkspace(name, self.firstIdx, self.lastIdx)
-        return wsToBeFitted
-    
-
 
 def main(initialConditionsDict=initialConditionsDict):
 
     ic = InitialConditions(initialConditionsDict)
-    maskedDetectorIdx = ic.calculateMaskedDetectIdx(maskedSpecNo)
-    ic.loadRawAndEmptyWorkspaces(userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)
-    wsToBeFitted = ic.chooseWorkspaceToBeFitted()
 
-    scalingFactors = prepareScalingFactors(ic.scaleParsFlag, initPars)
-    createSlabGeometry(slabPars)
+    loadRawAndEmptyWorkspaces(ic.userpathInitWsFlag, ic.firstSpec, ic.lastSpec)
+    firstIdx, lastIdx = convertFirstAndLastSpecToIdx(ic.name, ic.firstSpec, ic.lastSpec)
+    maskedDetectorIdx = calculateMaskedDetectIdx(ic.maskedSpecNo, ic.name, ic.firstSpec, ic.lastSpec)
+    wsToBeFitted = chooseWorkspaceToBeFitted(ic.fitSyntheticWsFlag, firstIdx, lastIdx)
+
+    scalingFactors = prepareScalingFactors(ic.scaleParsFlag, ic.initPars)
+    createSlabGeometry(ic.slabPars)
 
     # Initialize arrays to store script results
     thisScriptResults = resultsObject(wsToBeFitted)
