@@ -213,8 +213,7 @@ createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 fitSyntheticWorkspace = False 
 wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWorkspace)
 
-savePath = r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
-#repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild_synthetic"
+savePath = repoPath / "script_runs" / "testing_runs"
 
 
 def main():
