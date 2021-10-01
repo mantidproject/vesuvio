@@ -39,12 +39,12 @@ def prepareScalingFactors(scaleParsFlag, initPars):
     return scalingFactors
 
 
-def loadRawAndEmptyWorkspaces(userPathInitWsFlag, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
-    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-    if userPathInitWsFlag:
-        loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
-    else:
-        loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
+# def loadRawAndEmptyWorkspaces(userPathInitWsFlag, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
+#     """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
+#     if userPathInitWsFlag:
+#         loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
+#     else:
+#         loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
 
 
 def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
@@ -92,12 +92,12 @@ def convertFirstAndLastSpecToIdx(name, firstSpec, lastSpec):
     return firstIdx, lastIdx
 
 
-def calculateMaskedDetectIdx(maskedSpecNo, firstSpec, lastSpec):
-    maskedSpecNo = np.array(maskedSpecNo)   
-    maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-    maskedDetectorsIdx = maskedSpecNo - spec_offset
-    return maskedDetectorsIdx
+# def calculateMaskedDetectIdx(maskedSpecNo, firstSpec, lastSpec):
+#     maskedSpecNo = np.array(maskedSpecNo)   
+#     maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
+#     spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
+#     maskedDetectorsIdx = maskedSpecNo - spec_offset
+#     return maskedDetectorsIdx
 
 
 def createSlabGeometry(slabPars):
@@ -114,13 +114,13 @@ def createSlabGeometry(slabPars):
     return
 
 
-def chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx):
-    if fitSyntheticWsFlag:
-        syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
-        wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx)
-    else:
-        wsToBeFitted = cropAndCloneMainWorkspace(name, firstIdx, lastIdx)
-    return wsToBeFitted
+# def chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx):
+#     if fitSyntheticWsFlag:
+#         syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
+#         wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx)
+#     else:
+#         wsToBeFitted = cropAndCloneMainWorkspace(name, firstIdx, lastIdx)
+#     return wsToBeFitted
 
 
 def loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx):
@@ -201,26 +201,79 @@ vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in me
 slabPars = [name, vertical_width, horizontal_width, thickness]
 
 # Frequently changed conditions
-noOfMSIterations = 1
-firstSpec, lastSpec = 3, 134  # 3, 134
-userPathInitWsFlag = True
-scaleParsFlag = False
-statisticalWeightChi2Flag = False 
-fitSyntheticWsFlag = False 
+# noOfMSIterations = 1
+# firstSpec, lastSpec = 3, 134  # 3, 134
+# userPathInitWsFlag = True
+# scaleParsFlag = False
+# statisticalWeightChi2Flag = False 
+# fitSyntheticWsFlag = False 
 # Path to save the results of teh script
 savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
 #r"C:/Users/guijo/Desktop/optimizations/scaling_parameters_improved"
 
-loadRawAndEmptyWorkspaces(userPathInitWsFlag, userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)
-scalingFactors = prepareScalingFactors(scaleParsFlag, initPars)
-firstIdx, lastIdx = convertFirstAndLastSpecToIdx(name, firstSpec, lastSpec)
-wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx)
-maskedDetectorIdx = calculateMaskedDetectIdx(maskedSpecNo, firstSpec, lastSpec)
-createSlabGeometry(slabPars)
+initialConditionsDict = {
+    "noOfMSIterations" : 1, 
+    "firstSpec" : 3, 
+    "lastSpec" : 134,
+    "userPathInitWsFlag" : True, 
+    "scaleParsFlag" : False, 
+    "statisticalWeightChi2Flag" : False, 
+    "fitSyntheticWsFlag" : False   
+}
 
-def main():
+class InitialConditions:
+    def __init__(self, initialConditionsDict):
+        D = initialConditionsDict
+        self.noOfMSIterations = D["noOfMSIterations"]
+        self.firstSpec = D["firstSpec"]
+        self.lastSpec = D["lastSpec"]
+        self.userpathInitWsFlag = D["userPathInitWsFlag"]
+        self.scaleParsFlag = D["scaleParsFlag"]
+        self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
+        self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
+
+        firstIdx, lastIdx = convertFirstAndLastSpecToIdx(name, self.firstSpec, self.lastSpec)
+        self.firstIdx = firstIdx
+        self.lastIdx = lastIdx
+
+    def calculateMaskedDetectIdx(self, maskedSpecNo):
+        maskedSpecNo = np.array(maskedSpecNo)   
+        maskedSpecNo = maskedSpecNo[(maskedSpecNo >= self.firstSpec) & (maskedSpecNo <= self.lastSpec)] 
+        spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
+        maskedDetectorsIdx = maskedSpecNo - spec_offset
+        return maskedDetectorsIdx
+
+    def loadRawAndEmptyWorkspaces(self, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
+        """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
+        if self.userPathInitWsFlag:
+            loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
+        else:
+            loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
+
+    def chooseWorkspaceToBeFitted(self):
+        if self.fitSyntheticWsFlag:
+            syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
+            wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, self.firstIdx, self.lastIdx)
+        else:
+            wsToBeFitted = cropAndCloneMainWorkspace(name, self.firstIdx, self.lastIdx)
+        return wsToBeFitted
+    
+
+
+        
+
+def main(initialConditionsDict=initialConditionsDict):
+
+    ic = InitialConditions(initialConditionsDict)
+    maskedDetectorIdx = ic.calculateMaskedDetectIdx(maskedSpecNo)
+    ic.loadRawAndEmptyWorkspaces(userWsRawPath, userWsEmptyPath, rawAndEmptyWsConfigs)
+    wsToBeFitted = ic.chooseWorkspaceToBeFitted()
+
+    scalingFactors = prepareScalingFactors(ic.scaleParsFlag, initPars)
+    createSlabGeometry(slabPars)
+
     # Initialize arrays to store script results
-    thisScriptResults = resultsObject()
+    thisScriptResults = resultsObject(wsToBeFitted)
 
     for iteration in range(noOfMSIterations):
         # Workspace from previous iteration
@@ -254,7 +307,7 @@ All the functions required to run main() are listed below, in order of appearanc
 class resultsObject:
     """Used to store results of the script"""
 
-    def __init__(self):
+    def __init__(self, wsToBeFitted):
         """Initializes arrays full of zeros"""
 
         noOfSpec = wsToBeFitted.getNumberHistograms()
