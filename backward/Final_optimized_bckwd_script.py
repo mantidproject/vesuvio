@@ -260,8 +260,6 @@ class InitialConditions:
     
 
 
-        
-
 def main(initialConditionsDict=initialConditionsDict):
 
     ic = InitialConditions(initialConditionsDict)

@@ -60,3 +60,48 @@ plt.ylabel("spectrums")
 plt.show()
 
 # %%
+class someObj:
+    def __init__(self):
+        self.attribute = 3
+
+def main():
+
+    a = [5]
+
+    def func():
+        a[0] += 1
+        print(a)
+    func()
+main()
+
+# %%
+
+class someObj:
+    def __init__(self):
+        self.no = 3
+
+def main():
+
+    a = someObj()
+
+    def func():
+        a.no += 1
+        print(a.no)
+    func()
+main()
+
+#%%
+
+class someObj:
+    def __init__(self):
+        self.no = 3
+
+def main():
+
+    a = someObj()
+
+    def func():
+        a.no += 1
+        print(a.no)
+    func()
+main()
