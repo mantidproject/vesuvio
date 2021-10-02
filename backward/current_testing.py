@@ -98,6 +98,7 @@ class someObj:
     def __init__(self):
         self.no = 3
         self.nameAndNo = str(self.no) + self.name 
+    
 
 def main():
 

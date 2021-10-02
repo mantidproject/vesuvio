@@ -24,126 +24,15 @@ The fit procedure in the time-of-flight domain is  based on the scipy.minimize.o
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
 '''
 
-def prepareScalingFactors(scaleParsFlag, initPars):
-    """Returns array used for scaling the fitting parameters.
-    Default is parameters not going to be scaled.
-    If Boolean Flag is set to True, centers are changed to one (can not be zero),
-    and scaling factors normalize the scaling parameters.
-    """
-
-    scalingFactors = np.ones(initPars.shape)
-    if scaleParsFlag:
-        noOfMasses = int(len(initPars)/3)
-        initPars[2::3] = np.full((1, noOfMasses), 1)  # Can experiment with other starting points
-        scalingFactors = 1 / initPars
-    return scalingFactors
-
-
-def loadRawAndEmptyWorkspaces(userPathInitWsFlag, userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
-    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-    if userPathInitWsFlag:
-        loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs)
-    else:
-        loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs)
-
-
-def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath, rawAndEmptyWsConfigs):
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = rawAndEmptyWsConfigs
-
-    print('\n', 'Loading the sample runs: ', runs, '\n')
-    Load(Filename=userRawPath, OutputWorkspace=name+"raw")
-    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
-          OutputWorkspace=name+'raw')
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-
-    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    Load(Filename=userEmptyPath, OutputWorkspace=name+"empty")
-    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-          OutputWorkspace=name+'empty')
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
-          'empty', OutputWorkspace=name)
-
-
-def loadRawAndEmptyWsVesuvio(rawAndEmptyWsConfigs):
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = rawAndEmptyWsConfigs
-    
-    print('\n', 'Loading the sample runs: ', runs, '\n')
-    LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode,
-                InstrumentParFile=ipfile, OutputWorkspace=name+'raw')
-    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
-          OutputWorkspace=name+'raw')
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-
-    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode,
-                InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
-    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-          OutputWorkspace=name+'empty')
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
-          'empty', OutputWorkspace=name)
-
-
-def convertFirstAndLastSpecToIdx(name, firstSpec, lastSpec):
-    """Used because idexes remain consistent between different workspaces, 
-    which might not be the case for spec numbers"""
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-    firstIdx = firstSpec - spec_offset
-    lastIdx = lastSpec - spec_offset
-    return firstIdx, lastIdx
-
-
-def calculateMaskedDetectIdx(maskedSpecNo, name,  firstSpec, lastSpec):
-    maskedSpecNo = np.array(maskedSpecNo)   
-    maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-    maskedDetectorsIdx = maskedSpecNo - spec_offset
-    return maskedDetectorsIdx
-
-
-def createSlabGeometry(slabPars):
-    name, vertical_width, horizontal_width, thickness = slabPars
-    half_height, half_width, half_thick = 0.5*vertical_width, 0.5*horizontal_width, 0.5*thickness
-    xml_str = \
-        " <cuboid id=\"sample-shape\"> " \
-        + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
-        + "<left-front-top-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, half_height, half_thick) \
-        + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
-        + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
-        + "</cuboid>"
-    CreateSampleShape(name, xml_str)
-    return
-
-
-def chooseWorkspaceToBeFitted(fitSyntheticWsFlag, firstIdx, lastIdx):
-    if fitSyntheticWsFlag:
-        syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
-        wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx)
-    else:
-        wsToBeFitted = cropAndCloneMainWorkspace(name, firstIdx, lastIdx)
-    return wsToBeFitted
-
-
-def loadSyntheticNcpWorkspace(syntheticResultsPath, firstIdx, lastIdx):
-    """Loads a synthetic ncpTotal workspace from previous fit results path"""
-    results = np.load(syntheticResultsPath)
-    # Ncp of first iteration
-    dataY = results["all_tot_ncp"][0, firstIdx : lastIdx+1]
-    # Cut last collumn to match ncpTotal length
-    dataX = mtd[name].extractX()[firstIdx : lastIdx+1, : -1]
-
-    wsToBeFitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(),
-                                   Nspec=len(dataX), OutputWorkspace=name+"0")
-    print(dataY.shape, dataX.shape)
-    return wsToBeFitted
-
-
-def cropAndCloneMainWorkspace(name, firstIdx, lastIdx):
-    """Returns cloned and cropped workspace with modified name"""
-    CropWorkspace(InputWorkspace=name, StartWorkspaceIndex=firstIdx,
-                  EndWorkspaceIndex=lastIdx, OutputWorkspace=name)
-    wsToBeFitted = CloneWorkspace(
-        InputWorkspace=name, OutputWorkspace=name+"0")
-    return wsToBeFitted
+initialConditionsDict = {
+    "noOfMSIterations" : 1, 
+    "firstSpec" : 3, 
+    "lastSpec" : 134,
+    "userPathInitWsFlag" : True, 
+    "scaleParsFlag" : False, 
+    "statisticalWeightChi2Flag" : False, 
+    "fitSyntheticWsFlag" : False   
+}
 
 class InitialConditions:
 # Parameters for Raw and Empty Workspaces
@@ -161,6 +50,7 @@ class InitialConditions:
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
+    noOfMasses = len(masses)
     InstrParsPath = repoPath / "ip2018.par"
 
     # Elements                                                             Cerium     Platinum     Germanium    Aluminium
@@ -187,7 +77,7 @@ class InitialConditions:
                 {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
 
     # Masked detectors
-    maskedSpecNo = [18,34,42,43,59,60,62,118,119,133]
+    maskedSpecNo = np.array([18,34,42,43,59,60,62,118,119,133])
 
     # Multiscaterring Correction Parameters
     transmission_guess = 0.98        # Experimental value from VesuvioTransmission
@@ -203,6 +93,12 @@ class InitialConditions:
 
     savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
 
+    syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
+
+    specOffset = 3
+
+    maskedSpecIdx = maskedSpecNo - specOffset
+    
     def __init__(self, initialConditionsDict):
         
         D = initialConditionsDict
@@ -214,50 +110,130 @@ class InitialConditions:
         self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
         self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
 
-    
-initialConditionsDict = {
-    "noOfMSIterations" : 1, 
-    "firstSpec" : 3, 
-    "lastSpec" : 134,
-    "userPathInitWsFlag" : True, 
-    "scaleParsFlag" : False, 
-    "statisticalWeightChi2Flag" : False, 
-    "fitSyntheticWsFlag" : False   
-}
+    firstIdx = firstSpec - specOffset
+    lastIdx = lastSpec - specOffset
 
+    scalingFactors = np.ones(initPars.shape)
+
+    def prepareScalingFactors(self):
+        """Returns array used for scaling the fitting parameters.
+        Default is parameters not going to be scaled.
+        If Boolean Flag is set to True, centers are changed to one (can not be zero),
+        and scaling factors normalize the scaling parameters.
+        """
+        if self.scaleParsFlag:
+            self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Can experiment with other starting points
+            self.scalingFactors = 1 / self.initPars
+    
+
+def prepareWorkspaceToBeFitted(ic):
+    if ic.fitSyntheticWsFlag:
+        wsToBeFitted = loadSyntheticNcpWorkspace(ic)
+    else:
+        wsToBeFitted = loadVesuvioDataWorkspaces(ic)
+    return wsToBeFitted
+
+
+def loadSyntheticNcpWorkspace(ic):
+    """Loads a synthetic ncpTotal workspace from previous fit results path"""
+    wsToBeFitted = Load(Filename=ic.syntheticResultsPath, OutputWorkspace=ic.name+"0") 
+    return wsToBeFitted
+
+
+def loadVesuvioDataWorkspaces(ic):
+    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
+    if ic.userPathInitWsFlag:
+        loadRawAndEmptyWsFromUserPath(ic)
+    else:
+        loadRawAndEmptyWsVesuvio(ic)
+
+
+def loadRawAndEmptyWsFromUserPath(ic):
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.rawAndEmptyWsConfigs
+
+    print('\n', 'Loading the sample runs: ', runs, '\n')
+    Load(Filename=ic.userRawPath, OutputWorkspace=name+"raw")
+    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
+          OutputWorkspace=name+'raw')
+    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+
+    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
+    Load(Filename=ic.userEmptyPath, OutputWorkspace=name+"empty")
+    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
+          OutputWorkspace=name+'empty')
+    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
+          'empty', OutputWorkspace=name)
+
+
+def loadRawAndEmptyWsVesuvio(ic):
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.rawAndEmptyWsConfigs
+    
+    print('\n', 'Loading the sample runs: ', runs, '\n')
+    LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode,
+                InstrumentParFile=ipfile, OutputWorkspace=name+'raw')
+    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
+          OutputWorkspace=name+'raw')
+    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+
+    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
+    LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode,
+                InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
+    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
+          OutputWorkspace=name+'empty')
+    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
+          'empty', OutputWorkspace=name)
+
+
+def cropAndCloneWorkspace(ws, ic):
+    """Returns cloned and cropped workspace with modified name"""
+    CropWorkspace(InputWorkspace=ws, StartWorkspaceIndex=ic.firstIdx,
+                  EndWorkspaceIndex=ic.lastIdx, OutputWorkspace=ws.name)
+    wsToBeFitted = CloneWorkspace(
+        InputWorkspace=ws.name, OutputWorkspace=ws.name+"0")
+    return wsToBeFitted
+
+
+def createSlabGeometry(slabPars):
+    name, vertical_width, horizontal_width, thickness = slabPars
+    half_height, half_width, half_thick = 0.5*vertical_width, 0.5*horizontal_width, 0.5*thickness
+    xml_str = \
+        " <cuboid id=\"sample-shape\"> " \
+        + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
+        + "<left-front-top-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, half_height, half_thick) \
+        + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
+        + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
+        + "</cuboid>"
+    CreateSampleShape(name, xml_str)
+    return
 
 def main(initialConditionsDict=initialConditionsDict):
 
     ic = InitialConditions(initialConditionsDict)
 
-    loadRawAndEmptyWorkspaces(ic.userpathInitWsFlag, ic.firstSpec, ic.lastSpec)
-    firstIdx, lastIdx = convertFirstAndLastSpecToIdx(ic.name, ic.firstSpec, ic.lastSpec)
-    maskedDetectorIdx = calculateMaskedDetectIdx(ic.maskedSpecNo, ic.name, ic.firstSpec, ic.lastSpec)
-    wsToBeFitted = chooseWorkspaceToBeFitted(ic.fitSyntheticWsFlag, firstIdx, lastIdx)
-
-    scalingFactors = prepareScalingFactors(ic.scaleParsFlag, ic.initPars)
+    wsToBeFitted = prepareWorkspaceToBeFitted(ic)
+    wsToBeFitted = cropAndCloneWorkspace(wsToBeFitted, ic)
+    ic.prepareScalingFactors()
     createSlabGeometry(ic.slabPars)
-
     # Initialize arrays to store script results
-    thisScriptResults = resultsObject(wsToBeFitted)
+    thisScriptResults = resultsObject(wsToBeFitted, ic)
 
-    for iteration in range(noOfMSIterations):
+    for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[name+str(iteration)]
 
-        MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=maskedDetectorIdx)
+        MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
 
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
         thisScriptResults.append(iteration, fittedNcpResults)
-        if (iteration < noOfMSIterations - 1):  # evaluate MS correction except if last iteration
+        if (iteration < ic.noOfMSIterations - 1):  # evaluate MS correction except if last iteration
             meanWidths, meanIntensityRatios = fittedNcpResults[:2]
 
-            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars)
-            Minus(LHSWorkspace=name, RHSWorkspace=name+"_MulScattering",
-                  OutputWorkspace=name+str(iteration+1))
+            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
+            Minus(LHSWorkspace=ic.name, RHSWorkspace=ic.name+"_MulScattering",
+                  OutputWorkspace=ic.name+str(iteration+1))
 
-    thisScriptResults.save(savePath)
+    thisScriptResults.save(ic.savePath)
 
 
 ######################################################################################################################################
@@ -273,18 +249,17 @@ All the functions required to run main() are listed below, in order of appearanc
 class resultsObject:
     """Used to store results of the script"""
 
-    def __init__(self, wsToBeFitted):
+    def __init__(self, wsToBeFitted, ic):
         """Initializes arrays full of zeros"""
 
         noOfSpec = wsToBeFitted.getNumberHistograms()
         lenOfSpec = wsToBeFitted.blocksize()
-        noOfMasses = len(masses)
 
-        all_fit_workspaces = np.zeros((noOfMSIterations, noOfSpec, lenOfSpec))
+        all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
         all_spec_best_par_chi_nit = np.zeros(
-            (noOfMSIterations, noOfSpec, noOfMasses*3+3))
-        all_tot_ncp = np.zeros((noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        all_mean_widths = np.zeros((noOfMSIterations, noOfMasses))
+            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
+        all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
+        all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
         resultsList = [all_mean_widths, all_mean_intensities,
