@@ -177,13 +177,13 @@ bounds = np.array([
 ])
 
 scalingFactors = np.ones(initPars.shape)
-scaleParameters = False
+scaleParameters = True
 if scaleParameters:
     noOfMasses = int(len(initPars)/3)
     initPars[2::3] = np.full((1, noOfMasses), 1)  # Can experiment with other starting points
     scalingFactors = 1 / initPars
 
-statisticalWeightChi2 = False 
+statisticalWeightChi2 = False
 
 # Intensities Constraints
 # CePt4Ge12 in Al can
@@ -210,10 +210,10 @@ mulscatPars = loadMSPars()
 vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 createSlabGeometry(name, vertical_width, horizontal_width, thickness)
 
-fitSyntheticWorkspace = False 
+fitSyntheticWorkspace = True
 wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWorkspace)
 
-savePath = repoPath / "script_runs" / "testing_runs"
+savePath = repoPath / "script_runs" / "testing_syn_ncp"
 
 
 def main():
@@ -481,7 +481,7 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     if statisticalWeightChi2:
         weight = dataY**2
 
-    if (np.sum(dataE) > 0):    # Don't understand this conditional statement
+    if (np.sum(dataE) > 0):    
         chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
     else:
         chi2 = (ncpTotal - dataY)**2 / weight

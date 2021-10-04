@@ -34,7 +34,7 @@ class TestFitParameters(unittest.TestCase):
         self.optwidths = self.optmainPars[:, 1::3]
         self.optcenters = self.optmainPars[:, 2::3]
 
-        self.rtol = 0.0001
+        self.rtol = 0.001
         self.equal_nan = True
 
     def test_mainPars(self):
@@ -44,7 +44,7 @@ class TestFitParameters(unittest.TestCase):
         totalDiffMask = ~ totalMask
         noDiff = np.sum(totalDiffMask)
         maskSize = totalDiffMask.size
-        print("No of different pars:\n",
+        print("\nNo of different pars:\n",
             noDiff, " out of ", maskSize,
             f"ie {100*noDiff/maskSize:.1f} %")
         
@@ -63,7 +63,7 @@ class TestFitParameters(unittest.TestCase):
         totalDiffMask = ~ totalMask
         noDiff = np.sum(totalDiffMask)
         maskSize = totalDiffMask.size
-        print("No of different chi2:\n",
+        print("\nNo of different chi2:\n",
             noDiff, " out of ", maskSize,
             f"ie {100*noDiff/maskSize:.1f} %")
 
@@ -86,7 +86,7 @@ class TestNcp(unittest.TestCase):
         optimizedResults = np.load(pathToOptimized)
         self.optncp = optimizedResults["all_tot_ncp"][0]
 
-        self.rtol = 0.0001
+        self.rtol = 0.001
         self.equal_nan = True
 
     def test_ncp(self):
@@ -100,17 +100,17 @@ class TestNcp(unittest.TestCase):
         totalDiffMask = ~ totalMask
         noDiff = np.sum(totalDiffMask)
         maskSize = totalDiffMask.size
-        print("No of different values ncp:\n",
+        print("\nNo of different values ncp:\n",
             noDiff, " out of ", maskSize,
             f"ie {100*noDiff/maskSize:.1f} %")
         
         plt.figure()
         plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
                     interpolation="nearest", norm=None)
-        plt.title("Comparison between ori and opt ncp workspace")
-        plt.xlabel("Parameters")
+        plt.title("Comparison between ori and opt ncp")
         plt.ylabel("Spectra")
         plt.show()
+
 
 class TestMeanWidths(unittest.TestCase):
     def setUp(self):
@@ -121,7 +121,7 @@ class TestMeanWidths(unittest.TestCase):
         self.optmeanwidths = optimizedResults["all_mean_widths"][0]
     
     def test_ncp(self):
-        print("Mean widths:\n",
+        print("\nMean widths:\n",
             "ori: ", self.orimeanwidths, 
             "\nopt: ", self.optmeanwidths)
 
@@ -134,7 +134,7 @@ class TestMeanIntensities(unittest.TestCase):
         self.optmeanintensities = optimizedResults["all_mean_intensities"][0]
     
     def test_ncp(self):
-        print("Mean widths:\n",
+        print("\nMean widths:\n",
             "ori: ", self.orimeanintensities, 
             "\nopt: ", self.optmeanintensities)
 
