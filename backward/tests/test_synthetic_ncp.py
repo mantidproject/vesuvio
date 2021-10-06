@@ -9,13 +9,16 @@ from jupyterthemes import jtplot
 jtplot.style()
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
-pathToSynthetic = currentPath / "script_runs" / "testing_syn_ncp.npz"
+pathToSynthetic = currentPath / "runs_for_testing" / \
+    "fit_synthetic_ncp.npz"
 
 class TestNCP(unittest.TestCase):
     def setUp(self):
         results = np.load(pathToSynthetic)
         self.ws = results["all_fit_workspaces"][0, :, :-1]
         self.ncp = results["all_tot_ncp"][0]
+        self.chi2 = results["all_spec_best_par_chi_nit"][0][:, -2]
+        
 
         if np.all(self.ws[np.isnan(self.ncp)] == 0):
             self.ws = np.where(self.ws==0, np.nan, self.ws)
@@ -26,7 +29,7 @@ class TestNCP(unittest.TestCase):
         self.mask = np.isclose(
             self.ncp, self.ws, rtol=self.rtol, equal_nan=self.equal_nan
         )
-        self.idxToPlot = 0
+        self.idxToPlot = 80
 
     def test_diff_values(self):
         totalDiffMask = ~ self.mask
@@ -36,14 +39,20 @@ class TestNCP(unittest.TestCase):
             noDiff, " out of ", maskSize,
             f"ie {100*noDiff/maskSize:.1f} %")
         
-        print(self.ws[15, :5], self.ncp[15, :5])
+        print(self.ws[5, :5], self.ncp[5, :5])
+        print("Mean chi2 of all spectrums:\n",
+                np.nanmean(self.chi2))
+        print("Maximum chi2: ", np.nanmax(self.chi2))
+        chi2NoNans = self.chi2[~np.isnan(self.chi2)]
+        print("Mean, taking out outliers:\n",
+                np.nanmean(np.sort(chi2NoNans)[:-5]))
 
     def test_visual(self):
         plt.figure()
         plt.imshow(self.mask, aspect="auto", cmap=plt.cm.RdYlGn, interpolation="nearest", norm=None)
-        plt.title("Comparison between ws and ncp")
+        plt.title("Comparison between sythetic ncp and fitted ncp")
         plt.xlabel("TOF")
-        plt.ylabel("spectrums")
+        plt.ylabel("Spectra")
         plt.show()
 
     def test_plot(self):
@@ -52,6 +61,7 @@ class TestNCP(unittest.TestCase):
         specIdx = self.idxToPlot
         plt.plot(x, self.ws[specIdx], label="synthetic ncp", linewidth = 2)
         plt.plot(x, self.ncp[specIdx], "--", label="fitted ncp", linewidth = 2)
+        plt.ylabel("DataY")
         plt.legend()
         plt.show()
 

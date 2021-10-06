@@ -29,9 +29,10 @@ initialConditionsDict = {
     "firstSpec" : 3, 
     "lastSpec" : 134,
     "userPathInitWsFlag" : True, 
-    "scaleParsFlag" : False, 
+    "scaleParsFlag" : True, 
     "statisticalWeightChi2Flag" : False, 
-    "fitSyntheticWsFlag" : False   
+    "fitSyntheticWsFlag" : True,
+    "errorsForSyntheticNcpFlag" : False   # Non-zero dataE when creating NCP workspaces
 }
 
 class InitialConditions:
@@ -91,8 +92,8 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
-    syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
+    savePath = repoPath / "tests" / "runs_for_testing" / "fit_synthetic_ncp" 
+    syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     specOffset = 3
     maskedDetectorIdx = maskedSpecNo - specOffset
@@ -109,6 +110,7 @@ class InitialConditions:
         self.scaleParsFlag = D["scaleParsFlag"]
         self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
         self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
+        self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
 
         self.firstIdx = self.firstSpec - self.specOffset
         self.lastIdx = self.lastSpec - self.specOffset
@@ -137,7 +139,7 @@ def prepareWorkspaceToBeFitted():
 
 def loadSyntheticNcpWorkspace():
     """Loads a synthetic ncpTotal workspace from previous fit results path"""
-    wsToBeFitted = Load(Filename=ic.syntheticResultsPath, OutputWorkspace=ic.name+"0") 
+    wsToBeFitted = Load(Filename=str(ic.syntheticResultsPath), OutputWorkspace=ic.name) 
     return wsToBeFitted
 
 
@@ -364,9 +366,9 @@ def loadWorkspaceIntoArrays(ws):
     dataE = ws.extractE()
     dataX = ws.extractX()
 
-    hist_widths = dataX[:, 1:] - dataX[:, :-1]
-    dataY = dataY[:, :-1] / hist_widths
-    dataE = dataE[:, :-1] / hist_widths
+    histWidths = dataX[:, 1:] - dataX[:, :-1]
+    dataY = dataY[:, :-1] / histWidths
+    dataE = dataE[:, :-1] / histWidths
     dataX = (dataX[:, 1:] + dataX[:, :-1]) / 2
     return dataY, dataX, dataE
 
@@ -478,10 +480,15 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     if ic.statisticalWeightChi2Flag:
         weight = dataY**2
 
-    if (np.sum(dataE) > 0):    
-        chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
-    else:
+    if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         chi2 = (ncpTotal - dataY)**2 / weight
+    else:
+        chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
+        
+    # if (np.sum(dataE) > 0):    
+    #     chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
+    # else:
+    #     chi2 = (ncpTotal - dataY)**2 / weight
     return np.sum(chi2)
 
 
@@ -679,14 +686,20 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
     # Need to rearrage array of yspaces into seperate arrays for each mass
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     dataX = ws.extractX()
+    dataE = np.zeros(dataX.shape)
+
+    if ic.errorsForSyntheticNcpFlag:
+        wsDataE = ws.extractE()
+        dataE = np.mean(wsDataE, axis=1)[:, np.newaxis] * np.ones((1, len(dataX[0])))
 
     # Not sure this is correct
-    hist_widths = dataX[:, 1:] - dataX[:, :-1]
+    histWidths = dataX[:, 1:] - dataX[:, :-1]
     dataX = dataX[:, :-1]  # Cut last column to match ncpTotal length
-    dataY = ncpTotal * hist_widths
+    dataY = ncpTotal * histWidths
+    dataE = dataE[:, :-1] * histWidths
 
-    CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), Nspec=len(dataX), 
-                    OutputWorkspace=ws.name()+"_tof_fitted_profiles")
+    CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), DataE=dataE.flatten(),
+                     Nspec=len(dataX), OutputWorkspace=ws.name()+"_tof_fitted_profiles")
 
     for i, ncp_m in enumerate(ncpForEachMass):
         CreateWorkspace(DataX=dataX.flatten(), DataY=ncp_m.flatten(), Nspec=len(dataX),
