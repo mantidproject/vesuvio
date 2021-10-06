@@ -92,12 +92,12 @@ class InitialConditions:
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
     savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
-
     syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
 
     specOffset = 3
+    maskedDetectorIdx = maskedSpecNo - specOffset
 
-    maskedSpecIdx = maskedSpecNo - specOffset
+    scalingFactors = np.ones(initPars.shape)
     
     def __init__(self, initialConditionsDict):
         
@@ -113,7 +113,6 @@ class InitialConditions:
         self.firstIdx = self.firstSpec - self.specOffset
         self.lastIdx = self.lastSpec - self.specOffset
 
-    scalingFactors = np.ones(initPars.shape)
 
     def prepareScalingFactors(self):
         """Returns array used for scaling the fitting parameters.
@@ -126,7 +125,7 @@ class InitialConditions:
             self.scalingFactors = 1 / self.initPars
     
 
-ic = InitialConditions(initialConditionsDict)
+ic = InitialConditions(initialConditionsDict)  
 
 def prepareWorkspaceToBeFitted():
     if ic.fitSyntheticWsFlag:
@@ -145,9 +144,10 @@ def loadSyntheticNcpWorkspace():
 def loadVesuvioDataWorkspaces():
     """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
     if ic.userpathInitWsFlag:
-        loadRawAndEmptyWsFromUserPath()
+        wsToBeFitted =  loadRawAndEmptyWsFromUserPath()
     else:
-        loadRawAndEmptyWsVesuvio()
+        wsToBeFitted = loadRawAndEmptyWsVesuvio()
+    return wsToBeFitted
 
 
 def loadRawAndEmptyWsFromUserPath():
@@ -163,8 +163,10 @@ def loadRawAndEmptyWsFromUserPath():
     Load(Filename=ic.userWsEmptyPath, OutputWorkspace=name+"empty")
     Rebin(InputWorkspace=name+'empty', Params=tof_binning,
           OutputWorkspace=name+'empty')
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
-          'empty', OutputWorkspace=name)
+    wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty',
+                         OutputWorkspace=name)
+    print(wsToBeFitted.name())
+    return wsToBeFitted
 
 
 def loadRawAndEmptyWsVesuvio():
@@ -182,16 +184,17 @@ def loadRawAndEmptyWsVesuvio():
                 InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
     Rebin(InputWorkspace=name+'empty', Params=tof_binning,
           OutputWorkspace=name+'empty')
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
-          'empty', OutputWorkspace=name)
+    wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', 
+                         OutputWorkspace=name)
+    return wsToBeFitted
 
 
 def cropAndCloneWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
     CropWorkspace(InputWorkspace=ws, StartWorkspaceIndex=ic.firstIdx,
-                  EndWorkspaceIndex=ic.lastIdx, OutputWorkspace=ws.name)
+                  EndWorkspaceIndex=ic.lastIdx, OutputWorkspace=ws.name())
     wsToBeFitted = CloneWorkspace(
-        InputWorkspace=ws.name, OutputWorkspace=ws.name+"0")
+        InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0")
     return wsToBeFitted
 
 
@@ -206,12 +209,12 @@ def createSlabGeometry(slabPars):
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
     CreateSampleShape(name, xml_str)
-    return
 
-def main(initialConditionsDict=initialConditionsDict):
+def main():
 
-    wsToBeFitted = prepareWorkspaceToBeFitted()
-    wsToBeFitted = cropAndCloneWorkspace(wsToBeFitted)
+    wsToBeFittedUncropped = prepareWorkspaceToBeFitted()
+    wsToBeFitted = cropAndCloneWorkspace(wsToBeFittedUncropped)
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
     ic.prepareScalingFactors()
     createSlabGeometry(ic.slabPars)
     # Initialize arrays to store script results
@@ -220,8 +223,6 @@ def main(initialConditionsDict=initialConditionsDict):
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
-
-        MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
 
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
