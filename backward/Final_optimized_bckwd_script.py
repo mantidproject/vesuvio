@@ -24,43 +24,153 @@ The fit procedure in the time-of-flight domain is  based on the scipy.minimize.o
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
 '''
 
+initialConditionsDict = {
+    "noOfMSIterations" : 1, 
+    "firstSpec" : 3, 
+    "lastSpec" : 134,
+    "userPathInitWsFlag" : True, 
+    "scaleParsFlag" : False, 
+    "statisticalWeightChi2Flag" : False, 
+    "fitSyntheticWsFlag" : False   
+}
 
-def loadRawAndEmptyWorkspaces(loadVesuvioWs):
-    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-    if loadVesuvioWs:
-        loadRawAndEmptyWsVesuvio()
-    else:
-        userRawPath = r"./input_ws/CePtGe12_100K_DD_raw.nxs"
-        userEmptyPath = r"./input_ws/CePtGe12_100K_DD_empty.nxs"
-        loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath)
+class InitialConditions:
+# Parameters for Raw and Empty Workspaces
+    name = 'CePtGe12_100K_DD_'
+    userWsRawPath = r"./input_ws/CePtGe12_100K_DD_raw.nxs"
+    userWsEmptyPath = r"./input_ws/CePtGe12_100K_DD_empty.nxs"
 
-
-def loadRawAndEmptyWsFromUserPath(userRawPath, userEmptyPath):
-    tof_binning='275.,1.,420'                     # Binning of ToF spectra
-    runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-
-    print('\n', 'Loading the sample runs: ', runs, '\n')
-    Load(Filename=userRawPath, OutputWorkspace=name+"raw")
-    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
-          OutputWorkspace=name+'raw')
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-
-    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    Load(Filename=userEmptyPath, OutputWorkspace=name+"empty")
-    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-          OutputWorkspace=name+'empty')
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
-          'empty', OutputWorkspace=name)
-
-
-def loadRawAndEmptyWsVesuvio():
     runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
     spectra='3-134'                               # Spectra to be analysed
     tof_binning='275.,1.,420'                     # Binning of ToF spectra
     mode='DoubleDifference'
     ipfile='ip2018.initPars'
+    rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
+
+    # Masses, instrument parameters and initial fitting parameters
+    masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
+    noOfMasses = len(masses)
+    InstrParsPath = repoPath / "ip2018.par"
+
+    # Elements                                                             Cerium     Platinum     Germanium    Aluminium
+    # Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
+    # Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A
+    # Intensities Constraints:
+    # CePt4Ge12 in Al can                 Cerium                  Platinum                  Germanium
+    # Cross section * Stoichiometry:      2.94*1 = 2.94           11.71*4 = 46.84           8.6*12 = 103.2        barn
+
+    initPars = np.array([ 
+    # Intensities, NCP widths, NCP centers
+        1, 18.22, 0,   # Cerium
+        1, 22.5, 0,    # Platinum
+        1, 15.4, 0,    # Germanium
+        1, 9.93, 0     # Aluminium
+    ])
+    bounds = np.array([
+        [0, np.nan], [17, 20], [-30, 30],
+        [0, np.nan], [20, 25], [-30, 30],
+        [0, np.nan], [12.2, 18], [-10, 10],
+        [0, np.nan], [9.8, 10], [-10, 10]
+    ])
+    constraints = ({'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/46.84*pars[3]},
+                {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
+
+    # Masked detectors
+    maskedSpecNo = np.array([18,34,42,43,59,60,62,118,119,133])
+
+    # Multiscaterring Correction Parameters
+    transmission_guess = 0.98        # Experimental value from VesuvioTransmission
+    multiple_scattering_order, number_of_events = 2, 1.e5   
+    hydrogen_peak = False                 # Hydrogen multiple scattering
+    hydrogen_to_mass0_ratio = 0
+    # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+    mulscatPars = [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
+
+    # Sample slab parameters
+    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+    slabPars = [name, vertical_width, horizontal_width, thickness]
+
+    savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
+    syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
+
+    specOffset = 3
+    maskedDetectorIdx = maskedSpecNo - specOffset
+
+    scalingFactors = np.ones(initPars.shape)
+    
+    def __init__(self, initialConditionsDict):
+        
+        D = initialConditionsDict
+        self.noOfMSIterations = D["noOfMSIterations"]
+        self.firstSpec = D["firstSpec"]
+        self.lastSpec = D["lastSpec"]
+        self.userpathInitWsFlag = D["userPathInitWsFlag"]
+        self.scaleParsFlag = D["scaleParsFlag"]
+        self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
+        self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
+
+        self.firstIdx = self.firstSpec - self.specOffset
+        self.lastIdx = self.lastSpec - self.specOffset
+
+
+    def prepareScalingFactors(self):
+        """Returns array used for scaling the fitting parameters.
+        Default is parameters not going to be scaled.
+        If Boolean Flag is set to True, centers are changed to one (can not be zero),
+        and scaling factors normalize the scaling parameters.
+        """
+        if self.scaleParsFlag:
+            self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Can experiment with other starting points
+            self.scalingFactors = 1 / self.initPars
+    
+
+ic = InitialConditions(initialConditionsDict)  
+
+def prepareWorkspaceToBeFitted():
+    if ic.fitSyntheticWsFlag:
+        wsToBeFitted = loadSyntheticNcpWorkspace()
+    else:
+        wsToBeFitted = loadVesuvioDataWorkspaces()
+    return wsToBeFitted
+
+
+def loadSyntheticNcpWorkspace():
+    """Loads a synthetic ncpTotal workspace from previous fit results path"""
+    wsToBeFitted = Load(Filename=ic.syntheticResultsPath, OutputWorkspace=ic.name+"0") 
+    return wsToBeFitted
+
+
+def loadVesuvioDataWorkspaces():
+    """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
+    if ic.userpathInitWsFlag:
+        wsToBeFitted =  loadRawAndEmptyWsFromUserPath()
+    else:
+        wsToBeFitted = loadRawAndEmptyWsVesuvio()
+    return wsToBeFitted
+
+
+def loadRawAndEmptyWsFromUserPath():
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.rawAndEmptyWsConfigs
+
+    print('\n', 'Loading the sample runs: ', runs, '\n')
+    Load(Filename=ic.userWsRawPath, OutputWorkspace=name+"raw")
+    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
+          OutputWorkspace=name+'raw')
+    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+
+    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
+    Load(Filename=ic.userWsEmptyPath, OutputWorkspace=name+"empty")
+    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
+          OutputWorkspace=name+'empty')
+    wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty',
+                         OutputWorkspace=name)
+    print(wsToBeFitted.name())
+    return wsToBeFitted
+
+
+def loadRawAndEmptyWsVesuvio():
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.rawAndEmptyWsConfigs
     
     print('\n', 'Loading the sample runs: ', runs, '\n')
     LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode,
@@ -74,37 +184,22 @@ def loadRawAndEmptyWsVesuvio():
                 InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
     Rebin(InputWorkspace=name+'empty', Params=tof_binning,
           OutputWorkspace=name+'empty')
-    Minus(LHSWorkspace=name+'raw', RHSWorkspace=name +
-          'empty', OutputWorkspace=name)
+    wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', 
+                         OutputWorkspace=name)
+    return wsToBeFitted
 
 
-def convertFirstAndLastSpecToIdx(firstSpec, lastSpec):
-    """Used because idexes remain consistent between different workspaces, 
-    which might not be the case for spec numbers"""
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-    firstIdx = firstSpec - spec_offset
-    lastIdx = lastSpec - spec_offset
-    return firstIdx, lastIdx
+def cropAndCloneWorkspace(ws):
+    """Returns cloned and cropped workspace with modified name"""
+    CropWorkspace(InputWorkspace=ws, StartWorkspaceIndex=ic.firstIdx,
+                  EndWorkspaceIndex=ic.lastIdx, OutputWorkspace=ws.name())
+    wsToBeFitted = CloneWorkspace(
+        InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0")
+    return wsToBeFitted
 
 
-def loadMaskedDetectors(firstSpec, lastSpec):
-    maskedSpecNo = np.array([18,34,42,43,59,60,62,118,119,133])   
-    maskedSpecNo = maskedSpecNo[(maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)] 
-    spec_offset = mtd[name].getSpectrum(0).getSpectrumNo()      #use the main ws as the reference point
-    maskedDetectorsIdx = maskedSpecNo - spec_offset
-    return maskedDetectorsIdx
-
-
-def loadMSPars():
-    transmission_guess = 0.98  # experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5
-    # hydrogen multiple scattering
-    hydrogen_peak = False
-    hydrogen_to_mass0_ratio = 0
-    # hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-    return [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
-
-def createSlabGeometry(ws_name,vertical_width, horizontal_width, thickness):  #Don't know what it does
+def createSlabGeometry(slabPars):
+    name, vertical_width, horizontal_width, thickness = slabPars
     half_height, half_width, half_thick = 0.5*vertical_width, 0.5*horizontal_width, 0.5*thickness
     xml_str = \
         " <cuboid id=\"sample-shape\"> " \
@@ -113,130 +208,33 @@ def createSlabGeometry(ws_name,vertical_width, horizontal_width, thickness):  #D
         + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
-    CreateSampleShape(ws_name, xml_str)
-    return
-
-
-def chooseWorkspaceToBeFitted(fitSyntheticWorkspace):
-    if fitSyntheticWorkspace:
-        syntheticResultsPath = repoPath / "script_runs" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
-        wsToBeFitted = loadSyntheticNcpWorkspace(syntheticResultsPath)
-    else:
-        wsToBeFitted = cropAndCloneMainWorkspace()
-    return wsToBeFitted
-
-
-def loadSyntheticNcpWorkspace(syntheticResultsPath):
-    """Loads a synthetic ncpTotal workspace from previous fit results path"""
-    results = np.load(syntheticResultsPath)
-    # Ncp of first iteration
-    dataY = results["all_tot_ncp"][0, firstIdx : lastIdx+1]
-    # Cut last collumn to match ncpTotal length
-    dataX = mtd[name].extractX()[firstIdx : lastIdx+1, : -1]
-
-    wsToBeFitted = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(),
-                                   Nspec=len(dataX), OutputWorkspace=name+"0")
-    print(dataY.shape, dataX.shape)
-    return wsToBeFitted
-
-
-def cropAndCloneMainWorkspace():
-    """Returns cloned and cropped workspace with modified name"""
-    CropWorkspace(InputWorkspace=name, StartWorkspaceIndex=firstIdx,
-                  EndWorkspaceIndex=lastIdx, OutputWorkspace=name)
-    wsToBeFitted = CloneWorkspace(
-        InputWorkspace=name, OutputWorkspace=name+"0")
-    return wsToBeFitted
-
-# Elements                                                             Cerium     Platinum     Germanium    Aluminium
-# Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
-# Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A
-
-#Parameters:   intensities,   NCP Width,    NCP centre
-# initPars     =      ( 1,           18.22,       0.       )     #Cerium
-# bounds  =      ((0, None),   (17,20),    (-30., 30.))     
-# initPars    +=      ( 1,           22.5,        0.       )     #Platinum
-# bounds +=      ((0, None),   (20,25),    (-30., 30.))
-# initPars    +=      ( 1,           15.4,        0.       )     #Germanium
-# bounds +=      ((0, None),   (12.2,18),  (-10., 10.))     
-# initPars    +=      ( 1,           9.93,        0.       )     #Aluminium
-# bounds +=      ((0, None),   (9.8,10),   (-10., 10.))     
-
-initPars = np.array([   # Centers changed to one because of the scaling
-    1, 18.22, 0,
-    1, 22.5, 0,
-    1, 15.4, 0,
-    1, 9.93, 0
-])
-
-bounds = np.array([
-    [0, np.nan], [17, 20], [-30, 30],
-    [0, np.nan], [20, 25], [-30, 30],
-    [0, np.nan], [12.2, 18], [-10, 10],
-    [0, np.nan], [9.8, 10], [-10, 10]
-])
-
-scalingFactors = np.ones(initPars.shape)
-scaleParameters = True
-if scaleParameters:
-    noOfMasses = int(len(initPars)/3)
-    initPars[2::3] = np.full((1, noOfMasses), 1)  # Can experiment with other starting points
-    scalingFactors = 1 / initPars
-
-statisticalWeightChi2 = False
-
-# Intensities Constraints
-# CePt4Ge12 in Al can
-#  Ce cross section * stoichiometry = 2.94 * 1 = 2.94    barn
-#  Pt cross section * stoichiometry = 11.71 * 4 = 46.84  barn
-#  Ge cross section * stoichiometry = 8.6 * 12 = 103.2   barn
-
-constraints = ({'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/46.84*pars[3]},
-               {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
-
-name = 'CePtGe12_100K_DD_'
-masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
-InstrParsPath = repoPath / "ip2018.par"
-
-loadVesuvioWs = False
-loadRawAndEmptyWorkspaces(loadVesuvioWs)
-
-noOfMSIterations = 1
-firstSpec, lastSpec = 3, 134 # 3, 134
-firstIdx, lastIdx = convertFirstAndLastSpecToIdx(firstSpec, lastSpec)
-maskedDetectorIdx = loadMaskedDetectors(firstSpec, lastSpec)
-
-mulscatPars = loadMSPars()
-vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-createSlabGeometry(name, vertical_width, horizontal_width, thickness)
-
-fitSyntheticWorkspace = True
-wsToBeFitted = chooseWorkspaceToBeFitted(fitSyntheticWorkspace)
-
-savePath = repoPath / "script_runs" / "testing_syn_ncp"
-
+    CreateSampleShape(name, xml_str)
 
 def main():
+
+    wsToBeFittedUncropped = prepareWorkspaceToBeFitted()
+    wsToBeFitted = cropAndCloneWorkspace(wsToBeFittedUncropped)
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
+    ic.prepareScalingFactors()
+    createSlabGeometry(ic.slabPars)
     # Initialize arrays to store script results
-    thisScriptResults = resultsObject()
+    thisScriptResults = resultsObject(wsToBeFitted)
 
-    for iteration in range(noOfMSIterations):
+    for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
-        wsToBeFitted = mtd[name+str(iteration)]
-
-        MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=maskedDetectorIdx)
+        wsToBeFitted = mtd[ic.name+str(iteration)]
 
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
         thisScriptResults.append(iteration, fittedNcpResults)
-        if (iteration < noOfMSIterations - 1):  # evaluate MS correction except if last iteration
+        if (iteration < ic.noOfMSIterations - 1):  # evaluate MS correction except if last iteration
             meanWidths, meanIntensityRatios = fittedNcpResults[:2]
 
-            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars)
-            Minus(LHSWorkspace=name, RHSWorkspace=name+"_MulScattering",
-                  OutputWorkspace=name+str(iteration+1))
+            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
+            Minus(LHSWorkspace=ic.name, RHSWorkspace=ic.name+"_MulScattering",
+                  OutputWorkspace=ic.name+str(iteration+1))
 
-    thisScriptResults.save(savePath)
+    thisScriptResults.save(ic.savePath)
 
 
 ######################################################################################################################################
@@ -252,18 +250,17 @@ All the functions required to run main() are listed below, in order of appearanc
 class resultsObject:
     """Used to store results of the script"""
 
-    def __init__(self):
+    def __init__(self, wsToBeFitted):
         """Initializes arrays full of zeros"""
 
         noOfSpec = wsToBeFitted.getNumberHistograms()
         lenOfSpec = wsToBeFitted.blocksize()
-        noOfMasses = len(masses)
 
-        all_fit_workspaces = np.zeros((noOfMSIterations, noOfSpec, lenOfSpec))
+        all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
         all_spec_best_par_chi_nit = np.zeros(
-            (noOfMSIterations, noOfSpec, noOfMasses*3+3))
-        all_tot_ncp = np.zeros((noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        all_mean_widths = np.zeros((noOfMSIterations, noOfMasses))
+            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
+        all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
+        all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
         resultsList = [all_mean_widths, all_mean_intensities,
@@ -332,7 +329,7 @@ class fitParameters:
               np.hstack((self.spec, self.intensities, self.widths, self.centers, self.chi2, self.nit)))
 
     def getMeanWidthsAndIntensities(self):
-        noOfMasses = len(masses)
+        noOfMasses = ic.noOfMasses
         widths = self.widths.T
         intensities = self.intensities.T
 
@@ -355,7 +352,7 @@ class fitParameters:
         meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
         stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
 
-        print("\nMasses: ", masses.reshape(1, 4),
+        print("\nMasses: ", ic.masses.reshape(1, 4),
             "\nMean Widths: ", meanWidths,
             "\nMean Intensity Ratios: ", meanIntensityRatios)
         return meanWidths, meanIntensityRatios
@@ -375,12 +372,12 @@ def loadWorkspaceIntoArrays(ws):
 
 
 def prepareFitArgs(dataX):
-    instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)        #shape(134,-)
+    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)        #shape(134,-)
     resolutionPars = loadResolutionPars(instrPars)                           #shape(134,-)        
 
     v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   #shape(134, 144)
     kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
-    ySpacesForEachMass = convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E)        #shape(134, 4, 144)
+    ySpacesForEachMass = convertDataXToySpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)        #shape(134, 4, 144)
     
     kinematicArrays = reshapeArrayPerSpectrum(kinematicArrays)
     ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
@@ -449,22 +446,22 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
     if np.all(dataY == 0) | np.all(np.isnan(dataY)): 
-        return np.full(len(initPars)+3, np.nan)
+        return np.full(len(ic.initPars)+3, np.nan)
     
-    scaledPars = initPars * scalingFactors
-    scaledBounds = bounds * scalingFactors[:, np.newaxis]
+    scaledPars = ic.initPars * ic.scalingFactors
+    scaledBounds = ic.bounds * ic.scalingFactors[:, np.newaxis]
 
     result = optimize.minimize(
         errorFunction, 
         scaledPars, 
-        args=(masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
+        args=(ic.masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
         method='SLSQP', 
         bounds = scaledBounds, 
-        constraints=constraints
+        constraints=ic.constraints
         )
 
     fitScaledPars = result["x"]
-    fitPars = fitScaledPars / scalingFactors
+    fitPars = fitScaledPars / ic.scalingFactors
 
     noDegreesOfFreedom = len(dataY) - len(fitPars)
     specFitPars = np.append(instrPars[0], fitPars)
@@ -474,11 +471,11 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
 def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Error function to be minimized, operates in TOF space"""
 
-    unscaledPars = scaledPars / scalingFactors
+    unscaledPars = scaledPars / ic.scalingFactors
     ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     
     weight = 1
-    if statisticalWeightChi2:
+    if ic.statisticalWeightChi2Flag:
         weight = dataY**2
 
     if (np.sum(dataE) > 0):    
@@ -552,7 +549,7 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
     deltaE = deltaE[yCentersMask].reshape(shapeOfArrays)
     deltaQ = deltaQ[yCentersMask].reshape(shapeOfArrays)
 
-    # # Could also do it like this, but it's probably even slower
+    # # Could also do it like this, but it's probably slower
     # def selectValuesAtYCenter(kineArray):
     #     kineArray = kineArray * np.ones(shapeOfArrays)
     #     return kineArray[yCentersMask].reshape(shapeOfArrays)
@@ -672,7 +669,7 @@ def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, ki
     if np.all(np.isnan(initPars)):
         return np.full(ySpacesForEachMass.shape, np.nan)
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ic.masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
 
 
@@ -703,41 +700,11 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-# def calculateMeanWidthsAndIntensities(widths, intensities):
-#     """calculates the mean widths and intensities of the Compton profile J(y) for each mass"""
-#     noOfMasses = len(masses)
-
-#     # Reshape arrays for broadcasting
-#     meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-#     stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
-
-#     # Subtraction row by row
-#     width_deviation = np.abs(widths - meanWidths)
-#     # Where True, replace by nan
-#     better_widths = np.where(width_deviation > stdWidths, np.nan, widths)
-#     better_intensities = np.where(width_deviation > stdWidths, np.nan, intensities)
-
-#     meanWidths = np.nanmean(better_widths, axis=1)  
-#     stdWidths = np.nanstd(better_widths, axis=1)
-
-#     # Not nansum(), to propagate nan
-#     normalization_sum = np.sum(better_intensities, axis=0)
-#     better_intensities /= normalization_sum
-
-#     meanIntensityRatios = np.nanmean(better_intensities, axis=1)
-#     meanIntensityRatios_std = np.nanstd(better_intensities, axis=1)
-
-#     print("\nMasses: ", masses.reshape(1, 4)[:],
-#           "\nMean Widths: ", meanWidths[:],
-#           "\nMean Intensity Ratios: ", meanIntensityRatios[:])
-#     return meanWidths, meanIntensityRatios
-
-
 def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
     sample_properties = calculateSampleProperties(
-        masses, meanWidths, meanIntensityRatios, "MultipleScattering", mulscatPars)
-    createMulScatWorkspaces(name, sample_properties, mulscatPars)
+        ic.masses, meanWidths, meanIntensityRatios, "MultipleScattering", mulscatPars)
+    createMulScatWorkspaces(ic.name, sample_properties, mulscatPars)
 
 
 def calculateSampleProperties(masses, meanWidths, meanIntensityRatios, mode, mulscatPars):
