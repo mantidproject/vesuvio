@@ -10,7 +10,7 @@ jtplot.style()
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 pathToSynthetic = currentPath / "runs_for_testing" / \
-    "fit_synthetic_ncp.npz"
+    "fit_synthetic_ncp_with_error_bars.npz"
 
 class TestNCP(unittest.TestCase):
     def setUp(self):
@@ -29,7 +29,7 @@ class TestNCP(unittest.TestCase):
         self.mask = np.isclose(
             self.ncp, self.ws, rtol=self.rtol, equal_nan=self.equal_nan
         )
-        self.idxToPlot = 80
+        self.idxToPlot = 55
 
     def test_diff_values(self):
         totalDiffMask = ~ self.mask
@@ -62,8 +62,27 @@ class TestNCP(unittest.TestCase):
         plt.plot(x, self.ws[specIdx], label="synthetic ncp", linewidth = 2)
         plt.plot(x, self.ncp[specIdx], "--", label="fitted ncp", linewidth = 2)
         plt.ylabel("DataY")
+        plt.title(f"IDX: {specIdx}")
         plt.legend()
         plt.show()
+
+
+class TestMeanWidths(unittest.TestCase):
+    def setUp(self):
+        results = np.load(pathToSynthetic)
+        self.meanwidths = results["all_mean_widths"][0]
+    
+    def test_ncp(self):
+        print("\nMean widths:\n", self.meanwidths)
+
+
+class TestMeanIntensities(unittest.TestCase):
+    def setUp(self):
+        results = np.load(pathToSynthetic)
+        self.meanintensities = results["all_mean_intensities"][0]
+    
+    def test_ncp(self):
+        print("\nMean intensities:\n", self.meanintensities), 
 
 
 if __name__ == "__main__":

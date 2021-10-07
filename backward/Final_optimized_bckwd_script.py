@@ -5,11 +5,6 @@ from scipy import optimize
 import time
 from pathlib import Path
 
-start_time = time.time()
-# format print output of arrays
-np.set_printoptions(suppress=True, precision=4, linewidth=150)
-repoPath = Path(__file__).absolute().parent  # Path to the repository
-
 #######################################################################################################################################
 #######################################################                      ##########################################################
 #######################################################     USER SECTION     ##########################################################
@@ -24,16 +19,11 @@ The fit procedure in the time-of-flight domain is  based on the scipy.minimize.o
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
 '''
 
-initialConditionsDict = {
-    "noOfMSIterations" : 1, 
-    "firstSpec" : 3, 
-    "lastSpec" : 134,
-    "userPathInitWsFlag" : True, 
-    "scaleParsFlag" : True, 
-    "statisticalWeightChi2Flag" : False, 
-    "fitSyntheticWsFlag" : True,
-    "errorsForSyntheticNcpFlag" : False   # Non-zero dataE when creating NCP workspaces
-}
+start_time = time.time()
+# format print output of arrays
+np.set_printoptions(suppress=True, precision=4, linewidth=150)
+repoPath = Path(__file__).absolute().parent  # Path to the repository
+
 
 class InitialConditions:
 # Parameters for Raw and Empty Workspaces
@@ -92,7 +82,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "fit_synthetic_ncp" 
+    savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original_with_statisticalWeight" 
     syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     specOffset = 3
@@ -108,7 +98,6 @@ class InitialConditions:
         self.lastSpec = D["lastSpec"]
         self.userpathInitWsFlag = D["userPathInitWsFlag"]
         self.scaleParsFlag = D["scaleParsFlag"]
-        self.statisticalWeightChi2Flag = D["statisticalWeightChi2Flag"]
         self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
         self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
 
@@ -125,9 +114,57 @@ class InitialConditions:
         if self.scaleParsFlag:
             self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Can experiment with other starting points
             self.scalingFactors = 1 / self.initPars
-    
+
+
+initialConditionsDict = {
+    "noOfMSIterations" : 1, 
+    "firstSpec" : 3, 
+    "lastSpec" : 134,
+    "userPathInitWsFlag" : True, 
+    "scaleParsFlag" : False, 
+    "fitSyntheticWsFlag" : False,
+    "errorsForSyntheticNcpFlag" : False   # Non-zero dataE when creating NCP workspaces
+}
+
 
 ic = InitialConditions(initialConditionsDict)  
+
+
+def main():
+
+    wsToBeFittedUncropped = prepareWorkspaceToBeFitted()
+    wsToBeFitted = cropAndCloneWorkspace(wsToBeFittedUncropped)
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
+    ic.prepareScalingFactors()
+    createSlabGeometry(ic.slabPars)
+    # Initialize arrays to store script results
+    thisScriptResults = resultsObject(wsToBeFitted)
+
+    for iteration in range(ic.noOfMSIterations):
+        # Workspace from previous iteration
+        wsToBeFitted = mtd[ic.name+str(iteration)]
+
+        fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
+
+        thisScriptResults.append(iteration, fittedNcpResults)
+        if (iteration < ic.noOfMSIterations - 1):  # evaluate MS correction except if last iteration
+            meanWidths, meanIntensityRatios = fittedNcpResults[:2]
+
+            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
+            Minus(LHSWorkspace=ic.name, RHSWorkspace=ic.name+"_MulScattering",
+                  OutputWorkspace=ic.name+str(iteration+1))
+
+    thisScriptResults.save(ic.savePath)
+
+
+######################################################################################################################################
+#####################################################                          #######################################################
+#####################################################   DEVELOPMENT SECTION    #######################################################
+#####################################################                          #######################################################
+######################################################################################################################################
+""""
+All the functions required to run main() are listed below, in order of appearance
+"""
 
 def prepareWorkspaceToBeFitted():
     if ic.fitSyntheticWsFlag:
@@ -212,42 +249,6 @@ def createSlabGeometry(slabPars):
         + "</cuboid>"
     CreateSampleShape(name, xml_str)
 
-def main():
-
-    wsToBeFittedUncropped = prepareWorkspaceToBeFitted()
-    wsToBeFitted = cropAndCloneWorkspace(wsToBeFittedUncropped)
-    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
-    ic.prepareScalingFactors()
-    createSlabGeometry(ic.slabPars)
-    # Initialize arrays to store script results
-    thisScriptResults = resultsObject(wsToBeFitted)
-
-    for iteration in range(ic.noOfMSIterations):
-        # Workspace from previous iteration
-        wsToBeFitted = mtd[ic.name+str(iteration)]
-
-        fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
-
-        thisScriptResults.append(iteration, fittedNcpResults)
-        if (iteration < ic.noOfMSIterations - 1):  # evaluate MS correction except if last iteration
-            meanWidths, meanIntensityRatios = fittedNcpResults[:2]
-
-            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
-            Minus(LHSWorkspace=ic.name, RHSWorkspace=ic.name+"_MulScattering",
-                  OutputWorkspace=ic.name+str(iteration+1))
-
-    thisScriptResults.save(ic.savePath)
-
-
-######################################################################################################################################
-#####################################################                          #######################################################
-#####################################################   DEVELOPMENT SECTION    #######################################################
-#####################################################                          #######################################################
-######################################################################################################################################
-""""
-All the functions required to run main() are listed below, in order of appearance
-"""
-
 
 class resultsObject:
     """Used to store results of the script"""
@@ -312,53 +313,6 @@ def fitNcpToWorkspace(ws):
 
     return [meanWidths, meanIntensityRatios, fitPars, ncpTotal, wsDataY]
 
-class fitParameters:
-    """Stores the fitted parameters from map and defines methods to extract information"""
-
-    def __init__(self, fitPars):
-        self.spec = fitPars[:, 0][:, np.newaxis]
-        self.chi2 = fitPars[:, -2][:, np.newaxis]
-        self.nit = fitPars[:, -1][:, np.newaxis]
-
-        mainPars = fitPars[:, 1:-2]
-        self.intensities = mainPars[:, 0::3]
-        self.widths = mainPars[:, 1::3]
-        self.centers = mainPars[:, 2::3]
-        self.mainPars = mainPars
-
-    def printPars(self):
-        print("[Spec Intensities----Widths----Centers Chi2 Nit]:\n\n", 
-              np.hstack((self.spec, self.intensities, self.widths, self.centers, self.chi2, self.nit)))
-
-    def getMeanWidthsAndIntensities(self):
-        noOfMasses = ic.noOfMasses
-        widths = self.widths.T
-        intensities = self.intensities.T
-
-        meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-        stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
-
-        # Subtraction row by row
-        widthDeviation = np.abs(widths - meanWidths)
-        # Where True, replace by nan
-        betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
-        betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
-
-        meanWidths = np.nanmean(betterWidths, axis=1)  
-        stdWidths = np.nanstd(betterWidths, axis=1)
-
-        # Not nansum(), to propagate nan
-        normalization = np.sum(betterIntensities, axis=0)
-        intensityRatios = betterIntensities / normalization
-
-        meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
-        stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
-
-        print("\nMasses: ", ic.masses.reshape(1, 4),
-            "\nMean Widths: ", meanWidths,
-            "\nMean Intensity Ratios: ", meanIntensityRatios)
-        return meanWidths, meanIntensityRatios
-
 
 def loadWorkspaceIntoArrays(ws):
     """Output: dataY, dataX and dataE as arrays and converted to point data"""
@@ -379,7 +333,7 @@ def prepareFitArgs(dataX):
 
     v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   #shape(134, 144)
     kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
-    ySpacesForEachMass = convertDataXToySpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)        #shape(134, 4, 144)
+    ySpacesForEachMass = convertDataXToYSpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)        #shape(134, 4, 144)
     
     kinematicArrays = reshapeArrayPerSpectrum(kinematicArrays)
     ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
@@ -433,7 +387,7 @@ def reshapeArrayPerSpectrum(A):
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
-def convertDataXToySpacesForEachMass(dataX, masses, delta_Q, delta_E):
+def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
     "Calculates y spaces from TOF data, each row corresponds to one mass"   
     dataX, delta_Q, delta_E = dataX[np.newaxis, :, :],  delta_Q[np.newaxis, :, :], delta_E[np.newaxis, :, :]   #prepare arrays to broadcast
     mN, Ef, en_to_vel, vf, hbar = loadConstants()
@@ -475,20 +429,14 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
 
     unscaledPars = scaledPars / ic.scalingFactors
     ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
-    
-    weight = 1
-    if ic.statisticalWeightChi2Flag:
-        weight = dataY**2
 
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
-        chi2 = (ncpTotal - dataY)**2 / weight
+        # This condition is not usually satisfied but in the exceptional case that it is,
+        # we can use a statistical weight to make sure the chi2 used is not too small for the 
+        # optimization algorithm
+        chi2 = (ncpTotal - dataY)**2 / dataY**2
     else:
-        chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
-        
-    # if (np.sum(dataE) > 0):    
-    #     chi2 =  ((ncpTotal - dataY)**2)/(dataE)**2    
-    # else:
-    #     chi2 = (ncpTotal - dataY)**2 / weight
+        chi2 =  (ncpTotal - dataY)**2 / dataE**2    
     return np.sum(chi2)
 
 
@@ -669,6 +617,55 @@ def numericalThirdDerivative(x, fun):
     derivative[:, 6:-6] = dev
     return derivative
 
+
+class fitParameters:
+    """Stores the fitted parameters from map and defines methods to extract information"""
+
+    def __init__(self, fitPars):
+        self.spec = fitPars[:, 0][:, np.newaxis]
+        self.chi2 = fitPars[:, -2][:, np.newaxis]
+        self.nit = fitPars[:, -1][:, np.newaxis]
+
+        mainPars = fitPars[:, 1:-2]
+        self.intensities = mainPars[:, 0::3]
+        self.widths = mainPars[:, 1::3]
+        self.centers = mainPars[:, 2::3]
+        self.mainPars = mainPars
+
+    def printPars(self):
+        print("[Spec Intensities----Widths----Centers Chi2 Nit]:\n\n", 
+              np.hstack((self.spec, self.intensities, self.widths, self.centers, self.chi2, self.nit)))
+
+    def getMeanWidthsAndIntensities(self):
+        noOfMasses = ic.noOfMasses
+        widths = self.widths.T
+        intensities = self.intensities.T
+
+        meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
+        stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
+
+        # Subtraction row by row
+        widthDeviation = np.abs(widths - meanWidths)
+        # Where True, replace by nan
+        betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+        betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
+
+        meanWidths = np.nanmean(betterWidths, axis=1)  
+        stdWidths = np.nanstd(betterWidths, axis=1)
+
+        # Not nansum(), to propagate nan
+        normalization = np.sum(betterIntensities, axis=0)
+        intensityRatios = betterIntensities / normalization
+
+        meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
+        stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
+
+        print("\nMasses: ", ic.masses.reshape(1, 4),
+            "\nMean Widths: ", meanWidths,
+            "\nMean Intensity Ratios: ", meanIntensityRatios)
+        return meanWidths, meanIntensityRatios
+
+
 def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
@@ -681,14 +678,14 @@ def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, ki
 
 
 def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
-    """Transforms the data straight from the map and creates matrices of the fitted ncpTotal and respective workspaces"""
+    """Creates workspaces from ncp array data"""
 
     # Need to rearrage array of yspaces into seperate arrays for each mass
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     dataX = ws.extractX()
     dataE = np.zeros(dataX.shape)
 
-    if ic.errorsForSyntheticNcpFlag:
+    if ic.errorsForSyntheticNcpFlag:   # Generates synthetic ncp data with homoscedastic error bars
         wsDataE = ws.extractE()
         dataE = np.mean(wsDataE, axis=1)[:, np.newaxis] * np.ones((1, len(dataX[0])))
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 pathToOriginal = currentPath / "fixatures" / "opt_spec3-134_iter4_ncp_nightlybuild.npz"
-pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original.npz"
+pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original_with_statisticalWeight.npz"
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):

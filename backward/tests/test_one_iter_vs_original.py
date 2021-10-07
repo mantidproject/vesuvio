@@ -9,8 +9,8 @@ from jupyterthemes import jtplot
 jtplot.style()
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
-pathToOriginal = currentPath / "script_runs" / "ori_spec3-134_iter4_ncp.npz"
-pathToOptimized = currentPath / "script_runs" / "testing_runs.npz"
+pathToOriginal = currentPath / "fixatures" / "ori_spec3-134_iter4_ncp.npz"
+pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original_with_statisticalWeight.npz"
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
