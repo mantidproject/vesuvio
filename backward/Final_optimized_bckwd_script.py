@@ -82,11 +82,11 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original_with_statisticalWeight" 
+    savePath = repoPath / "tests" / "runs_for_testing" / "testing_fwd" 
     syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
-    specOffset = 3
-    maskedDetectorIdx = maskedSpecNo - specOffset
+    # specOffset = 3
+    # maskedDetectorIdx = maskedSpecNo - specOffset
 
     scalingFactors = np.ones(initPars.shape)
     
@@ -100,9 +100,15 @@ class InitialConditions:
         self.scaleParsFlag = D["scaleParsFlag"]
         self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
         self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
+        self.MSCorrectionFlag = D["MSCorrectionFlag"]
+        self.GammaCorrectionFlag = D["GammaCorrectionFlag"]
 
+
+        self.specOffset = self.firstSpec
         self.firstIdx = self.firstSpec - self.specOffset
         self.lastIdx = self.lastSpec - self.specOffset
+        self.maskedSpecNo = self.maskedSpecNo[(self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)]
+        self.maskedDetectorIdx = self.maskedSpecNo - self.specOffset
 
 
     def prepareScalingFactors(self):
@@ -117,13 +123,16 @@ class InitialConditions:
 
 
 initialConditionsDict = {
-    "noOfMSIterations" : 1, 
+    "noOfMSIterations" : 2, 
     "firstSpec" : 3, 
-    "lastSpec" : 134,
+    "lastSpec" : 7,
     "userPathInitWsFlag" : True, 
     "scaleParsFlag" : False, 
     "fitSyntheticWsFlag" : False,
-    "errorsForSyntheticNcpFlag" : False   # Non-zero dataE when creating NCP workspaces
+    "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces
+
+    "MSCorrectionFlag" : False,
+    "GammaCorrectionFlag" : True
 }
 
 
@@ -147,13 +156,45 @@ def main():
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
 
         thisScriptResults.append(iteration, fittedNcpResults)
-        if (iteration < ic.noOfMSIterations - 1):  # evaluate MS correction except if last iteration
+
+        if (iteration < ic.noOfMSIterations - 1):  
+
             meanWidths, meanIntensityRatios = fittedNcpResults[:2]
 
-            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
-            Minus(LHSWorkspace=ic.name, RHSWorkspace=ic.name+"_MulScattering",
-                  OutputWorkspace=ic.name+str(iteration+1))
+            CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
+            if ic.MSCorrectionFlag:
+                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
+                Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
+                      OutputWorkspace="tmpNameWs")
+
+            if ic.GammaCorrectionFlag:
+
+                IPDict = {
+                "sigma_gauss" : 73,
+                "hwhm_lorentz" : 24,
+                # "sigma_tof" : 0.37,
+                # "sigma_theta" : 0.016,
+                # "sigma_l1" : 0.021,
+                # "sigma_l2" : 0.023
+                }
+                
+                for key in IPDict:
+                    SetInstrumentParameter(
+                        ic.name, ParameterName=key, ParameterType='Number', Value=str(IPDict[key])
+                        )
+
+                createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios)
+                Scale(
+                    InputWorkspace = ic.name+"_gamma_background", 
+                    OutputWorkspace = ic.name+"_gamma_background", 
+                    Factor=0.9, Operation="Multiply"
+                    )
+                Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
+                      OutputWorkspace="tmpNameWs")
+
+            RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration)+1)
+                
     thisScriptResults.save(ic.savePath)
 
 
@@ -367,6 +408,7 @@ def loadResolutionPars(instrPars):
     
     resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()  #store all parameters in a matrix
     return resolutionPars 
+
 
 def calculateKinematicsArrays(dataX, instrPars):          
     """Kinematics quantities calculated from TOF data"""   
@@ -710,79 +752,135 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
+#-------------------- Currently working here ------------------------
+
 def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
-    sample_properties = calculateSampleProperties(
-        ic.masses, meanWidths, meanIntensityRatios, "MultipleScattering", mulscatPars)
-    createMulScatWorkspaces(ic.name, sample_properties, mulscatPars)
+    sampleProperties = calcMSCorrectionSampleProperties(
+        ic.masses, meanWidths, meanIntensityRatios, mulscatPars
+        )
+    createMulScatWorkspaces(ic.name, sampleProperties, mulscatPars)
 
-
-def calculateSampleProperties(masses, meanWidths, meanIntensityRatios, mode, mulscatPars):
-    """returns the one of the inputs necessary for the VesuvioCalculateGammaBackground
-    or VesuvioCalculateMS"""
+def calcMSCorrectionSampleProperties(masses, meanWidths, meanIntensityRatios, mulscatPars):
     masses = masses.reshape(4)
     hydrogen_peak, hydrogen_to_mass0_ratio = mulscatPars[:2]
 
-    if mode == "GammaBackground":  # Not used for backscattering
-        profiles = ""
-        for m, mass in enumerate(masses):
-            width, intensity = str(meanWidths[m]), str(meanIntensityRatios[m])
-            profiles += "name=GaussianComptonProfile,Mass=" + \
-                str(mass)+",Width="+width + \
-                ",intensities="+intensity+';'
-        sample_properties = profiles
+    if hydrogen_peak:
+        # ADDITION OF THE HYDROGEN intensities AS PROPORTIONAL TO A FITTED NCP (OXYGEN HERE)
+        masses = np.append(masses, 1.0079)
+        meanWidths = np.append(meanWidths, 5.0)
+        meanIntensityRatios = np.append(
+            meanIntensityRatios, hydrogen_to_mass0_ratio * meanIntensityRatios[0]
+            )
+        meanIntensityRatios /= np.sum(meanIntensityRatios)
 
-    elif mode == "MultipleScattering":
-        if hydrogen_peak:
-            # ADDITION OF THE HYDROGEN intensities AS PROPORTIONAL TO A FITTED NCP (OXYGEN HERE)
-            masses = np.append(masses, 1.0079)
-            meanWidths = np.append(meanWidths, 5.0)
-            meanIntensityRatios = np.append(
-                meanIntensityRatios, hydrogen_to_mass0_ratio * meanIntensityRatios[0])
-            meanIntensityRatios /= np.sum(meanIntensityRatios)
-
-        MS_properties = np.zeros(3*len(masses))
-        MS_properties[::3] = masses
-        MS_properties[1::3] = meanIntensityRatios
-        MS_properties[2::3] = meanWidths
-        sample_properties = list(MS_properties)
-    else:
-        print("\n Mode entered not valid")
-    print("\n The sample properties for ", mode, " are: ", sample_properties)
-    return sample_properties
+    MSProperties = np.zeros(3*len(masses))
+    MSProperties[::3] = masses
+    MSProperties[1::3] = meanIntensityRatios
+    MSProperties[2::3] = meanWidths
+    sampleProperties = list(MSProperties)   
+    print("\n The sample properties for Multiple Scattering correction are:\n ", 
+            sampleProperties)
 
 
-def createMulScatWorkspaces(ws_name, sample_properties, mulscatPars):
+def createMulScatWorkspaces(ws_name, sampleProperties, mulscatPars):
     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
 
     print("Evaluating the Multiple Scattering Correction.")
     transmission_guess, multiple_scattering_order, number_of_events = mulscatPars[2:]
     # selects only the masses, every 3 numbers
-    MS_masses = sample_properties[::3]
+    MS_masses = sampleProperties[::3]
     # same as above, but starts at first intensities
-    MS_amplitudes = sample_properties[1::3]
+    MS_amplitudes = sampleProperties[1::3]
 
     dens, trans = VesuvioThickness(
-        Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=transmission_guess, Thickness=0.1)
+        Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=transmission_guess, Thickness=0.1
+        )
 
     _TotScattering, _MulScattering = VesuvioCalculateMS(
-        ws_name, NoOfMasses=len(MS_masses), SampleDensity=dens.cell(9, 1),
-        AtomicProperties=sample_properties, BeamRadius=2.5,
+        ws_name, 
+        NoOfMasses=len(MS_masses), 
+        SampleDensity=dens.cell(9, 1),
+        AtomicProperties=sampleProperties, 
+        BeamRadius=2.5,
         NumScatters=multiple_scattering_order,
-        NumEventsPerRun=int(number_of_events))
+        NumEventsPerRun=int(number_of_events)
+        )
 
     data_normalisation = Integration(ws_name)
     simulation_normalisation = Integration("_TotScattering")
     for workspace in ("_MulScattering", "_TotScattering"):
-        Divide(LHSWorkspace=workspace,
-               RHSWorkspace=simulation_normalisation, OutputWorkspace=workspace)
-        Multiply(LHSWorkspace=workspace,
-                 RHSWorkspace=data_normalisation, OutputWorkspace=workspace)
+        Divide(LHSWorkspace=workspace, RHSWorkspace=simulation_normalisation, 
+               OutputWorkspace=workspace)
+        Multiply(LHSWorkspace=workspace, RHSWorkspace=data_normalisation, 
+                 OutputWorkspace=workspace)
         RenameWorkspace(InputWorkspace=workspace,
                         OutputWorkspace=str(ws_name)+workspace)
     DeleteWorkspaces(
-        [data_normalisation, simulation_normalisation, trans, dens])
+        [data_normalisation, simulation_normalisation, trans, dens]
+        )
   # The only remaining workspaces are the _MulScattering and _TotScattering
+
+
+def createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios):
+    """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
+    profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
+    background, corrected = VesuvioCalculateGammaBackground(
+        InputWorkspace=ic.name, ComptonFunction=profiles
+        )
+    RenameWorkspace(InputWorkspace= background, OutputWorkspace = ws_name+"_gamma_background")
+    DeleteWorkspace(corrected)
+
+
+def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
+    masses = masses.reshape(4)
+    profiles = ""
+    for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
+        profiles += "name=GaussianComptonProfile,Mass="   \
+                    + str(mass) + ",Width=" + str(width)  \
+                    + ",Intensity=" + str(intensity) + ';'
+    print("\n The sample properties for Gamma Correction are: ",
+            profiles)
+    return profiles
+
+
+# def createMulScatWorkspaces(ws_name, sampleProperties, mulscatPars):
+#     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
+
+#     print("Evaluating the Multiple Scattering Correction.")
+#     transmission_guess, multiple_scattering_order, number_of_events = mulscatPars[2:]
+#     # selects only the masses, every 3 numbers
+#     MS_masses = sampleProperties[::3]
+#     # same as above, but starts at first intensities
+#     MS_amplitudes = sampleProperties[1::3]
+
+#     dens, trans = VesuvioThickness(
+#         Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=transmission_guess, Thickness=0.1
+#         )
+
+#     _TotScattering, _MulScattering = VesuvioCalculateMS(
+#         ws_name, 
+#         NoOfMasses=len(MS_masses), 
+#         SampleDensity=dens.cell(9, 1),
+#         AtomicProperties=sampleProperties, 
+#         BeamRadius=2.5,
+#         NumScatters=multiple_scattering_order,
+#         NumEventsPerRun=int(number_of_events)
+#         )
+
+#     data_normalisation = Integration(ws_name)
+#     simulation_normalisation = Integration("_TotScattering")
+#     for workspace in ("_MulScattering", "_TotScattering"):
+#         Divide(LHSWorkspace=workspace, RHSWorkspace=simulation_normalisation, 
+#                OutputWorkspace=workspace)
+#         Multiply(LHSWorkspace=workspace, RHSWorkspace=data_normalisation, 
+#                  OutputWorkspace=workspace)
+#         RenameWorkspace(InputWorkspace=workspace,
+#                         OutputWorkspace=str(ws_name)+workspace)
+#     DeleteWorkspaces(
+#         [data_normalisation, simulation_normalisation, trans, dens]
+#         )
+#   # The only remaining workspaces are the _MulScattering and _TotScattering
 
 
 # -------------- Other functions not used yet on main()--------------
