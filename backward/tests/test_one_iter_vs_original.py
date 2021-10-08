@@ -10,7 +10,7 @@ jtplot.style()
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 pathToOriginal = currentPath / "fixatures" / "ori_spec3-134_iter4_ncp.npz"
-pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original_with_statisticalWeight.npz"
+pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original.npz"
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):

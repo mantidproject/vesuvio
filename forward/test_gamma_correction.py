@@ -532,7 +532,7 @@ create_slab_geometry(ws_name,vertical_width, horizontal_width, thickness)
 masses = [1.0079,12,16,27]
 abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
 
-simple_gaussian_fit = True
+simple_gaussian_fit = True       # Used if fit_in_Y_space is set to True
 
 ## backscattering results
 #Mass:  12  width:  12.71902583773011  \pm  3.4359310000812378
@@ -608,15 +608,15 @@ if fit_in_Y_space:
     Rebin(InputWorkspace=ws_name+'joy',Params=rebin_params,OutputWorkspace=ws_name+'joy')
     Rebin(InputWorkspace=ws_name+'q',Params=rebin_params,OutputWorkspace=ws_name+'q')
     tmp=Integration(InputWorkspace=ws_name+'joy',RangeLower='-20',RangeUpper='20')
-    Divide(LHSWorkspace=ws_name+'joy',RHSWorkspace='tmp',OutputWorkspace=ws_name+'joy')
+    Divide(LHSWorkspace=ws_name+'joy',RHSWorkspace='tmp',OutputWorkspace=ws_name+'joy')  # I guess this step normalizes the npc in the y space
     
     # Symmetrisation to remove the FSEs
     ws=mtd[ws_name+'joy']
     for j in range(ws.getNumberHistograms()):
         for k in range(ws.blocksize()):
-            if (ws.dataX(j)[k]<0):
+            if (ws.dataX(j)[k]<0):              # This symetrises the dataY and dataE 
                 ws.dataY(j)[k] =ws.dataY(j)[ws.blocksize()-1-k]
-                ws.dataE(j)[k] =ws.dataE(j)[ws.blocksize()-1-k]
+                ws.dataE(j)[k] =ws.dataE(j)[ws.blocksize()-1-k]    
 
 
     # Definition of a normalising workspace taking into consideration the kinematic constraints
@@ -636,7 +636,7 @@ if fit_in_Y_space:
 
     # Definition of the resolution functions
     resolution=CloneWorkspace(InputWorkspace=ws_name+'joy')
-    resolution=Rebin(InputWorkspace='resolution',Params='-20,0.5,20')
+    resolution=Rebin(InputWorkspace='resolution',Params='-20,0.5,20')      ####### For loop necessary if Vesuvio
     for i in range(resolution.getNumberHistograms()):
         VesuvioResolution(Workspace=ws_name+str(iteration),WorkspaceIndex=str(i), Mass=1.0079, OutputWorkspaceYSpace='tmp')
         tmp=Rebin(InputWorkspace='tmp',Params='-20,0.5,20')
@@ -644,7 +644,7 @@ if fit_in_Y_space:
             resolution.dataY(i)[p]=tmp.dataY(0)[p]
 
     # Definition of the sum of resolution functions
-    resolution_sum=SumSpectra('resolution')
+    resolution_sum=SumSpectra('resolution')      ############# Is this the same as the average resolution??
     tmp=Integration('resolution_sum')
     resolution_sum=Divide('resolution_sum','tmp')
     DeleteWorkspace('tmp')        
@@ -655,7 +655,7 @@ if fit_in_Y_space:
     ######              FIT OF THE SUM OF SPECTRA 
     ######
     ############################################################################
-    print('\n','Fit on the sum of spectra in the West domain','\n')
+    print('\n','Fit on the sum of spectra in the West domain','\n')         #### West domain is the same as Y scaling
     for minimizer_sum in ('Levenberg-Marquardt','Simplex'):
         CloneWorkspace(InputWorkspace = ws_name+'joy_sum', OutputWorkspace = ws_name+minimizer_sum+'_joy_sum_fitted')
         
