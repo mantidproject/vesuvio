@@ -169,20 +169,8 @@ def main():
                       OutputWorkspace="tmpNameWs")
 
             if ic.GammaCorrectionFlag:
-
-                IPDict = {
-                "sigma_gauss" : 73,
-                "hwhm_lorentz" : 24,
-                # "sigma_tof" : 0.37,
-                # "sigma_theta" : 0.016,
-                # "sigma_l1" : 0.021,
-                # "sigma_l2" : 0.023
-                }
-                
-                for key in IPDict:
-                    SetInstrumentParameter(
-                        ic.name, ParameterName=key, ParameterType='Number', Value=str(IPDict[key])
-                        )
+                SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', ParameterType='Number', Value='24.0')
+                SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', ParameterType='Number', Value='73.0')
 
                 createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios)
                 Scale(
@@ -193,7 +181,7 @@ def main():
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
                       OutputWorkspace="tmpNameWs")
 
-            RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration)+1)
+            RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
                 
     thisScriptResults.save(ic.savePath)
 
@@ -828,7 +816,7 @@ def createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios):
     background, corrected = VesuvioCalculateGammaBackground(
         InputWorkspace=ic.name, ComptonFunction=profiles
         )
-    RenameWorkspace(InputWorkspace= background, OutputWorkspace = ws_name+"_gamma_background")
+    RenameWorkspace(InputWorkspace= background, OutputWorkspace = ic.name+"_gamma_background")
     DeleteWorkspace(corrected)
 
 
