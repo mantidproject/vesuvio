@@ -27,51 +27,43 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 class InitialConditions:
 # Parameters for Raw and Empty Workspaces
-    name = 'CePtGe12_100K_DD_'
-    userWsRawPath = r"./input_ws/CePtGe12_100K_DD_raw.nxs"
-    userWsEmptyPath = r"./input_ws/CePtGe12_100K_DD_empty.nxs"
+    name = "starch_80_RD_"
+    userWsRawPath = r"./input_ws/starch_80_RD_raw.nxs"
+    userWsEmptyPath = r"./input_ws/starch_80_RD_raw.nxs"
 
-    runs='44462-44463'         # 100K             # The numbers of the runs to be analysed
+    runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-    spectra='3-134'                               # Spectra to be analysed
-    tof_binning='275.,1.,420'                     # Binning of ToF spectra
-    mode='DoubleDifference'
-    ipfile='ip2018.pars'
+    spectra='144-182'                               # Spectra to be analysed
+    tof_binning="110,1.,430"                    # Binning of ToF spectra
+    mode='SingleDifference'
+    ipfile=r'./ip2018_3.par'
     rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
 
     # Masses, instrument parameters and initial fitting parameters
-    masses = np.array([140.1, 195.1, 72.6, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
+    masses = np.array([1.0079, 12, 16, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
     noOfMasses = len(masses)
-    InstrParsPath = repoPath / "ip2018.par"
-
-    # Elements                                                             Cerium     Platinum     Germanium    Aluminium
-    # Classical value of Standard deviation of the momentum distribution:  16.9966    20.0573      12.2352      7.4615         inv A
-    # Debye value of Standard deviation of the momentum distribution:      18.22      22.5         15.4         9.93           inv A
-    # Intensities Constraints:
-    # CePt4Ge12 in Al can                 Cerium                  Platinum                  Germanium
-    # Cross section * Stoichiometry:      2.94*1 = 2.94           11.71*4 = 46.84           8.6*12 = 103.2        barn
+    InstrParsPath = repoPath / 'ip2018_3.par'
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers
-        1, 18.22, 0,   # Cerium
-        1, 22.5, 0,    # Platinum
-        1, 15.4, 0,    # Germanium
-        1, 9.93, 0     # Aluminium
+        1, 4.7, 0.,   
+        1, 12.71, 0.,    
+        1, 8.76, 0.,   
+        1, 13.897, 0.    
     ])
     bounds = np.array([
-        [0, np.nan], [17, 20], [-30, 30],
-        [0, np.nan], [20, 25], [-30, 30],
-        [0, np.nan], [12.2, 18], [-10, 10],
-        [0, np.nan], [9.8, 10], [-10, 10]
+        [0, np.nan], [3, 6], [-3, 1],
+        [0, np.nan], [12.71, 12.71], [-3, 1],
+        [0, np.nan], [8.76, 8.76], [-3, 1],
+        [0, np.nan], [13.897, 13.897], [-3, 1]
     ])
-    constraints = ({'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/46.84*pars[3]},
-                {'type': 'eq', 'fun': lambda pars:  pars[0] - 2.94/103.2*pars[6]})
+    constraints = ()
 
     # Masked detectors
-    maskedSpecNo = np.array([18,34,42,43,59,60,62,118,119,133])
+    maskedSpecNo = np.array([173, 174, 179])
 
     # Multiscaterring Correction Parameters
-    transmission_guess = 0.98        # Experimental value from VesuvioTransmission
+    transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5   
     hydrogen_peak = False                 # Hydrogen multiple scattering
     hydrogen_to_mass0_ratio = 0
@@ -83,10 +75,7 @@ class InitialConditions:
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
     savePath = repoPath / "tests" / "runs_for_testing" / "testing_fwd" 
-    syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
-
-    # specOffset = 3
-    # maskedDetectorIdx = maskedSpecNo - specOffset
+    # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
     
@@ -125,8 +114,8 @@ class InitialConditions:
 
 initialConditionsDict = {
     "noOfMSIterations" : 2, 
-    "firstSpec" : 3, 
-    "lastSpec" : 7,
+    "firstSpec" : 144, 
+    "lastSpec" : 147,
     "userPathInitWsFlag" : True, 
     "scaleParsFlag" : False, 
     "fitSyntheticWsFlag" : False,
@@ -154,15 +143,12 @@ def main():
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
-
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
-
         thisScriptResults.append(iteration, fittedNcpResults)
 
         if (iteration < ic.noOfMSIterations - 1):  
 
             meanWidths, meanIntensityRatios = fittedNcpResults[:2]
-
             CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
             if ic.MSCorrectionFlag:
@@ -228,13 +214,16 @@ def loadRawAndEmptyWsFromUserPath():
     Rebin(InputWorkspace=name+'raw', Params=tof_binning,
           OutputWorkspace=name+'raw')
     SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+    wsToBeFitted = CloneWorkspace(InputWorkspace=name+'raw', OutputWorkspace=name)
 
-    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    Load(Filename=ic.userWsEmptyPath, OutputWorkspace=name+"empty")
-    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-          OutputWorkspace=name+'empty')
-    wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty',
-                         OutputWorkspace=name)
+    if mode=="DoubleDifference":
+        print('\n', 'Loading the empty runs: ', empty_runs, '\n')
+        Load(Filename=ic.userWsEmptyPath, OutputWorkspace=name+"empty")
+        Rebin(InputWorkspace=name+'empty', Params=tof_binning,
+            OutputWorkspace=name+'empty')
+        wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty',
+                            OutputWorkspace=name)
+
     print(wsToBeFitted.name())
     return wsToBeFitted
 
@@ -248,20 +237,22 @@ def loadRawAndEmptyWsVesuvio():
     Rebin(InputWorkspace=name+'raw', Params=tof_binning,
           OutputWorkspace=name+'raw')
     SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
+    wsToBeFitted = CloneWorkspace(InputWorkspace=name+'raw', OutputWorkspace=name)
 
-    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-    LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode,
-                InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
-    Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-          OutputWorkspace=name+'empty')
-    wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', 
-                         OutputWorkspace=name)
+    if mode=="DoubleDifference":
+        print('\n', 'Loading the empty runs: ', empty_runs, '\n')
+        LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode,
+                    InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
+        Rebin(InputWorkspace=name+'empty', Params=tof_binning,
+            OutputWorkspace=name+'empty')
+        wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', 
+                            OutputWorkspace=name)
     return wsToBeFitted
 
 
 def cropAndCloneWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
-    CropWorkspace(InputWorkspace=ws, StartWorkspaceIndex=ic.firstIdx,
+    ws = CropWorkspace(InputWorkspace=ws.name(), StartWorkspaceIndex=ic.firstIdx,
                   EndWorkspaceIndex=ic.lastIdx, OutputWorkspace=ws.name())
     wsToBeFitted = CloneWorkspace(
         InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0")

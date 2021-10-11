@@ -24,6 +24,9 @@ from scipy import signal
 from scipy.optimize import curve_fit
 from scipy import optimize
 from scipy.ndimage import convolve1d
+import time
+
+start_time = time.time()
 
 # command for the formatting of the printed output
 np.set_printoptions(suppress=True, precision=4, linewidth= 150 )
@@ -69,7 +72,7 @@ def fun_derivative4(x,fun): # not used at present. Can be used for the H4 polyno
 
 def load_ip_file(spectrum):
     #print "Loading parameters from file: ", namedtuple
-    ipfile = '//olympic/babylon5/Public/Romanelli/Algorithms/ip2018_3.par'
+    ipfile = r'./ip2018_3.par'
     f = open(ipfile, 'r')
     data = f.read()
     lines = data.split('\n')
@@ -155,6 +158,10 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
     CloneWorkspace(InputWorkspace=str(ws_name),OutputWorkspace=str(ws_name)+'_tof_fitted_profiles')
     for m in range(len(masses)):
         CloneWorkspace(InputWorkspace=str(ws_name),OutputWorkspace=str(ws_name)+ '_tof_fitted_profile_' + str(m + 1))
+        
+    ######################
+    par_chi = np.zeros((last_spectrum-first_spectrum+1, len(par)+3))
+    ###########
 
     j=0
     
@@ -170,10 +177,16 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
             
             print(spectrum, " ... skipping ...")
             
-            for m in range(len(masses)):
+            for m in range(len(masses)):      #introduced this loop from original
                 intensities[m][j]=None
                 widths[m][j]=None
                 positions[m][j]=None
+            
+            #####
+            par_chi[j, -1] = None
+            par_chi[j, -2] = None
+            par_chi[j, 1:-2] = np.full(len(par), None)
+            #####
             
             tmp=mtd[str(ws_name)+'_tof_fitted_profiles']
             for bin in range(ws_len):
@@ -204,7 +217,12 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
                     tmp.dataY(spec_index)[bin] = ncp_m[bin] 
                     tmp.dataE(spec_index)[bin] = 0. 
              
-            reduced_chi2 = result.values()[4]/(len(data_x) - len(par))     
+            reduced_chi2 = result.values()[4]/(len(data_x) - len(par))    
+           ####### 
+            par_chi[j, -1] = result["nit"]
+            par_chi[j, -2] = reduced_chi2
+            par_chi[j, 1:-2] = fitted_par
+            ######
             npars = len(par)/len(masses)
                         
             for m in range(len(masses)):
@@ -214,10 +232,11 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
                     
             print(spectrum, fitted_par, "%.4g" % reduced_chi2)
        
+        par_chi[j, 0] = spectrum
         spectra[j]=spectrum
         j +=1
         
-    return spectra, intensities, widths, positions
+    return spectra, intensities, widths, positions, par_chi
 
 
 def fit_ncp(par, spectrum, masses, data_x, data_y, data_e, fit_arguments):
@@ -345,7 +364,7 @@ def calculate_sample_properties(masses,mean_widths,mean_intensity_ratios, mode, 
         profiles=""
         for m in range(len(masses)):
             mass, width, intensity=str(masses[m]), str(mean_widths[m]),str(mean_intensity_ratios[m])
-            profiles+= "name=GaussianComptonProfile,Mass="+mass+",Width="+width+",Intensity="+intensity+';' 
+            profiles+= "ws_name=GaussianComptonProfile,Mass="+mass+",Width="+width+",Intensity="+intensity+';' 
         sample_properties = profiles
     elif mode == "MultipleScattering":
         MS_properties=[]
@@ -368,7 +387,7 @@ def correct_for_gamma_background(ws_name):
         profiles=''
         for m in range(masses.__len__()):
             mass,width,intensity=str(masses[m]), str(mean_widths[m]),str(mean_intensity_ratios[m])
-            profiles+= "name=GaussianComptonProfile,Mass="+mass+",Width="+width+",Intensity="+intensity+';'
+            profiles+= "ws_name=GaussianComptonProfile,Mass="+mass+",Width="+width+",Intensity="+intensity+';'
         background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=ws_name, 
                                                                         ComptonFunction=profiles, WorkspaceIndexList=spec)
         for bin in range(ws.blocksize()):
@@ -415,6 +434,9 @@ def correct_for_multiple_scattering(ws_name,first_spectrum,last_spectrum, sample
 ############################
 def subtract_other_masses(ws_last_iteration, intensities, widths, positions, spectra, masses):
     first_ws = CloneWorkspace(InputWorkspace=ws_last_iteration)
+    ##----------------------
+    all_ncp_m = np.zeros((len(masses)-1, first_ws.getNumberHistograms(), first_ws.blocksize()-1))
+    ##--------------------------
     for index in range(len(spectra)):
         data_x, data_y, data_e = load_workspace(first_ws , spectra[index])
         if (data_y.all()==0):
@@ -424,10 +446,13 @@ def subtract_other_masses(ws_last_iteration, intensities, widths, positions, spe
             for m in range(len(masses)-1):
                 other_par = (intensities[m+1, index],widths[m+1, index],positions[m+1, index])
                 ncp = calculate_ncp(other_par, spectra[index], [masses[m+1]], data_x)
+                ##--------------
+                all_ncp_m[m, index, :] = ncp
+                ##------------------
                 for bin in range(len(data_x)-1):
                     first_ws.dataY(index)[bin] -= ncp[bin]*(data_x[bin+1]-data_x[bin])
 
-    return first_ws
+    return first_ws, all_ncp_m    #originally returns just the workspace
 
 def convert_to_y_space_and_symmetrise(ws_name,mass):
     max_Y = np.ceil(2.5*mass+27)
@@ -504,20 +529,21 @@ is not needed as a result of the symmetrisation.
 load_data=True                             # If data have already been loaded, it can be put to Fasle to save time;
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 4              # This is the number of iterations for the reduction analysis in time-of-flight.
-fit_in_Y_space = True      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
+number_of_iterations = 2              # This is the number of iterations for the reduction analysis in time-of-flight.
+fit_in_Y_space = False      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
 
 ws_name="starch_80_RD_"
 ws_name_raw="starch_80_RD_raw_"
 ws_name_empty="starch_80_RD_empty_"
-first_spectrum, last_spectrum = 144,182
+first_spectrum, last_spectrum = 144,147
 
 
 if load_data:
     spectrum_list=str(first_spectrum)+'-'+str(last_spectrum)
     runs='43066-43076'
-    ipfile = 'ip2018_3.par'
-    LoadVesuvio(Filename=runs,SpectrumList=spectrum_list,Mode="SingleDifference",SumSpectra=False,InstrumentParFile=ipfile, OutputWorkspace=ws_name_raw)
+    ipfile = r'./ip2018_3.par'
+    # LoadVesuvio(Filename=runs,SpectrumList=spectrum_list,Mode="SingleDifference",SumSpectra=False,InstrumentParFile=ipfile, OutputWorkspace=ws_name_raw)
+    Load(Filename= r"./input_ws/starch_80_RD_raw.nxs", OutputWorkspace=ws_name_raw)
     Rebin(InputWorkspace=ws_name_raw,Params="110,1.,430",OutputWorkspace=ws_name_raw)
     SumSpectra(InputWorkspace=ws_name_raw, OutputWorkspace=ws_name_raw+'_sum')
     CloneWorkspace(InputWorkspace = ws_name_raw, OutputWorkspace = ws_name)
@@ -566,10 +592,27 @@ bounds     += (  (0, None),  (13.897,13.897),  (-3., 1.))
 constraints =  ()
 fit_arguments = [bounds, constraints]
 # spectra to be masked
-spectra_to_be_masked = "173,174,179"
+#spectra_to_be_masked = "173,174,179"
+spectra_to_be_masked = [173, 174, 179]
 H_spectra_to_be_masked = ""
 
+############### my edits #############
+######################################
 
+spectra_to_be_masked = np.array(spectra_to_be_masked)
+spectra_to_be_masked = spectra_to_be_masked[(spectra_to_be_masked >= first_spectrum) & (spectra_to_be_masked <= last_spectrum)]   #detectors within spectrums
+
+spec_offset = mtd[ws_name].getSpectrum(0).getSpectrumNo()  
+first_idx, last_idx = first_spectrum - spec_offset, last_spectrum - spec_offset
+CropWorkspace(InputWorkspace=ws_name, StartWorkspaceIndex = first_idx, EndWorkspaceIndex = last_idx, OutputWorkspace=ws_name) #for MS correction
+##spec_offset = mtd[ws_name].getSpectrum(0).getSpectrumNo()
+
+all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
+all_spec_best_par_chi_nit = np.zeros((number_of_iterations, last_spectrum-first_spectrum+1, len(masses)*3+3))
+all_fit_workspaces = np.zeros((number_of_iterations, mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize())) 
+
+#######################################
+#######################################
 
 # Iterative analysis and correction of time-of-flight spectra.
 for iteration in range(number_of_iterations):
@@ -578,22 +621,34 @@ for iteration in range(number_of_iterations):
     ws_to_be_fitted = mtd[ws_name+str(iteration)]
     MaskDetectors(Workspace=ws_to_be_fitted,SpectraList=spectra_to_be_masked)
 
+    ##-------------
+    all_fit_workspaces[iteration] = ws_to_be_fitted.extractY()
+    ##-------------
+
+
     # Fit and plot where the spectra for the current iteration
-    spectra, intensities, widths, positions = block_fit_ncp(par,first_spectrum,last_spectrum, masses,ws_to_be_fitted, fit_arguments, verbose)
+    spectra, intensities, widths, positions, par_chi = block_fit_ncp(par,first_spectrum,last_spectrum, masses,ws_to_be_fitted, fit_arguments, verbose)
     # Calculate mean widths and intensities
     mean_widths, mean_intensity_ratios = calculate_mean_widths_and_intensities(masses, widths, intensities, spectra, verbose) # at present is not multiplying for 0,9
 
+    ##----------
+    all_mean_widths[iteration] = np.array(mean_widths)
+    all_mean_intensities[iteration] = np.array(mean_intensity_ratios)
+    all_spec_best_par_chi_nit[iteration] = par_chi
+    ##----------
+
     if (number_of_iterations - iteration -1 > 0):
-        # evaluate gamma background correction ---------- This creates a background workspace with name :  str(ws_name)+"_gamma_background"
+        # evaluate gamma background correction ---------- This creates a background workspace with ws_name :  str(ws_name)+"_gamma_background"
         sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "GammaBackground", verbose)
         correct_for_gamma_background(ws_name)
         Scale(InputWorkspace = str(ws_name)+"_gamma_background", OutputWorkspace = str(ws_name)+"_gamma_background", Factor=0.9, Operation = "Multiply")
-        # evaluate multiple scattering correction --------- This creates a background workspace with name :  str(ws_name)+"_MulScattering"
-        sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", verbose)
-        correct_for_multiple_scattering(ws_name, first_spectrum,last_spectrum, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)
-        # Create corrected workspace
+        # evaluate multiple scattering correction --------- This creates a background workspace with ws_name :  str(ws_name)+"_MulScattering"
+        # skip the multiscattering correction for now
+        # sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", verbose)
+        # correct_for_multiple_scattering(ws_name, first_spectrum,last_spectrum, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)
+        # # Create corrected workspace
         Minus(LHSWorkspace= ws_name, RHSWorkspace = str(ws_name)+"_gamma_background", OutputWorkspace = ws_name+str(iteration+1))
-        Minus(LHSWorkspace= ws_name+str(iteration+1), RHSWorkspace = str(ws_name)+"_MulScattering", OutputWorkspace = ws_name+str(iteration+1))
+        # Minus(LHSWorkspace= ws_name+str(iteration+1), RHSWorkspace = str(ws_name)+"_MulScattering", OutputWorkspace = ws_name+str(iteration+1))
 
 if fit_in_Y_space:
     first_ws = subtract_other_masses(ws_name+str(number_of_iterations-1), intensities, widths, positions, spectra, masses)
@@ -661,13 +716,13 @@ if fit_in_Y_space:
         
         if (simple_gaussian_fit):
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
-            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
+            ws_name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
+            ws_name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()'''
         else:
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
-            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
+            ws_name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
+            ws_name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
             +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
             y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
 
@@ -678,6 +733,34 @@ if fit_in_Y_space:
         print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
 
 
+# ----------------- My edits ----------------------
+all_tot_ncp = np.zeros((number_of_iterations, mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize()))
+all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize()))
+                       
+for i in range(number_of_iterations):
+    ncp_ws_name = ws_name + str(i)
+    ncp_tot = mtd[ncp_ws_name + "_tof_fitted_profiles"]
+    ncp_tot_dataY = ncp_tot.extractY()
+    all_tot_ncp[i] = ncp_tot_dataY
+    
+    for m in range(len(masses)):
+        ncp_m = mtd[ncp_ws_name + "_tof_fitted_profile_" + str(m+1)]
+        ncp_m_dataY = ncp_m.extractY()
+        all_indiv_ncp[i, m] = ncp_m_dataY
+
+##-------------------save results-------------------
+savepath = r"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_with_mulscat\ori_spec3-134_iter4_ncp"
+
+np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
+                   all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
+                   all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
+                   all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp)
+
+
+#"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_no_mulscat\original_spec3-13_iter1"
+
+end_time = time.time()
+print("execution time: ", end_time - start_time, "seconds")
 ############################################################################
 ######
 ######              AND THEY ALL LIVED HAPPILY EVER AFTER
