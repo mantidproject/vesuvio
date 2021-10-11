@@ -73,7 +73,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "testing_fwd" 
+    savePath = repoPath / "tests" / "fixatures" / "data_to_test_func_sub_mass" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -112,16 +112,16 @@ class InitialConditions:
 
 
 initialConditionsDict = {
-    "noOfMSIterations" : 2, 
-    "firstSpec" : 144, 
-    "lastSpec" : 147,
+    "noOfMSIterations" : 1, 
+    "firstSpec" : 144,    #144
+    "lastSpec" : 182,     #182
     "userPathInitWsFlag" : True, 
     "scaleParsFlag" : False, 
     "fitSyntheticWsFlag" : False,
     "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces
 
     "MSCorrectionFlag" : False,
-    "GammaCorrectionFlag" : True,
+    "GammaCorrectionFlag" : False,
     "fitInYSpaceFlag" : False
 }
 
@@ -282,13 +282,17 @@ class resultsObject:
 
         all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
         all_spec_best_par_chi_nit = np.zeros(
-            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
+            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3)
+            )
         all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
+        all_ncp_for_each_mass = np.zeros(
+            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1)
+            )
         all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
         resultsList = [all_mean_widths, all_mean_intensities,
-                       all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces]
+                       all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, all_ncp_for_each_mass]
         self.resultsList = resultsList
 
     def append(self, mulscatIter, resultsToAppend):
@@ -297,13 +301,16 @@ class resultsObject:
             self.resultsList[i][mulscatIter] = currentMSArray
 
     def save(self, savePath):
-        all_mean_widths, all_mean_intensities, all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces = self.resultsList
+        all_mean_widths, all_mean_intensities, \
+        all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
+        all_ncp_for_each_mass = self.resultsList
         np.savez(savePath,
                  all_fit_workspaces=all_fit_workspaces,
                  all_spec_best_par_chi_nit=all_spec_best_par_chi_nit,
                  all_mean_widths=all_mean_widths,
                  all_mean_intensities=all_mean_intensities,
-                 all_tot_ncp=all_tot_ncp)
+                 all_tot_ncp=all_tot_ncp,
+                 all_ncp_for_each_mass=all_ncp_for_each_mass)
 
 
 def fitNcpToWorkspace(ws):
@@ -332,7 +339,7 @@ def fitNcpToWorkspace(ws):
     ncpTotal = np.sum(ncpForEachMass, axis=1)  
     createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
 
-    return [meanWidths, meanIntensityRatios, fitPars, ncpTotal, wsDataY]
+    return [meanWidths, meanIntensityRatios, fitPars, ncpTotal, wsDataY, ncpForEachMass]
 
 
 def loadWorkspaceIntoArrays(ws):
@@ -918,6 +925,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     """Input: workspace from last iteration, ncpTotal for each mass
        Output: workspace with all the ncpTotal subtracted except for the first mass"""
 
+    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     # Select all masses other than the first one
     ncpForEachMass = ncpForEachMass[1:, :, :]
     # Sum the ncpTotal for remaining masses

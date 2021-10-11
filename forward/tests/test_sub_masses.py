@@ -3,6 +3,8 @@ import numpy as np
 import numpy.testing as nptest
 import matplotlib.pyplot as plt
 from mantid.simpleapi import *    
+from pathlib import Path
+currentPath = Path(__file__).absolute().parent  # Path to the repository
 
 #optimized function to test
 target = __import__("../Optimized_fwd_script.py")
@@ -28,6 +30,21 @@ def subtract_other_masses(ws_last_iteration, intensities, widths, positions, spe
                 ##------------------
                 for bin in range(len(data_x)-1):
                     first_ws.dataY(index)[bin] -= ncp[bin]*(data_x[bin+1]-data_x[bin])
+    return first_ws  #, all_ncp_m    #originally returns just the workspace
+
+def load_workspace(ws_name, spectrum):
+    ws=mtd[str(ws_name)]
+    ws_len, ws_spectra =ws.blocksize()-1, ws.getNumberHistograms()
+    ws_x,ws_y, ws_e = [0.]*ws_len, [0.]*ws_len,[0.]*ws_len
+    for spec in range(ws_spectra):
+        if ws.getSpectrum(spec).getSpectrumNo() == spectrum :
+            for i in range(ws_len):
+                # converting the histogram into points
+                ws_y[i] = ( ws.readY(spec)[i] / (ws.readX(spec)[i+1] - ws.readX(spec)[i] ) )
+                ws_e[i] = ( ws.readE(spec)[i] / (ws.readX(spec)[i+1] - ws.readX(spec)[i] ) )
+                ws_x[i] = ( 0.5 * (ws.readX(spec)[i+1] + ws.readX(spec)[i] ) )
+    ws_x, ws_y, ws_e = np.array(ws_x), np.array(ws_y), np.array(ws_e)
+    return ws_x, ws_y, ws_e
 
 def calculate_ncp(par, spectrum , masses, data_x):
     angle, T0, L0, L1 = load_ip_file(spectrum)
@@ -83,9 +100,21 @@ wsExample = Load(Filename=r"../input_ws/starch_80_RD_raw.nxs")
 
 # Same initial conditions
 masses = [1.0079,12,16,27]
-spectra = 
+dataFilePath = currentPath / "fixatures" / "data_to_test_func_sub_mass.npz"
+dataFile = np.load(dataFilePath)
 
-ncpForEachMass = 
+ncpForEachMass = dataFile["all_ncp_for_each_mass"][0]
+parameters = dataFile["all_spec_best_par_chi_nit"][0]
+spectra = parameters[:, 0]
+parameters = parameters[1:-2]
+intensities = parameters[::3].T
+widths = parameters[1::3].T
+centers = parameters[2::3].T
 
 class TestSubMasses(unittest.TestCase):
 
+    def test_function():
+
+
+if __name__ == "__main__":
+    unittest.main()
