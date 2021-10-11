@@ -25,7 +25,8 @@ from scipy.optimize import curve_fit
 from scipy import optimize
 from scipy.ndimage import convolve1d
 import time
-
+from pathlib import Path
+repoPath = Path(__file__).absolute().parent  # Path to the repository
 start_time = time.time()
 
 # command for the formatting of the printed output
@@ -72,7 +73,7 @@ def fun_derivative4(x,fun): # not used at present. Can be used for the H4 polyno
 
 def load_ip_file(spectrum):
     #print "Loading parameters from file: ", namedtuple
-    ipfile = r'./ip2018_3.par'
+    ipfile =  repoPath / 'ip2018_3.par'
     f = open(ipfile, 'r')
     data = f.read()
     lines = data.split('\n')
@@ -217,13 +218,13 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
                     tmp.dataY(spec_index)[bin] = ncp_m[bin] 
                     tmp.dataE(spec_index)[bin] = 0. 
              
-            reduced_chi2 = result.values()[4]/(len(data_x) - len(par))    
+            reduced_chi2 = result["fun"]/(len(data_x) - len(par))    
            ####### 
             par_chi[j, -1] = result["nit"]
             par_chi[j, -2] = reduced_chi2
             par_chi[j, 1:-2] = fitted_par
             ######
-            npars = len(par)/len(masses)
+            npars = int(len(par)/len(masses))
                         
             for m in range(len(masses)):
                     intensities[m][j]=float(fitted_par[npars*m])
@@ -242,7 +243,7 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
 def fit_ncp(par, spectrum, masses, data_x, data_y, data_e, fit_arguments):
     boundaries, constraints = fit_arguments[0], fit_arguments[1]
     result = optimize.minimize(errfunc, par[:], args=(spectrum, masses, data_x, data_y, data_e), method='SLSQP', bounds = boundaries, constraints=constraints)
-    fitted_par = result.values()[5]
+    fitted_par = result["x"]
     ncp = calculate_ncp(fitted_par, spectrum , masses, data_x)
     return ncp, fitted_par, result
 
@@ -261,7 +262,7 @@ def calculate_ncp(par, spectrum , masses, data_x):
     ncp = 0. # initialising the function values
     # velocities in m/us, times in us, energies in meV
     v0, E0, delta_E, delta_Q = calculate_kinematics(data_x, angle, T0, L0, L1 )
-    npars = len(par)/len(masses)
+    npars = int(len(par)/len(masses))
     for m in range(len(masses)):#   [parameter_index + number_of_mass * number_of_parameters_per_mass ]
         mass, hei , width, centre = masses[m] , par[m*npars], par[1+m*npars], par[2+m*npars]
         E_r = ( hbar * delta_Q )**2 / 2. / mass
@@ -283,7 +284,7 @@ def calculate_ncp_m(par, m, spectrum , masses, data_x):
     ncp_m = 0. # initialising the function values
     # velocities in m/us, times in us, energies in meV
     v0, E0, delta_E, delta_Q = calculate_kinematics(data_x, angle, T0, L0, L1 )
-    npars = len(par)/len(masses)
+    npars = int(len(par)/len(masses))
     mass, hei , width, centre = masses[m] , par[m*npars], par[1+m*npars], par[2+m*npars]
     E_r = ( hbar * delta_Q )**2 / 2. / mass
     y = mass / hbar**2 /delta_Q * (delta_E - E_r) 
@@ -387,7 +388,7 @@ def correct_for_gamma_background(ws_name):
         profiles=''
         for m in range(masses.__len__()):
             mass,width,intensity=str(masses[m]), str(mean_widths[m]),str(mean_intensity_ratios[m])
-            profiles+= "ws_name=GaussianComptonProfile,Mass="+mass+",Width="+width+",Intensity="+intensity+';'
+            profiles+= "name=GaussianComptonProfile,Mass="+mass+",Width="+width+",Intensity="+intensity+';'
         background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=ws_name, 
                                                                         ComptonFunction=profiles, WorkspaceIndexList=spec)
         for bin in range(ws.blocksize()):
@@ -511,6 +512,8 @@ def normalise_workspace(ws_name):
 ##########################################################
 ####        USER SECTION  -  FOR USERS 
 ##########################################################
+
+
 '''
 The user section is composed of an initialisation section, an iterative analysis/reduction section
 of the spectra in the time-of-flight domain, and a final section where the analysis of the corrected
@@ -535,8 +538,12 @@ fit_in_Y_space = False      # If True, corrected time-of-flight spectra containi
 ws_name="starch_80_RD_"
 ws_name_raw="starch_80_RD_raw_"
 ws_name_empty="starch_80_RD_empty_"
-first_spectrum, last_spectrum = 144,147
+first_spectrum, last_spectrum = 144,147   #144, 182
 
+masses = [1.0079,12,16,27]
+abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
+
+simple_gaussian_fit = True
 
 if load_data:
     spectrum_list=str(first_spectrum)+'-'+str(last_spectrum)
@@ -555,10 +562,10 @@ vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001 # expressed in met
 create_slab_geometry(ws_name,vertical_width, horizontal_width, thickness)
 
 # parameters of the neutron Compton profiles to be fitted.
-masses = [1.0079,12,16,27]
-abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
+# masses = [1.0079,12,16,27]
+# abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
 
-simple_gaussian_fit = True
+# simple_gaussian_fit = True
 
 ## backscattering results
 #Mass:  12  width:  12.71902583773011  \pm  3.4359310000812378
@@ -736,7 +743,7 @@ if fit_in_Y_space:
 # ----------------- My edits ----------------------
 all_tot_ncp = np.zeros((number_of_iterations, mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize()))
 all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize()))
-                       
+                    
 for i in range(number_of_iterations):
     ncp_ws_name = ws_name + str(i)
     ncp_tot = mtd[ncp_ws_name + "_tof_fitted_profiles"]
@@ -749,16 +756,15 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = r"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_with_mulscat\ori_spec3-134_iter4_ncp"
+savepath = repoPath / "tests" / "fixatures" / "original_adapted_run_144-182"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
-                   all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
-                   all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
-                   all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp)
+                all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
+                all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
+                all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp)
 
 
 #"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_no_mulscat\original_spec3-13_iter1"
-
 end_time = time.time()
 print("execution time: ", end_time - start_time, "seconds")
 ############################################################################

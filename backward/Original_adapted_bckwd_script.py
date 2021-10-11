@@ -25,8 +25,10 @@ from scipy.optimize import curve_fit
 from scipy import optimize
 from scipy.ndimage import convolve1d
 import time
+from pathlib import Path
 
 start_time = time.time()
+repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 # command for the formatting of the printed output
 np.set_printoptions(suppress=True, precision=4, linewidth= 150 )
@@ -72,7 +74,7 @@ def fun_derivative4(x,fun): # not used at present. Can be used for the H4 polyno
 
 def load_ip_file(spectrum):
     #print "Loading parameters from file: ", namedtuple
-    ipfile = 'C:\Users\guijo\Desktop\Work\ip2018.par'
+    ipfile = repoPath / 'ip2018.par'
     f = open(ipfile, 'r')
     data = f.read()
     lines = data.split('\n')
@@ -144,7 +146,7 @@ def load_workspace(ws_name, spectrum):
 #
 def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments, verbose):
     
-    print "\n", "Fitting Workspace: ", str(ws_name)
+    print("\n", "Fitting Workspace: ", str(ws_name))
         
     intensities=np.zeros((len(masses),last_spectrum-first_spectrum+1))
     widths=np.zeros((len(masses),last_spectrum-first_spectrum+1))
@@ -165,7 +167,7 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
 
     j=0
     
-    print "Fitting parameters are given as: [Intensity Width Centre] for each NCP"
+    print("Fitting parameters are given as: [Intensity Width Centre] for each NCP")
     
     for spectrum in range(first_spectrum,last_spectrum+1):
         
@@ -175,7 +177,7 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
         
         if (data_y.all()==0):
             
-            print spectrum, " ... skipping ..."
+            print(spectrum, " ... skipping ...")
             
             for m in range(len(masses)):      #introduced this loop from original
                 intensities[m][j]=None
@@ -217,20 +219,20 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
                     tmp.dataY(spec_index)[bin] = ncp_m[bin] 
                     tmp.dataE(spec_index)[bin] = 0. 
              
-            reduced_chi2 = result.values()[4]/(len(data_x) - len(par))    
+            reduced_chi2 = result["fun"]/(len(data_x) - len(par))    
            ####### 
             par_chi[j, -1] = result["nit"]
             par_chi[j, -2] = reduced_chi2
             par_chi[j, 1:-2] = fitted_par
             ######
-            npars = len(par)/len(masses)
+            npars = int(len(par)/len(masses))
                         
             for m in range(len(masses)):
                     intensities[m][j]=float(fitted_par[npars*m])
                     widths[m][j]=float(fitted_par[npars*m+1])
                     positions[m][j]=float(fitted_par[npars*m+2])
                     
-            print spectrum, fitted_par, "%.4g" % reduced_chi2
+            print(spectrum, fitted_par, "%.4g" % reduced_chi2)
        
         par_chi[j, 0] = spectrum
         spectra[j]=spectrum
@@ -242,7 +244,7 @@ def block_fit_ncp(par,first_spectrum,last_spectrum,masses,ws_name,fit_arguments,
 def fit_ncp(par, spectrum, masses, data_x, data_y, data_e, fit_arguments):
     boundaries, constraints = fit_arguments[0], fit_arguments[1]
     result = optimize.minimize(errfunc, par[:], args=(spectrum, masses, data_x, data_y, data_e), method='SLSQP', bounds = boundaries, constraints=constraints)
-    fitted_par = result.values()[5]
+    fitted_par = result["x"]
     ncp = calculate_ncp(fitted_par, spectrum , masses, data_x)
     return ncp, fitted_par, result
 
@@ -261,7 +263,7 @@ def calculate_ncp(par, spectrum , masses, data_x):
     ncp = 0. # initialising the function values
     # velocities in m/us, times in us, energies in meV
     v0, E0, delta_E, delta_Q = calculate_kinematics(data_x, angle, T0, L0, L1 )
-    npars = len(par)/len(masses)
+    npars = int(len(par)/len(masses))
     for m in range(len(masses)):#   [parameter_index + number_of_mass * number_of_parameters_per_mass ]
         mass, hei , width, centre = masses[m] , par[m*npars], par[1+m*npars], par[2+m*npars]
         E_r = ( hbar * delta_Q )**2 / 2. / mass
@@ -283,7 +285,7 @@ def calculate_ncp_m(par, m, spectrum , masses, data_x):
     ncp_m = 0. # initialising the function values
     # velocities in m/us, times in us, energies in meV
     v0, E0, delta_E, delta_Q = calculate_kinematics(data_x, angle, T0, L0, L1 )
-    npars = len(par)/len(masses)
+    npars = int(len(par)/len(masses))
     mass, hei , width, centre = masses[m] , par[m*npars], par[1+m*npars], par[2+m*npars]
     E_r = ( hbar * delta_Q )**2 / 2. / mass
     y = mass / hbar**2 /delta_Q * (delta_E - E_r) 
@@ -355,8 +357,8 @@ def calculate_mean_widths_and_intensities(masses,widths,intensities,spectra, ver
         mean_intensity_ratios[m] = np.nanmean(better_intensities[m])
         mean_intensity_ratios_std[m] = np.nanstd(better_intensities[m])
     for m in range(len(masses)):
-        print "\n", "Mass: ", masses[m], " width: ", mean_widths[m], " \pm ", widths_std[m]
-        print "\n", "Mass: ", masses[m], " mean_intensity_ratio: ", mean_intensity_ratios[m], " \pm ", mean_intensity_ratios_std[m]
+        print("\n", "Mass: ", masses[m], " width: ", mean_widths[m], " \pm ", widths_std[m])
+        print("\n", "Mass: ", masses[m], " mean_intensity_ratio: ", mean_intensity_ratios[m], " \pm ", mean_intensity_ratios_std[m])
     return mean_widths, mean_intensity_ratios
 
 def calculate_sample_properties(masses,mean_widths,mean_intensity_ratios, mode, verbose):
@@ -404,12 +406,12 @@ def calculate_sample_properties(masses,mean_widths,mean_intensity_ratios, mode, 
         sample_properties = MS_properties    
         
     if verbose:
-        print "\n", "The sample properties for ",mode," are: ", sample_properties
+        print("\n", "The sample properties for ",mode," are: ", sample_properties)
     return sample_properties
         
 def correct_for_gamma_background(ws_name):
     if verbose:
-        print "Evaluating the Gamma Background Correction."
+        print("Evaluating the Gamma Background Correction.")
     # Create an empty workspace for the gamma correction
     CloneWorkspace(InputWorkspace=ws_name,OutputWorkspace="gamma_background_correction")
     ws=mtd["gamma_background_correction"]
@@ -452,7 +454,7 @@ def correct_for_multiple_scattering(ws_name,first_spectrum,last_spectrum, sample
 
 
     if verbose:
-        print "Evaluating the Multiple Scattering Correction."
+        print("Evaluating the Multiple Scattering Correction.")
     dens, trans = VesuvioThickness(Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=transmission_guess,Thickness=0.1)         
     _TotScattering, _MulScattering = VesuvioCalculateMS(ws_name, NoOfMasses=len(MS_masses), SampleDensity=dens.cell(9,1), 
                                                                         AtomicProperties=sample_properties, BeamRadius=2.5,
@@ -568,7 +570,7 @@ is not needed as a result of the symmetrisation.
 '''
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 4 #4               # This is the number of iterations for the reduction analysis in time-of-flight.
+number_of_iterations = 1 #4               # This is the number of iterations for the reduction analysis in time-of-flight.
 
 
 name='CePtGe12_100K_DD_'  
@@ -584,15 +586,15 @@ detectors_masked=[18,34,42,43,59,60,62,118,119,133]   # Optional detectors to be
 
 
 if (name+'raw' not in mtd):
-    print '\n', 'Loading the sample runs: ', runs, '\n'
+    print('\n', 'Loading the sample runs: ', runs, '\n')
     #LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile,OutputWorkspace=name+'raw')
-    Load(Filename= r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_raw.nxs", OutputWorkspace="CePtGe12_100K_DD_raw")
+    Load(Filename= r"./input_ws/CePtGe12_100K_DD_raw.nxs", OutputWorkspace="CePtGe12_100K_DD_raw")
     Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
     SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
 if (name+'empty' not in mtd):
-    print '\n', 'Loading the empty runs: ', empty_runs, '\n'
+    print('\n', 'Loading the empty runs: ', empty_runs, '\n')
     #LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile,OutputWorkspace=name+'empty')
-    Load(Filename= r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_empty.nxs", OutputWorkspace="CePtGe12_100K_DD_empty")
+    Load(Filename= r"./input_ws/CePtGe12_100K_DD_empty.nxs", OutputWorkspace="CePtGe12_100K_DD_empty")
     Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty') 
     
 Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
@@ -740,7 +742,7 @@ for i in range(number_of_iterations):
 
 ##-------------------save results-------------------
 
-savepath = r"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_with_mulscat\ori_spec3-134_iter4_ncp"
+savepath = repoPath / "tests" / "fixatures" / "adapted_original_1iter_testing"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
@@ -751,7 +753,7 @@ np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
 #"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_no_mulscat\original_spec3-13_iter1"
 
 end_time = time.time()
-print "execution time: ", end_time - start_time, "seconds"
+print("execution time: ", end_time - start_time, "seconds")
 
 ############################################################################
 ######

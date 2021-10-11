@@ -5,17 +5,12 @@ import numpy.testing as nptest
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from jupyterthemes import jtplot
-jtplot.style()
+# from jupyterthemes import jtplot
+# jtplot.style()
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
-pathToOriginal = currentPath / "fixatures" / "adapted_original_1iter.npz"
-pathToOptimized = currentPath / "fixatures" / "opt_spec3-134_iter4_ncp.npz"
-
-#--------------------- Problem to solve
-# The same original script ran in Mantid 6.2 gives different results for
-# the intensities, but it should give very similar results
-
+pathToOriginal = currentPath / "fixatures" / "original_adapted_run_144-182.npz"
+pathToOptimized = currentPath / "runs_for_testing" / "testing_fwd.npz"
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
@@ -139,7 +134,7 @@ class TestMeanIntensities(unittest.TestCase):
         self.optmeanintensities = optimizedResults["all_mean_intensities"][0]
     
     def test_ncp(self):
-        print("\nMean intensity ratios:\n",
+        print("\nMean widths:\n",
             "ori: ", self.orimeanintensities, 
             "\nopt: ", self.optmeanintensities)
 

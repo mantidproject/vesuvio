@@ -19,7 +19,6 @@ The fit procedure in the time-of-flight domain is  based on the scipy.minimize.o
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
 '''
 
-start_time = time.time()
 # format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=150)
 repoPath = Path(__file__).absolute().parent  # Path to the repository
@@ -990,6 +989,8 @@ def normalise_workspace(wsName):
     Divide(LHSWorkspace=wsName, RHSWorkspace="tmp_norm", OutputWorkspace=wsName)
     DeleteWorkspace("tmp_norm")
 
-main()
-end_time = time.time()
-print("running time: ", end_time-start_time, " seconds")
+if __name__=="__main__":
+    start_time = time.time()
+    main()
+    end_time = time.time()
+    print("running time: ", end_time-start_time, " seconds")
