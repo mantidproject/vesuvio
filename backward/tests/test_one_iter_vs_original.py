@@ -7,10 +7,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from jupyterthemes import jtplot
 jtplot.style()
+plt.style.use('dark_background')
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
+
 pathToOriginal = currentPath / "fixatures" / "adapted_original_1iter.npz"
-pathToOptimized = currentPath / "fixatures" / "opt_spec3-134_iter4_ncp.npz"
+#pathToOriginal = currentPath / "fixatures" / "ori_spec3-134_iter4_ncp.npz"
+
+pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original.npz"
 
 #--------------------- Problem to solve
 # The same original script ran in Mantid 6.2 gives different results for
@@ -39,8 +43,11 @@ class TestFitParameters(unittest.TestCase):
         self.optwidths = self.optmainPars[:, 1::3]
         self.optcenters = self.optmainPars[:, 2::3]
 
-        self.rtol = 0.0001
+        self.rtol = 0.01
         self.equal_nan = True
+
+    def test_print_rtol(self):
+        print("\nrtol: ", self.rtol)
 
     def test_mainPars(self):
         totalMask = np.isclose(
@@ -79,7 +86,18 @@ class TestFitParameters(unittest.TestCase):
         totalDiffMask = ~ totalMask
         noDiff = np.sum(totalDiffMask)
         maskSize = totalDiffMask.size
-        print("No of different nit:\n",
+        print("\nNo of different nit:\n",
+            noDiff, " out of ", maskSize,
+            f"ie {100*noDiff/maskSize:.1f} %")
+
+    def test_intensities(self):
+        totalMask = np.isclose(
+            self.oriintensities, self.optintensities, rtol=self.rtol, equal_nan=self.equal_nan
+            )
+        totalDiffMask = ~ totalMask
+        noDiff = np.sum(totalDiffMask)
+        maskSize = totalDiffMask.size
+        print("\nNo of different intensities:\n",
             noDiff, " out of ", maskSize,
             f"ie {100*noDiff/maskSize:.1f} %")
 
@@ -125,9 +143,9 @@ class TestMeanWidths(unittest.TestCase):
         optimizedResults = np.load(pathToOptimized)
         self.optmeanwidths = optimizedResults["all_mean_widths"][0]
     
-    def test_ncp(self):
-        print("\nMean widths:\n",
-            "ori: ", self.orimeanwidths, 
+    def test_widths(self):
+        print("\nMean widths:",
+            "\nori: ", self.orimeanwidths, 
             "\nopt: ", self.optmeanwidths)
 
 class TestMeanIntensities(unittest.TestCase):
@@ -138,9 +156,9 @@ class TestMeanIntensities(unittest.TestCase):
         optimizedResults = np.load(pathToOptimized)
         self.optmeanintensities = optimizedResults["all_mean_intensities"][0]
     
-    def test_ncp(self):
-        print("\nMean intensity ratios:\n",
-            "ori: ", self.orimeanintensities, 
+    def test_intensities(self):
+        print("\nMean intensity ratios:",
+            "\nori: ", self.orimeanintensities, 
             "\nopt: ", self.optmeanintensities)
 
 # class TestFitWorkspaces(unittest.TestCase):

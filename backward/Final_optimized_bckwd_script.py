@@ -82,7 +82,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "testing_loadPath" 
+    savePath = repoPath / "tests" / "runs_for_testing" / "compare_with_original" 
     syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -118,7 +118,7 @@ class InitialConditions:
 initialConditionsDict = {
     "noOfMSIterations" : 1, 
     "firstSpec" : 3, 
-    "lastSpec" : 5,
+    "lastSpec" : 134,
     "userPathInitWsFlag" : True, 
     "scaleParsFlag" : False, 
     "fitSyntheticWsFlag" : False,
