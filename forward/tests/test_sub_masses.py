@@ -223,8 +223,8 @@ class TestSubMasses(unittest.TestCase):
         self.equal_nan = True
 
     def test_dataY(self):
-        oriDataY = self.wsOri.extractY()[:, :-2]   # Last two columns are the problem!
-        optDataY = self.wsOpt.extractY()[:, :-2]
+        oriDataY = self.wsOri.extractY()#[:, :-2]   # Last two columns are the problem!
+        optDataY = self.wsOpt.extractY()#[:, :-2]
         optDataY = np.where(np.isnan(optDataY), 0, optDataY)
 
         totalMask = np.isclose(
