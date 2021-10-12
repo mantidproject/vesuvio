@@ -532,13 +532,13 @@ is not needed as a result of the symmetrisation.
 load_data=True                             # If data have already been loaded, it can be put to Fasle to save time;
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 2              # This is the number of iterations for the reduction analysis in time-of-flight.
+number_of_iterations = 4              # This is the number of iterations for the reduction analysis in time-of-flight.
 fit_in_Y_space = False      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
 
 ws_name="starch_80_RD_"
 ws_name_raw="starch_80_RD_raw_"
 ws_name_empty="starch_80_RD_empty_"
-first_spectrum, last_spectrum = 144,147   #144, 182
+first_spectrum, last_spectrum = 144, 182   #144, 182
 
 masses = [1.0079,12,16,27]
 abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
@@ -756,7 +756,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = repoPath / "tests" / "fixatures" / "original_adapted_run_144-182"
+savepath = repoPath / "tests" / "fixatures" / "original_adapted_run_144-182_GC"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                 all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \

@@ -73,7 +73,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "fixatures" / "data_to_test_func_sub_mass" 
+    savePath = repoPath / "tests" / "runs_for_testing" / "testing_gamma_correction" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -112,7 +112,7 @@ class InitialConditions:
 
 
 initialConditionsDict = {
-    "noOfMSIterations" : 1, 
+    "noOfMSIterations" : 4, 
     "firstSpec" : 144,    #144
     "lastSpec" : 182,     #182
     "userPathInitWsFlag" : True, 
@@ -121,7 +121,7 @@ initialConditionsDict = {
     "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces
 
     "MSCorrectionFlag" : False,
-    "GammaCorrectionFlag" : False,
+    "GammaCorrectionFlag" : True,
     "fitInYSpaceFlag" : False
 }
 
