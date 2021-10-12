@@ -9,13 +9,15 @@ import matplotlib.pyplot as plt
 # jtplot.style()
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
-pathToOriginal = currentPath / "fixatures" / "original_adapted_run_144-182.npz"
-pathToOptimized = currentPath / "runs_for_testing" / "testing_fwd.npz"
+pathToOriginal = currentPath / "fixatures" / "original_adapted_run_144-182_GC.npz"
+pathToOptimized = currentPath / "runs_for_testing" / "testing_gamma_correction.npz"
+
+MSIterationIndex = 3
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        oriPars = originalResults["all_spec_best_par_chi_nit"][0]
+        oriPars = originalResults["all_spec_best_par_chi_nit"][MSIterationIndex]
         self.orispec = oriPars[:, 0]
         self.orichi2 = oriPars[:, -2]
         self.orinit = oriPars[:, -1]
@@ -25,7 +27,7 @@ class TestFitParameters(unittest.TestCase):
         self.oricenters = self.orimainPars[:, 2::3]
 
         optimizedResults = np.load(pathToOptimized)
-        optPars = optimizedResults["all_spec_best_par_chi_nit"][0]
+        optPars = optimizedResults["all_spec_best_par_chi_nit"][MSIterationIndex]
         self.optspec = optPars[:, 0]
         self.optchi2 = optPars[:, -2]
         self.optnit = optPars[:, -1]
@@ -74,17 +76,17 @@ class TestFitParameters(unittest.TestCase):
         totalDiffMask = ~ totalMask
         noDiff = np.sum(totalDiffMask)
         maskSize = totalDiffMask.size
-        print("No of different nit:\n",
+        print("\nNo of different nit:\n",
             noDiff, " out of ", maskSize,
             f"ie {100*noDiff/maskSize:.1f} %")
 
 class TestNcp(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orincp = originalResults["all_tot_ncp"][0, :, :-1]
+        self.orincp = originalResults["all_tot_ncp"][MSIterationIndex, :, :-1]
         
         optimizedResults = np.load(pathToOptimized)
-        self.optncp = optimizedResults["all_tot_ncp"][0]
+        self.optncp = optimizedResults["all_tot_ncp"][MSIterationIndex]
 
         self.rtol = 0.001
         self.equal_nan = True
@@ -115,27 +117,27 @@ class TestNcp(unittest.TestCase):
 class TestMeanWidths(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orimeanwidths = originalResults["all_mean_widths"][0]
+        self.orimeanwidths = originalResults["all_mean_widths"][MSIterationIndex]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optmeanwidths = optimizedResults["all_mean_widths"][0]
+        self.optmeanwidths = optimizedResults["all_mean_widths"][MSIterationIndex]
     
     def test_ncp(self):
-        print("\nMean widths:\n",
-            "ori: ", self.orimeanwidths, 
+        print("\nMean widths:",
+            "\nori: ", self.orimeanwidths, 
             "\nopt: ", self.optmeanwidths)
 
 class TestMeanIntensities(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orimeanintensities = originalResults["all_mean_intensities"][0]
+        self.orimeanintensities = originalResults["all_mean_intensities"][MSIterationIndex]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optmeanintensities = optimizedResults["all_mean_intensities"][0]
+        self.optmeanintensities = optimizedResults["all_mean_intensities"][MSIterationIndex]
     
     def test_ncp(self):
-        print("\nMean widths:\n",
-            "ori: ", self.orimeanintensities, 
+        print("\nMean widths:",
+            "\nori: ", self.orimeanintensities, 
             "\nopt: ", self.optmeanintensities)
 
 # class TestFitWorkspaces(unittest.TestCase):
