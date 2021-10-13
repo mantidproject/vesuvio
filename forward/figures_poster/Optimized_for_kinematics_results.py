@@ -27,8 +27,8 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 class InitialConditions:
 # Parameters for Raw and Empty Workspaces
     name = "starch_80_RD_"
-    userWsRawPath = r"./input_ws/starch_80_RD_raw.nxs"
-    userWsEmptyPath = r"./input_ws/starch_80_RD_raw.nxs"
+    userWsRawPath = r"../input_ws/starch_80_RD_raw.nxs"
+    userWsEmptyPath = r"../input_ws/starch_80_RD_raw.nxs"
 
     runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
@@ -73,7 +73,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "testing_gamma_correction" 
+    savePath = repoPath / "make_plots" / "data_for_plots" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -88,10 +88,6 @@ class InitialConditions:
         self.scaleParsFlag = D["scaleParsFlag"]
         self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
         self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
-        self.MSCorrectionFlag = D["MSCorrectionFlag"]
-        self.GammaCorrectionFlag = D["GammaCorrectionFlag"]
-        self.fitInYSpaceFlag = D["fitInYSpaceFlag"]
-
 
         self.specOffset = self.firstSpec
         self.firstIdx = self.firstSpec - self.specOffset
@@ -112,17 +108,13 @@ class InitialConditions:
 
 
 initialConditionsDict = {
-    "noOfMSIterations" : 4, 
+    "noOfMSIterations" : 1,     
     "firstSpec" : 144,    #144
     "lastSpec" : 182,     #182
     "userPathInitWsFlag" : True, 
     "scaleParsFlag" : False, 
     "fitSyntheticWsFlag" : False,
     "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces
-
-    "MSCorrectionFlag" : False,
-    "GammaCorrectionFlag" : False,
-    "fitInYSpaceFlag" : False
 }
 
 
@@ -139,37 +131,12 @@ def main():
     # Initialize arrays to store script results
     thisScriptResults = resultsObject(wsToBeFitted)
 
-    for iteration in range(ic.noOfMSIterations):
+    for iteration in range(ic.noOfMSIterations):   
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
         thisScriptResults.append(iteration, fittedNcpResults)
-
-        if (iteration < ic.noOfMSIterations - 1):  
-
-            meanWidths, meanIntensityRatios = fittedNcpResults[:2]
-            CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
-
-            if ic.MSCorrectionFlag:
-                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
-                Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
-                      OutputWorkspace="tmpNameWs")
-
-            if ic.GammaCorrectionFlag:
-                SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', ParameterType='Number', Value='24.0')
-                SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', ParameterType='Number', Value='73.0')
-
-                createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios)
-                Scale(
-                    InputWorkspace = ic.name+"_gamma_background", 
-                    OutputWorkspace = ic.name+"_gamma_background", 
-                    Factor=0.9, Operation="Multiply"
-                    )
-                Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
-                      OutputWorkspace="tmpNameWs")
-
-            RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
-                
+          
     thisScriptResults.save(ic.savePath)
 
 
@@ -280,19 +247,25 @@ class resultsObject:
         noOfSpec = wsToBeFitted.getNumberHistograms()
         lenOfSpec = wsToBeFitted.blocksize()
 
-        all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
-        all_spec_best_par_chi_nit = np.zeros(
-            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3)
-            )
-        all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        all_ncp_for_each_mass = np.zeros(
-            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1)
-            )
+        all_dataY = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
+        all_dataX = np.zeros(all_dataY.shape)
+        all_dataE = np.zeros(all_dataY.shape)
+        all_tot_ncp = np.zeros(all_dataY.shape)
+        all_deltaE = np.zeros(all_dataY.shape)
+        all_deltaQ = np.zeros(all_dataY.shape)
+
+        all_ncp_for_each_mass = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
+        all_yspaces_for_each_mass = np.zeros(all_ncp_for_each_mass.shape)
+
+        all_spec_best_par_chi_nit = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
+        
         all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
         resultsList = [all_mean_widths, all_mean_intensities,
-                       all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, all_ncp_for_each_mass]
+                       all_spec_best_par_chi_nit, all_tot_ncp, all_ncp_for_each_mass,
+                       all_dataY, all_dataX, all_dataE, 
+                       all_deltaE, all_deltaQ, all_yspaces_for_each_mass]
         self.resultsList = resultsList
 
     def append(self, mulscatIter, resultsToAppend):
@@ -302,10 +275,16 @@ class resultsObject:
 
     def save(self, savePath):
         all_mean_widths, all_mean_intensities, \
-        all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
-        all_ncp_for_each_mass = self.resultsList
+        all_spec_best_par_chi_nit, all_tot_ncp, all_ncp_for_each_mass, \
+        all_dataY, all_dataX, all_dataE, \
+        all_deltaE, all_deltaQ, all_yspaces_for_each_mass = self.resultsList
         np.savez(savePath,
-                 all_fit_workspaces=all_fit_workspaces,
+                 all_dataY=all_dataY,    # In the order of the script
+                 all_dataX=all_dataX,
+                 all_dataE=all_dataE,
+                 all_deltaQ=all_deltaQ,
+                 all_deltaE=all_deltaE,
+                 all_yspaces_for_each_mass=all_yspaces_for_each_mass,
                  all_spec_best_par_chi_nit=all_spec_best_par_chi_nit,
                  all_mean_widths=all_mean_widths,
                  all_mean_intensities=all_mean_intensities,
@@ -339,7 +318,11 @@ def fitNcpToWorkspace(ws):
     ncpTotal = np.sum(ncpForEachMass, axis=1)  
     createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
 
-    return [meanWidths, meanIntensityRatios, fitPars, ncpTotal, wsDataY, ncpForEachMass]
+    kinematicArrays = switchFirstTwoAxis(kinematicArrays)
+    deltaE, deltaQ = kinematicArrays[-2:]
+    print(deltaE.shape)
+    return [meanWidths, meanIntensityRatios, fitPars, ncpTotal, ncpForEachMass,\
+             dataY, dataX, dataE, deltaE, deltaQ, ySpacesForEachMass]
 
 
 def loadWorkspaceIntoArrays(ws):
@@ -738,264 +721,6 @@ def switchFirstTwoAxis(A):
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
-
-#-------------------- Currently working here ------------------------
-
-def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars):
-    """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
-    sampleProperties = calcMSCorrectionSampleProperties(
-        ic.masses, meanWidths, meanIntensityRatios, mulscatPars
-        )
-    createMulScatWorkspaces(ic.name, sampleProperties, mulscatPars)
-
-def calcMSCorrectionSampleProperties(masses, meanWidths, meanIntensityRatios, mulscatPars):
-    masses = masses.reshape(4)
-    hydrogen_peak, hydrogen_to_mass0_ratio = mulscatPars[:2]
-
-    if hydrogen_peak:
-        # ADDITION OF THE HYDROGEN intensities AS PROPORTIONAL TO A FITTED NCP (OXYGEN HERE)
-        masses = np.append(masses, 1.0079)
-        meanWidths = np.append(meanWidths, 5.0)
-        meanIntensityRatios = np.append(
-            meanIntensityRatios, hydrogen_to_mass0_ratio * meanIntensityRatios[0]
-            )
-        meanIntensityRatios /= np.sum(meanIntensityRatios)
-
-    MSProperties = np.zeros(3*len(masses))
-    MSProperties[::3] = masses
-    MSProperties[1::3] = meanIntensityRatios
-    MSProperties[2::3] = meanWidths
-    sampleProperties = list(MSProperties)   
-    print("\n The sample properties for Multiple Scattering correction are:\n ", 
-            sampleProperties)
-
-
-def createMulScatWorkspaces(wsName, sampleProperties, mulscatPars):
-    """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
-
-    print("Evaluating the Multiple Scattering Correction.")
-    transmission_guess, multiple_scattering_order, number_of_events = mulscatPars[2:]
-    # selects only the masses, every 3 numbers
-    MS_masses = sampleProperties[::3]
-    # same as above, but starts at first intensities
-    MS_amplitudes = sampleProperties[1::3]
-
-    dens, trans = VesuvioThickness(
-        Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=transmission_guess, Thickness=0.1
-        )
-
-    _TotScattering, _MulScattering = VesuvioCalculateMS(
-        wsName, 
-        NoOfMasses=len(MS_masses), 
-        SampleDensity=dens.cell(9, 1),
-        AtomicProperties=sampleProperties, 
-        BeamRadius=2.5,
-        NumScatters=multiple_scattering_order,
-        NumEventsPerRun=int(number_of_events)
-        )
-
-    data_normalisation = Integration(wsName)
-    simulation_normalisation = Integration("_TotScattering")
-    for workspace in ("_MulScattering", "_TotScattering"):
-        Divide(LHSWorkspace=workspace, RHSWorkspace=simulation_normalisation, 
-               OutputWorkspace=workspace)
-        Multiply(LHSWorkspace=workspace, RHSWorkspace=data_normalisation, 
-                 OutputWorkspace=workspace)
-        RenameWorkspace(InputWorkspace=workspace,
-                        OutputWorkspace=str(wsName)+workspace)
-    DeleteWorkspaces(
-        [data_normalisation, simulation_normalisation, trans, dens]
-        )
-  # The only remaining workspaces are the _MulScattering and _TotScattering
-
-
-def createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios):
-    """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
-    profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
-    background, corrected = VesuvioCalculateGammaBackground(
-        InputWorkspace=ic.name, ComptonFunction=profiles
-        )
-    RenameWorkspace(InputWorkspace= background, OutputWorkspace = ic.name+"_gamma_background")
-    DeleteWorkspace(corrected)
-
-
-def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
-    masses = masses.reshape(4)
-    profiles = ""
-    for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
-        profiles += "name=GaussianComptonProfile,Mass="   \
-                    + str(mass) + ",Width=" + str(width)  \
-                    + ",Intensity=" + str(intensity) + ';'
-    print("\n The sample properties for Gamma Correction are: ",
-            profiles)
-    return profiles
-
-
-# -------------- Working on fitting in the Y space --------------
-
-def FitFinalWsInYSpace(wsFinal, ncpForEachMass):
-    HSpectraToBeMasked = []
-
-    wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
-    RenameWorkspace(InputWorkspace=wsSubMass, OutputWorkspace=ic.name+"_H")
-    Rebin(InputWorkspace=ic.name+'_H',Params="110,1.,430",OutputWorkspace=ic.name+'_H')
-    MaskDetectors(Workspace=ic.name+'_H',SpectraList=HSpectraToBeMasked)
-    RemoveMaskedSpectra(InputWorkspace=ic.name+'_H', OutputWorkspace=ic.name+'_H') 
-
-    rebin_params='-20,0.5,20'
-    ConvertToYSpace(InputWorkspace=ic.name+'_H',Mass=1.0079,OutputWorkspace=ic.name+'joy',QWorkspace=ic.name+'q')
-    Rebin(InputWorkspace=ic.name+'joy',Params=rebin_params,OutputWorkspace=ic.name+'joy')
-    Rebin(InputWorkspace=ic.name+'q',Params=rebin_params,OutputWorkspace=ic.name+'q')
-    tmp=Integration(InputWorkspace=ic.name+'joy',RangeLower='-20',RangeUpper='20')
-    Divide(LHSWorkspace=ic.name+'joy',RHSWorkspace='tmp',OutputWorkspace=ic.name+'joy')  # I guess this step normalizes the npc in the y space
-    
-    ws=mtd[ic.name+'joy']
-
-    for spec in range(ws.getNumberHistograms()):
-        dataX = ws.readX(spec)[:]
-        dataY = ws.readY(spec)[:]
-        dataE = ws.readE(spec)[:]
-        dataXNegMask = dataX < 0
-        flipDataY = np.flip(dataY)
-        flipDataE = np.flip(dataE)
-        ws.dataY(spec)[:] = np.where(dataXNegMask, flipDataY, dataY)
-        ws.dataE(spec)[:] = np.where(dataXNegMask, flipDataE, dataE)
-
-
-    # for j in range(ws.getNumberHistograms()):
-    #     for k in range(ws.blocksize()):
-    #         if (ws.dataX(j)[k]<0):              
-    #             ws.dataY(j)[k] =ws.dataY(j)[ws.blocksize()-1-k]
-    #             ws.dataE(j)[k] =ws.dataE(j)[ws.blocksize()-1-k]    
-
-
-    # Definition of a normalising workspace taking into consideration the kinematic constraints
-    ws=CloneWorkspace(InputWorkspace=ic.name+'joy')
-    for j in range(ws.getNumberHistograms()):
-        for k in range(ws.blocksize()):
-            ws.dataE(j)[k] =0.000001
-            if (ws.dataY(j)[k]!=0):
-                ws.dataY(j)[k] =1.
-    ws=SumSpectra('ws')
-    RenameWorkspace('ws',ic.name+'joy_sum_normalisation')
-
-    # Definition of the sum of all spectra
-    SumSpectra(ic.name+'joy',OutputWorkspace=ic.name+'joy_sum')
-    Divide(LHSWorkspace=ic.name+'joy_sum',RHSWorkspace=ic.name+'joy_sum_normalisation',OutputWorkspace=ic.name+'joy_sum')
-
-    # Definition of the resolution functions
-    resolution=CloneWorkspace(InputWorkspace=ic.name+'joy')
-    resolution=Rebin(InputWorkspace='resolution',Params='-20,0.5,20')      ####### For loop necessary if Vesuvio
-    for i in range(resolution.getNumberHistograms()):
-        VesuvioResolution(Workspace=ic.name+str(iteration),WorkspaceIndex=str(i), Mass=1.0079, OutputWorkspaceYSpace='tmp')
-        tmp=Rebin(InputWorkspace='tmp',Params='-20,0.5,20')
-        for p in range (tmp.blocksize()):
-            resolution.dataY(i)[p]=tmp.dataY(0)[p]
-
-    # Definition of the sum of resolution functions
-    resolution_sum=SumSpectra('resolution')      ############# Is this the same as the average resolution??
-    tmp=Integration('resolution_sum')
-    resolution_sum=Divide('resolution_sum','tmp')
-    DeleteWorkspace('tmp') 
-
-    print('\n','Fit on the sum of spectra in the West domain','\n')         #### West domain is the same as Y scaling
-    for minimizer_sum in ('Levenberg-Marquardt','Simplex'):
-        CloneWorkspace(InputWorkspace = ic.name+'joy_sum', OutputWorkspace = ic.name+minimizer_sum+'_joy_sum_fitted')
-        
-        if (simple_gaussian_fit):
-            function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
-            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
-            y0=0,A=1,x0=0,sigma=5,   ties=()'''
-        else:
-            function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
-            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
-            +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
-            y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
-
-        Fit(Function=function, InputWorkspace=ic.name+minimizer_sum+'_joy_sum_fitted', Output=ic.name+minimizer_sum+'_joy_sum_fitted',Minimizer=minimizer_sum)
-        
-        ws=mtd[ic.name+minimizer_sum+'_joy_sum_fitted_Parameters']
-        print('Using the minimizer: ',minimizer_sum)
-        print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
-
-# I tested this function but not throughouly, so could have missed something
-def subtractAllMassesExceptFirst(ws, ncpForEachMass):
-    """Input: workspace from last iteration, ncpTotal for each mass
-       Output: workspace with all the ncpTotal subtracted except for the first mass"""
-
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    # Select all masses other than the first one
-    ncpForEachMass = ncpForEachMass[1:, :, :]
-    # Sum the ncpTotal for remaining masses
-    ncpTotal = np.sum(ncpForEachMass, axis=0)
-    dataY, dataX, dataE = ws.extractY(), ws.extractX(), ws.extractE()
-
-    # The original uses the mean points of the histograms, not dataX!
-    dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
-    # But this makes more sense to calculate histogram widths, we can preserve one more data point
-    wsSubMass = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), DataE=dataE.flatten(), Nspec=len(dataX))
-    return wsSubMass
-
-
-def convertWsToYSpaceAndSymetrise(wsName, mass):
-    """input: TOF workspace
-       output: workspace in y-space for given mass with dataY symetrised"""
-
-    wsYSpace, wsQ = ConvertToYSpace(
-        InputWorkspace=wsName, Mass=mass, OutputWorkspace=wsName+"_JoY", QWorkspace=wsName+"_Q"
-        )
-    max_Y = np.ceil(2.5*mass+27)  
-    # First bin boundary, width, last bin boundary
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
-    wsYSpace = Rebin(
-        InputWorkspace=wsYSpace, Params=rebin_parameters, FullBinsOnly=True, OutputWorkspace=wsName+"_JoY"
-        )
-
-    dataYSpace = wsYSpace.extractY()
-    # safeguarding against nans as well
-    nonZerosNansMask = (dataYSpace != 0) & (dataYSpace != np.nan)
-    dataYSpace[nonZerosNansMask] = 1
-    noOfNonNanY = np.nansum(dataYSpace, axis=0)
-
-    wsYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=wsName+"_JoY")
-
-    tmp = CloneWorkspace(InputWorkspace=wsYSpace)
-    tmp.dataY(0)[:] = noOfNonNanY
-    tmp.dataE(0)[:] = np.zeros(tmp.blocksize())
-    ws = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-        LHSWorkspace=wsYSpace, RHSWorkspace=tmp, OutputWorkspace=wsName+"_JoY"
-        )
-    ws.dataY(0)[:] = (ws.readY(0)[:] + np.flip(ws.readY(0)[:])) / 2 
-    ws.dataE(0)[:] = (ws.readE(0)[:] + np.flip(ws.readE(0)[:])) / 2 
-    normalise_workspace(ws)
-    return max_Y
-
-
-def calculate_mantid_resolutions(wsName, mass):
-    # Only for loop in this script because the fuction VesuvioResolution takes in one spectra at a time
-    # Haven't really tested this one becuase it's not modified
-    max_Y = np.ceil(2.5*mass+27)
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
-    ws = mtd[wsName]
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(Workspace=ws, WorkspaceIndex=index,
-                          Mass=mass, OutputWorkspaceySpacesForEachMass="tmp")
-        tmp = Rebin("tmp", rebin_parameters)
-        if index == 0:
-            RenameWorkspace("tmp", "resolution")
-        else:
-            AppendSpectra("resolution", "tmp", OutputWorkspace="resolution")
-    SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
-    normalise_workspace("resolution")
-    DeleteWorkspace("tmp")
-
-
-def normalise_workspace(wsName):
-    tmp_norm = Integration(wsName)
-    Divide(LHSWorkspace=wsName, RHSWorkspace="tmp_norm", OutputWorkspace=wsName)
-    DeleteWorkspace("tmp_norm")
 
 if __name__=="__main__":
     start_time = time.time()
