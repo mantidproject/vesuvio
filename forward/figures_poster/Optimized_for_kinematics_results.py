@@ -39,7 +39,8 @@ class InitialConditions:
     rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
 
     # Masses, instrument parameters and initial fitting parameters
-    masses = np.array([1.0079, 12, 16, 27]).reshape(4, 1, 1)  #Will change to shape(4, 1) in the future
+    # Original masses: [1.0079, 12, 16, 27]
+    masses = np.array([1.0079, 12, 16, 27])[:, np.newaxis, np.newaxis]  #Will change to shape(4, 1) in the future
     noOfMasses = len(masses)
     InstrParsPath = repoPath / 'ip2018_3.par'
 
@@ -278,6 +279,7 @@ class resultsObject:
         all_spec_best_par_chi_nit, all_tot_ncp, all_ncp_for_each_mass, \
         all_dataY, all_dataX, all_dataE, \
         all_deltaE, all_deltaQ, all_yspaces_for_each_mass = self.resultsList
+        print(all_dataY)
         np.savez(savePath,
                  all_dataY=all_dataY,    # In the order of the script
                  all_dataX=all_dataX,
@@ -289,7 +291,8 @@ class resultsObject:
                  all_mean_widths=all_mean_widths,
                  all_mean_intensities=all_mean_intensities,
                  all_tot_ncp=all_tot_ncp,
-                 all_ncp_for_each_mass=all_ncp_for_each_mass)
+                 all_ncp_for_each_mass=all_ncp_for_each_mass,
+                 masses=ic.masses.reshape(ic.noOfMasses))
 
 
 def fitNcpToWorkspace(ws):
@@ -672,7 +675,7 @@ class fitParameters:
         meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
         stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
 
-        print("\nMasses: ", ic.masses.reshape(1, 4),
+        print("\nMasses: ", ic.masses.reshape(1, ic.noOfMasses),
             "\nMean Widths: ", meanWidths,
             "\nMean Intensity Ratios: ", meanIntensityRatios)
         return meanWidths, meanIntensityRatios
