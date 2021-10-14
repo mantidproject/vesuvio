@@ -851,6 +851,7 @@ def FitFinalWsInYSpace(wsFinal, ncpForEachMass):
     
     ws=mtd[ic.name+'joy']
 
+    # Symetrise the workspace in y space
     for spec in range(ws.getNumberHistograms()):
         dataX = ws.readX(spec)[:]
         dataY = ws.readY(spec)[:]
@@ -920,7 +921,7 @@ def FitFinalWsInYSpace(wsFinal, ncpForEachMass):
         print('Using the minimizer: ',minimizer_sum)
         print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
 
-# I tested this function but not throughouly, so could have missed something
+
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     """Input: workspace from last iteration, ncpTotal for each mass
        Output: workspace with all the ncpTotal subtracted except for the first mass"""
@@ -932,10 +933,11 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     ncpTotal = np.sum(ncpForEachMass, axis=0)
     dataY, dataX, dataE = ws.extractY(), ws.extractX(), ws.extractE()
 
-    # The original uses the mean points of the histograms, not dataX!
     dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
-    # But this makes more sense to calculate histogram widths, we can preserve one more data point
-    wsSubMass = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), DataE=dataE.flatten(), Nspec=len(dataX))
+    wsSubMass = CreateWorkspace(    # Discard the last colums of workspace
+        DataX=dataX[:, :-1].flatten(), DataY=dataY[:, :-1].flatten(),
+        DataE=dataE[:, :-1].flatten(), Nspec=len(dataX)
+        )
     return wsSubMass
 
 

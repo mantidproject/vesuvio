@@ -60,14 +60,14 @@ class TestPlots(unittest.TestCase):
         plt.legend()
         plt.show()
     
-    # def test_ncp_yspace(self):
-    #     for m, yspace_m, ncp_m in zip(self.masses, self.yspaces_for_each_mass, self.ncp_for_each_mass):
-    #         plt.figure()
-    #         plt.plot(yspace_m, ncp_m, label=f"NCP for mass {m}")
-    #         plt.errorbar(yspace_m, self.dataY, yerr=self.dataE, fmt="none", label="Data")
-    #         plt.xlabel(f"yspace for mass={m}")
-    #         plt.legend()
-    #         plt.show()
+    def test_ncp_yspace(self):
+        for m, yspace_m, ncp_m in zip(self.masses, self.yspaces_for_each_mass, self.ncp_for_each_mass):
+            plt.figure()
+            plt.plot(yspace_m, ncp_m, label=f"NCP for mass {m}")
+            plt.errorbar(yspace_m, self.dataY, yerr=self.dataE, fmt="none", label="Data")
+            plt.xlabel(f"yspace for mass={m}")
+            plt.legend()
+            plt.show()
 
 if __name__ == "__main__":
     unittest.main()
