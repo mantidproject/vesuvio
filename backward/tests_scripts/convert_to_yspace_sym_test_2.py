@@ -70,9 +70,9 @@ def test_func(ws, mass):
     np.testing.assert_allclose(dataX_ori, dataX_opt)
     
     
-ws = Load(Filename= r"C:/Users/guijo/Desktop/Work/CePtGe12_backward_100K_scipy/CePtGe12_100K_DD_.nxs", OutputWorkspace="CePtGe12_100K_DD_")
+ws = Load(Filename= )
    
-test_func(ws.name(), 27)
+test_func(ws.name(), 1.0079)
     
     
         
