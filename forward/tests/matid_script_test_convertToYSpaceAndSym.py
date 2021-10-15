@@ -5,73 +5,87 @@ import numpy as np
 from pathlib import Path
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
+
 # Load example workspace 
 ws0 = Load(Filename=r"../input_ws/starch_80_RD_raw.nxs", OutputWorkspace="raw_data")
 wsName = ws0.name()
-# Same initial conditions
-masses = [1.0079, 12, 16, 27]
-dataFilePath = currentPath / "fixatures" / "data_to_test_func_sub_mass.npz"
+ws1 = CloneWorkspace(wsName, OutputWorkspace=wsName+"_opt")
 
-# def createSlabGeometry(slabPars):
-#     name, vertical_width, horizontal_width, thickness = slabPars
-#     half_height, half_width, half_thick = 0.5*vertical_width, 0.5*horizontal_width, 0.5*thickness
-#     xml_str = \
-#         " <cuboid id=\"sample-shape\"> " \
-#         + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
-#         + "<left-front-top-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, half_height, half_thick) \
-#         + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
-#         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
-#         + "</cuboid>"
-#     CreateSampleShape(name, xml_str)
-# 
-# vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-# slabPars = [name, vertical_width, horizontal_width, thickness]
-# createSlabGeometry(slabPars)
+    
+def convertToYSpaceAndSymetrise(ws0, mass):
+    wsYSpace, wsQ = ConvertToYSpace(
+        InputWorkspace=ws0, Mass=mass, OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
+        )
+    max_Y = np.ceil(2.5*mass+27)  
+    # First bin boundary, width, last bin boundary
+    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    wsYSpace = Rebin(
+        InputWorkspace=wsYSpace, Params=rebin_parameters, FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
+        )
 
-# Testing section
-dataFile = np.load(dataFilePath)
-ncpForEachMass = dataFile["all_ncp_for_each_mass"][0]
-Hmass = 1.0079
+    dataY = wsYSpace.extractY()
+    # safeguarding against nans as well
+    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
+    noOfNonZerosRow = (~nanOrZerosMask).sum(axis=0)
 
-wsYSpace, wsQ = ConvertToYSpace(
-    InputWorkspace=ws0, Mass=Hmass, OutputWorkspace=wsName+"_JoY", QWorkspace=wsName+"_Q"
-    )
-max_Y = np.ceil(2.5*Hmass+27)  
-# First bin boundary, width, last bin boundary
-rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
-wsYSpace = Rebin(
-    InputWorkspace=wsYSpace, Params=rebin_parameters, FullBinsOnly=True, OutputWorkspace=wsName+"_JoY"
-    )
+    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
 
-dataY = wsYSpace.extractY()
-# safeguarding against nans as well
-nanOrZerosMask = (dataY==0) | np.isnan(dataY)
-noOfNonZerosRow = (~nanOrZerosMask).sum(axis=0)
+    tmp = CloneWorkspace(InputWorkspace=wsSumYSpace)
+    tmp.dataY(0)[:] = noOfNonZerosRow
+    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
 
-wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=wsName+"_sum")
+    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
+        LHSWorkspace=wsSumYSpace, RHSWorkspace=tmp, OutputWorkspace=ws0.name()+"_JoY_mean"
+       )
+    # Need to correct this up  
+    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
 
-tmp = CloneWorkspace(InputWorkspace=wsSumYSpace)
-tmp.dataY(0)[:] = noOfNonZerosRow
-tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+    datay = ws.dataY(0)[:]
+    datay = np.where(np.isnan(datay), np.flip(datay), datay)
+    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
 
-wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-    LHSWorkspace=wsSumYSpace, RHSWorkspace=tmp, OutputWorkspace=wsName+"_JoY_mean"
-   )
+    datae = ws.dataE(0)[:]
+    datae = np.where(np.isnan(datae), np.flip(datae), datae)
+    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
+    normalise_workspace(ws)
+    DeleteWorkspaces(
+        [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean"]
+        )
 
-# Need to correct this up  
-ws = CloneWorkspace(wsMean, OutputWorkspace=wsName+"_Sym")
 
-datay = ws.dataY(0)[:]
-datay = np.where(np.isnan(datay), np.flip(datay), datay)
-dataySym = datay + np.flip(dataY)
-ws.dataY(0)[:] = dataySym
-#ws.dataY(0)[:] = (ws.readY(0)[:] + np.flip(ws.readY(0)[:])) / 2 
-# ws.dataE(0)[:] = (ws.readE(0)[:] + np.flip(ws.readE(0)[:])) / 2 
+def convert_to_y_space_and_symmetrise(ws_name,mass):
+    max_Y = np.ceil(2.5*mass+27)
+    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    ConvertToYSpace(InputWorkspace=ws_name,Mass=mass,OutputWorkspace=ws_name+"_JoY",QWorkspace=ws_name+"_Q")
+    Rebin(InputWorkspace=ws_name+"_JoY", Params = rebin_parameters,FullBinsOnly=True, OutputWorkspace= ws_name+"_JoY")
+    tmp=CloneWorkspace(InputWorkspace=ws_name+"_JoY")
+    for j in range(tmp.getNumberHistograms()):
+        for k in range(tmp.blocksize()):
+            tmp.dataE(j)[k] =0.
+            if (tmp.dataY(j)[k]!=0):
+                tmp.dataY(j)[k] =1.
+    tmp=SumSpectra('tmp')
+    SumSpectra(InputWorkspace=ws_name+"_JoY",OutputWorkspace=ws_name+"_JoY")
+    Divide(LHSWorkspace=ws_name+"_JoY", RHSWorkspace="tmp", OutputWorkspace =ws_name+"_JoY")
+    ws=mtd[ws_name+"_JoY"]
+    tmp=CloneWorkspace(InputWorkspace=ws_name+"_JoY")
+    for k in range(tmp.blocksize()):
+        tmp.dataE(0)[k] =(ws.dataE(0)[k]+ws.dataE(0)[ws.blocksize()-1-k])/2.
+        tmp.dataY(0)[k] =(ws.dataY(0)[k]+ws.dataY(0)[ws.blocksize()-1-k])/2
+    RenameWorkspace(InputWorkspace="tmp",OutputWorkspace=ws_name+"_JoY")
+    normalise_workspace(ws_name+"_JoY")
+    return mtd[ws_name+"_JoY"]
+    
+    
+def normalise_workspace(ws_name):
+    tmp_norm = Integration(ws_name)
+    Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
+    DeleteWorkspace("tmp_norm")
 
-# def normalise_workspace(ws_name):
-#     tmp_norm = Integration(ws_name)
-#     Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
-#     DeleteWorkspace("tmp_norm")
-# normalise_workspace(ws)
-#    
-   
+def test_function():
+    # Same initial conditions
+    Hmass = 1.0079
+    wsOpt = convertToYSpaceAndSymetrise(ws1, Hmass)
+    wsOri = convert_to_y_space_and_symmetrise(wsName, Hmass)
+    
+test_function()
