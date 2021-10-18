@@ -97,7 +97,7 @@ def convertToYSpaceAndSymetrise(ws0, mass):
        )
 
     ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
-    datay = ws.dataY(0)[:]
+    datay = ws.readY(0)[:]
     # Next step ensures that nans do not count as a data point during the symetrization
     datay = np.where(np.isnan(datay), np.flip(datay), datay)      
     ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
