@@ -326,7 +326,7 @@ def fitNcpToWorkspace(ws):
         fitNcpToSingleSpec, 
         dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )))
-    fitParsObj = fitParameters(fitPars)
+    fitParsObj = FitParameters(fitPars)
     fitParsObj.printPars()
     meanWidths, meanIntensityRatios = fitParsObj.getMeanWidthsAndIntensities()
 
@@ -647,7 +647,7 @@ def numericalThirdDerivative(x, fun):
     return derivative
 
 
-class fitParameters:
+class FitParameters:
     """Stores the fitted parameters from map and defines methods to extract information"""
 
     def __init__(self, fitPars):
@@ -834,19 +834,125 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
 # -------------- Working on fitting in the Y space --------------
 
 def prepareFinalWsInYSpace(wsFinal, ncpForEachMass):
-    HSpectraToBeMasked = []
-
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
-    RenameWorkspace(InputWorkspace=wsSubMass, OutputWorkspace=ic.name+"_H")
-    Rebin(InputWorkspace=ic.name+'_H',Params="110,1.,430",OutputWorkspace=ic.name+'_H')
-    MaskDetectors(Workspace=ic.name+'_H',SpectraList=HSpectraToBeMasked)
-    RemoveMaskedSpectra(InputWorkspace=ic.name+'_H', OutputWorkspace=ic.name+'_H') 
-    
-    wsH = mtd[ic.name + "_H"]
     massH = 1.0079
-    wsYSpaceSym = convertToYSpaceAndSymetrise(wsH, massH) 
+    wsYSpaceSym = convertToYSpaceAndSymetrise(wsSubMass, massH) 
     wsRes = calculate_mantid_resolutions(wsFinal, massH)
     return wsYSpaceSym, wsRes
+
+
+def subtractAllMassesExceptFirst(ws, ncpForEachMass):
+    """Input: workspace from last iteration, ncpTotal for each mass
+       Output: workspace with all the ncpTotal subtracted except for the first mass"""
+
+    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
+    # Select all masses other than the first one
+    ncpForEachMass = ncpForEachMass[1:, :, :]
+    # Sum the ncpTotal for remaining masses
+    ncpTotal = np.sum(ncpForEachMass, axis=0)
+
+    dataY, dataX = ws.extractY(), ws.extractX() 
+    
+    dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
+
+    # Pass the data onto a Workspace, clone to preserve properties
+    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
+    for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
+        wsSubMass.dataY(i)[:] = dataY[i, :]
+
+    # wsSubMass = CreateWorkspace(    # Discard the last colums of workspace
+    #     DataX=dataX[:, :-1].flatten(), DataY=dataY[:, :-1].flatten(),
+    #     DataE=dataE[:, :-1].flatten(), Nspec=len(dataX)
+    #     )
+    HSpectraToBeMasked = []
+    Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
+    MaskDetectors(Workspace=ws.name()+"_H",SpectraList=HSpectraToBeMasked)
+    RemoveMaskedSpectra(InputWorkspace=ws.name()+"_H", OutputWorkspace=ws.name()+"_H")    # Probably not necessary
+    return mtd[ws.name()+"_H"]
+
+
+def switchFirstTwoAxis(A):
+    """Exchanges the first two indices of an array A,
+    rearranges matrices per spectrum for iteration of main fitting procedure
+    """
+    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
+
+
+def convertToYSpaceAndSymetrise(ws0, mass):
+    ConvertToYSpace(
+        InputWorkspace=ws0, Mass=mass, 
+        OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
+        )
+    max_Y = np.ceil(2.5*mass+27)  
+    # First bin boundary, width, last bin boundary
+    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    Rebin(
+        InputWorkspace=ws0.name()+"_JoY", Params=rebin_parameters, 
+        FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
+        )
+
+    wsYSpace = mtd[ws0.name()+"_JoY"]
+    dataY = wsYSpace.extractY()  
+    # safeguarding against nans as well
+    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
+    noOfNonZerosRow = np.nansum(~nanOrZerosMask, axis=0)
+
+    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
+    # SumSpectra can not handle nan values 
+    # Nan values might be coming from the ncp
+    wsSumYSpace.dataY(0)[:] = np.nansum(dataY, axis=0)
+    
+
+    tmp = CloneWorkspace(InputWorkspace=wsSumYSpace, OutputWorkspace="normalization")
+    tmp.dataY(0)[:] = noOfNonZerosRow
+    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+
+    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
+        LHSWorkspace=wsSumYSpace, RHSWorkspace="normalization", OutputWorkspace=ws0.name()+"_JoY_mean"
+       )
+
+    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    datay = ws.dataY(0)[:]
+    # Next step ensures that nans do not count as a data point during the symetrization
+    datay = np.where(np.isnan(datay), np.flip(datay), datay)      
+    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
+
+    datae = ws.dataE(0)[:]
+    datae = np.where(np.isnan(datae), np.flip(datae), datae)
+    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
+
+    normalise_workspace(ws)
+    # DeleteWorkspaces(
+    #     [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean", "normalization"]
+    #     )
+    return mtd[ws0.name()+"_JoY"], mtd[ws0.name()+"_JoY_sum"], \
+        mtd[ws0.name()+"_JoY_mean"], mtd[ws0.name()+"_JoY_Sym"]
+
+
+def normalise_workspace(ws_name):
+    tmp_norm = Integration(ws_name)
+    Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
+    DeleteWorkspace("tmp_norm")
+
+
+def calculate_mantid_resolutions(ws, mass):
+    # Only for loop in this script because the fuction VesuvioResolution takes in one spectra at a time
+    # Haven't really tested this one becuase it's not modified
+    max_Y = np.ceil(2.5*mass+27)
+    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
+    for index in range(ws.getNumberHistograms()):
+        VesuvioResolution(Workspace=ws, WorkspaceIndex=index,
+                          Mass=mass, OutputWorkspaceYSpace="tmp")
+        tmp = Rebin("tmp", rebin_parameters)
+        if index == 0:
+            RenameWorkspace("tmp", "resolution")
+        else:
+            AppendSpectra("resolution", "tmp", OutputWorkspace="resolution")
+    SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
+    normalise_workspace("resolution")
+    DeleteWorkspace("tmp")
+    return mtd["resolution"]
+
 
 def fitProfileInYSpace(wsYSpaceSym, wsRes):
 
@@ -873,91 +979,6 @@ def fitProfileInYSpace(wsYSpaceSym, wsRes):
         print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
 
 
-def subtractAllMassesExceptFirst(ws, ncpForEachMass):
-    """Input: workspace from last iteration, ncpTotal for each mass
-       Output: workspace with all the ncpTotal subtracted except for the first mass"""
-
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    # Select all masses other than the first one
-    ncpForEachMass = ncpForEachMass[1:, :, :]
-    # Sum the ncpTotal for remaining masses
-    ncpTotal = np.sum(ncpForEachMass, axis=0)
-    dataY, dataX, dataE = ws.extractY(), ws.extractX(), ws.extractE()
-
-    dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
-    wsSubMass = CreateWorkspace(    # Discard the last colums of workspace
-        DataX=dataX[:, :-1].flatten(), DataY=dataY[:, :-1].flatten(),
-        DataE=dataE[:, :-1].flatten(), Nspec=len(dataX)
-        )
-    return wsSubMass
-
-
-def convertToYSpaceAndSymetrise(ws0, mass):
-    wsYSpace, wsQ = ConvertToYSpace(
-        InputWorkspace=ws0, Mass=mass, OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
-        )
-    max_Y = np.ceil(2.5*mass+27)  
-    # First bin boundary, width, last bin boundary
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
-    wsYSpace = Rebin(
-        InputWorkspace=wsYSpace, Params=rebin_parameters, FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
-        )
-
-
-    dataY = wsYSpace.extractY()
-    # safeguarding against nans as well
-    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
-    noOfNonZerosRow = (~nanOrZerosMask).sum(axis=0)
-
-    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
-
-    tmp = CloneWorkspace(InputWorkspace=wsSumYSpace)
-    tmp.dataY(0)[:] = noOfNonZerosRow
-    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
-
-    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-        LHSWorkspace=wsSumYSpace, RHSWorkspace=tmp, OutputWorkspace=ws0.name()+"_JoY_mean"
-       )
-    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
-
-    datay = ws.dataY(0)[:]
-    # Next step ensures that nans do not count as a data point during the symetrization
-    datay = np.where(np.isnan(datay), np.flip(datay), datay)      
-    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
-
-    datae = ws.dataE(0)[:]
-    datae = np.where(np.isnan(datae), np.flip(datae), datae)
-    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
-    normalise_workspace(ws)
-    DeleteWorkspaces(
-        [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean"]
-        )
-    return mtd[ws0.name()+"_JoY_Sym"]
-
-
-def calculate_mantid_resolutions(wsName, mass):
-    # Only for loop in this script because the fuction VesuvioResolution takes in one spectra at a time
-    # Haven't really tested this one becuase it's not modified
-    max_Y = np.ceil(2.5*mass+27)
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(Workspace=wsName, WorkspaceIndex=index,
-                          Mass=mass, OutputWorkspaceySpacesForEachMass="tmp")
-        tmp = Rebin("tmp", rebin_parameters)
-        if index == 0:
-            RenameWorkspace("tmp", "resolution")
-        else:
-            AppendSpectra("resolution", "tmp", OutputWorkspace="resolution")
-    SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
-    normalise_workspace("resolution")
-    DeleteWorkspace("tmp")
-    return mtd["resolution"]
-
-
-def normalise_workspace(wsName):
-    tmp_norm = Integration(wsName)
-    Divide(LHSWorkspace=wsName, RHSWorkspace="tmp_norm", OutputWorkspace=wsName)
-    DeleteWorkspace("tmp_norm")
 
 
 if __name__=="__main__":

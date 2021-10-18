@@ -6,38 +6,47 @@ from mantid.simpleapi import *
 from pathlib import Path
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-def convertWsToYSpaceAndSymetrise(wsName, mass):
-    """input: TOF workspace
-       output: workspace in y-space for given mass with dataY symetrised"""
-
+def convertToYSpaceAndSymetrise(ws0, mass):
     wsYSpace, wsQ = ConvertToYSpace(
-        InputWorkspace=wsName, Mass=mass, OutputWorkspace=wsName+"_JoY", QWorkspace=wsName+"_Q"
+        InputWorkspace=ws0, Mass=mass, OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
     max_Y = np.ceil(2.5*mass+27)  
     # First bin boundary, width, last bin boundary
     rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
     wsYSpace = Rebin(
-        InputWorkspace=wsYSpace, Params=rebin_parameters, FullBinsOnly=True, OutputWorkspace=wsName+"_JoY"
+        InputWorkspace=wsYSpace, Params=rebin_parameters, FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
 
-    dataYSpace = wsYSpace.extractY()
+    dataY = wsYSpace.extractY()
     # safeguarding against nans as well
-    nonZerosNansMask = (dataYSpace != 0) & (dataYSpace != np.nan)
-    dataYSpace[nonZerosNansMask] = 1
-    noOfNonZeroNanY = np.nansum(dataYSpace, axis=0)
+    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
+    noOfNonZerosRow = (~nanOrZerosMask).sum(axis=0)
 
-    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=wsName+"_JoY")
+    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
 
     tmp = CloneWorkspace(InputWorkspace=wsSumYSpace)
-    tmp.dataY(0)[:] = noOfNonZeroNanY
-    tmp.dataE(0)[:] = np.zeros(tmp.blocksize())
-    ws = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-        LHSWorkspace=wsSumYSpace, RHSWorkspace=tmp, OutputWorkspace=wsName+"_JoY"
-        )
-    ws.dataY(0)[:] = (ws.readY(0)[:] + np.flip(ws.readY(0)[:])) / 2 
-    ws.dataE(0)[:] = (ws.readE(0)[:] + np.flip(ws.readE(0)[:])) / 2 
+    tmp.dataY(0)[:] = noOfNonZerosRow
+    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+
+    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
+        LHSWorkspace=wsSumYSpace, RHSWorkspace=tmp, OutputWorkspace=ws0.name()+"_JoY_mean"
+       )
+    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
+
+    datay = ws.dataY(0)[:]
+    # Next step ensures that nans do not count as a data point during the symetrization
+    datay = np.where(np.isnan(datay), np.flip(datay), datay)      
+    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
+
+    datae = ws.dataE(0)[:]
+    datae = np.where(np.isnan(datae), np.flip(datae), datae)
+    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
+
     normalise_workspace(ws)
-    return ws
+    DeleteWorkspaces(
+        [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean"]
+        )
+    return mtd[ws0.name()+"_JoY_Sym"]
 
 def convert_to_y_space_and_symmetrise(ws_name,mass):
     max_Y = np.ceil(2.5*mass+27)
@@ -70,26 +79,11 @@ def normalise_workspace(ws_name):
 # Load example workspace 
 ws0 = Load(Filename=r"../input_ws/starch_80_RD_raw.nxs")
 name = ws0.name()
-ws1 = CloneWorkspace(ws0, OutputWorkspace=name+"1")
+ws1 = CloneWorkspace(ws0, OutputWorkspace=name+"_1_")
 # Same initial conditions
 masses = [1.0079, 12, 16, 27]
+# Load results that were obtained from the same workspace
 dataFilePath = currentPath / "fixatures" / "data_to_test_func_sub_mass.npz"
-
-def createSlabGeometry(slabPars):
-    name, vertical_width, horizontal_width, thickness = slabPars
-    half_height, half_width, half_thick = 0.5*vertical_width, 0.5*horizontal_width, 0.5*thickness
-    xml_str = \
-        " <cuboid id=\"sample-shape\"> " \
-        + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
-        + "<left-front-top-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, half_height, half_thick) \
-        + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
-        + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
-        + "</cuboid>"
-    CreateSampleShape(name, xml_str)
-
-vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-slabPars = [name, vertical_width, horizontal_width, thickness]
-createSlabGeometry(slabPars)
 
 class TestSubMasses(unittest.TestCase):
     def setUp(self):
@@ -98,13 +92,13 @@ class TestSubMasses(unittest.TestCase):
         Hmass = 1.0079
     
         self.wsOri = convert_to_y_space_and_symmetrise(ws0.name(), Hmass)
-        self.wsOpt = convertWsToYSpaceAndSymetrise(ws1.name(), Hmass)
+        self.wsOpt = convertToYSpaceAndSymetrise(ws1, Hmass)
 
         self.rtol = 0.0001
 
     def test_dataY(self):
-        oriDataY = self.wsOri.extractY()#[:, :-2]   # Last two columns are the problem!
-        optDataY = self.wsOpt.extractY()#[:, :-2]
+        oriDataY = self.wsOri.extractY()
+        optDataY = self.wsOpt.extractY()
 
         totalMask = np.isclose(
             optDataY, oriDataY, rtol=self.rtol
