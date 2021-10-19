@@ -8,6 +8,7 @@ from jupyterthemes import jtplot
 jtplot.style(theme='monokai', context='notebook', ticks=True, grid=True)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
+np.set_printoptions(linewidth=150)
 
 
 # Load example workspace 
@@ -21,9 +22,9 @@ dataFilePath = currentPath / "fixatures" / "data_to_test_func_sub_mass.npz"
 def prepareFinalWsInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     massH = 1.0079
-    wsYSpace, wsYSpaceSum, wsYSpaceMean, wsYSpaceSym = convertToYSpaceAndSymetrise(wsSubMass, massH) 
+    wsYSpaceSymSum = convertToYSpaceAndSymetrise(wsSubMass, massH) 
     wsRes = calculate_mantid_resolutions(wsFinal, massH)
-    return wsFinal, wsSubMass, wsYSpace, wsYSpaceSum, wsYSpaceMean, wsYSpaceSym, wsRes
+    return wsFinal, wsSubMass, wsYSpaceSymSum, wsRes
 
 
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
@@ -45,11 +46,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
-    # wsSubMass = CreateWorkspace(    # Discard the last colums of workspace
-    #     DataX=dataX[:, :-1].flatten(), DataY=dataY[:, :-1].flatten(),
-    #     DataE=dataE[:, :-1].flatten(), Nspec=len(dataX)
-    #     )
-    HSpectraToBeMasked = []
+    HSpectraToBeMasked = [173, 174, 179]   # Eventually need to test without this safeguard
     Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
     MaskDetectors(Workspace=ws.name()+"_H",SpectraList=HSpectraToBeMasked)
     RemoveMaskedSpectra(InputWorkspace=ws.name()+"_H", OutputWorkspace=ws.name()+"_H")    # Probably not necessary
@@ -68,50 +65,116 @@ def convertToYSpaceAndSymetrise(ws0, mass):
         InputWorkspace=ws0, Mass=mass, 
         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    max_Y = np.ceil(2.5*mass+27)  
-    # First bin boundary, width, last bin boundary
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    # max_Y = np.ceil(2.5*mass+27) 
+    # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    rebin_parameters='-20,0.5,20'  # To compare with original
+
     Rebin(
         InputWorkspace=ws0.name()+"_JoY", Params=rebin_parameters, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
+    normalise_workspace(ws0.name()+"_JoY")
 
     wsYSpace = mtd[ws0.name()+"_JoY"]
-    dataY = wsYSpace.extractY()  
-    # safeguarding against nans as well
-    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
-    noOfNonZerosRow = np.nansum(~nanOrZerosMask, axis=0)
+    dataY = wsYSpace.extractY() 
+    dataE = wsYSpace.extractE()
+    dataX = wsYSpace.extractX()
 
-    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
-    # SumSpectra can not handle nan values 
-    # Nan values might be coming from the ncp
-    wsSumYSpace.dataY(0)[:] = np.nansum(dataY, axis=0)
+    # Symmetrize
+    dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
+    dataE = np.where(dataX<0, np.flip(dataE, axis=1), dataE)
+
+    # Normalization
+    dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
+    nonZerosMask = ~(dataY==0)
+    dataYnorm = np.where(nonZerosMask, 1, 0)
+    dataEnorm = np.full(dataE.shape, 0.000001)
+
+    # Build Workspaces
+    wsYSym = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    wsYNorm = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_norm")
+    for i in range(wsYSpace.getNumberHistograms()):
+        wsYSym.dataY(i)[:] = dataY[i, :]
+        wsYSym.dataE(i)[:] = dataE[i, :]
+        wsYNorm.dataY(i)[:] = dataYnorm[i, :]
+        wsYNorm.dataE(i)[:] = dataEnorm[i, :]
+
+    # Sum of spectra
+    SumSpectra(InputWorkspace=wsYSym, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    SumSpectra(InputWorkspace=wsYNorm, OutputWorkspace=ws0.name()+"_JoY_norm")
+
+    # Normalize
+    Divide(
+        LHSWorkspace=ws0.name()+"_JoY_Sym", RHSWorkspace=ws0.name()+"_JoY_norm",
+        OutputWorkspace=ws0.name()+'_JoY_sum_final'
+    )
+    return mtd[ws0.name()+"_JoY_sum_final"]
+
+
+    # dataYSum = np.nansum(dataY, axis=0)
+    # dataESum = np.sqrt(np.nansum(dataE**2, axis=0))
+    # print("\ndataYSum: \n", dataYSum)
+    # print("\ndataESum: \n", dataESum)
     
 
-    tmp = CloneWorkspace(InputWorkspace=wsSumYSpace, OutputWorkspace="normalization")
-    tmp.dataY(0)[:] = noOfNonZerosRow
-    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+    # # Build the normalization for dataYsum and dataEsum
+    # nonZerosNansMask = ~((dataY==0) | np.isnan(dataY))
+    # nonZerosRow = np.sum(nonZerosNansMask, axis=0)      # Normalizes dataY
 
-    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-        LHSWorkspace=wsSumYSpace, RHSWorkspace="normalization", OutputWorkspace=ws0.name()+"_JoY_mean"
-       )
+    # dataEnorm = np.full(dataE.shape, 0.000001)
+    # errorSum = np.sqrt(np.nansum(dataEnorm**2, axis=0))   
+    # print("\nnonZerosRow: \n", nonZerosRow)
+    # print("\nerrorSum: \n", errorSum)
+    # # Divide by normalization
+    # dataYMean = dataYSum / nonZerosRow
+    # dataEMean = dataYMean * np.sqrt((dataESum/dataYSum)**2 + (errorSum/nonZerosRow)**2)
 
-    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
-    datay = ws.readY(0)[:]
-    # Next step ensures that nans do not count as a data point during the symetrization
-    datay = np.where(np.isnan(datay), np.flip(datay), datay)      
-    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
+    # wsJoY = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sym_sum")
+    # wsJoY.dataY(0)[:] = dataYMean
+    # wsJoY.dataE(0)[:] = dataEMean
+    # return wsJoY
 
-    datae = ws.dataE(0)[:]
-    datae = np.where(np.isnan(datae), np.flip(datae), datae)
-    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
+    # wsYSym = CloneWorkspace(wsYSpace, ws0.name+"_JoY_sym")
+    # for i in range(wsYSym.getNumberHistograms()):
+    #     wsYSym.dataY(i)[:] = dataY[i, :]
+    #     wsYSym.dataE(i)[:] = dataE[i, :]
 
-    normalise_workspace(ws)
+
+
+    # safeguarding against nans as well
+    # nanOrZerosMask = (dataY==0) | np.isnan(dataY)
+    # noOfNonZerosRow = np.nansum(~nanOrZerosMask, axis=0)
+
+    # wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
+    # # SumSpectra can not handle nan values 
+    # # Nan values might be coming from the ncp
+    # wsSumYSpace.dataY(0)[:] = np.nansum(dataY, axis=0)
+    
+
+    # tmp = CloneWorkspace(InputWorkspace=wsSumYSpace, OutputWorkspace="normalization")
+    # tmp.dataY(0)[:] = noOfNonZerosRow
+    # tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+
+    # wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
+    #     LHSWorkspace=wsSumYSpace, RHSWorkspace="normalization", OutputWorkspace=ws0.name()+"_JoY_mean"
+    #    )
+
+    # ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    # datay = ws.readY(0)[:]
+    # # Next step ensures that nans do not count as a data point during the symetrization
+    # datay = np.where(np.isnan(datay), np.flip(datay), datay)      
+    # ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
+
+    # datae = ws.dataE(0)[:]
+    # datae = np.where(np.isnan(datae), np.flip(datae), datae)
+    # ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
+
+    # normalise_workspace(ws)
     # DeleteWorkspaces(
     #     [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean", "normalization"]
     #     )
-    return mtd[ws0.name()+"_JoY"], mtd[ws0.name()+"_JoY_sum"], \
-        mtd[ws0.name()+"_JoY_mean"], mtd[ws0.name()+"_JoY_Sym"]
+    # return mtd[ws0.name()+"_JoY"], mtd[ws0.name()+"_JoY_sum"], \
+    #     mtd[ws0.name()+"_JoY_mean"], mtd[ws0.name()+"_JoY_Sym"]
 
 
 def normalise_workspace(ws_name):
@@ -140,18 +203,36 @@ def calculate_mantid_resolutions(ws, mass):
 
 
 class TestSubMasses(unittest.TestCase):
-    def setUp(self):
-        dataFile = np.load(dataFilePath)
-        ncpForEachMass = dataFile["all_ncp_for_each_mass"][0]
-        Hmass = 1.0079
 
-        self.wsRaw, self.wsSubMass,\
-        self.wsYSpace, self.wsYSpaceSum, self.wsYSpaceMean, self.wsYSpaceSym, \
-        self.wsRes = prepareFinalWsInYSpace(exampleWorkspace, ncpForEachMass)
-        self.rtol = 0.0001
-        self.index = 3
-        # self.savePath = currentPath / "fixatures" / "data_for_fit_in_yspace"
+    dataFile = np.load(dataFilePath)
+    ncpForEachMass = dataFile["all_ncp_for_each_mass"][0]
+    Hmass = 1.0079
+
+    wsRaw, wsSubMass,\
+    wsYSpaceSym, wsRes = prepareFinalWsInYSpace(exampleWorkspace, ncpForEachMass)
+    rtol = 0.0001
+    index = 3
+
+    oriSymSum = Load(Filename=r"fixatures/original_ws_yspace/starch_80_joy_sum.nxs")
+    oriSubMass = Load(Filename=r"fixatures/original_ws_yspace/starch_80_raw_H.nxs")
+    oriResolution = Load(Filename=r"fixatures/original_ws_yspace/starch_80_resolution.nxs")
+
     
+    def test_symSumWorkspace(self):
+        (result, messages) = CompareWorkspaces(self.oriSymSum, self.wsYSpaceSym)
+        print("Result of comparison: ", result)
+        print(messages.rowCount())
+
+    def test_subMassWorkspace(self):
+        (result, messages) = CompareWorkspaces(self.oriSubMass, self.wsSubMass)
+        print("Result of comparison: ", result)
+        print(messages.rowCount())
+
+    def test_resolutionWs(self):
+        (result, messages) = CompareWorkspaces(self.oriResolution, self.wsRes)
+        print("Result of comparison: ", result)
+        print(messages.rowCount())
+
     def test_plotRawDataAndSubMassesData(self):
         yRaw = self.wsRaw.dataY(self.index)
         eRaw = self.wsRaw.dataE(self.index)
@@ -174,12 +255,7 @@ class TestSubMasses(unittest.TestCase):
         datae = self.wsYSpaceSym.dataE(0)
         datax = self.wsYSpaceSym.dataX(0)
 
-        # yMean = self.wsYSpaceMean.dataY(0)
-        # eMean= self.wsYSpaceMean.dataE(0)
-        # xMean = self.wsYSpaceMean.dataX(0)
-
         plt.figure()
-        # plt.errorbar(xMean, yMean, yerr=eMean, fmt="none", label="Mean Data")
         plt.errorbar(datax, datay, yerr=datae, fmt="none", label="Summed Symetrized Data")
         plt.xlabel("Y-Space")
         plt.ylabel("Counts")
@@ -196,17 +272,6 @@ class TestSubMasses(unittest.TestCase):
         plt.legend()
         plt.show()
     
-    # def test_saveresults(self):
-    #     dataYSym = self.wsYSpaceSym.dataY(0)
-    #     dataXSym = self.wsYSpaceSym.dataX(0)
-    #     dataESym = self.wsYSpaceSym.dataE(0)
-
-    #     dataYRes = self.wsRes.dataY(0)
-    #     dataXRes = self.wsRes.dataX(0)
-    #     dataERes = self.wsRes.dataE(0)
-
-    #     np.savez(self.savePath, dataX=dataXSym, dataY=dataYSym, dataE=dataESym,
-    #                 dataYRes=dataYRes, dataXRes=dataXRes, dataERes=dataERes)
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,9 +22,9 @@ def prepareFinalWsInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     wsH = mtd[name + "_H"]
     massH = 1.0079
-    wsYSpace, wsYSpaceSum, wsYSpaceMean, wsYSpaceSym = convertToYSpaceAndSymetrise(wsSubMass, massH) 
+    wsYSpaceSym = convertToYSpaceAndSymetrise(wsSubMass, massH) 
     wsRes = calculate_mantid_resolutions(wsFinal, massH)
-    return wsFinal, wsSubMass, wsYSpace, wsYSpaceSum, wsYSpaceMean, wsYSpaceSym, wsRes
+    return wsFinal, wsSubMass, wsYSpaceSym, wsRes
 
 
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
@@ -48,7 +48,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     #     DataX=dataX[:, :-1].flatten(), DataY=dataY[:, :-1].flatten(),
     #     DataE=dataE[:, :-1].flatten(), Nspec=len(dataX)
     #     )
-    HSpectraToBeMasked = []
+    HSpectraToBeMasked = [173, 174, 179]
     Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
     MaskDetectors(Workspace=ws.name()+"_H",SpectraList=HSpectraToBeMasked)
     RemoveMaskedSpectra(InputWorkspace=ws.name()+"_H", OutputWorkspace=ws.name()+"_H")    # Probably not necessary
@@ -67,50 +67,49 @@ def convertToYSpaceAndSymetrise(ws0, mass):
         InputWorkspace=ws0, Mass=mass, 
         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    max_Y = np.ceil(2.5*mass+27)  
-    # First bin boundary, width, last bin boundary
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+#     max_Y = np.ceil(2.5*mass+27)  
+#     # First bin boundary, width, last bin boundary
+#     rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    rebin_parameters ='-20,0.5,20'
     Rebin(
         InputWorkspace=ws0.name()+"_JoY", Params=rebin_parameters, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
+    normalise_workspace(ws0.name()+"_JoY")
 
     wsYSpace = mtd[ws0.name()+"_JoY"]
-    dataY = wsYSpace.extractY()  
-    # safeguarding against nans as well
-    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
-    noOfNonZerosRow = np.nansum(~nanOrZerosMask, axis=0)
+    dataY = wsYSpace.extractY() 
+    dataE = wsYSpace.extractE()
+    dataX = wsYSpace.extractX()
 
-    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
-    # For some reason, SumSpectra is not working properly for dataY
-    # So do sum with numpy arrays
-    wsSumYSpace.dataY(0)[:] = np.nansum(dataY, axis=0)
-    
+    # Symmetrize
+    dataY = np.where(dataX<0, np.flip(dataY), dataY)
+    dataE = np.where(dataX<0, np.flip(dataE), dataE)
 
-    tmp = CloneWorkspace(InputWorkspace=wsSumYSpace, OutputWorkspace="normalization")
-    tmp.dataY(0)[:] = noOfNonZerosRow
-    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+    # Build normalization arrays
+    dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
+    nonZerosMask = ~(dataY==0)
+    dataYnorm = np.where(nonZerosMask, 1, 0)
+    dataEnorm = np.full(dataE.shape, 0.000001)
 
-    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-        LHSWorkspace=wsSumYSpace, RHSWorkspace="normalization", OutputWorkspace=ws0.name()+"_JoY_mean"
-       )
+    wsYSym = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    wsYNorm = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_norm")
+    for i in range(wsYSpace.getNumberHistograms()):
+        wsYSym.dataY(i)[:] = dataY[i, :]
+        wsYSym.dataE(i)[:] = dataE[i, :]
+        wsYNorm.dataY(i)[:] = dataYnorm[i, :]
+        wsYNorm.dataE(i)[:] = dataEnorm[i, :]
 
-    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
-    datay = ws.readY(0)[:]
-    # Next step ensures that nans do not count as a data point during the symetrization
-    datay = np.where(np.isnan(datay), np.flip(datay), datay)      
-    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
+    # Sum of spectra
+    SumSpectra(InputWorkspace=wsYSym, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    SumSpectra(InputWorkspace=wsYNorm, OutputWorkspace=ws0.name()+"_JoY_norm")
 
-    datae = ws.dataE(0)[:]
-    datae = np.where(np.isnan(datae), np.flip(datae), datae)
-    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
-
-    normalise_workspace(ws)
-    # DeleteWorkspaces(
-    #     [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean", "normalization"]
-    #     )
-    return mtd[ws0.name()+"_JoY"], mtd[ws0.name()+"_JoY_sum"], \
-        mtd[ws0.name()+"_JoY_mean"], mtd[ws0.name()+"_JoY_Sym"]
+    # Normalize
+    Divide(
+        LHSWorkspace=ws0.name()+"_JoY_Sym", RHSWorkspace=ws0.name()+"_JoY_norm",
+        OutputWorkspace=ws0.name()+'_JoY_sum_final'
+    )
+    return mtd[ws0.name()+"_JoY_sum_final"]
 
 
 def normalise_workspace(ws_name):
@@ -138,16 +137,12 @@ def calculate_mantid_resolutions(ws, mass):
     return mtd["resolution"]
 
 
-
 dataFile = np.load(dataFilePath)
 ncpForEachMass = dataFile["all_ncp_for_each_mass"][0]
 Hmass = 1.0079
-
-wsRaw, wsSubMass,\
-wsYSpace, wsYSpaceSum, wsYSpaceMean, wsYSpaceSym, \
-wsRes = prepareFinalWsInYSpace(exampleWorkspace, ncpForEachMass)
-rtol = 0.0001
-index = 0
+wsRaw, wsSubMass, wsYSpaceSym, wsRes = prepareFinalWsInYSpace(exampleWorkspace, ncpForEachMass)
+# rtol = 0.0001
+# index = 0
 
 # yRaw = wsRaw.dataY(index)
 # eRaw = wsRaw.dataE(index)
