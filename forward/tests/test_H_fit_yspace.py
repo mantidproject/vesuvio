@@ -1,4 +1,4 @@
-import unittest
+
 import numpy as np
 import numpy.testing as nptest
 import matplotlib.pyplot as plt
@@ -6,8 +6,14 @@ from mantid.simpleapi import *
 from pathlib import Path
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-resolution = Load(currentPath / "fixatures" / "resolution.nxs")
-H_JoY_Sym = Load(currentPath / "fixatures" / "H_JoY_Sym.nxs")
+from scipy import signal
+from scipy import optimize
+
+from jupyterthemes import jtplot
+jtplot.style(theme='monokai', context='notebook', ticks=True, grid=True)
+
+resolution = Load(r"fixatures/yspace_fit/resolution.nxs")
+H_JoY_Sym = Load(r"fixatures/yspace_fit/H_JoY_Sym.nxs")
 simple_gaussian_fit = True
 
 def fitProfileInYSpace(wsYSpaceSym, wsRes):
@@ -32,15 +38,35 @@ def fitProfileInYSpace(wsYSpaceSym, wsRes):
         print('Using the minimizer: ',minimizer_sum)
         print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
 
+# Need to check that dataX has the same seperation for the resolution and profile array
+def optimizedFitInYSpace(wsYSpaceSym, wsRes):
+    res = wsRes.extractY()[0]
+    dataY = wsYSpaceSym.extractY()[0]
+    dataX = wsYSpaceSym.extractX()[0]
+    dataE = wsYSpaceSym.extractE()[0]
+
+    def convolvedGaussian(x, y0, x0, A, sigma):
+        gaussFunc = gaussian(x, y0, x0, A, sigma)
+        # Mode=same guarantees that convolved signal remains centered 
+        convGauss = signal.convolve(gaussFunc, res, mode="same")
+        return convGauss
+    
+    p0 = [0, 0, 1, 5]
+    popt, pcov = optimize.curve_fit(
+        convolvedGaussian, dataX, dataY, p0=p0,
+        sigma=dataE
+    )
+    yfit = convolvedGaussian(dataX, *popt)
+
+    plt.errorbar(dataX, dataY, yerr=dataE, fmt="none", label="Data")
+    plt.plot(dataX, yfit, label="Fit")
+    plt.legend()
+    plt.show()
+    return popt, yfit
 
 def gaussian(x, y0, x0, A, sigma):
+    """Gaussian centered at zero"""
     return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
-
-class TestSubMasses(unittest.TestCase):
-    def setUp(self):
-        dataFile = np.load(loadPath)
-
-
-if __name__ == "__main__":
-    unittest.main()
+popt, yfit = optimizedFitInYSpace(H_JoY_Sym, resolution)
+print(popt)
