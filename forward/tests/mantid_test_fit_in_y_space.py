@@ -67,10 +67,10 @@ def convertToYSpaceAndSymetrise(ws0, mass):
         InputWorkspace=ws0, Mass=mass, 
         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    max_Y = np.ceil(2.5*mass+27)  
-    # First bin boundary, width, last bin boundary
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
-    #rebin_parameters ='-20,0.5,20'
+#     max_Y = np.ceil(2.5*mass+27)  
+#     # First bin boundary, width, last bin boundary
+#     rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    rebin_parameters ='-20,0.5,20'
     Rebin(
         InputWorkspace=ws0.name()+"_JoY", Params=rebin_parameters, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
