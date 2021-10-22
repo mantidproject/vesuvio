@@ -80,11 +80,23 @@ print(res[halfPoint-2 : halfPoint+2])
 
 
 yfitGaussian = gaussian(dataX, popt)
-print(yfitGaussian[halfPoint-2 : halfPoint+2])
+
+# Add a zero data point to function being convolved
+# Output of numerical convolution will have this lenght
+# yfitGaussian0 = np.pad(yfitGaussian, (0, 1), 'constant', constant_values=(0, 0))
+# print(len(yfitGaussian0))
+#print(yfitGaussian[halfPoint-2 : halfPoint+2])
 print("norm gauss:", np.sum(yfitGaussian*0.5))
+
 yfit = signal.convolve(yfitGaussian, res, mode="same") * 0.5
-print(yfit[halfPoint-2 : halfPoint+2])
+print(len(yfit))
+print(yfit[:4], yfit[-4:])
+#print(yfit[halfPoint-2 : halfPoint+2])
 print("norm convolved gauss:", np.sum(yfit*0.5))
+
+#take out the maximum point, lenght is now the original before padding with zero
+# yfitMaxMask = yfit==np.max(yfit)
+# yfit = yfit[~yfitMaxMask]
 
 plt.figure()
 plt.plot(dataX, yfitGaussian, label="yfitGaussian")

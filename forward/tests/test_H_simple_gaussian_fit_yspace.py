@@ -69,8 +69,13 @@ def optimizedFitInYSpace(wsYSpaceSym, wsRes):
             raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
         gaussFunc = gaussian(x, y0, x0, A, sigma)
+        # # Add a zero to the end to increase length by one
+        # gaussFunc = np.pad(gaussFunc, (0, 1), 'constant', constant_values=(0, 0))
         # Mode=same guarantees that convolved signal remains centered 
         convGauss = signal.convolve(gaussFunc, res, mode="same") * histWidths[0]
+        # # Take out maximum poit to match form of original
+        # convGaussMaxMask = convGauss==np.max(convGauss)
+        # convGauss = convGauss[~convGaussMaxMask]
         return convGauss
     
     def gaussian(x, y0, x0, A, sigma):
@@ -140,15 +145,21 @@ popt, pcov, yfit = optimizedFitInYSpace(ws, wsRes)
 
 # ---- somethjing dirty down below
 
-def convolvedGaussian(x, pars, res):
-    y0, x0, A, sigma = pars
+def convolvedGaussian(x, popt, res):
+    y0, x0, A, sigma = popt
+
     histWidths = x[1:] - x[:-1]
     if ~ (np.max(histWidths)==np.min(histWidths)):
-        raise("The histograms widhts need to be the same for the discrete convolution to work!")
+        raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
     gaussFunc = gaussian(x, y0, x0, A, sigma)
+    # # Add a zero to the end to increase length by one
+    # gaussFunc = np.pad(gaussFunc, (0, 1), 'constant', constant_values=(0, 0))
     # Mode=same guarantees that convolved signal remains centered 
     convGauss = signal.convolve(gaussFunc, res, mode="same") * histWidths[0]
+    # # Take out maximum poit to match form of original
+    # convGaussMaxMask = convGauss==np.max(convGauss)
+    # convGauss = convGauss[~convGaussMaxMask]
     return convGauss
 
 def gaussian(x, y0, x0, A, sigma):
