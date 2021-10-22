@@ -33,12 +33,6 @@ ws=mtd[name+'_joy_sum_fitted_Parameters']
 
 popt = [ws.cell(0,1), ws.cell(2,1), ws.cell(1,1), ws.cell(3,1)]
 pcov = [ws.cell(0,2), ws.cell(2,2), ws.cell(1,2), ws.cell(3,2)]
-# 
-# def convolvedGaussian(x, pars, res):
-#     gaussFunc = gaussian(x, pars)
-#     # Mode=same guarantees that convolved signal remains centered 
-#     convGauss = signal.convolve(gaussFunc, res, mode="same")
-#     return convGauss
 
 def gaussian(x, pars):
     y0, x0, A, sigma = pars
@@ -56,10 +50,40 @@ print(integral)
 print(np.sum(res*0.5))
 mantid_int = Integration(resolution)
 
-# res = np.roll(res, -1)
+dataX_len = len(dataX)
+print(dataX_len)
+halfPoint = int(np.round(dataX_len/2))
+# Shift not due to symetric resolution
+#res[:halfPoint] = np.flip(res)[:halfPoint]
+#print(res[halfPoint-5 : halfPoint])
+print(dataX[halfPoint-2 : halfPoint+2])
+print(res[halfPoint-2 : halfPoint+2])
+
+# # Resolution has to be re-centered
+# # Currently only works with even lenght of array
+# print("centering resolution ...")
+# firstZeroIdx = np.argmin(np.abs(dataX))
+# print(dataX[firstZeroIdx-2 : firstZeroIdx+2]) 
+# print(dataX[firstZeroIdx])
+# A = dataX[:2*firstZeroIdx+2]  #+2 is for even zero points
+# print(A[0], A[-1])
+# 
+# # Crop resolution
+# res = res[:2*firstZeroIdx+2]
+# 
+
+# The shift is due to the fact that the convolution returns
+# an array that has 3 points at the peak instead of 1
+# solution: use mode='full', remove the maximum point from
+# array, crop the full array to match the size of original func,
+# and need to align the two peaks
+
+
 yfitGaussian = gaussian(dataX, popt)
+print(yfitGaussian[halfPoint-2 : halfPoint+2])
 print("norm gauss:", np.sum(yfitGaussian*0.5))
 yfit = signal.convolve(yfitGaussian, res, mode="same") * 0.5
+print(yfit[halfPoint-2 : halfPoint+2])
 print("norm convolved gauss:", np.sum(yfit*0.5))
 
 plt.figure()
