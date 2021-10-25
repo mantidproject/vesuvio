@@ -8,6 +8,7 @@ from pathlib import Path
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
 from scipy import signal
+from scipy import ndimage
 from scipy import optimize
 
 from jupyterthemes import jtplot
