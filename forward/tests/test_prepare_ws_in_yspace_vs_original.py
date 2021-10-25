@@ -81,7 +81,7 @@ def convertToYSpaceAndSymetrise(ws0, mass):
     dataX = wsYSpace.extractX()
 
     # Symmetrize
-    symmetrise_using_averages = True
+    symmetrise_using_averages = False
     if symmetrise_using_averages:
         dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
         dataE = np.where(dataE==0, np.flip(dataE, axis=1), dataE)

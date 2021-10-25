@@ -14,18 +14,23 @@ def gaussian(x, y0, x0, A, sigma):
     
 # Generate gaussian
 
-x = np.arange(-50, 50)
+x = np.arange(-50.5, 50.5)
 y = gaussian(x, 0, 10, 1, 10)
-print("Integral: ", np.sum(y))
+print("Integral of function: ", np.sum(y))
 
-res = gaussian(x, 0, -10, 1, 3)
+res = gaussian(x, 0, 0, 1, 3)
+print("Integral of resolution before interpolation: ", np.sum(res))
+xNew = x + 0.5
+resNew = np.interp(xNew, x, res)
+res = resNew
+print("Integral of resolution after interpolation: ", np.sum(res))
 
-# convolution = signal.convolve(y, res, mode="same")
-convolution = ndimage.convolve1d(y, res, mode="constant")
-print(convolution.shape)
+conv_signal = signal.convolve(y, res, mode="same")
+conv_ndimage = ndimage.convolve1d(y, res, mode="constant")
 
 plt.plot(x, y, "o", label="Function")
 plt.plot(x, res, label="Resolution")
-plt.plot(x, convolution, "o", label="Convolution")
+plt.plot(x, conv_ndimage, "o", label="ndimage.concolve1d")
+plt.plot(x, conv_signal, "^", label="signal.convolve")
 plt.legend()
 plt.show()

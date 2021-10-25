@@ -3,6 +3,7 @@ from mantid.simpleapi import *
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
+from scipy import ndimage
 
 # from jupyterthemes import jtplot
 # jtplot.style(theme='monokai', context='notebook', ticks=True, grid=True)
@@ -12,7 +13,8 @@ H_JoY_Sym = Load(r"fixatures/yspace_fit/H_JoY_Sym.nxs")
 name = H_JoY_Sym.name()
 resName = resolution.name()
 
-rebinPars = "-20,0.5,20"
+rebinPars = "-25,0.5,15"  # Gives a shift in the convolution, even if resolution is centered at zero!
+rebinPars = "-20, 0.5, 20"
 Rebin(InputWorkspace=name, Params=rebinPars, OutputWorkspace=name)
 Rebin(InputWorkspace=resName, Params=rebinPars, OutputWorkspace=resName)
 
@@ -43,64 +45,26 @@ dataX = mtd[name].extractX()[0]
 res = mtd["resolution_sum"].extractY()[0]
 resX = mtd["resolution_sum"].extractX()[0]
 
-# Several ways of computing Integrals
-histWidths = resX[1:] - resX[:-1]
-integral = np.sum(histWidths * res[:-1])
-print(integral)       
-print(np.sum(res*0.5))
-mantid_int = Integration(resolution)
+# interpolate resolution such that one max at zero
+start, interval, end = [float(i) for i in rebinPars.split(",")]
+print(start, end, interval)
+resXNew = np.arange(start, end, interval)
+res = np.interp(resXNew, resX, res)
+ 
 
-dataX_len = len(dataX)
-print(dataX_len)
-halfPoint = int(np.round(dataX_len/2))
-# Shift not due to symetric resolution
-#res[:halfPoint] = np.flip(res)[:halfPoint]
-#print(res[halfPoint-5 : halfPoint])
-print(dataX[halfPoint-2 : halfPoint+2])
-print(res[halfPoint-2 : halfPoint+2])
-
-# # Resolution has to be re-centered
-# # Currently only works with even lenght of array
-# print("centering resolution ...")
-# firstZeroIdx = np.argmin(np.abs(dataX))
-# print(dataX[firstZeroIdx-2 : firstZeroIdx+2]) 
-# print(dataX[firstZeroIdx])
-# A = dataX[:2*firstZeroIdx+2]  #+2 is for even zero points
-# print(A[0], A[-1])
-# 
-# # Crop resolution
-# res = res[:2*firstZeroIdx+2]
-# 
-
-# The shift is due to the fact that the convolution returns
-# an array that has 3 points at the peak instead of 1
-# solution: use mode='full', remove the maximum point from
-# array, crop the full array to match the size of original func,
-# and need to align the two peaks
-
+mantid_int = Integration(resName)
 
 yfitGaussian = gaussian(dataX, popt)
 
-# Add a zero data point to function being convolved
-# Output of numerical convolution will have this lenght
-# yfitGaussian0 = np.pad(yfitGaussian, (0, 1), 'constant', constant_values=(0, 0))
-# print(len(yfitGaussian0))
-#print(yfitGaussian[halfPoint-2 : halfPoint+2])
 print("norm gauss:", np.sum(yfitGaussian*0.5))
 
-yfit = signal.convolve(yfitGaussian, res, mode="same") * 0.5
-print(len(yfit))
-print(yfit[:4], yfit[-4:])
-#print(yfit[halfPoint-2 : halfPoint+2])
-print("norm convolved gauss:", np.sum(yfit*0.5))
+yfit = ndimage.convolve1d(yfitGaussian, res, mode="constant") * 0.5
 
-#take out the maximum point, lenght is now the original before padding with zero
-# yfitMaxMask = yfit==np.max(yfit)
-# yfit = yfit[~yfitMaxMask]
+print("norm convolved gauss:", np.sum(yfit*0.5))
 
 plt.figure()
 plt.plot(dataX, yfitGaussian, label="yfitGaussian")
-plt.plot(dataX, res, label="resolution")
+plt.plot(resXNew, res, label="resolution")
 plt.plot(dataX, yfit, label="convolvedGaussian")
 plt.legend()
 plt.show()

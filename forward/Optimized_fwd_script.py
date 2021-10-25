@@ -841,6 +841,7 @@ def prepareFinalWsInYSpace(wsFinal, ncpForEachMass):
     return wsYSpaceSym, wsRes
 
 
+# ----------- use the results from the test ------------------
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     """Input: workspace from last iteration, ncpTotal for each mass
        Output: workspace with all the ncpTotal subtracted except for the first mass"""
@@ -954,9 +955,13 @@ def calculate_mantid_resolutions(ws, mass):
     return mtd["resolution"]
 
 
-def fitProfileInYSpace(wsYSpaceSym, wsRes):
+# ------------------- Edit of final section, haven't tested it yet ----------------------
 
-    print('\n','Fit on the sum of spectra in the West domain','\n')         #### West domain is the same as Y scaling
+
+
+def fitProfileMantidFit(wsYSpaceSym, wsRes):
+
+    print('\n','Fit on the sum of spectra in the West domain','\n')     
     for minimizer_sum in ('Levenberg-Marquardt','Simplex'):
         CloneWorkspace(InputWorkspace = ic.name+'joy_sum', OutputWorkspace = ic.name+minimizer_sum+'_joy_sum_fitted')
         
@@ -977,8 +982,6 @@ def fitProfileInYSpace(wsYSpaceSym, wsRes):
         ws=mtd[ic.name+minimizer_sum+'_joy_sum_fitted_Parameters']
         print('Using the minimizer: ',minimizer_sum)
         print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
-
-
 
 
 if __name__=="__main__":
