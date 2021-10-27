@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from mantid.simpleapi import *    
 from pathlib import Path
 currentPath = Path(__file__).absolute().parent  # Path to the repository
-
+plt.style.use('seaborn-dark')
 # from jupyterthemes import jtplot
 # jtplot.style()
 
@@ -16,7 +16,7 @@ class TestPlots(unittest.TestCase):
         results = np.load(dataPath)
         self.masses = results["masses"]
         self.hbar = 2.0445
-        spec = 11
+        spec = 13
         self.dataY = results["all_dataY"][0, spec]    # In the order of the script
         self.dataX = results["all_dataX"][0, spec]
         self.dataE = results["all_dataE"][0, spec]
@@ -30,44 +30,54 @@ class TestPlots(unittest.TestCase):
         self.ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
 
     def test_TOF_plot(self):
-        plt.figure()
+        fig, ax = plt.subplots()
         plt.errorbar(self.dataX, self.dataY, yerr=self.dataE,
-                    fmt="none", label="Data", linewidth=1, color="orange")
+                    fmt="none", linewidth=0.5, color="black")
+        plt.plot(self.dataX, self.dataY, ".", label="Data", linewidth=1, color="black")
+
         for i, ncp_m in enumerate(self.ncp_for_each_mass):
-            plt.plot(self.dataX, ncp_m, label=f"NCP mass {self.masses[i]}")
+            plt.fill_between(self.dataX, ncp_m, 
+                            label=f"M={self.masses[i]}", alpha=0.5)
         
         plt.plot(self.dataX, self.tot_ncp, label="NCP total fit",
-                 linestyle="--", color="black" )
+                 linestyle="-", linewidth=2, color="red" )
 
-        plt.xlabel("TOF")
-        plt.ylabel("C(t)")
-        plt.legend()
+        plt.xlabel(r"TOF [$\mu s$]")
+        plt.ylabel(r"C(t) [$\mu s^{-1}$]")
+        # plt.ylim(bottom=-0.001)
+        # plt.xlim((120, 420))
+        plt.legend(loc="upper left")
 
-    def test_structure_factor_plot(self):
-        ax = plt.figure().add_subplot(projection='3d')
-        #ax.errorbar(deltaq, deltaw, datay, datae)
-        #ax.scatter3D(self.deltaQ, self.deltaE, self.dataY, label="Data")
-        ax.plot3D(self.deltaQ, self.deltaE, self.tot_ncp, label="Total NCP fit" )
-        
-        for i, ncp_m in enumerate(self.ncp_for_each_mass):
-            ax.plot3D(self.deltaQ, self.deltaE, ncp_m, label=f"NCP mass {self.masses[i]}")
-        
-        for m in self.masses:
-            ax.plot3D(self.deltaQ, self.hbar**2*self.deltaQ**2/2/m, 0, label=f"mass: {m}")
-        ax.set_xlabel("q")
-        ax.set_ylabel("w")
-        ax.set_zlabel("S(q,w)")
-        plt.legend()
+        #axin0 = ax.inset_axes([0.6, 0.6, 0.3, 0.2])
+
         plt.show()
+        plt.savefig("single_detector_fit.pdf", bbox_inches="tight")
+
+    # def test_structure_factor_plot(self):
+    #     ax = plt.figure().add_subplot(projection='3d')
+    #     #ax.errorbar(deltaq, deltaw, datay, datae)
+    #     #ax.scatter3D(self.deltaQ, self.deltaE, self.dataY, label="Data")
+    #     ax.plot3D(self.deltaQ, self.deltaE, self.tot_ncp, label="Total NCP fit" )
+        
+    #     for i, ncp_m in enumerate(self.ncp_for_each_mass):
+    #         ax.plot3D(self.deltaQ, self.deltaE, ncp_m, label=f"NCP mass {self.masses[i]}")
+        
+    #     for m in self.masses:
+    #         ax.plot3D(self.deltaQ, self.hbar**2*self.deltaQ**2/2/m, 0, label=f"mass: {m}")
+    #     ax.set_xlabel("q")
+    #     ax.set_ylabel("w")
+    #     ax.set_zlabel("S(q,w)")
+    #     plt.legend()
+    #     plt.show()
     
-    def test_ncp_yspace(self):
-        for m, yspace_m, ncp_m in zip(self.masses, self.yspaces_for_each_mass, self.ncp_for_each_mass):
-            plt.figure()
-            plt.plot(yspace_m, ncp_m, label=f"NCP for mass {m}")
-            plt.errorbar(yspace_m, self.dataY, yerr=self.dataE, fmt="none", label="Data")
-            plt.xlabel(f"yspace for mass={m}")
-            plt.legend()
-            plt.show()
+    # def test_ncp_yspace(self):
+    #     for m, yspace_m, ncp_m in zip(self.masses, self.yspaces_for_each_mass, self.ncp_for_each_mass):
+    #         plt.figure()
+    #         plt.plot(yspace_m, ncp_m, label=f"NCP for mass {m}")
+    #         plt.errorbar(yspace_m, self.dataY, yerr=self.dataE, fmt="none", label="Data")
+    #         plt.xlabel(f"yspace for mass={m}")
+    #         plt.legend()
+    #         plt.show()
 
 if __name__ == "__main__":
     unittest.main()
