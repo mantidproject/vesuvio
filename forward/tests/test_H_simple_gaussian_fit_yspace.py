@@ -172,3 +172,11 @@ plt.show()
 
 wsYFit = CloneWorkspace(wsRes, OutputWorkspace="MyFit")
 wsYFit.dataY(0)[:] = yfitMinimize
+
+# savepath = currentPath / ".." / "figures_poster" / "make_plots" / "data_H_NCP_fit"
+# np.savez(savepath,
+#         dataX = dataX, 
+#         dataY = dataY,
+#         fit = yfitOpt,
+#         dataE = dataE,
+#         )
