@@ -74,7 +74,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "testing_gamma_correction" 
+    savePath = repoPath / "tests" / "runs_for_testing" / "general_testing" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -330,7 +330,7 @@ def fitNcpToWorkspace(ws):
     dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(dataX)
     
-    #-------------Fit all spectrums----------
+    # Fit all spectrums
     fitPars = np.array(list(map(
         fitNcpToSingleSpec, 
         dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
@@ -365,12 +365,12 @@ def loadWorkspaceIntoArrays(ws):
 
 
 def prepareFitArgs(dataX):
-    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)        #shape(134,-)
-    resolutionPars = loadResolutionPars(instrPars)                           #shape(134,-)        
+    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)       
+    resolutionPars = loadResolutionPars(instrPars)                                   
 
-    v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   #shape(134, 144)
+    v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   
     kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
-    ySpacesForEachMass = convertDataXToYSpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)        #shape(134, 4, 144)
+    ySpacesForEachMass = convertDataXToYSpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)        
     
     kinematicArrays = reshapeArrayPerSpectrum(kinematicArrays)
     ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
@@ -471,7 +471,7 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is not usually satisfied but in the exceptional case that it is,
         # we can use a statistical weight to make sure the chi2 used is not too small for the 
-        # optimization algorithm
+        # optimization algorithm. This is not used in the original script
         chi2 = (ncpTotal - dataY)**2 / dataY**2
     else:
         chi2 =  (ncpTotal - dataY)**2 / dataE**2    
@@ -727,9 +727,9 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
         wsDataE = ws.extractE()
         dataE = np.mean(wsDataE, axis=1)[:, np.newaxis] * np.ones((1, len(dataX[0])))
 
-    # Not sure this is correct
+    # Original script does not have this step to multiply by histogram widths
     histWidths = dataX[:, 1:] - dataX[:, :-1]
-    dataX = dataX[:, :-1]  # Cut last column to match ncpTotal length
+    dataX = dataX[:, :-1]       # Cut last column to match ncpTotal length
     dataY = ncpTotal * histWidths
     dataE = dataE[:, :-1] * histWidths
 
@@ -747,8 +747,6 @@ def switchFirstTwoAxis(A):
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
-
-#-------------------- Currently working here ------------------------
 
 def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
@@ -840,7 +838,7 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
     return profiles
 
 
-# -------------- Working on fitting in the Y space --------------
+# -------------- Isolate H Profile and fit in y space -------------------
 
 def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
@@ -869,10 +867,16 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
-    HSpectraToBeMasked = ic.maskedSpecNo  # I guess the spectra to be masked do not change
+    if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
+        raise ValueError("The workspace for the isolated H data countains NaNs, might cause problems!")
+
     Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
-    MaskDetectors(Workspace=ws.name()+"_H",SpectraList=HSpectraToBeMasked)
+    MaskDetectors(Workspace=ws.name()+"_H",SpectraList=ic.maskedSpecNo)     # Mask same spectrums as initial workspace
     RemoveMaskedSpectra(InputWorkspace=ws.name()+"_H", OutputWorkspace=ws.name()+"_H")    # Probably not necessary
+
+    if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
+        raise ValueError("The workspace for the isolated H data countains NaNs, might cause problems!")
+
     return mtd[ws.name()+"_H"]
 
 
@@ -898,7 +902,7 @@ def convertToYSpaceAndSymetrise(ws0, mass):
 
     # Symmetrize
     if ic.symmetriseHProfileUsingAveragesFlag:
-        dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)  # Might want to cover NaNs as well
+        dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)  # Might want to cover possible NaNs as well
         dataE = np.where(dataE==0, np.flip(dataE, axis=1), dataE)
 
         dataY = (dataY + np.flip(dataY, axis=1)) / 2
