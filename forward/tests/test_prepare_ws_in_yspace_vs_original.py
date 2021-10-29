@@ -83,7 +83,7 @@ def convertToYSpaceAndSymetrise(ws0, mass):
     # Symmetrize
     symmetrise_using_averages = False
     if symmetrise_using_averages:
-        dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
+        dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)  # Might want to cover NaNs as well
         dataE = np.where(dataE==0, np.flip(dataE, axis=1), dataE)
 
         dataY = (dataY + np.flip(dataY, axis=1)) / 2
@@ -92,13 +92,13 @@ def convertToYSpaceAndSymetrise(ws0, mass):
         dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
         dataE = np.where(dataX<0, np.flip(dataE, axis=1), dataE)
 
-    # Normalization
+    # Prepare Normalization
     dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
     nonZerosMask = ~(dataY==0)
     dataYnorm = np.where(nonZerosMask, 1, 0)
-    dataEnorm = np.full(dataE.shape, 0.000001)
+    dataEnorm = np.full(dataE.shape, 0.000001)  # Value from original script
 
-    # Build Workspaces
+    # Build Workspaces, couldn't find a method for this in Mantid
     wsYSym = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_Sym")
     wsYNorm = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_norm")
     for i in range(wsYSpace.getNumberHistograms()):

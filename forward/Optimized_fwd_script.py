@@ -2,6 +2,7 @@ import numpy as np
 import mantid
 from mantid.simpleapi import *
 from scipy import optimize
+from scipy import ndimage
 import time
 from pathlib import Path
 
@@ -77,6 +78,12 @@ class InitialConditions:
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
+
+    symmetriseHProfileUsingAveragesFlag = True
+    useScipyCurveFitToHProfileFlag = True
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"
+    singleGaussFitToHProfile = True
+
     
     def __init__(self, initialConditionsDict):
         
@@ -90,8 +97,6 @@ class InitialConditions:
         self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
         self.MSCorrectionFlag = D["MSCorrectionFlag"]
         self.GammaCorrectionFlag = D["GammaCorrectionFlag"]
-        self.fitInYSpaceFlag = D["fitInYSpaceFlag"]
-
 
         self.specOffset = self.firstSpec
         self.firstIdx = self.firstSpec - self.specOffset
@@ -112,7 +117,7 @@ class InitialConditions:
 
 
 initialConditionsDict = {
-    "noOfMSIterations" : 4, 
+    "noOfMSIterations" : 1, 
     "firstSpec" : 144,    #144
     "lastSpec" : 182,     #182
     "userPathInitWsFlag" : True, 
@@ -121,8 +126,7 @@ initialConditionsDict = {
     "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces
 
     "MSCorrectionFlag" : False,
-    "GammaCorrectionFlag" : False,
-    "fitInYSpaceFlag" : False
+    "GammaCorrectionFlag" : False
 }
 
 
@@ -169,6 +173,11 @@ def main():
                       OutputWorkspace="tmpNameWs")
 
             RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
+    
+    wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
+    ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
+    wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
+    fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
                 
     thisScriptResults.save(ic.savePath)
 
@@ -833,15 +842,14 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
 
 # -------------- Working on fitting in the Y space --------------
 
-def prepareFinalWsInYSpace(wsFinal, ncpForEachMass):
+def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     massH = 1.0079
-    wsYSpaceSym = convertToYSpaceAndSymetrise(wsSubMass, massH) 
+    wsYSpaceSymSum = convertToYSpaceAndSymetrise(wsSubMass, massH) 
     wsRes = calculate_mantid_resolutions(wsFinal, massH)
-    return wsYSpaceSym, wsRes
+    return wsYSpaceSymSum, wsRes
 
 
-# ----------- use the results from the test ------------------
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     """Input: workspace from last iteration, ncpTotal for each mass
        Output: workspace with all the ncpTotal subtracted except for the first mass"""
@@ -861,22 +869,11 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
-    # wsSubMass = CreateWorkspace(    # Discard the last colums of workspace
-    #     DataX=dataX[:, :-1].flatten(), DataY=dataY[:, :-1].flatten(),
-    #     DataE=dataE[:, :-1].flatten(), Nspec=len(dataX)
-    #     )
-    HSpectraToBeMasked = []
+    HSpectraToBeMasked = ic.maskedSpecNo  # I guess the spectra to be masked do not change
     Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
     MaskDetectors(Workspace=ws.name()+"_H",SpectraList=HSpectraToBeMasked)
     RemoveMaskedSpectra(InputWorkspace=ws.name()+"_H", OutputWorkspace=ws.name()+"_H")    # Probably not necessary
     return mtd[ws.name()+"_H"]
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
 def convertToYSpaceAndSymetrise(ws0, mass):
@@ -884,50 +881,57 @@ def convertToYSpaceAndSymetrise(ws0, mass):
         InputWorkspace=ws0, Mass=mass, 
         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    max_Y = np.ceil(2.5*mass+27)  
-    # First bin boundary, width, last bin boundary
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    # max_Y = np.ceil(2.5*mass+27) 
+    # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
+    rebin_parameters=ic.rebinParametersForYSpaceFit
+
     Rebin(
         InputWorkspace=ws0.name()+"_JoY", Params=rebin_parameters, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
+    normalise_workspace(ws0.name()+"_JoY")
 
     wsYSpace = mtd[ws0.name()+"_JoY"]
-    dataY = wsYSpace.extractY()  
-    # safeguarding against nans as well
-    nanOrZerosMask = (dataY==0) | np.isnan(dataY)
-    noOfNonZerosRow = np.nansum(~nanOrZerosMask, axis=0)
+    dataY = wsYSpace.extractY() 
+    dataE = wsYSpace.extractE()
+    dataX = wsYSpace.extractX()
 
-    wsSumYSpace = SumSpectra(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_sum")
-    # SumSpectra can not handle nan values 
-    # Nan values might be coming from the ncp
-    wsSumYSpace.dataY(0)[:] = np.nansum(dataY, axis=0)
-    
+    # Symmetrize
+    if ic.symmetriseHProfileUsingAveragesFlag:
+        dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)  # Might want to cover NaNs as well
+        dataE = np.where(dataE==0, np.flip(dataE, axis=1), dataE)
 
-    tmp = CloneWorkspace(InputWorkspace=wsSumYSpace, OutputWorkspace="normalization")
-    tmp.dataY(0)[:] = noOfNonZerosRow
-    tmp.dataE(0)[:] = np.zeros(noOfNonZerosRow.shape)
+        dataY = (dataY + np.flip(dataY, axis=1)) / 2
+        dataE = (dataE + np.flip(dataE, axis=1)) / 2
+    else:
+        dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
+        dataE = np.where(dataX<0, np.flip(dataE, axis=1), dataE)
 
-    wsMean = Divide(                                  # Use of Divide and not nanmean, err are prop automatically
-        LHSWorkspace=wsSumYSpace, RHSWorkspace="normalization", OutputWorkspace=ws0.name()+"_JoY_mean"
-       )
+    # Prepare Normalization
+    dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
+    nonZerosMask = ~(dataY==0)
+    dataYnorm = np.where(nonZerosMask, 1, 0)
+    dataEnorm = np.full(dataE.shape, 0.000001)  # Value from original script
 
-    ws = CloneWorkspace(wsMean, OutputWorkspace=ws0.name()+"_JoY_Sym")
-    datay = ws.dataY(0)[:]
-    # Next step ensures that nans do not count as a data point during the symetrization
-    datay = np.where(np.isnan(datay), np.flip(datay), datay)      
-    ws.dataY(0)[:] = (datay + np.flip(datay)) / 2
+    # Build Workspaces, couldn't find a method for this in Mantid
+    wsYSym = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    wsYNorm = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_norm")
+    for i in range(wsYSpace.getNumberHistograms()):
+        wsYSym.dataY(i)[:] = dataY[i, :]
+        wsYSym.dataE(i)[:] = dataE[i, :]
+        wsYNorm.dataY(i)[:] = dataYnorm[i, :]
+        wsYNorm.dataE(i)[:] = dataEnorm[i, :]
 
-    datae = ws.dataE(0)[:]
-    datae = np.where(np.isnan(datae), np.flip(datae), datae)
-    ws.dataE(0)[:] = (datae + np.flip(datae)) / 2
+    # Sum of spectra
+    SumSpectra(InputWorkspace=wsYSym, OutputWorkspace=ws0.name()+"_JoY_Sym")
+    SumSpectra(InputWorkspace=wsYNorm, OutputWorkspace=ws0.name()+"_JoY_norm")
 
-    normalise_workspace(ws)
-    # DeleteWorkspaces(
-    #     [ws0.name()+"_JoY_sum", ws0.name()+"_JoY_mean", "normalization"]
-    #     )
-    return mtd[ws0.name()+"_JoY"], mtd[ws0.name()+"_JoY_sum"], \
-        mtd[ws0.name()+"_JoY_mean"], mtd[ws0.name()+"_JoY_Sym"]
+    # Normalize
+    Divide(
+        LHSWorkspace=ws0.name()+"_JoY_Sym", RHSWorkspace=ws0.name()+"_JoY_norm",
+        OutputWorkspace=ws0.name()+'_JoY_sum_final'
+    )
+    return mtd[ws0.name()+"_JoY_sum_final"]
 
 
 def normalise_workspace(ws_name):
@@ -937,51 +941,117 @@ def normalise_workspace(ws_name):
 
 
 def calculate_mantid_resolutions(ws, mass):
-    # Only for loop in this script because the fuction VesuvioResolution takes in one spectra at a time
-    # Haven't really tested this one becuase it's not modified
-    max_Y = np.ceil(2.5*mass+27)
-    rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(Workspace=ws, WorkspaceIndex=index,
-                          Mass=mass, OutputWorkspaceYSpace="tmp")
-        tmp = Rebin("tmp", rebin_parameters)
-        if index == 0:
-            RenameWorkspace("tmp", "resolution")
-        else:
-            AppendSpectra("resolution", "tmp", OutputWorkspace="resolution")
+    # max_Y = np.ceil(2.5*mass+27)
+    # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
+    rebin_parameters=ic.rebinParametersForYSpaceFit
+    resolution=CloneWorkspace(InputWorkspace=ws)
+    resolution=Rebin(InputWorkspace=resolution, Params=rebin_parameters)
+
+    for i in range(resolution.getNumberHistograms()):
+        VesuvioResolution(Workspace=ws, Mass=1.0079, OutputWorkspaceYSpace='tmp')
+        tmp = Rebin(InputWorkspace='tmp', Params=rebin_parameters)
+        resolution.dataY(i)[:] = tmp.dataY(0)
+
     SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
     normalise_workspace("resolution")
     DeleteWorkspace("tmp")
     return mtd["resolution"]
 
 
-# ------------------- Edit of final section, haven't tested it yet ----------------------
+def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
 
+    if ic.useScipyCurveFitToHProfileFlag:
+        popt, pcov = fitProfileCurveFit(wsYSpaceSym, wsRes)
+        print("popt:\n", popt)
+        print("pcov:\n", pcov)
+    else:
+        fitProfileMantidFit(wsYSpaceSym, wsRes)
+
+
+def fitProfileCurveFit(wsYSpaceSym, wsRes):
+    res = wsRes.extractY()[0]
+    resX = wsRes. extractX()[0]
+
+    # Interpolate Resolution to get single peak at zero
+    start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
+    resNewX = np.arange(start, end, interval)
+    res = np.interp(resNewX, resX, res)
+
+    dataY = wsYSpaceSym.extractY()[0]
+    dataX = wsYSpaceSym.extractX()[0]
+    dataE = wsYSpaceSym.extractE()[0]
+
+    if ic.singleGaussFitToHProfile:
+        def convolvedGaussian(x, y0, x0, A, sigma):
+            histWidths = x[1:] - x[:-1]
+            if ~ (np.max(histWidths)==np.min(histWidths)):
+                raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+
+            gaussFunc = gaussianFit(x, y0, x0, A, sigma)
+            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
+            return convGauss
+        p0 = [0, 0, 1, 5]
+
+    else:
+        def convolvedGaussian(x, y0, x0, A, sigma):
+            histWidths = x[1:] - x[:-1]
+            if ~ (np.max(histWidths)==np.min(histWidths)):
+                raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+
+            gaussFunc = gaussianFit(x, y0, x0, A, 4.76) + gaussianFit(x, 0, x0, 0.054*A, sigma)
+            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
+            return convGauss
+        p0 = [0, 0, 0.7143, 5]
+
+    popt, pcov = optimize.curve_fit(
+        convolvedGaussian, dataX, dataY, p0=p0,
+        sigma=dataE
+    )
+    yfit = convolvedGaussian(dataX, *popt)
+    Residuals = dataY - yfit
+    
+    # Create Workspace with the fit results
+    CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
+                    DataY=np.concatenate((dataY, yfit, Residuals)), 
+                    NSpec=3,
+                    OutputWorkspace="CurveFitResults")
+    return popt, pcov
+
+
+def gaussianFit(x, y0, x0, A, sigma):
+    """Gaussian centered at zero"""
+    return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
 
 def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
     print('\n','Fit on the sum of spectra in the West domain','\n')     
     for minimizer_sum in ('Levenberg-Marquardt','Simplex'):
-        CloneWorkspace(InputWorkspace = ic.name+'joy_sum', OutputWorkspace = ic.name+minimizer_sum+'_joy_sum_fitted')
+        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = ic.name+minimizer_sum+'_joy_sum_fitted')
         
-        if (simple_gaussian_fit):
+        if ic.singleGaussFitToHProfile:
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
+            name=Resolution,Workspace=resolution,WorkspaceIndex=0;
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()'''
         else:
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
+            name=Resolution,Workspace=resolution,WorkspaceIndex=0;
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
             +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
             y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
 
-        Fit(Function=function, InputWorkspace=ic.name+minimizer_sum+'_joy_sum_fitted', Output=ic.name+minimizer_sum+'_joy_sum_fitted',Minimizer=minimizer_sum)
+        Fit(
+            Function=function, 
+            InputWorkspace=ic.name+minimizer_sum+'_joy_sum_fitted',
+            Output=ic.name+minimizer_sum+'_joy_sum_fitted',
+            Minimizer=minimizer_sum
+            )
         
         ws=mtd[ic.name+minimizer_sum+'_joy_sum_fitted_Parameters']
         print('Using the minimizer: ',minimizer_sum)
-        print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
+        print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))   # Selects the wrong parameter in the case of the double gaussian
+
 
 
 if __name__=="__main__":

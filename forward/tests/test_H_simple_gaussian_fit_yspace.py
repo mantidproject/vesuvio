@@ -83,6 +83,12 @@ def optimizedFitInYSpace(wsYSpaceSym, wsRes):
         sigma=dataE
     )
     yfit = convolvedGaussian(dataX, *popt)
+    Residuals = dataY - yfit
+    
+    # Create Workspace with the fit results
+    CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
+                    DataY=np.concatenate((dataY, yfit, Residuals)), NSpec=3,
+                    OutputWorkspace="CurveFitResults")
     return popt, pcov, yfit
 
 
@@ -117,11 +123,12 @@ def fitWithMinimize(ws, wsRes):
         errorFunc,
         pars,
         args=(res, dataX, dataY, dataE),
-        method="Nelder-Mead",
+        method="SLSQP",
         options={"disp":True}
     )
     fitPars = result["x"]
     yfit = convolvedGaussian(dataX, fitPars, res)
+
     return fitPars, yfit
 
 
