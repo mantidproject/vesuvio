@@ -20,7 +20,7 @@ ax.errorbar(dataX, dataY, yerr=dataE,
             capsize=2, capthick=1.5)
 ax.plot(dataX, dataY, "o", label=" Avg Data", 
         linewidth=1, color="black", markersize=5)
-ax.plot(dataX, fit, label="H NCP Fit",
+ax.plot(dataX, fit, label="Gaussian Fit",
             linestyle="-", linewidth=1.25, color="red" )
 
 plt.xlabel(r"y-space [$A^{-1}$]")

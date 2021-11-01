@@ -174,5 +174,42 @@ class TestMeanIntensities(unittest.TestCase):
 #             self.optws, self.oriws
 #         )
 
+
+class TestSymSumYSpace(unittest.TestCase):
+    def setUp(self):
+        originalResults = np.load(pathToOriginal)
+        self.oridataY = originalResults["YSpaceSymSumDataY"]
+        self.oridataE = originalResults["YSpaceSymSumDataE"]
+
+        optimizedResults = np.load(pathToOptimized)
+        self.optdataY = optimizedResults["YSpaceSymSumDataY"]
+        self.optdataE = optimizedResults["YSpaceSymSumDataE"]
+        self.rtol = 0.0001
+        self.equal_nan = True
+        self.decimal = 6
+
+    def test_YSpaceDataY(self):
+        nptest.assert_almost_equal(self.oridataY, self.optdataY, decimal=self.decimal)
+        print(f"\nSummed Spectra in YSpace is equal up to decimal={self.decimal}")
+        # totalMask = np.isclose(
+        #     self.oridataY, self.optdataY, rtol=self.rtol, equal_nan=self.equal_nan
+        #     )
+        # totalDiffMask = ~ totalMask
+        # noDiff = np.sum(totalDiffMask)
+        # maskSize = totalDiffMask.size
+        # print("\nNo of different values y-space sym sum dataY:\n",
+        #     noDiff, " out of ", maskSize,
+        #     f"ie {100*noDiff/maskSize:.1f} %")
+        
+        # plt.figure()
+        # plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+        #             interpolation="nearest", norm=None)
+        # plt.title("YSpace difference dataY")
+        # plt.ylabel("Summed Spectra")
+        # plt.show()        
+    def test_YSpaceDataE(self):
+        nptest.assert_almost_equal(self.oridataE, self.optdataE, decimal=self.decimal)
+        print(f"\nErrors of Summed Spectra in YSpace is equal up to decimal={self.decimal}")
+
 if __name__ == "__main__":
     unittest.main()

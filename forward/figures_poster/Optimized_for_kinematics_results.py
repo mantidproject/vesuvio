@@ -469,6 +469,7 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
     
     JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes)  
     
+    # The FSE are probably introducing negative wings in the functions
     FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
     
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   

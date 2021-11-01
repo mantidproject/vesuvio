@@ -757,10 +757,16 @@ for i in range(number_of_iterations):
 ##-------------------save results-------------------
 savepath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz"
 
+wsJoY = mtd[ws_name+'joy_sum']
+YSpaceSymSumDataY = wsJoY.extractY()
+YSpaceSymSumDataE = wsJoY.extractE()
+
+
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                 all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
                 all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
-                all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp)
+                all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp, \
+                YSpaceSymSumDataY=YSpaceSymSumDataY, YSpaceSymSumDataE=YSpaceSymSumDataE)
 
 
 #"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_no_mulscat\original_spec3-13_iter1"

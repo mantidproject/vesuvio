@@ -74,7 +74,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "optimized_using_ori_ws.npz" 
+    savePath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -178,9 +178,10 @@ def main():
     ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
     fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
-                
-    thisScriptResults.save(ic.savePath)
 
+    thisScriptResults.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
+    thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
+    thisScriptResults.save(ic.savePath)
 
 ######################################################################################################################################
 #####################################################                          #######################################################
@@ -283,6 +284,11 @@ def createSlabGeometry(slabPars):
 class resultsObject:
     """Used to store results of the script"""
 
+    # Introduce these as a dirty way of saving this info
+    YSpaceSymSumDataY = 0
+    YSpaceSymSumDataE = 0
+
+
     def __init__(self, wsToBeFitted):
         """Initializes arrays full of zeros"""
 
@@ -319,7 +325,9 @@ class resultsObject:
                  all_mean_widths=all_mean_widths,
                  all_mean_intensities=all_mean_intensities,
                  all_tot_ncp=all_tot_ncp,
-                 all_ncp_for_each_mass=all_ncp_for_each_mass)
+                 all_ncp_for_each_mass=all_ncp_for_each_mass,
+                 YSpaceSymSumDataY=self.YSpaceSymSumDataY,
+                 YSpaceSymSumDataE=self.YSpaceSymSumDataE)
 
 
 def fitNcpToWorkspace(ws):
