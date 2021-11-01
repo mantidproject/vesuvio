@@ -532,8 +532,8 @@ is not needed as a result of the symmetrisation.
 load_data=True                             # If data have already been loaded, it can be put to Fasle to save time;
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 4              # This is the number of iterations for the reduction analysis in time-of-flight.
-fit_in_Y_space = False      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
+number_of_iterations = 1              # This is the number of iterations for the reduction analysis in time-of-flight.
+fit_in_Y_space = True      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
 
 ws_name="starch_80_RD_"
 ws_name_raw="starch_80_RD_raw_"
@@ -617,7 +617,6 @@ CropWorkspace(InputWorkspace=ws_name, StartWorkspaceIndex = first_idx, EndWorksp
 all_mean_widths, all_mean_intensities = np.zeros((number_of_iterations, len(masses))), np.zeros((number_of_iterations, len(masses)))
 all_spec_best_par_chi_nit = np.zeros((number_of_iterations, last_spectrum-first_spectrum+1, len(masses)*3+3))
 all_fit_workspaces = np.zeros((number_of_iterations, mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize())) 
-
 #######################################
 #######################################
 
@@ -651,11 +650,11 @@ for iteration in range(number_of_iterations):
         Scale(InputWorkspace = str(ws_name)+"_gamma_background", OutputWorkspace = str(ws_name)+"_gamma_background", Factor=0.9, Operation = "Multiply")
         # evaluate multiple scattering correction --------- This creates a background workspace with ws_name :  str(ws_name)+"_MulScattering"
         # skip the multiscattering correction for now
-        # sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", verbose)
-        # correct_for_multiple_scattering(ws_name, first_spectrum,last_spectrum, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)
-        # # Create corrected workspace
+        sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", verbose)
+        correct_for_multiple_scattering(ws_name, first_spectrum,last_spectrum, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)
+        # Create corrected workspace
         Minus(LHSWorkspace= ws_name, RHSWorkspace = str(ws_name)+"_gamma_background", OutputWorkspace = ws_name+str(iteration+1))
-        # Minus(LHSWorkspace= ws_name+str(iteration+1), RHSWorkspace = str(ws_name)+"_MulScattering", OutputWorkspace = ws_name+str(iteration+1))
+        Minus(LHSWorkspace= ws_name+str(iteration+1), RHSWorkspace = str(ws_name)+"_MulScattering", OutputWorkspace = ws_name+str(iteration+1))
 
 if fit_in_Y_space:
     first_ws = subtract_other_masses(ws_name+str(number_of_iterations-1), intensities, widths, positions, spectra, masses)
@@ -723,13 +722,13 @@ if fit_in_Y_space:
         
         if (simple_gaussian_fit):
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            ws_name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
-            ws_name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
+            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
+            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()'''
         else:
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            ws_name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
-            ws_name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
+            name=Resolution,Workspace=resolution_sum,WorkspaceIndex=0;
+            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
             +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
             y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
 
@@ -756,7 +755,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = repoPath / "tests" / "fixatures" / "original_adapted_run_144-182_GC"
+savepath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                 all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \

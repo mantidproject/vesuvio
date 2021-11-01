@@ -20,6 +20,9 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
 
     # The original uses the mean points of the histograms, not dataX!
     dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
+    # Uncomment to leave last two collumns unchanged
+    # dataY[:, :-2] -= ncpTotal[:, :-1] * (dataX[:, 1:-1] - dataX[:, :-2])
+
     # But this makes more sense to calculate histogram widths, we can preserve one more data point
     # Last column fo data reamains unaltered, so is faulty
     # Need to decide if I keep this column or not

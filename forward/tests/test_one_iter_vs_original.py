@@ -11,10 +11,10 @@ plt.style.use('dark_background')
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-pathToOriginal = currentPath / "fixatures" / "adapted_original_1iter.npz"
+pathToOriginal = currentPath / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz" 
 # pathToOriginal = currentPath / "fixatures" / "ori_spec3-134_iter4_ncp.npz"
 
-pathToOptimized = currentPath / "runs_for_testing" / "compare_with_original.npz"
+pathToOptimized = currentPath / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
 
 #--------------------- Problem to solve
 # The same original script ran in Mantid 6.2 gives different results for
@@ -43,7 +43,7 @@ class TestFitParameters(unittest.TestCase):
         self.optwidths = self.optmainPars[:, 1::3]
         self.optcenters = self.optmainPars[:, 2::3]
 
-        self.rtol = 0.01
+        self.rtol = 0.0001
         self.equal_nan = True
 
     def test_print_rtol(self):

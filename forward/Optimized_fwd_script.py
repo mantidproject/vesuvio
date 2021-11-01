@@ -74,13 +74,13 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "runs_for_testing" / "general_testing" 
+    savePath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "optimized_using_ori_ws.npz" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
 
-    symmetriseHProfileUsingAveragesFlag = True
-    useScipyCurveFitToHProfileFlag = True
+    symmetriseHProfileUsingAveragesFlag = False
+    useScipyCurveFitToHProfileFlag = False
     rebinParametersForYSpaceFit = "-20, 0.5, 20"
     singleGaussFitToHProfile = True
 
@@ -698,7 +698,7 @@ class FitParameters:
         meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
         stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
 
-        print("\nMasses: ", ic.masses.reshape(1, 4),
+        print("\nMasses: ", ic.masses.reshape(1, noOfMasses),
             "\nMean Widths: ", meanWidths,
             "\nMean Intensity Ratios: ", meanIntensityRatios)
         return meanWidths, meanIntensityRatios
@@ -861,14 +861,13 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     dataY, dataX = ws.extractY(), ws.extractX() 
     
     dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
+    # Although original cuts two last columns and this optimized cuts only last one,
+    # I have tested it and this effect is not significant
 
     # Pass the data onto a Workspace, clone to preserve properties
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
-
-    if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
-        raise ValueError("The workspace for the isolated H data countains NaNs, might cause problems!")
 
     Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
     MaskDetectors(Workspace=ws.name()+"_H",SpectraList=ic.maskedSpecNo)     # Mask same spectrums as initial workspace
@@ -1058,8 +1057,8 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
 
 
-if __name__=="__main__":
-    start_time = time.time()
-    main()
-    end_time = time.time()
-    print("running time: ", end_time-start_time, " seconds")
+#if __name__=="__main__":
+start_time = time.time()
+main()
+end_time = time.time()
+print("running time: ", end_time-start_time, " seconds")
