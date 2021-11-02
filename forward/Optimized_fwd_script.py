@@ -174,13 +174,15 @@ def main():
 
             RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
     
-    wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
+    wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]   
     ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
     fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
 
     thisScriptResults.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
     thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
+    thisScriptResults.resolution = wsRes.extractY()
+    thisScriptResults.HdataY = mtd[wsFinal.name()+"_H"].extractY()
     thisScriptResults.save(ic.savePath)
 
 ######################################################################################################################################
@@ -287,6 +289,8 @@ class resultsObject:
     # Introduce these as a dirty way of saving this info
     YSpaceSymSumDataY = 0
     YSpaceSymSumDataE = 0
+    resolution = 0
+    HdataY = 0
 
 
     def __init__(self, wsToBeFitted):
@@ -327,7 +331,8 @@ class resultsObject:
                  all_tot_ncp=all_tot_ncp,
                  all_ncp_for_each_mass=all_ncp_for_each_mass,
                  YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-                 YSpaceSymSumDataE=self.YSpaceSymSumDataE)
+                 YSpaceSymSumDataE=self.YSpaceSymSumDataE,
+                 resolution=self.resolution, HdataY=self.HdataY)
 
 
 def fitNcpToWorkspace(ws):
@@ -947,30 +952,44 @@ def convertToYSpaceAndSymetrise(ws0, mass):
 
 def normalise_workspace(ws_name):
     tmp_norm = Integration(ws_name)
-    Divide(LHSWorkspace=ws_name,RHSWorkspace="tmp_norm",OutputWorkspace=ws_name)
+    Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
     DeleteWorkspace("tmp_norm")
 
+# TODO: figure out why the resolution is giving different results 
+# def calculate_mantid_resolutions(ws, mass):
+#     # max_Y = np.ceil(2.5*mass+27)
+#     # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
+#     rebin_parameters=ic.rebinParametersForYSpaceFit
+#     resolution = CloneWorkspace(InputWorkspace=ws)
+#     resolution = Rebin(InputWorkspace=resolution, Params=rebin_parameters)
+
+#     for i in range(resolution.getNumberHistograms()):
+#         VesuvioResolution(
+#             Workspace=ws, WorkspaceIndex=str(i), Mass=mass, OutputWorkspaceYSpace='tmp'
+#             )
+#         tmp = Rebin(InputWorkspace='tmp', Params=rebin_parameters)
+#         resolution.dataY(i)[:] = tmp.dataY(0)
+
+#     SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
+#     normalise_workspace("resolution")
+#     DeleteWorkspace("tmp")
+#     return mtd["resolution"]
 
 def calculate_mantid_resolutions(ws, mass):
-    # max_Y = np.ceil(2.5*mass+27)
-    # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
     rebin_parameters=ic.rebinParametersForYSpaceFit
-    resolution=CloneWorkspace(InputWorkspace=ws)
-    resolution=Rebin(InputWorkspace=resolution, Params=rebin_parameters)
-
-    for i in range(resolution.getNumberHistograms()):
-        VesuvioResolution(Workspace=ws, Mass=1.0079, OutputWorkspaceYSpace='tmp')
-        tmp = Rebin(InputWorkspace='tmp', Params=rebin_parameters)
-        resolution.dataY(i)[:] = tmp.dataY(0)
-
-    SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
+    for index in range(ws.getNumberHistograms()):
+        VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
+        Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
+        if index == 0:
+            RenameWorkspace("tmp","resolution")
+        else:
+            AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
+    SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
     normalise_workspace("resolution")
     DeleteWorkspace("tmp")
     return mtd["resolution"]
 
-
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
-
     if ic.useScipyCurveFitToHProfileFlag:
         popt, pcov = fitProfileCurveFit(wsYSpaceSym, wsRes)
         print("popt:\n", popt)
