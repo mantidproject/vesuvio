@@ -11,7 +11,7 @@ plt.style.use('seaborn-poster')
 # jtplot.style()
 plt.rcParams['axes.facecolor'] = (0.9, 0.9, 0.9)
 
-dataPath = currentPath / "data_for_plots.npz"
+dataPath = currentPath / "data_for_plots_negative_fse.npz"
 
 class TestPlots(unittest.TestCase):
     def setUp(self):
@@ -72,6 +72,7 @@ class TestPlots(unittest.TestCase):
 
         plt.savefig("./single_detector_fit.pdf", bbox_inches="tight")
         plt.show()
+
     # def test_structure_factor_plot(self):
     #     ax = plt.figure().add_subplot(projection='3d')
     #     #ax.errorbar(deltaq, deltaw, datay, datae)

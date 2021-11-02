@@ -74,7 +74,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "make_plots" / "data_for_plots" 
+    savePath = repoPath / "make_plots" / "data_for_plots_no_fse.npz" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -470,7 +470,8 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
     JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes)  
     
     # The FSE are probably introducing negative wings in the functions
-    FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
+    #FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
+    FSE = 0
     
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   
     ncpTotal = np.sum(ncpForEachMass, axis=0)
