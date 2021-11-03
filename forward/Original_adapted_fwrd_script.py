@@ -762,14 +762,16 @@ resolution = mtd["resolution_sum"].extractY()
 HdataY = mtd[ws_name+'_H'].extractY()
 YSpaceSymSumDataY = wsJoY.extractY()
 YSpaceSymSumDataE = wsJoY.extractE()
-
+finalRawDataY = mtd[ws_name+str(iteration)].extractY()
+finalRawDataE = mtd[ws_name+str(iteration)].extractE()
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                 all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
                 all_mean_widths = all_mean_widths, all_mean_intensities = all_mean_intensities, \
                 all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp, \
                 YSpaceSymSumDataY=YSpaceSymSumDataY, YSpaceSymSumDataE=YSpaceSymSumDataE, \
-                resolution=resolution, HdataY=HdataY)
+                resolution=resolution, HdataY=HdataY, \
+                finalRawDataY=finalRawDataY, finalRawDataE=finalRawDataE)
 
 
 #"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_no_mulscat\original_spec3-13_iter1"

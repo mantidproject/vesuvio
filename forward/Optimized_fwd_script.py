@@ -183,6 +183,8 @@ def main():
     thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
     thisScriptResults.resolution = wsRes.extractY()
     thisScriptResults.HdataY = mtd[wsFinal.name()+"_H"].extractY()
+    thisScriptResults.finalRawDataY = wsFinal.extractY()
+    thisScriptResults.finalRawDataE = wsFinal.extractE()
     thisScriptResults.save(ic.savePath)
 
 ######################################################################################################################################
@@ -290,6 +292,8 @@ class resultsObject:
     YSpaceSymSumDataY = 0
     YSpaceSymSumDataE = 0
     resolution = 0
+    finalRawDataY = 0
+    finalRawDataE = 0
     HdataY = 0
 
 
@@ -332,7 +336,8 @@ class resultsObject:
                  all_ncp_for_each_mass=all_ncp_for_each_mass,
                  YSpaceSymSumDataY=self.YSpaceSymSumDataY,
                  YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-                 resolution=self.resolution, HdataY=self.HdataY)
+                 resolution=self.resolution, HdataY=self.HdataY,
+                 finalRawDataY=self.finalRawDataY, finalRawDataE=self.finalRawDataE)
 
 
 def fitNcpToWorkspace(ws):

@@ -273,5 +273,67 @@ class TestHdataY(unittest.TestCase):
         print(f"\nIsolated H peak in TOF is equal up to decimal={self.decimal}")
 
 
+class TestFinalRawDataY(unittest.TestCase):
+    def setUp(self):
+        originalResults = np.load(pathToOriginal)
+        self.oriFinalDataY = originalResults["finalRawDataY"]
+
+        optimizedResults = np.load(pathToOptimized)
+        self.optFinalDataY = optimizedResults["finalRawDataY"]
+
+        self.rtol = 1e-6
+        self.equal_nan = True
+        self.decimal = 10
+
+    def test_HdataY(self):
+        totalMask = np.isclose(
+            self.oriFinalDataY, self.optFinalDataY, rtol=self.rtol, equal_nan=self.equal_nan
+            )
+        totalDiffMask = ~ totalMask
+        displayMask(totalDiffMask, self.rtol, "values final raw dataY")
+
+        plotFinalRawDataY = False
+        if plotFinalRawDataY:            
+            plt.figure()
+            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+                        interpolation="nearest", norm=None)
+            plt.title("Final raw dataY TOF")
+            plt.ylabel("Spectra")
+            plt.show()    
+
+        nptest.assert_almost_equal(self.oriFinalDataY, self.optFinalDataY, decimal=self.decimal)
+        print(f"\nFinal DataY in TOF is equal up to decimal={self.decimal}")
+
+
+class TestFinalRawDataE(unittest.TestCase):
+    def setUp(self):
+        originalResults = np.load(pathToOriginal)
+        self.oriFinalDataE = originalResults["finalRawDataE"]
+
+        optimizedResults = np.load(pathToOptimized)
+        self.optFinalDataE = optimizedResults["finalRawDataE"]
+
+        self.rtol = 1e-6
+        self.equal_nan = True
+        self.decimal = 10
+
+    def test_HdataY(self):
+        totalMask = np.isclose(
+            self.oriFinalDataE, self.optFinalDataE, rtol=self.rtol, equal_nan=self.equal_nan
+            )
+        totalDiffMask = ~ totalMask
+        displayMask(totalDiffMask, self.rtol, "values final raw dataE")
+
+        plotFinalRawDataY = False
+        if plotFinalRawDataY:            
+            plt.figure()
+            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+                        interpolation="nearest", norm=None)
+            plt.title("Final raw dataE TOF")
+            plt.ylabel("Spectra")
+            plt.show()    
+
+        nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE, decimal=self.decimal)
+        print(f"\nFinal DataE in TOF is equal up to decimal={self.decimal}")
 if __name__ == "__main__":
     unittest.main()
