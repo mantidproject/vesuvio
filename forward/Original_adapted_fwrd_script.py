@@ -696,7 +696,7 @@ if fit_in_Y_space:
     Divide(LHSWorkspace=ws_name+'joy_sum',RHSWorkspace=ws_name+'joy_sum_normalisation',OutputWorkspace=ws_name+'joy_sum')
 
     # Definition of the resolution functions
-    resolution=CloneWorkspace(InputWorkspace=ws_name+'joy')
+    resolution=CloneWorkspace(InputWorkspace=ws_name+'joy')          # The clonning of joy workspace must be to preserve units
     resolution=Rebin(InputWorkspace='resolution',Params='-20,0.5,20')
     for i in range(resolution.getNumberHistograms()):
         VesuvioResolution(Workspace=ws_name+str(iteration),WorkspaceIndex=str(i), Mass=1.0079, OutputWorkspaceYSpace='tmp')

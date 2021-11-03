@@ -857,7 +857,7 @@ def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     massH = 1.0079
     wsYSpaceSymSum = convertToYSpaceAndSymetrise(wsSubMass, massH) 
-    wsRes = calculate_mantid_resolutions(wsFinal, massH)
+    wsRes = calculate_mantid_resolutions(wsFinal, massH)  
     return wsYSpaceSymSum, wsRes
 
 
@@ -955,39 +955,23 @@ def normalise_workspace(ws_name):
     Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
     DeleteWorkspace("tmp_norm")
 
-# TODO: figure out why the resolution is giving different results 
-# def calculate_mantid_resolutions(ws, mass):
-#     # max_Y = np.ceil(2.5*mass+27)
-#     # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/240)+","+str(max_Y)
-#     rebin_parameters=ic.rebinParametersForYSpaceFit
-#     resolution = CloneWorkspace(InputWorkspace=ws)
-#     resolution = Rebin(InputWorkspace=resolution, Params=rebin_parameters)
-
-#     for i in range(resolution.getNumberHistograms()):
-#         VesuvioResolution(
-#             Workspace=ws, WorkspaceIndex=str(i), Mass=mass, OutputWorkspaceYSpace='tmp'
-#             )
-#         tmp = Rebin(InputWorkspace='tmp', Params=rebin_parameters)
-#         resolution.dataY(i)[:] = tmp.dataY(0)
-
-#     SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
-#     normalise_workspace("resolution")
-#     DeleteWorkspace("tmp")
-#     return mtd["resolution"]
 
 def calculate_mantid_resolutions(ws, mass):
     rebin_parameters=ic.rebinParametersForYSpaceFit
     for index in range(ws.getNumberHistograms()):
         VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
         Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
-        if index == 0:
+
+        if index == 0:   # Ensures that workspace has desired units
             RenameWorkspace("tmp","resolution")
         else:
             AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
+
     SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
     normalise_workspace("resolution")
     DeleteWorkspace("tmp")
     return mtd["resolution"]
+
 
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
     if ic.useScipyCurveFitToHProfileFlag:
@@ -1018,7 +1002,7 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
             gaussFunc = gaussianFit(x, y0, x0, A, sigma)
-            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
+            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]  
             return convGauss
         p0 = [0, 0, 1, 5]
 
@@ -1034,13 +1018,17 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
         p0 = [0, 0, 0.7143, 5]
 
     popt, pcov = optimize.curve_fit(
-        convolvedGaussian, dataX, dataY, p0=p0,
+        convolvedGaussian, 
+        dataX, 
+        dataY, 
+        p0=p0,
         sigma=dataE
     )
     yfit = convolvedGaussian(dataX, *popt)
     Residuals = dataY - yfit
     
     # Create Workspace with the fit results
+    # TODO add DataE 
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, yfit, Residuals)), 
                     NSpec=3,

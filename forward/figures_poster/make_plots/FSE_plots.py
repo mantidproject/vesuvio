@@ -8,51 +8,63 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 plt.style.use('seaborn-poster')
 # plt.rcParams['axes.facecolor'] = (0.8, 0.8, 0.8)
 
-posFSEPath = currentPath / "data_for_plots_positive_fse.npz"
-negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
-zeroFSEPath = currentPath / "data_for_plots_no_fse.npz"
-paths = [posFSEPath, negFSEPath, zeroFSEPath]
-plt.figure()
+def plotFSE(loadPaths, signs, colors, lines):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    axins = ax.inset_axes([0.59, 0.75, 0.40, 0.24])
 
-for path, sign, color in zip(paths, [">", "<", "="], ["tab:blue", "tab:orange", "tab:purple"]):
-    results = np.load(path)
-    # masses = results["masses"]
-    # hbar = 2.0445
-    spec = 15
-    # dataY = results["all_dataY"][0, spec]    # In the order of the script
-    dataX = results["all_dataX"][0, spec]
-    # dataE = results["all_dataE"][0, spec]
-    # deltaQ = results["all_deltaQ"][0, spec]
-    # deltaE = results["all_deltaE"][0, spec]
-    # yspaces_for_each_mass = results["all_yspaces_for_each_mass"][0, spec]
-    # spec_best_par_chi_nit = results["all_spec_best_par_chi_nit"][0, spec]
-    # mean_widths = results["all_mean_widths"][0]
-    # mean_intensities = results["all_mean_intensities"][0]
-    # tot_ncp = results["all_tot_ncp"][0, spec]
-    ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
+    for path, sign, color, line in zip(loadPaths, signs, colors, lines):
+        results = np.load(path)
+        spec = 15
+        try:
+            dataX = results["all_dataX"][0, spec]
+            ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
+        except KeyError:
+            pass
+            ncp_for_each_mass = results["all_indiv_ncp"][0, :, spec, :-1]
+            print(ncp_for_each_mass.shape)
+            #break
+        ncp_m = ncp_for_each_mass[0]
+        
+        ax.fill_between(dataX, ncp_m, color=color, alpha=0.6)
+        axins.fill_between(dataX, ncp_m, color=color, alpha=0.6)
+        
+        ax.plot(dataX, ncp_m, linewidth=3, linestyle=line,
+                    label=f"H NCP, FSE "+sign, color=color)
+        axins.plot(dataX, ncp_m, linewidth=3, linestyle=line,
+                    label=f"H NCP, FSE "+sign, color=color)
+        
+        xmax = dataX[ncp_m==np.max(ncp_m)]
+        ax.vlines(xmax, 0, np.max(ncp_m), color=color, linewidth=3)
 
-    # plt.errorbar(dataX, dataY, yerr=dataE,
-    #                 fmt="none", linewidth=0.5, color="black")
-    # plt.plot(dataX, dataY, ".", label="Count Data", linewidth=1, color="black")
+    x1, x2, y1, y2 = 350, 400, -0.0005, 0.0005
+    axins.set_xlim(x1, x2)
+    axins.set_ylim(y1, y2)
+    axins.set_xticklabels('')
+    axins.set_yticklabels('')
+    ax.indicate_inset_zoom(axins, edgecolor="black", linewidth=1.5, label="Tails")
 
-    ncp_m = ncp_for_each_mass[0]
-    plt.fill_between(dataX, ncp_m, 
-                label=f"H NCP, FSE"+sign+"0", color=color, alpha=0.6)
-    plt.plot(dataX, ncp_m, linewidth=3,
-                label=f"H NCP, FSE"+sign+"0", color=color)
-    xmax = dataX[ncp_m==np.max(ncp_m)]
-    plt.vlines(xmax, 0, np.max(ncp_m), color=color, linewidth=3)
-    # for i, ncp_m in enumerate(ncp_for_each_mass):
-    #     plt.fill_between(dataX, ncp_m, 
-    #                     label=f"NCP, M={masses[i]}", alpha=0.5)
-    
-    # plt.plot(dataX, tot_ncp, label="Total NCP Fit",
-    #             linestyle="-", linewidth=3, color="red" )
+    ax.set_xlabel(r"TOF [$\mu s$]")
+    ax.set_ylabel(r"C(t) [$\mu s^{-1}$]")
+    ax.set_xlim(200, 400)
+    ax.legend(loc="upper left")
+    plt.show()
 
-#plt.plot(dataX, np.zeros(dataX.shape), "--r", label="Zero line")
-plt.xlabel(r"TOF [$\mu s$]")
-plt.ylabel(r"C(t) [$\mu s^{-1}$]")
-# plt.ylim((-0.005, 0.06))
-# plt.xlim((120, 420))
-plt.legend()
-plt.show()
+plotSignsOfFSE = False
+if plotSignsOfFSE:
+    posFSEPath = currentPath / "data_for_plots_positive_fse.npz"
+    negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
+    zeroFSEPath = currentPath / "data_for_plots_no_fse.npz"
+    paths = [posFSEPath, negFSEPath, zeroFSEPath]
+    signs = [">0", "<0", "=0"]
+    colors = ["tab:blue", "tab:orange", "tab:purple"]
+    linestyles = ["solid", "dashed", "dotted"]
+    plotFSE(paths, signs, colors, linestyles)
+else:
+    QtofPath = currentPath / "data_for_plots_negative_fse.npz"
+    QpeakPath = currentPath / "data_for_plots_neg_fse_Q_at_peak.npz"
+    originalPath =currentPath / "original_144-182_1iter.npz"
+    paths = [QpeakPath, QtofPath, originalPath]
+    labels = ["Q at peak", "Q(TOF)", "Q(TOF) Ori"]
+    colors = ["tab:blue", "tab:orange", "tab:purple"]
+    linestyles = ["solid", "dashed", "dotted"]
+    plotFSE(paths, labels, colors, linestyles)
