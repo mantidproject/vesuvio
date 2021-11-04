@@ -74,7 +74,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
+    savePath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "optimized_cleaning_work.npz" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -442,11 +442,13 @@ def calculateKinematicsArrays(dataX, instrPars):
     delta_Q = np.sqrt( delta_Q2 )
     return v0, E0, delta_E, delta_Q              #shape(no_spectrums, len_spec)
 
+
 def reshapeArrayPerSpectrum(A):
     """Exchanges the first two indices of an array A,
     ao rearranges array to match iteration per spectrum of main fitting map()
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
+
 
 def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
     "Calculates y spaces from TOF data, each row corresponds to one mass"   
@@ -458,6 +460,7 @@ def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
     energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
     ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
     return ySpacesForEachMass
+
 
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Fits the NCP and returns the best fit parameters for one spectrum"""
@@ -564,12 +567,6 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
     E0 = E0[yCentersMask].reshape(shapeOfArrays)
     deltaE = deltaE[yCentersMask].reshape(shapeOfArrays)
     deltaQ = deltaQ[yCentersMask].reshape(shapeOfArrays)
-
-    # # Could also do it like this, but it's probably slower
-    # def selectValuesAtYCenter(kineArray):
-    #     kineArray = kineArray * np.ones(shapeOfArrays)
-    #     return kineArray[yCentersMask].reshape(shapeOfArrays)
-    # v0, E0, deltaE, deltaQ = [selectValuesAtYCenter(A) for A in (v0, E0, deltaE, deltaQ)]
     return v0, E0, deltaE, deltaQ
 
 
@@ -778,6 +775,7 @@ def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars
         )
     createMulScatWorkspaces(ic.name, sampleProperties, mulscatPars)
 
+
 def calcMSCorrectionSampleProperties(masses, meanWidths, meanIntensityRatios, mulscatPars):
     masses = masses.reshape(4)
     hydrogen_peak, hydrogen_to_mass0_ratio = mulscatPars[:2]
@@ -861,14 +859,12 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
     return profiles
 
 
-# -------------- Isolate H Profile and fit in y space -------------------
-
 def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     massH = 1.0079
-    wsYSpaceSymSum = convertToYSpaceAndSymetrise(wsSubMass, massH) 
+    averagedSpectraYSpace = averageJOfYOverAllSpectra(wsSubMass, massH) 
     wsRes = calculate_mantid_resolutions(wsFinal, massH)  
-    return wsYSpaceSymSum, wsRes
+    return averagedSpectraYSpace, wsRes
 
 
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
@@ -902,62 +898,80 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     return mtd[ws.name()+"_H"]
 
 
-def convertToYSpaceAndSymetrise(ws0, mass):
+def averageJOfYOverAllSpectra(ws0, mass):
+    wsYSpace = convertToYSpace(ws0, mass)
+    wsYSpaceSym = SymetriseWorkspace(wsYSpace)
+    wsOnes = replaceNonZeroNanValuesByOnesInWs(wsYSpaceSym)
+    wsOnesSum = SumSpectra(wsOnes)
+
+    wsYSpaceSymSum = SumSpectra(wsYSpaceSym)
+    averagedSpectraYSpace = Divide(
+         LHSWorkspace=wsYSpaceSymSum, RHSWorkspace=wsOnesSum,
+         OutputWorkspace=ws0.name()+"_JOfY_symetrized_averaged"
+    )
+    return averagedSpectraYSpace
+
+
+def convertToYSpace(ws0, mass):
     ConvertToYSpace(
         InputWorkspace=ws0, Mass=mass, 
         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    # max_Y = np.ceil(2.5*mass+27) 
-    # rebin_parameters = str(-max_Y)+","+str(2.*max_Y/120)+","+str(max_Y)
-    rebin_parameters=ic.rebinParametersForYSpaceFit
-
+    rebinPars=ic.rebinParametersForYSpaceFit
     Rebin(
-        InputWorkspace=ws0.name()+"_JoY", Params=rebin_parameters, 
+        InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
     normalise_workspace(ws0.name()+"_JoY")
+    return mtd[ws0.name()+"_JoY"]
 
-    wsYSpace = mtd[ws0.name()+"_JoY"]
+
+def SymetriseWorkspace(wsYSpace):
     dataY = wsYSpace.extractY() 
     dataE = wsYSpace.extractE()
     dataX = wsYSpace.extractX()
 
-    # Symmetrize
     if ic.symmetriseHProfileUsingAveragesFlag:
-        dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)  # Might want to cover possible NaNs as well
-        dataE = np.where(dataE==0, np.flip(dataE, axis=1), dataE)
-
-        dataY = (dataY + np.flip(dataY, axis=1)) / 2
-        dataE = (dataE + np.flip(dataE, axis=1)) / 2
+        dataY = symetriseArrayUsingAverages(dataY)
+        dataE = symetriseArrayUsingAverages(dataE)
     else:
-        dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
-        dataE = np.where(dataX<0, np.flip(dataE, axis=1), dataE)
+        dataY = symetriseArrayNegMirrorsPos(dataX, dataY)
+        dataE = symetriseArrayNegMirrorsPos(dataX, dataE)
 
-    # Prepare Normalization
-    dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
-    nonZerosMask = ~(dataY==0)
-    dataYnorm = np.where(nonZerosMask, 1, 0)
-    dataEnorm = np.full(dataE.shape, 0.000001)  # Value from original script
-
-    # Build Workspaces, couldn't find a method for this in Mantid
-    wsYSym = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_Sym")
-    wsYNorm = CloneWorkspace(InputWorkspace=wsYSpace, OutputWorkspace=ws0.name()+"_JoY_norm")
+    wsYSym = CloneWorkspace(wsYSpace)
     for i in range(wsYSpace.getNumberHistograms()):
         wsYSym.dataY(i)[:] = dataY[i, :]
         wsYSym.dataE(i)[:] = dataE[i, :]
-        wsYNorm.dataY(i)[:] = dataYnorm[i, :]
-        wsYNorm.dataE(i)[:] = dataEnorm[i, :]
+    return wsYSym
 
-    # Sum of spectra
-    SumSpectra(InputWorkspace=wsYSym, OutputWorkspace=ws0.name()+"_JoY_Sym")
-    SumSpectra(InputWorkspace=wsYNorm, OutputWorkspace=ws0.name()+"_JoY_norm")
+def symetriseArrayUsingAverages(dataY):
+    # TODO The symetrization needs to consider dataX! Correct for this!
+    # Need to account for kinematic cut-offs
+    dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
+    # With zeros being masked, can perform the average
+    dataY = (dataY + np.flip(dataY, axis=1)) / 2
+    return dataY
 
-    # Normalize
-    Divide(
-        LHSWorkspace=ws0.name()+"_JoY_Sym", RHSWorkspace=ws0.name()+"_JoY_norm",
-        OutputWorkspace=ws0.name()+'_JoY_sum_final'
-    )
-    return mtd[ws0.name()+"_JoY_sum_final"]
+def symetriseArrayNegMirrorsPos(dataX, dataY):
+    dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
+    return dataY
+
+
+def replaceNonZeroNanValuesByOnesInWs(wsYSym):
+    dataY = wsYSym.extractY()
+    dataE = wsYSym.extractE()
+    
+    dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
+    nonZerosMask = ~(dataY==0)
+    dataYones = np.where(nonZerosMask, 1, 0)
+    dataE = np.full(dataE.shape, 0.000001)  # Value from original script
+
+    # Build Workspaces, couldn't find a method for this in Mantid
+    wsOnes = CloneWorkspace(wsYSym)
+    for i in range(wsYSym.getNumberHistograms()):
+        wsOnes.dataY(i)[:] = dataYones[i, :]
+        wsOnes.dataE(i)[:] = dataE[i, :]
+    return wsOnes
 
 
 def normalise_workspace(ws_name):
@@ -967,13 +981,13 @@ def normalise_workspace(ws_name):
 
 
 def calculate_mantid_resolutions(ws, mass):
-    rebin_parameters=ic.rebinParametersForYSpaceFit
+    rebinPars=ic.rebinParametersForYSpaceFit
     for index in range(ws.getNumberHistograms()):
         if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
             pass
         else:
             VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-            Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
+            Rebin(InputWorkspace="tmp", Params=rebinPars, OutputWorkspace="tmp")
 
             if index == 0:   # Ensures that workspace has desired units
                 RenameWorkspace("tmp","resolution")
