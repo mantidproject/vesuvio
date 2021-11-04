@@ -482,6 +482,9 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
     
     FSE =  - np.sqrt(2)/12 * widths / deltaQ 
 
+    if FSE.shape != JOfY.shape:
+        raise ValueError("JOfY and FSE shape mismatch:", FSE.shape, JOfY.shape)
+
        
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   
     ncpTotal = np.sum(ncpForEachMass, axis=0)
