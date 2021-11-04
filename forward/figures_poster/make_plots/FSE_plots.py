@@ -50,6 +50,9 @@ def plotFSE(loadPaths, signs, colors, lines):
     plt.show()
 
 plotSignsOfFSE = False
+plotQOfFSE = False
+plotConstrFSE = True
+
 if plotSignsOfFSE:
     posFSEPath = currentPath / "data_for_plots_positive_fse.npz"
     negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
@@ -59,7 +62,7 @@ if plotSignsOfFSE:
     colors = ["tab:blue", "tab:orange", "tab:purple"]
     linestyles = ["solid", "dashed", "dotted"]
     plotFSE(paths, signs, colors, linestyles)
-else:
+elif plotQOfFSE:
     QtofPath = currentPath / "data_for_plots_negative_fse.npz"
     QpeakPath = currentPath / "data_for_plots_neg_fse_Q_at_peak.npz"
     originalPath =currentPath / "original_144-182_1iter.npz"
@@ -68,3 +71,13 @@ else:
     colors = ["tab:blue", "tab:orange", "tab:purple"]
     linestyles = ["solid", "dashed", "dotted"]
     plotFSE(paths, labels, colors, linestyles)
+elif plotConstrFSE:
+    negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
+    constrFSEPath = currentPath / "data_for_plots_constr_fse_by_widths.npz"
+    paths = [negFSEPath, constrFSEPath]
+    labels = ["ori", "constr"]
+    colors = ["tab:blue", "tab:orange", "tab:purple"]
+    linestyles = ["solid", "dashed", "dotted"]
+    plotFSE(paths, labels, colors, linestyles)
+    
+    

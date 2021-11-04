@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from jupyterthemes import jtplot
 jtplot.style()
+np.set_printoptions(suppress=True, precision=8, linewidth=150)
 # plt.style.use('dark_background')
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
@@ -218,9 +219,9 @@ class TestResolution(unittest.TestCase):
         optimizedResults = np.load(pathToOptimized)
         self.optres = optimizedResults["resolution"]
 
-        self.rtol = 0.01
+        self.rtol = 0.0001
         self.equal_nan = True
-        self.decimal = 3
+        self.decimal = 8
 
     def test_resolution(self):
         totalMask = np.isclose(
@@ -335,5 +336,34 @@ class TestFinalRawDataE(unittest.TestCase):
 
         nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE, decimal=self.decimal)
         print(f"\nFinal DataE in TOF is equal up to decimal={self.decimal}")
+
+class Testpopt(unittest.TestCase):
+    def setUp(self):
+        originalResults = np.load(pathToOriginal)
+        self.oripopt = originalResults["popt"]
+
+        optimizedResults = np.load(pathToOptimized)
+        self.optpopt = optimizedResults["popt"]
+    
+    def test_intensities(self):
+        print("\nFit parameters LM:\nori:",
+                self.oripopt[0], "\nopt:", self.optpopt[0])
+        print("\nFit parameters Simplex:\nori:",
+                self.oripopt[1], "\nopt:", self.optpopt[1])
+
+class Testperr(unittest.TestCase):
+    def setUp(self):
+        originalResults = np.load(pathToOriginal)
+        self.oriperr = originalResults["perr"]
+
+        optimizedResults = np.load(pathToOptimized)
+        self.optperr = optimizedResults["perr"]
+    
+    def test_intensities(self):
+        print("\nError in parameters LM:\nori:",
+                self.oriperr[0], "\nopt:", self.optperr[0])
+        print("\nError in parameters Simplex:\nori:",
+                self.oriperr[1], "\nopt:", self.optperr[1])
+
 if __name__ == "__main__":
     unittest.main()

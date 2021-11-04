@@ -4,36 +4,22 @@ from mantid.simpleapi import *
 
 rebinParametersForYSpaceFit = "-20, 0.5, 20"
 
-def original_function(ws, mass):
+def function_in_optimized(ws, mass):
     rebin_parameters=rebinParametersForYSpaceFit
     for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-        Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
-        if index == 0:
-            RenameWorkspace("tmp","resolution1")
+        if np.all(ws.dataY(index)[:] == 0):
+            pass
         else:
-            AppendSpectra("resolution1", "tmp", OutputWorkspace= "resolution1")
-    SumSpectra(InputWorkspace="resolution1",OutputWorkspace="resolution1")
-    normalise_workspace("resolution1")
+            VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
+            Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
+            if index == 0:
+                RenameWorkspace("tmp","resolution_opt")
+            else:
+                AppendSpectra("resolution_opt", "tmp", OutputWorkspace= "resolution_opt")
+    SumSpectra(InputWorkspace="resolution_opt",OutputWorkspace="resolution_opt_sum")
+    normalise_workspace("resolution_opt_sum")
     DeleteWorkspace("tmp")
-    return mtd["resolution1"]
-
-def simpler_function(ws, mass):
-    rebin_parameters=rebinParametersForYSpaceFit
-    resolution = CloneWorkspace(InputWorkspace=ws)
-    resolution = Rebin(InputWorkspace=resolution, Params=rebin_parameters)
-
-    for i in range(resolution.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=str(i), Mass=mass, OutputWorkspaceYSpace='tmp'
-            )
-        tmp = Rebin(InputWorkspace='tmp', Params=rebin_parameters)
-        resolution.dataY(i)[:] = tmp.dataY(0)
-
-    SumSpectra(InputWorkspace="resolution", OutputWorkspace="resolution")
-    normalise_workspace("resolution")
-    DeleteWorkspace("tmp")
-    return mtd["resolution"]
+    return mtd["resolution_opt_sum"]
 
 def normalise_workspace(ws_name):
     tmp_norm = Integration(ws_name)
@@ -41,12 +27,37 @@ def normalise_workspace(ws_name):
     DeleteWorkspace("tmp_norm")
 
 
+def function_in_original(ws, mass):
+    resolution=CloneWorkspace(InputWorkspace=ws)          # The clonning of joy workspace must be to preserve units
+    resolution=Rebin(InputWorkspace='resolution',Params=rebinParametersForYSpaceFit)
+    for i in range(resolution.getNumberHistograms()):
+#         if np.all(ws.dataY(i)[:] == 0):
+#             pass
+#         else:
+        VesuvioResolution(Workspace=ws, WorkspaceIndex=str(i), Mass=mass, OutputWorkspaceYSpace='tmp')
+        tmp=Rebin(InputWorkspace='tmp',Params=rebinParametersForYSpaceFit)
+        for p in range (tmp.blocksize()):
+            resolution.dataY(i)[p]=tmp.dataY(0)[p]
+
+    # Definition of the sum of resolution functions
+    resolution_sum=SumSpectra('resolution')
+    tmp=Integration('resolution_sum')
+    resolution_sum=Divide('resolution_sum','tmp')
+    DeleteWorkspace('tmp')  
+    return mtd["resolution_sum"]
+
+
 def test_func():
-    mass = 1.079
+    mass = 1.0079
     wsTest = Load(Filename= r"./input_ws/starch_80_RD_raw.nxs")
-    res1 = original_function(wsTest, mass)
-    res2 = simpler_function(wsTest, mass)
-    CompareWorkspaces(res1, res2)
-    # Workspaces differ only in the units, which maybe is important for Fit algorithm
+    MaskDetectors(Workspace=wsTest, SpectraList=[173, 174, 179])
+    res1 = function_in_original(wsTest, mass)
+    res2 = function_in_optimized(wsTest, mass)
+    CompareWorkspaces(res1, res2, CheckAxes=False)
+    Integration(res1, OutputWorkspace="integration_ori")
+    Integration(res2, OutputWorkspace="integration_opt")
+    # Check if convert to y space alters the masked spectra
+    ConvertToYSpace(InputWorkspace=wsTest,Mass=mass,OutputWorkspace='joy',QWorkspace='q')
+
 
 test_func()

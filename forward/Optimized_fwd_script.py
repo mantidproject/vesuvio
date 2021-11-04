@@ -177,7 +177,7 @@ def main():
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]   
     ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
-    fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
+    popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
 
     thisScriptResults.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
     thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
@@ -185,6 +185,8 @@ def main():
     thisScriptResults.HdataY = mtd[wsFinal.name()+"_H"].extractY()
     thisScriptResults.finalRawDataY = wsFinal.extractY()
     thisScriptResults.finalRawDataE = wsFinal.extractE()
+    thisScriptResults.popt = popt
+    thisScriptResults.perr = perr
     thisScriptResults.save(ic.savePath)
 
 ######################################################################################################################################
@@ -295,6 +297,8 @@ class resultsObject:
     finalRawDataY = 0
     finalRawDataE = 0
     HdataY = 0
+    popt = 0
+    perr = 0
 
 
     def __init__(self, wsToBeFitted):
@@ -337,7 +341,8 @@ class resultsObject:
                  YSpaceSymSumDataY=self.YSpaceSymSumDataY,
                  YSpaceSymSumDataE=self.YSpaceSymSumDataE,
                  resolution=self.resolution, HdataY=self.HdataY,
-                 finalRawDataY=self.finalRawDataY, finalRawDataE=self.finalRawDataE)
+                 finalRawDataY=self.finalRawDataY, finalRawDataE=self.finalRawDataE,
+                 popt=self.popt, perr=self.perr)
 
 
 def fitNcpToWorkspace(ws):
@@ -964,13 +969,16 @@ def normalise_workspace(ws_name):
 def calculate_mantid_resolutions(ws, mass):
     rebin_parameters=ic.rebinParametersForYSpaceFit
     for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-        Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
-
-        if index == 0:   # Ensures that workspace has desired units
-            RenameWorkspace("tmp","resolution")
+        if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
+            pass
         else:
-            AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
+            VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
+            Rebin(InputWorkspace="tmp", Params=rebin_parameters, OutputWorkspace="tmp")
+
+            if index == 0:   # Ensures that workspace has desired units
+                RenameWorkspace("tmp","resolution")
+            else:
+                AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
 
     SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
     normalise_workspace("resolution")
@@ -983,9 +991,11 @@ def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
         popt, pcov = fitProfileCurveFit(wsYSpaceSym, wsRes)
         print("popt:\n", popt)
         print("pcov:\n", pcov)
+        perr = np.sqrt(np.diag(pcov))
     else:
-        fitProfileMantidFit(wsYSpaceSym, wsRes)
-
+        popt, perr = fitProfileMantidFit(wsYSpaceSym, wsRes)
+    
+    return popt, perr
 
 def fitProfileCurveFit(wsYSpaceSym, wsRes):
     res = wsRes.extractY()[0]
@@ -1048,8 +1058,14 @@ def gaussianFit(x, y0, x0, A, sigma):
 
 def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
+    if ic.singleGaussFitToHProfile:
+        popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
+    else:
+        popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
+
+
     print('\n','Fit on the sum of spectra in the West domain','\n')     
-    for minimizer_sum in ('Levenberg-Marquardt','Simplex'):
+    for i, minimizer_sum in enumerate(['Levenberg-Marquardt','Simplex']):
         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = ic.name+minimizer_sum+'_joy_sum_fitted')
         
         if ic.singleGaussFitToHProfile:
@@ -1072,9 +1088,13 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
             )
         
         ws=mtd[ic.name+minimizer_sum+'_joy_sum_fitted_Parameters']
-        print('Using the minimizer: ',minimizer_sum)
-        print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))   # Selects the wrong parameter in the case of the double gaussian
+        popt[i] = ws.column("Value")
+        perr[i] = ws.column("Error")
 
+        # print('Using the minimizer: ',minimizer_sum)
+        # print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))   # Selects the wrong parameter in the case of the double gaussian
+    print("\nFitting ------ \npopt:\n", popt, "\nperr:\n", perr)
+    return popt, perr
 
 
 #if __name__=="__main__":

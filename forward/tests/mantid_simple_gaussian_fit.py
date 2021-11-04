@@ -33,6 +33,10 @@ Fit(
     
 ws=mtd[name+'_joy_sum_fitted_Parameters']
 
+poptfit = ws.column("Value")
+popterr = ws.column("Error")
+print("\nextracted values\n: ", poptfit, "\nerrors:\n", popterr) 
+
 popt = [ws.cell(0,1), ws.cell(2,1), ws.cell(1,1), ws.cell(3,1)]
 pcov = [ws.cell(0,2), ws.cell(2,2), ws.cell(1,2), ws.cell(3,2)]
 

@@ -661,7 +661,8 @@ if fit_in_Y_space:
     RenameWorkspace("first_ws", ws_name+'_H')
     Rebin(InputWorkspace=ws_name+'_H',Params="110,1.,430",OutputWorkspace=ws_name+'_H')
     MaskDetectors(Workspace=ws_name+'_H',SpectraList=H_spectra_to_be_masked)
-    RemoveMaskedSpectra(InputWorkspace=ws_name+'_H', OutputWorkspace=ws_name+'_H')      
+    # Original has the line below uncommented
+    #RemoveMaskedSpectra(InputWorkspace=ws_name+'_H', OutputWorkspace=ws_name+'_H')      
     
     # Conversion to hydrogen West-scaling variable
     rebin_params='-20,0.5,20'
@@ -695,6 +696,15 @@ if fit_in_Y_space:
     SumSpectra(ws_name+'joy',OutputWorkspace=ws_name+'joy_sum')
     Divide(LHSWorkspace=ws_name+'joy_sum',RHSWorkspace=ws_name+'joy_sum_normalisation',OutputWorkspace=ws_name+'joy_sum')
 
+    ########### ----- my edit ------ ###########
+    wsjoy = mtd[ws_name+'joy']
+    wsFinal = mtd[ws_name+str(iteration)]
+    if wsjoy.getNumberHistograms() != wsFinal.getNumberHistograms():
+        raise IndexError("The size of workspaces don't match: ",
+                            wsjoy.getNumberHistograms(), " and ", 
+                            wsFinal.getNumberHistograms())
+    ########### --------------------- ##########
+
     # Definition of the resolution functions
     resolution=CloneWorkspace(InputWorkspace=ws_name+'joy')          # The clonning of joy workspace must be to preserve units
     resolution=Rebin(InputWorkspace='resolution',Params='-20,0.5,20')
@@ -716,8 +726,16 @@ if fit_in_Y_space:
     ######              FIT OF THE SUM OF SPECTRA 
     ######
     ############################################################################
+
+    ####-------- my edits ----------####
+    if simple_gaussian_fit:
+        popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
+    else:
+        popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
+    ########--------------------########
+
     print('\n','Fit on the sum of spectra in the West domain','\n')
-    for minimizer_sum in ('Levenberg-Marquardt','Simplex'):
+    for i, minimizer_sum in enumerate(['Levenberg-Marquardt','Simplex']):
         CloneWorkspace(InputWorkspace = ws_name+'joy_sum', OutputWorkspace = ws_name+minimizer_sum+'_joy_sum_fitted')
         
         if (simple_gaussian_fit):
@@ -738,6 +756,9 @@ if fit_in_Y_space:
         print('Using the minimizer: ',minimizer_sum)
         print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))
 
+        popt[i] = ws.column("Value")
+        perr[i] = ws.column("Error")
+    
 
 # ----------------- My edits ----------------------
 all_tot_ncp = np.zeros((number_of_iterations, mtd[ws_name].getNumberHistograms(), mtd[ws_name].blocksize()))
@@ -771,7 +792,8 @@ np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                 all_tot_ncp = all_tot_ncp, all_indiv_ncp = all_indiv_ncp, \
                 YSpaceSymSumDataY=YSpaceSymSumDataY, YSpaceSymSumDataE=YSpaceSymSumDataE, \
                 resolution=resolution, HdataY=HdataY, \
-                finalRawDataY=finalRawDataY, finalRawDataE=finalRawDataE)
+                finalRawDataY=finalRawDataY, finalRawDataE=finalRawDataE, \
+                popt=popt, perr=perr)
 
 
 #"C:\Users\guijo\Desktop\Work\My_edited_scripts\tests_data\original_4.2_no_mulscat\original_spec3-13_iter1"
