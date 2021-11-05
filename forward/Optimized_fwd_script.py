@@ -6,6 +6,8 @@ from scipy import ndimage
 import time
 from pathlib import Path
 
+from scipy.sparse.linalg.isolve import iterative
+
 #######################################################################################################################################
 #######################################################                      ##########################################################
 #######################################################     USER SECTION     ##########################################################
@@ -74,9 +76,31 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "optimized_cleaning_work.npz" 
-    # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
+    pathForTesting = repoPath / "tests" / "fixatures" / "testing_full_scripts"
+    forwardScatteringSavePath = pathForTesting / "optimized_cleaning_work.npz" 
+    backScatteringSavePath = None
 
+    backScatteringProcedure = False
+    forwardScatteringProcedure = True
+
+    noOfMSIterations = 1     #4
+    firstSpec = 144    #144
+    lastSpec = 182     #182
+    userpathInitWsFlag = True
+    scaleParsFlag = False
+    fitSyntheticWsFlag = False 
+    errorsForSyntheticNcpFlag = False
+    MSCorrectionFlag = False
+    GammaCorrectionFlag = False
+
+    specOffset = firstSpec
+    firstIdx = firstSpec - specOffset
+    lastIdx = lastSpec - specOffset
+    maskedSpecNo = maskedSpecNo[
+        (maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)
+        ]
+    maskedDetectorIdx = maskedSpecNo - specOffset
+    
     scalingFactors = np.ones(initPars.shape)
 
     symmetriseHProfileUsingAveragesFlag = False
@@ -85,24 +109,26 @@ class InitialConditions:
     singleGaussFitToHProfile = True
 
     
-    def __init__(self, initialConditionsDict):
+    # def __init__(self, initialConditionsDict):
         
-        D = initialConditionsDict
-        self.noOfMSIterations = D["noOfMSIterations"]
-        self.firstSpec = D["firstSpec"]
-        self.lastSpec = D["lastSpec"]
-        self.userpathInitWsFlag = D["userPathInitWsFlag"]
-        self.scaleParsFlag = D["scaleParsFlag"]
-        self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
-        self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
-        self.MSCorrectionFlag = D["MSCorrectionFlag"]
-        self.GammaCorrectionFlag = D["GammaCorrectionFlag"]
+    #     D = initialConditionsDict
+    #     self.noOfMSIterations = D["noOfMSIterations"]
+    #     self.firstSpec = D["firstSpec"]
+    #     self.lastSpec = D["lastSpec"]
+    #     self.userpathInitWsFlag = D["userPathInitWsFlag"]
+    #     self.scaleParsFlag = D["scaleParsFlag"]
+    #     self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
+    #     self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
+    #     self.MSCorrectionFlag = D["MSCorrectionFlag"]
+    #     self.GammaCorrectionFlag = D["GammaCorrectionFlag"]
 
-        self.specOffset = self.firstSpec
-        self.firstIdx = self.firstSpec - self.specOffset
-        self.lastIdx = self.lastSpec - self.specOffset
-        self.maskedSpecNo = self.maskedSpecNo[(self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)]
-        self.maskedDetectorIdx = self.maskedSpecNo - self.specOffset
+    #     self.specOffset = self.firstSpec
+    #     self.firstIdx = self.firstSpec - self.specOffset
+    #     self.lastIdx = self.lastSpec - self.specOffset
+    #     self.maskedSpecNo = self.maskedSpecNo[
+    #         (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
+    #         ]
+    #     self.maskedDetectorIdx = self.maskedSpecNo - self.specOffset
 
 
     def prepareScalingFactors(self):
@@ -116,30 +142,41 @@ class InitialConditions:
             self.scalingFactors = 1 / self.initPars
 
 
-initialConditionsDict = {
-    "noOfMSIterations" : 1, 
-    "firstSpec" : 144,    #144
-    "lastSpec" : 182,     #182
-    "userPathInitWsFlag" : True, 
-    "scaleParsFlag" : False, 
-    "fitSyntheticWsFlag" : False,
-    "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces
+# initialConditionsDict = {
+#     "noOfMSIterations" : 1, 
+#     "firstSpec" : 144,    #144
+#     "lastSpec" : 182,     #182
+#     "userPathInitWsFlag" : True, 
+#     "scaleParsFlag" : False, 
+#     "fitSyntheticWsFlag" : False,
+#     "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces for testing
 
-    "MSCorrectionFlag" : False,
-    "GammaCorrectionFlag" : False
-}
+#     "MSCorrectionFlag" : False,
+#     "GammaCorrectionFlag" : False
+# }
 
 
-ic = InitialConditions(initialConditionsDict)  
-
+ic = InitialConditions 
 
 def main():
+    if ic.backScatteringProcedure:
+        wsFinal, backScatteringResults = iterativeFitForDataReduction()
+        backScatteringResults.save(ic.backScatteringSavePath)
+        # Alter ic parameters according to results
+    if ic.forwardScatteringProcedure:
+        wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
+        fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
+        forwardScatteringResults.save(ic.forwardScatteringSavePath)
+
+
+def iterativeFitForDataReduction():
 
     wsToBeFittedUncropped = prepareWorkspaceToBeFitted()
     wsToBeFitted = cropAndCloneWorkspace(wsToBeFittedUncropped)
     MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
     ic.prepareScalingFactors()
     createSlabGeometry(ic.slabPars)
+
     # Initialize arrays to store script results
     thisScriptResults = resultsObject(wsToBeFitted)
 
@@ -160,8 +197,10 @@ def main():
                       OutputWorkspace="tmpNameWs")
 
             if ic.GammaCorrectionFlag:
-                SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', ParameterType='Number', Value='24.0')
-                SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', ParameterType='Number', Value='73.0')
+                SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', 
+                                        ParameterType='Number', Value='24.0')
+                SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', 
+                                        ParameterType='Number', Value='73.0')
 
                 createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios)
                 Scale(
@@ -173,21 +212,26 @@ def main():
                       OutputWorkspace="tmpNameWs")
 
             RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
-    
-    wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]   
+    wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
+    return wsFinal, thisScriptResults
+
+
+def fitInYSpaceProcedure(wsFinal, thisScriptResults):
     ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
     popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
+    wsH = mtd[wsFinal.name()+"_H"]
 
-    thisScriptResults.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
-    thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-    thisScriptResults.resolution = wsRes.extractY()
-    thisScriptResults.HdataY = mtd[wsFinal.name()+"_H"].extractY()
-    thisScriptResults.finalRawDataY = wsFinal.extractY()
-    thisScriptResults.finalRawDataE = wsFinal.extractE()
-    thisScriptResults.popt = popt
-    thisScriptResults.perr = perr
-    thisScriptResults.save(ic.savePath)
+    thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
+    # thisScriptResults.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
+    # thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
+    # thisScriptResults.resolution = wsRes.extractY()
+    # thisScriptResults.HdataY = mtd[wsFinal.name()+"_H"].extractY()
+    # thisScriptResults.finalRawDataY = wsFinal.extractY()
+    # thisScriptResults.finalRawDataE = wsFinal.extractE()
+    # thisScriptResults.popt = popt
+    # thisScriptResults.perr = perr
+    # thisScriptResults.save(ic.savePath)
 
 ######################################################################################################################################
 #####################################################                          #######################################################
@@ -290,17 +334,6 @@ def createSlabGeometry(slabPars):
 class resultsObject:
     """Used to store results of the script"""
 
-    # Introduce these as a dirty way of saving this info
-    YSpaceSymSumDataY = 0
-    YSpaceSymSumDataE = 0
-    resolution = 0
-    finalRawDataY = 0
-    finalRawDataE = 0
-    HdataY = 0
-    popt = 0
-    perr = 0
-
-
     def __init__(self, wsToBeFitted):
         """Initializes arrays full of zeros"""
 
@@ -319,13 +352,37 @@ class resultsObject:
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
         resultsList = [all_mean_widths, all_mean_intensities,
-                       all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, all_ncp_for_each_mass]
+                       all_spec_best_par_chi_nit, all_tot_ncp, 
+                       all_fit_workspaces, all_ncp_for_each_mass]
         self.resultsList = resultsList
+
 
     def append(self, mulscatIter, resultsToAppend):
         """Append results at a given MS iteration"""
         for i, currentMSArray in enumerate(resultsToAppend):
             self.resultsList[i][mulscatIter] = currentMSArray
+
+
+    # Currently not a very elegant way of storing this info
+    YSpaceSymSumDataY = 0
+    YSpaceSymSumDataE = 0
+    resolution = 0
+    finalRawDataY = 0
+    finalRawDataE = 0
+    HdataY = 0
+    popt = 0
+    perr = 0
+
+    def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
+        self.finalRawDataY = wsFinal.extractY()
+        self.finalRawDataE = wsFinal.extractE()
+        self.HdataY = wsH.extractY()
+        self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
+        self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
+        self.resolution = wsRes.exctractY()
+        self.popt = popt
+        self.perr = perr
+
 
     def save(self, savePath):
         all_mean_widths, all_mean_intensities, \
@@ -860,10 +917,11 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
 
 
 def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
-    wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     massH = 1.0079
+    wsRes = calculateMantidResolution(wsFinal, massH)  
+
+    wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     averagedSpectraYSpace = averageJOfYOverAllSpectra(wsSubMass, massH) 
-    wsRes = calculate_mantid_resolutions(wsFinal, massH)  
     return averagedSpectraYSpace, wsRes
 
 
@@ -888,14 +946,13 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
-    Rebin(InputWorkspace=ws.name()+"_H",Params="110,1.,430", OutputWorkspace=ws.name()+"_H")
-    MaskDetectors(Workspace=ws.name()+"_H",SpectraList=ic.maskedSpecNo)     # Mask same spectrums as initial workspace
-    RemoveMaskedSpectra(InputWorkspace=ws.name()+"_H", OutputWorkspace=ws.name()+"_H")    # Probably not necessary
+     # Safeguard against possible NaNs
+    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.maskedSpecNo)    
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
-        raise ValueError("The workspace for the isolated H data countains NaNs, might cause problems!")
-
-    return mtd[ws.name()+"_H"]
+        raise ValueError("The workspace for the isolated H data countains NaNs, \
+                            might cause problems!")
+    return wsSubMass
 
 
 def averageJOfYOverAllSpectra(ws0, mass):
@@ -946,6 +1003,7 @@ def SymetriseWorkspace(wsYSpace):
 
 def symetriseArrayUsingAverages(dataY):
     # TODO The symetrization needs to consider dataX! Correct for this!
+    # Code below works as long as dataX is symetric
     # Need to account for kinematic cut-offs
     dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
     # With zeros being masked, can perform the average
@@ -980,7 +1038,7 @@ def normalise_workspace(ws_name):
     DeleteWorkspace("tmp_norm")
 
 
-def calculate_mantid_resolutions(ws, mass):
+def calculateMantidResolution(ws, mass):
     rebinPars=ic.rebinParametersForYSpaceFit
     for index in range(ws.getNumberHistograms()):
         if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
@@ -1113,6 +1171,6 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
 #if __name__=="__main__":
 start_time = time.time()
-main()
+iterativeFitForDataReduction()
 end_time = time.time()
 print("running time: ", end_time-start_time, " seconds")

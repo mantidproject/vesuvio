@@ -14,6 +14,7 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 
 pathToOriginal = currentPath / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
 pathToOptimized = currentPath / "fixatures" / "testing_full_scripts" / "optimized_cleaning_work.npz" 
+# pathToOptimized = currentPath / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz" 
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
@@ -42,51 +43,15 @@ class TestFitParameters(unittest.TestCase):
 
     def test_mainPars(self):
         nptest.assert_array_equal(self.orimainPars, self.optmainPars)
-        # totalMask = np.isclose(
-        #     self.orimainPars, self.optmainPars, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "parameters")
-
-        
-        # plotPars = False
-        # if plotPars:
-        #     plt.figure()
-        #     plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-        #                 interpolation="nearest", norm=None)
-        #     plt.title("Comparison between ori and opt pars")
-        #     plt.xlabel("Parameters")
-        #     plt.ylabel("Spectra")
-        #     plt.show()
 
     def test_chi2(self):
         nptest.assert_array_equal(self.orichi2, self.optchi2)
 
-        # totalMask = np.isclose(
-        #     self.orichi2, self.optchi2, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "chi2")
-
-
     def test_nit(self):
         nptest.assert_array_equal(self.orinit, self.optnit)
 
-        # totalMask = np.isclose(
-        #     self.orinit, self.optnit, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "nit")
-
-
     def test_intensities(self):
         nptest.assert_array_equal(self.oriintensities, self.optintensities)
-
-        # totalMask = np.isclose(
-        #     self.oriintensities, self.optintensities, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "intensities")
 
 
 def displayMask(mask, rtol, string):
@@ -111,25 +76,6 @@ class TestNcp(unittest.TestCase):
     def test_ncp(self):
         nptest.assert_array_equal(self.orincp, self.optncp)
 
-        # correctNansOri = np.where(
-        #     (self.orincp==0) & np.isnan(self.optncp), np.nan, self.orincp
-        # )
-
-        # totalMask = np.isclose(
-        #     correctNansOri, self.optncp, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "ncp")
-        
-        # plotNcp = False
-        # if plotNcp:
-        #     plt.figure()
-        #     plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-        #                 interpolation="nearest", norm=None)
-        #     plt.title("Comparison between ori and opt ncp")
-        #     plt.ylabel("Spectra")
-        #     plt.show()
-
 
 class TestMeanWidths(unittest.TestCase):
     def setUp(self):
@@ -142,10 +88,6 @@ class TestMeanWidths(unittest.TestCase):
     def test_widths(self):
         nptest.assert_array_equal(self.orimeanwidths, self.optmeanwidths)
 
-        # print("\nMean widths:",
-        #     "\nori: ", self.orimeanwidths, 
-        #     "\nopt: ", self.optmeanwidths)
-
 
 class TestMeanIntensities(unittest.TestCase):
     def setUp(self):
@@ -157,10 +99,6 @@ class TestMeanIntensities(unittest.TestCase):
     
     def test_intensities(self):
         nptest.assert_array_equal(self.orimeanintensities, self.optmeanintensities)
-
-        # print("\nMean intensity ratios:",
-        #     "\nori: ", self.orimeanintensities, 
-        #     "\nopt: ", self.optmeanintensities)
 
 
 class TestFitWorkspaces(unittest.TestCase):
@@ -175,9 +113,6 @@ class TestFitWorkspaces(unittest.TestCase):
 
     def test_ws(self):
         nptest.assert_array_equal(self.optws, self.oriws)
-
-        # nptest.assert_almost_equal(self.optws, self.oriws, decimal=self.decimal)
-        # print(f"\nFitted ws is equal up to decimal={self.decimal}")
 
 
 class TestSymSumYSpace(unittest.TestCase):
@@ -196,30 +131,9 @@ class TestSymSumYSpace(unittest.TestCase):
     def test_YSpaceDataY(self):
         nptest.assert_array_equal(self.oridataY, self.optdataY)
 
-        # nptest.assert_almost_equal(self.oridataY, self.optdataY, decimal=self.decimal)
-        # print(f"\nSummed Spectra in YSpace is equal up to decimal={self.decimal}")
-
-        # totalMask = np.isclose(
-        #     self.oridataY, self.optdataY, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "sym sum dataY YSpace")
-
-
-        # plotSumSpectra = False
-        # if plotSumSpectra:            
-        #     plt.figure()
-        #     plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-        #                 interpolation="nearest", norm=None)
-        #     plt.title("YSpace difference dataY")
-        #     plt.ylabel("Summed Spectra")
-        #     plt.show()     
-           
+ 
     def test_YSpaceDataE(self):
         nptest.assert_array_equal(self.oridataE, self.optdataE)
-
-        # nptest.assert_almost_equal(self.oridataE, self.optdataE, decimal=self.decimal)
-        # print(f"\nErrors of Summed Spectra in YSpace is equal up to decimal={self.decimal}")
 
 
 class TestResolution(unittest.TestCase):
@@ -237,23 +151,6 @@ class TestResolution(unittest.TestCase):
     def test_resolution(self):
         nptest.assert_array_equal(self.orires, self.optres)
 
-        # totalMask = np.isclose(
-        #     self.orires, self.optres, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "values resolution YSpace")
-
-        # plotResolution = False
-        # if plotResolution:
-        #     plt.figure()
-        #     x = range(len(self.orires[0]))
-        #     plt.plot(x, self.orires[0], label="oriRes")
-        #     plt.plot(x, self.optres[0], label="optRes")
-        #     plt.legend()
-        #     plt.show()
-        # nptest.assert_almost_equal(self.orires, self.optres, decimal=self.decimal)
-        # print(f"\nResolution in YSpace is equal up to decimal={self.decimal}")
-
 
 class TestHdataY(unittest.TestCase):
     def setUp(self):
@@ -269,24 +166,6 @@ class TestHdataY(unittest.TestCase):
 
     def test_HdataY(self):
         nptest.assert_array_equal(self.oriHdataY, self.optHdataY)
-
-        # totalMask = np.isclose(
-        #     self.oriHdataY, self.optHdataY, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "values isolated H TOF")
-
-        # plotHdataY = False
-        # if plotHdataY:            
-        #     plt.figure()
-        #     plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-        #                 interpolation="nearest", norm=None)
-        #     plt.title("H peak TOF dataY")
-        #     plt.ylabel("Spectra")
-        #     plt.show()    
-
-        # nptest.assert_almost_equal(self.oriHdataY, self.optHdataY, decimal=self.decimal)
-        # print(f"\nIsolated H peak in TOF is equal up to decimal={self.decimal}")
 
 
 class TestFinalRawDataY(unittest.TestCase):
@@ -304,24 +183,6 @@ class TestFinalRawDataY(unittest.TestCase):
     def test_HdataY(self):
         nptest.assert_array_equal(self.oriFinalDataY, self.optFinalDataY)
 
-        # totalMask = np.isclose(
-        #     self.oriFinalDataY, self.optFinalDataY, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "values final raw dataY")
-
-        # plotFinalRawDataY = False
-        # if plotFinalRawDataY:            
-        #     plt.figure()
-        #     plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-        #                 interpolation="nearest", norm=None)
-        #     plt.title("Final raw dataY TOF")
-        #     plt.ylabel("Spectra")
-        #     plt.show()    
-
-        # nptest.assert_almost_equal(self.oriFinalDataY, self.optFinalDataY, decimal=self.decimal)
-        # print(f"\nFinal DataY in TOF is equal up to decimal={self.decimal}")
-
 
 class TestFinalRawDataE(unittest.TestCase):
     def setUp(self):
@@ -338,23 +199,6 @@ class TestFinalRawDataE(unittest.TestCase):
     def test_HdataE(self):
         nptest.assert_array_equal(self.oriFinalDataE, self.optFinalDataE)
 
-        # totalMask = np.isclose(
-        #     self.oriFinalDataE, self.optFinalDataE, rtol=self.rtol, equal_nan=self.equal_nan
-        #     )
-        # totalDiffMask = ~ totalMask
-        # displayMask(totalDiffMask, self.rtol, "values final raw dataE")
-
-        # plotFinalRawDataY = False
-        # if plotFinalRawDataY:            
-        #     plt.figure()
-        #     plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-        #                 interpolation="nearest", norm=None)
-        #     plt.title("Final raw dataE TOF")
-        #     plt.ylabel("Spectra")
-        #     plt.show()    
-
-        # nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE, decimal=self.decimal)
-        # print(f"\nFinal DataE in TOF is equal up to decimal={self.decimal}")
 
 class Testpopt(unittest.TestCase):
     def setUp(self):
@@ -367,10 +211,6 @@ class Testpopt(unittest.TestCase):
     def test_intensities(self):
         nptest.assert_array_equal(self.oripopt, self.optpopt)
 
-        # print("\nFit parameters LM:\nori:",
-        #         self.oripopt[0], "\nopt:", self.optpopt[0])
-        # print("\nFit parameters Simplex:\nori:",
-        #         self.oripopt[1], "\nopt:", self.optpopt[1])
 
 class Testperr(unittest.TestCase):
     def setUp(self):
@@ -383,10 +223,7 @@ class Testperr(unittest.TestCase):
     def test_intensities(self):
         nptest.assert_array_equal( self.oriperr, self.optperr)
 
-        # print("\nError in parameters LM:\nori:",
-        #         self.oriperr[0], "\nopt:", self.optperr[0])
-        # print("\nError in parameters Simplex:\nori:",
-        #         self.oriperr[1], "\nopt:", self.optperr[1])
+
 
 if __name__ == "__main__":
     unittest.main()

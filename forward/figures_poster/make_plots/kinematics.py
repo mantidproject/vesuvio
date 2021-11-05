@@ -35,7 +35,7 @@ class TestPlots(unittest.TestCase):
         fig, ax = plt.subplots(figsize=(10, 10))
         plt.errorbar(self.dataX, self.dataY, yerr=self.dataE,
                     fmt="none", linewidth=0.5, color="black")
-        plt.plot(self.dataX, self.dataY, ".", label="Count Data", linewidth=1, color="black")
+        plt.plot(self.dataX, self.dataY, ".", label="Counts", linewidth=1, color="black")
 
         for i, ncp_m in enumerate(self.ncp_for_each_mass):
             plt.fill_between(self.dataX, ncp_m, 
@@ -50,7 +50,7 @@ class TestPlots(unittest.TestCase):
         plt.xlim((120, 420))
         plt.legend(loc="upper left")
 
-        axins = ax.inset_axes([0.59, 0.55, 0.40, 0.44])
+        axins = ax.inset_axes([0.59, 0.56, 0.40, 0.43])
         axins.errorbar(self.dataX, self.dataY, yerr=self.dataE,
                     fmt="none", linewidth=0.5, color="black")
         axins.plot(self.dataX, self.dataY, ".", label="Data", linewidth=1, color="black")

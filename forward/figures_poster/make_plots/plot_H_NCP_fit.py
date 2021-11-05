@@ -18,7 +18,7 @@ fig, ax = plt.subplots(figsize=(5, 8))
 ax.errorbar(dataX, dataY, yerr=dataE,
             fmt="none", linewidth=1.5, color="black",
             capsize=2, capthick=1.5)
-ax.plot(dataX, dataY, "o", label=" Avg Data", 
+ax.plot(dataX, dataY, "o", label=" Avg Counts", 
         linewidth=1, color="black", markersize=5)
 ax.plot(dataX, fit, label="Gaussian Fit",
             linestyle="-", linewidth=1.25, color="red" )
