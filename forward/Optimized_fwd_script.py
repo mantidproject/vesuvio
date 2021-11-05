@@ -28,7 +28,12 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 class InitialConditions:
-# Parameters for Raw and Empty Workspaces
+
+    # Initialize object to use self methods
+    def __init__(self):
+        return None
+
+    # Parameters for Raw and Empty Workspaces
     name = "starch_80_RD_"
     userWsRawPath = r"./input_ws/starch_80_RD_raw.nxs"
     userWsEmptyPath = r"./input_ws/starch_80_RD_raw.nxs"
@@ -76,22 +81,31 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
+    # Choose type of scattering, both or either one works
+    backScatteringProcedure = False
+    forwardScatteringProcedure = True
+
+    # Paths to save results for back and forward scattering
     pathForTesting = repoPath / "tests" / "fixatures" / "testing_full_scripts"
     forwardScatteringSavePath = pathForTesting / "optimized_cleaning_work.npz" 
     backScatteringSavePath = None
 
-    backScatteringProcedure = False
-    forwardScatteringProcedure = True
-
     noOfMSIterations = 1     #4
     firstSpec = 144    #144
     lastSpec = 182     #182
+
+    # Boolean Flags to control script
     userpathInitWsFlag = True
     scaleParsFlag = False
     fitSyntheticWsFlag = False 
     errorsForSyntheticNcpFlag = False
     MSCorrectionFlag = False
     GammaCorrectionFlag = False
+
+    symmetriseHProfileUsingAveragesFlag = False
+    useScipyCurveFitToHProfileFlag = False
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"
+    singleGaussFitToHProfile = True
 
     specOffset = firstSpec
     firstIdx = firstSpec - specOffset
@@ -102,67 +116,19 @@ class InitialConditions:
     maskedDetectorIdx = maskedSpecNo - specOffset
     
     scalingFactors = np.ones(initPars.shape)
+    if scaleParsFlag:        # Option to scale fitting parameters using initial values
+            initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
+            scalingFactors = 1 / initPars
 
-    symmetriseHProfileUsingAveragesFlag = False
-    useScipyCurveFitToHProfileFlag = False
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"
-    singleGaussFitToHProfile = True
+ic = InitialConditions() 
 
-    
-    # def __init__(self, initialConditionsDict):
-        
-    #     D = initialConditionsDict
-    #     self.noOfMSIterations = D["noOfMSIterations"]
-    #     self.firstSpec = D["firstSpec"]
-    #     self.lastSpec = D["lastSpec"]
-    #     self.userpathInitWsFlag = D["userPathInitWsFlag"]
-    #     self.scaleParsFlag = D["scaleParsFlag"]
-    #     self.fitSyntheticWsFlag = D["fitSyntheticWsFlag"] 
-    #     self.errorsForSyntheticNcpFlag = D["errorsForSyntheticNcpFlag"]
-    #     self.MSCorrectionFlag = D["MSCorrectionFlag"]
-    #     self.GammaCorrectionFlag = D["GammaCorrectionFlag"]
-
-    #     self.specOffset = self.firstSpec
-    #     self.firstIdx = self.firstSpec - self.specOffset
-    #     self.lastIdx = self.lastSpec - self.specOffset
-    #     self.maskedSpecNo = self.maskedSpecNo[
-    #         (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
-    #         ]
-    #     self.maskedDetectorIdx = self.maskedSpecNo - self.specOffset
-
-
-    def prepareScalingFactors(self):
-        """Returns array used for scaling the fitting parameters.
-        Default is parameters not going to be scaled.
-        If Boolean Flag is set to True, centers are changed to one (can not be zero),
-        and scaling factors normalize the scaling parameters.
-        """
-        if self.scaleParsFlag:
-            self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Can experiment with other starting points
-            self.scalingFactors = 1 / self.initPars
-
-
-# initialConditionsDict = {
-#     "noOfMSIterations" : 1, 
-#     "firstSpec" : 144,    #144
-#     "lastSpec" : 182,     #182
-#     "userPathInitWsFlag" : True, 
-#     "scaleParsFlag" : False, 
-#     "fitSyntheticWsFlag" : False,
-#     "errorsForSyntheticNcpFlag" : False,   # Non-zero dataE when creating NCP workspaces for testing
-
-#     "MSCorrectionFlag" : False,
-#     "GammaCorrectionFlag" : False
-# }
-
-
-ic = InitialConditions 
 
 def main():
     if ic.backScatteringProcedure:
         wsFinal, backScatteringResults = iterativeFitForDataReduction()
         backScatteringResults.save(ic.backScatteringSavePath)
         # Alter ic parameters according to results
+
     if ic.forwardScatteringProcedure:
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
         fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
@@ -171,10 +137,8 @@ def main():
 
 def iterativeFitForDataReduction():
 
-    wsToBeFittedUncropped = prepareWorkspaceToBeFitted()
-    wsToBeFitted = cropAndCloneWorkspace(wsToBeFittedUncropped)
-    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
-    ic.prepareScalingFactors()
+    wsToBeFittedUncropped = loadWorkspaceToBeFitted()
+    wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
     createSlabGeometry(ic.slabPars)
 
     # Initialize arrays to store script results
@@ -223,15 +187,6 @@ def fitInYSpaceProcedure(wsFinal, thisScriptResults):
     wsH = mtd[wsFinal.name()+"_H"]
 
     thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
-    # thisScriptResults.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
-    # thisScriptResults.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-    # thisScriptResults.resolution = wsRes.extractY()
-    # thisScriptResults.HdataY = mtd[wsFinal.name()+"_H"].extractY()
-    # thisScriptResults.finalRawDataY = wsFinal.extractY()
-    # thisScriptResults.finalRawDataE = wsFinal.extractE()
-    # thisScriptResults.popt = popt
-    # thisScriptResults.perr = perr
-    # thisScriptResults.save(ic.savePath)
 
 ######################################################################################################################################
 #####################################################                          #######################################################
@@ -242,7 +197,7 @@ def fitInYSpaceProcedure(wsFinal, thisScriptResults):
 All the functions required to run main() are listed below, in order of appearance
 """
 
-def prepareWorkspaceToBeFitted():
+def loadWorkspaceToBeFitted():
     if ic.fitSyntheticWsFlag:
         wsToBeFitted = loadSyntheticNcpWorkspace()
     else:
@@ -309,12 +264,17 @@ def loadRawAndEmptyWsVesuvio():
     return wsToBeFitted
 
 
-def cropAndCloneWorkspace(ws):
+def cropCloneAndMaskWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
-    ws = CropWorkspace(InputWorkspace=ws.name(), StartWorkspaceIndex=ic.firstIdx,
-                  EndWorkspaceIndex=ic.lastIdx, OutputWorkspace=ws.name())
+    ws = CropWorkspace(
+        InputWorkspace=ws.name(), 
+        StartWorkspaceIndex=ic.firstIdx, EndWorkspaceIndex=ic.lastIdx, 
+        OutputWorkspace=ws.name()
+        )
     wsToBeFitted = CloneWorkspace(
-        InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0")
+        InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0"
+        )
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
     return wsToBeFitted
 
 
@@ -379,7 +339,7 @@ class resultsObject:
         self.HdataY = wsH.extractY()
         self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
         self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-        self.resolution = wsRes.exctractY()
+        self.resolution = wsRes.extractY()
         self.popt = popt
         self.perr = perr
 
@@ -1171,6 +1131,6 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
 #if __name__=="__main__":
 start_time = time.time()
-iterativeFitForDataReduction()
+main()
 end_time = time.time()
 print("running time: ", end_time-start_time, " seconds")
