@@ -103,9 +103,9 @@ class InitialConditions:
     GammaCorrectionFlag = False
 
     symmetriseHProfileUsingAveragesFlag = False
-    useScipyCurveFitToHProfileFlag = True
+    useScipyCurveFitToHProfileFlag = False
     rebinParametersForYSpaceFit = "-20, 0.5, 20"
-    singleGaussFitToHProfile = False
+    singleGaussFitToHProfile = True
 
     specOffset = firstSpec
     firstIdx = firstSpec - specOffset

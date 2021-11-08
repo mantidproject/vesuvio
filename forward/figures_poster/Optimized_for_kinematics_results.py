@@ -493,9 +493,12 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
     elif FSEconstrained:  # The units cancel on this one, how can this be correct?
         FSE =  - np.sqrt(2)/12 * widths / deltaQ
     elif harmonicIsotropic:
+
         FSE = widths/deltaQ /3 /2**(3/2) * H3(ySpacesForEachMass/widths/2**0.5) * JOfY
+        
     else:
-        FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 1/3 #0.72 
+
+        FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 1/3  #0.72 
     
     if FSE.shape != JOfY.shape:
         raise ValueError("JOfY and FSE shape mismatch:", FSE.shape, JOfY.shape)
