@@ -103,9 +103,9 @@ class InitialConditions:
     GammaCorrectionFlag = False
 
     symmetriseHProfileUsingAveragesFlag = False
-    useScipyCurveFitToHProfileFlag = False
+    useScipyCurveFitToHProfileFlag = True
     rebinParametersForYSpaceFit = "-20, 0.5, 20"
-    singleGaussFitToHProfile = True
+    singleGaussFitToHProfile = False
 
     specOffset = firstSpec
     firstIdx = firstSpec - specOffset
@@ -119,6 +119,7 @@ class InitialConditions:
     if scaleParsFlag:        # Option to scale fitting parameters using initial values
             initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
             scalingFactors = 1 / initPars
+
 
 ic = InitialConditions() 
 
@@ -962,7 +963,6 @@ def SymetriseWorkspace(wsYSpace):
     return wsYSym
 
 def symetriseArrayUsingAverages(dataY):
-    # TODO The symetrization needs to consider dataX! Correct for this!
     # Code below works as long as dataX is symetric
     # Need to account for kinematic cut-offs
     dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)

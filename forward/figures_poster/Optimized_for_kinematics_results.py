@@ -74,7 +74,7 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
     slabPars = [name, vertical_width, horizontal_width, thickness]
 
-    savePath = repoPath / "make_plots" / "data_for_plots_constr_fse_by_widths.npz" 
+    savePath = repoPath / "make_plots" / "data_for_plots_negative_fse_factor_third.npz" 
     # syntheticResultsPath = repoPath / "input_ws" / "synthetic_ncp.nxs"
 
     scalingFactors = np.ones(initPars.shape)
@@ -263,10 +263,12 @@ class resultsObject:
         all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
+        FSE = np.zeros(all_ncp_for_each_mass.shape)
+
         resultsList = [all_mean_widths, all_mean_intensities,
                        all_spec_best_par_chi_nit, all_tot_ncp, all_ncp_for_each_mass,
                        all_dataY, all_dataX, all_dataE, 
-                       all_deltaE, all_deltaQ, all_yspaces_for_each_mass]
+                       all_deltaE, all_deltaQ, all_yspaces_for_each_mass, FSE]
         self.resultsList = resultsList
 
     def append(self, mulscatIter, resultsToAppend):
@@ -278,7 +280,7 @@ class resultsObject:
         all_mean_widths, all_mean_intensities, \
         all_spec_best_par_chi_nit, all_tot_ncp, all_ncp_for_each_mass, \
         all_dataY, all_dataX, all_dataE, \
-        all_deltaE, all_deltaQ, all_yspaces_for_each_mass = self.resultsList
+        all_deltaE, all_deltaQ, all_yspaces_for_each_mass, FSE = self.resultsList
         print(all_dataY)
         np.savez(savePath,
                  all_dataY=all_dataY,    # In the order of the script
@@ -292,7 +294,8 @@ class resultsObject:
                  all_mean_intensities=all_mean_intensities,
                  all_tot_ncp=all_tot_ncp,
                  all_ncp_for_each_mass=all_ncp_for_each_mass,
-                 masses=ic.masses.reshape(ic.noOfMasses))
+                 masses=ic.masses.reshape(ic.noOfMasses),
+                 all_FSE=FSE)
 
 
 def fitNcpToWorkspace(ws):
@@ -319,13 +322,18 @@ def fitNcpToWorkspace(ws):
         mainPars , ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )))
     ncpTotal = np.sum(ncpForEachMass, axis=1)  
-    createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
+    createNcpWorkspaces(ncpForEachMass, ncpTotal, ws) 
+
+    FSE = np.array(list(map(
+        buildFSEFromSpec, 
+        mainPars , ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
+    ))) 
 
     kinematicArrays = switchFirstTwoAxis(kinematicArrays)
     deltaE, deltaQ = kinematicArrays[-2:]
     print(deltaE.shape)
     return [meanWidths, meanIntensityRatios, fitPars, ncpTotal, ncpForEachMass,\
-             dataY, dataX, dataE, deltaE, deltaQ, ySpacesForEachMass]
+             dataY, dataX, dataE, deltaE, deltaQ, ySpacesForEachMass, FSE]
 
 
 def loadWorkspaceIntoArrays(ws):
@@ -443,7 +451,7 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     """Error function to be minimized, operates in TOF space"""
 
     unscaledPars = scaledPars / ic.scalingFactors
-    ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
+    ncpForEachMass, ncpTotal, FSE = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is not usually satisfied but in the exceptional case that it is,
@@ -470,26 +478,35 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
     JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes)  
     
     # The FSE are probably introducing negative wings in the functions
-    # deltaQAtPeaks = False
-    # if deltaQAtPeaks:
-    #     v0p, E0p, deltaEp, deltaQp = kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays)
-    #     if deltaQp.shape != (4, 1):
-    #         print(deltaQp.shape)
-    #         raise ValueError("The shape of Q is not the expected one")
-    #     FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQp * 0.72 
-    # else:
-    #     FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
+    deltaQAtPeaks = False
+    FSEzero = False
+    FSEconstrained = False
+    harmonicIsotropic = False
+    if deltaQAtPeaks:
+        v0p, E0p, deltaEp, deltaQp = kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays)
+        if deltaQp.shape != (4, 1):
+            print(deltaQp.shape)
+            raise ValueError("The shape of Q is not the expected one")
+        FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQp * 0.72 
+    elif FSEzero:
+        FSE = np.zeros(JOfY.shape)
+    elif FSEconstrained:  # The units cancel on this one, how can this be correct?
+        FSE =  - np.sqrt(2)/12 * widths / deltaQ
+    elif harmonicIsotropic:
+        FSE = widths/deltaQ /3 /2**(3/2) * H3(ySpacesForEachMass/widths/2**0.5) * JOfY
+    else:
+        FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 1/3 #0.72 
     
-    FSE =  - np.sqrt(2)/12 * widths / deltaQ 
-
     if FSE.shape != JOfY.shape:
         raise ValueError("JOfY and FSE shape mismatch:", FSE.shape, JOfY.shape)
-
-       
+   
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   
     ncpTotal = np.sum(ncpForEachMass, axis=0)
-    return ncpForEachMass, ncpTotal
+    return ncpForEachMass, ncpTotal, FSE
 
+# Define third Hermite polynomial
+def H3(x):
+    return 8 * np.power(x, 3) - 12 * x
 
 def prepareArraysFromPars(masses, initPars):
     noOfMasses = len(masses)
@@ -533,12 +550,6 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
     E0 = E0[yCentersMask].reshape(shapeOfArrays)
     deltaE = deltaE[yCentersMask].reshape(shapeOfArrays)
     deltaQ = deltaQ[yCentersMask].reshape(shapeOfArrays)
-
-    # # Could also do it like this, but it's probably slower
-    # def selectValuesAtYCenter(kineArray):
-    #     kineArray = kineArray * np.ones(shapeOfArrays)
-    #     return kineArray[yCentersMask].reshape(shapeOfArrays)
-    # v0, E0, deltaE, deltaQ = [selectValuesAtYCenter(A) for A in (v0, E0, deltaE, deltaQ)]
     return v0, E0, deltaE, deltaQ
 
 
@@ -703,8 +714,19 @@ def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, ki
     if np.all(np.isnan(initPars)):
         return np.full(ySpacesForEachMass.shape, np.nan)
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ic.masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    ncpForEachMass, ncpTotal, FSE = calculateNcpSpec(initPars, ic.masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
+
+
+def buildFSEFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
+    """input: all row shape
+       output: row shape with the ncpTotal for each mass"""
+
+    if np.all(np.isnan(initPars)):
+        return np.full(ySpacesForEachMass.shape, np.nan)
+    
+    ncpForEachMass, ncpTotal, FSE = calculateNcpSpec(initPars, ic.masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    return FSE
 
 
 def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):

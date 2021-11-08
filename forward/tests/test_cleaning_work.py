@@ -12,7 +12,8 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-pathToOriginal = currentPath / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
+#pathToOriginal = currentPath / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
+pathToOriginal = currentPath / "fixatures" / "testing_full_scripts" / "original_144-182_1iter_DGauss.npz" 
 pathToOptimized = currentPath / "fixatures" / "testing_full_scripts" / "optimized_cleaning_work.npz" 
 # pathToOptimized = currentPath / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz" 
 

@@ -543,7 +543,7 @@ first_spectrum, last_spectrum = 144, 182   #144, 182
 masses = [1.0079,12,16,27]
 abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
 
-simple_gaussian_fit = True
+simple_gaussian_fit = False
 
 if load_data:
     spectrum_list=str(first_spectrum)+'-'+str(last_spectrum)
@@ -776,7 +776,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz"
+savepath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "original_144-182_1iter_DGauss.npz"
 
 wsJoY = mtd[ws_name+'joy_sum']
 resolution = mtd["resolution_sum"].extractY()
