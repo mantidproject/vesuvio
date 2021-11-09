@@ -9,7 +9,7 @@ plt.style.use('seaborn-poster')
 # plt.rcParams['axes.facecolor'] = (0.8, 0.8, 0.8)
 
 # Use generator to see if any ncp reaches zero
-correctedFSEPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
+correctedFSEPath = currentPath / "data_for_plots_double_fit_fse_avg_widths.npz"
 results = np.load(correctedFSEPath)
 ncp_for_each_mass = results["all_ncp_for_each_mass"][0]
 
@@ -29,7 +29,7 @@ def plotFSE(loadPaths, signs, colors, lines):
 
     for path, sign, color, line in zip(loadPaths, signs, colors, lines):
         results = np.load(path)
-        spec = 37
+        spec = 22
         try:
             x = results["all_dataX"][0, spec]
             ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
@@ -106,13 +106,13 @@ elif plotConstrFSE:
     linestyles = ["solid", "dashed", "dotted"]
     plotFSE(paths, labels, colors, linestyles)
 elif plotFinalFSE:
-    negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
-    correctedFSEPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
-    H3FSEPath = currentPath / "data_for_plots_H3_fse.npz"
-    zeroFSEPath = currentPath / "data_for_plots_no_fse.npz"
-    paths = [H3FSEPath, correctedFSEPath, zeroFSEPath]
-    labels = ["H3", "*1/3", "=0"]
+    firstPath = currentPath / "data_for_plots_double_fit_fse.npz"
+    secondPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
+    #thirdPath = currentPath / "data_for_plots_no_fse.npz"
+    thirdPath = currentPath / "data_for_plots_double_fit_fse_avg_widths.npz"
+    paths = [firstPath, secondPath, thirdPath]
+    labels = ["fit X2", "*1/3", "fit X2 avg withs"]
     colors = ["tab:blue", "tab:orange", "tab:purple"]
     linestyles = ["solid", "dashed", "dotted"]
     plotFSE(paths, labels, colors, linestyles)
-    
+
