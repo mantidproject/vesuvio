@@ -9,7 +9,7 @@ plt.style.use('seaborn-poster')
 # plt.rcParams['axes.facecolor'] = (0.8, 0.8, 0.8)
 
 # Use generator to see if any ncp reaches zero
-correctedFSEPath = currentPath / "data_for_plots_double_fit_fse_avg_widths.npz"
+correctedFSEPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
 results = np.load(correctedFSEPath)
 ncp_for_each_mass = results["all_ncp_for_each_mass"][0]
 
@@ -29,7 +29,7 @@ def plotFSE(loadPaths, signs, colors, lines):
 
     for path, sign, color, line in zip(loadPaths, signs, colors, lines):
         results = np.load(path)
-        spec = 22
+        spec = 37
         try:
             x = results["all_dataX"][0, spec]
             ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
@@ -61,7 +61,7 @@ def plotFSE(loadPaths, signs, colors, lines):
         xmax = x[ncp_m==np.max(ncp_m)]
         ax.vlines(xmax, 0, np.max(ncp_m), color=color, linewidth=2)
 
-    x1, x2, y1, y2 = -26, -12, -0.001, 0.0005
+    x1, x2, y1, y2 = -26, -12, -0.00005, 0.00005
     axins.set_xlim(x1, x2)
     axins.set_ylim(y1, y2)
     axins.set_xticklabels('')
@@ -72,6 +72,7 @@ def plotFSE(loadPaths, signs, colors, lines):
     ax.set_ylabel(r"C(t) [$A$]")
     #ax.set_xlim(-20, 20)
     ax.legend(loc="upper left")
+    plt.title(r"FSE = $\frac{\sigma^4}{3q} \frac{d^3}{dy^3} J(y)$ ")
     plt.show()
 
 plotSignsOfFSE = False
@@ -110,9 +111,9 @@ elif plotFinalFSE:
     secondPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
     #thirdPath = currentPath / "data_for_plots_no_fse.npz"
     thirdPath = currentPath / "data_for_plots_double_fit_fse_avg_widths.npz"
-    paths = [firstPath, secondPath, thirdPath]
-    labels = ["fit X2", "*1/3", "fit X2 avg withs"]
-    colors = ["tab:blue", "tab:orange", "tab:purple"]
+    paths = [secondPath, thirdPath]
+    labels = ["inside single fit", "double fit avg widths"]
+    colors = ["tab:orange", "tab:purple"]
     linestyles = ["solid", "dashed", "dotted"]
     plotFSE(paths, labels, colors, linestyles)
 
