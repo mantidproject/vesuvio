@@ -88,6 +88,7 @@ class InitialConditions:
     # Paths to save results for back and forward scattering
     pathForTesting = repoPath / "tests" / "fixatures" / "testing_full_scripts"
     forwardScatteringSavePath = pathForTesting / "optimized_cleaning_work.npz" 
+    #forwardScatteringSavePath = repoPath / "figures_poster" / "make_plots" / "H_ncp_avg_JOfY_no_fse.npz" 
     backScatteringSavePath = None
 
     noOfMSIterations = 1     #4
@@ -184,10 +185,10 @@ def iterativeFitForDataReduction():
 def fitInYSpaceProcedure(wsFinal, thisScriptResults):
     ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
-    popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
+    popt, perr, yfit = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
     wsH = mtd[wsFinal.name()+"_H"]
 
-    thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
+    thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr, yfit)
 
 ######################################################################################################################################
 #####################################################                          #######################################################
@@ -323,18 +324,7 @@ class resultsObject:
         for i, currentMSArray in enumerate(resultsToAppend):
             self.resultsList[i][mulscatIter] = currentMSArray
 
-
-    # Currently not a very elegant way of storing this info
-    YSpaceSymSumDataY = 0
-    YSpaceSymSumDataE = 0
-    resolution = 0
-    finalRawDataY = 0
-    finalRawDataE = 0
-    HdataY = 0
-    popt = 0
-    perr = 0
-
-    def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
+    def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr, yfit):
         self.finalRawDataY = wsFinal.extractY()
         self.finalRawDataE = wsFinal.extractE()
         self.HdataY = wsH.extractY()
@@ -343,6 +333,7 @@ class resultsObject:
         self.resolution = wsRes.extractY()
         self.popt = popt
         self.perr = perr
+        self.ySpaceFit = yfit
 
 
     def save(self, savePath):
@@ -360,7 +351,7 @@ class resultsObject:
                  YSpaceSymSumDataE=self.YSpaceSymSumDataE,
                  resolution=self.resolution, HdataY=self.HdataY,
                  finalRawDataY=self.finalRawDataY, finalRawDataE=self.finalRawDataE,
-                 popt=self.popt, perr=self.perr)
+                 popt=self.popt, perr=self.perr, ySpaceFit=self.ySpaceFit)
 
 
 def fitNcpToWorkspace(ws):
@@ -536,6 +527,7 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
     
     JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes)  
     
+    #FSE = 0
     FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
     
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   
@@ -1020,14 +1012,14 @@ def calculateMantidResolution(ws, mass):
 
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
     if ic.useScipyCurveFitToHProfileFlag:
-        popt, pcov = fitProfileCurveFit(wsYSpaceSym, wsRes)
+        popt, pcov, yfit = fitProfileCurveFit(wsYSpaceSym, wsRes)
         print("popt:\n", popt)
         print("pcov:\n", pcov)
         perr = np.sqrt(np.diag(pcov))
     else:
-        popt, perr = fitProfileMantidFit(wsYSpaceSym, wsRes)
+        popt, perr, yfit = fitProfileMantidFit(wsYSpaceSym, wsRes)
     
-    return popt, perr
+    return popt, perr, yfit
 
 def fitProfileCurveFit(wsYSpaceSym, wsRes):
     res = wsRes.extractY()[0]
@@ -1080,7 +1072,7 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
                     DataY=np.concatenate((dataY, yfit, Residuals)), 
                     NSpec=3,
                     OutputWorkspace="CurveFitResults")
-    return popt, pcov
+    return popt, pcov, yfit
 
 
 def gaussianFit(x, y0, x0, A, sigma):
@@ -1095,6 +1087,7 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
     else:
         popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
 
+    yfit = np.zeros((2, wsYSpaceSym.blocksize()))
 
     print('\n','Fit on the sum of spectra in the West domain','\n')     
     for i, minimizer_sum in enumerate(['Levenberg-Marquardt','Simplex']):
@@ -1123,10 +1116,13 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
         popt[i] = ws.column("Value")
         perr[i] = ws.column("Error")
 
+        wsFit = mtd[ic.name+minimizer_sum+'_joy_sum_fitted_Workspace']
+        yfit[i] = wsFit.extractY()[1]
+
         # print('Using the minimizer: ',minimizer_sum)
         # print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))   # Selects the wrong parameter in the case of the double gaussian
     print("\nFitting ------ \npopt:\n", popt, "\nperr:\n", perr)
-    return popt, perr
+    return popt, perr, yfit
 
 
 #if __name__=="__main__":
