@@ -13,13 +13,18 @@ kMins = results["all_kMins"][0]
 x = np.arange(len(kMins))
 
 kMins = kMins.T
-std = np.std(kMins, axis=1)[:, np.newaxis]
-mean = np.mean(kMins, axis=1)[:, np.newaxis]
-print(std, mean)
+print(np.sum(kMins, axis=1))
+mean = np.nanmean(kMins, axis=1)[:, np.newaxis]
+std = np.nanstd(kMins, axis=1)[:, np.newaxis]
+print("means:\n", mean, "\nstd:\n", std)
 
 kMins[np.abs(kMins-mean)>std] = np.nan
 
 fig, ax = plt.subplots()
-for kMass in kMins:
-    ax.hist(kMass, alpha=0.5)
+ax.scatter(x, kMins[1], alpha=0.5, label=f"H")
+
+# for i, kMass in enumerate(kMins):
+#     ax.scatter(x, kMass, alpha=0.5, label=f"{i}")
+#ax.set_yscale("log")
+plt.legend()
 plt.show()

@@ -17,6 +17,7 @@ ncp_for_each_mass = results["all_ncp_for_each_mass"][0]
 # print("No of ncp with negative value: ", len(ncp_m))
 
 negWingSpecIdx = []
+print(ncp_for_each_mass.shape)
 for i, row in enumerate(ncp_for_each_mass):
     if np.min(row[0]) < 0:
         negWingSpecIdx.append(i)
@@ -35,7 +36,7 @@ def plotFSE(loadPaths, signs, colors, lines):
 
     for path, sign, color, line in zip(loadPaths, signs, colors, lines):
         results = np.load(path)
-        spec = 37
+        spec = 25
         try:
             x = results["all_dataX"][0, spec]
             ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
