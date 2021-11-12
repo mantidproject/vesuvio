@@ -77,10 +77,10 @@ def plotFSE(loadPaths, signs, colors, lines, spec):
 secondPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
 thirdPath = currentPath / "data_for_plots_cvxopt_fse.npz"
 
-findNegativeWingsSpecIdx(secondPath, "fixed k")
-findNegativeWingsSpecIdx(thirdPath, "lin fit k")
+findNegativeWingsSpecIdx(secondPath, r"No width correction")
+findNegativeWingsSpecIdx(thirdPath, "Iterative width correction")
 paths = [secondPath, thirdPath]
-labels = [r"k = $\frac{\sigma^4}{3}$ ", "lin fit k"]
+labels = [r"No width correction", "Iterative width correction"]
 colors = ["tab:orange", "tab:purple"]
 linestyles = ["solid", "dashed", "dotted"]
 plotFSE(paths, labels, colors, linestyles, 13)

@@ -490,20 +490,27 @@ def calculateNcpSpec(
     
     d3JOfY = numericalThirdDerivative(ySpacesForEachMass, JOfY)
 
-    FSE, kMin = linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses, widths)
+    # FSE, kMin = linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses, widths)
 
+    FSE =  - d3JOfY * widths**4 / deltaQ * 1/3  #0.72 
+    
+    # # Quick and simple correction
+    while np.any((JOfY + FSE) < 0):
+        rowsToChange = np.any((JOfY + FSE) < 0, axis=1)
+        # FSE[rowsToChange] *= 0.99
+        widths[rowsToChange] *= 0.99  
+        totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)                
+        JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes)  
+        d3JOfY = numericalThirdDerivative(ySpacesForEachMass, JOfY)
+        FSE =  - d3JOfY * widths**4 / deltaQ * 1/3  #0.72 
+
+    if FSE.shape != JOfY.shape:
+        raise ValueError("JOfY and FSE shape mismatch:", FSE.shape, JOfY.shape)
+
+    kMin = widths.T**4/3
     if kMin.shape != (1, ic.noOfMasses):
         raise ValueError("KMin has the wrong shape!")
 
-    # FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 1/3  #0.72 
-    
-    # # Quick and simple correction
-    # while np.any((JOfY + FSE) < 0):
-    #     rowsToChange = np.any((JOfY + FSE) < 0, axis=1)
-    #     FSE[rowsToChange] *= 0.99
-
-    # if FSE.shape != JOfY.shape:
-    #     raise ValueError("JOfY and FSE shape mismatch:", FSE.shape, JOfY.shape)
    
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   
     ncpTotal = np.sum(ncpForEachMass, axis=0)
@@ -528,10 +535,11 @@ def linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses, widths):
     zeroColumns = np.all(M==0, axis=0)
     M = M[:, ~zeroColumns]
 
-    h = np.power(widths, 4) / 3
+    # h = widths**4 / 3
+    h = np.zeros((ic.noOfMasses, 1))    # Set non zero constraint
     h = h[~zeroColumns]
 
-    G = np.identity(len(h))
+    G = - np.identity(len(h))     # Change sign when changing constraint
 
     sol = leastSquaresLinear(M, y, G, h)
     kMin = np.zeros((ic.noOfMasses, 1))
