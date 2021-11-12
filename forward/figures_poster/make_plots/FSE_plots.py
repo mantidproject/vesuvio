@@ -9,16 +9,23 @@ plt.style.use('seaborn-poster')
 # plt.rcParams['axes.facecolor'] = (0.8, 0.8, 0.8)
 
 # Use generator to see if any ncp reaches zero
-correctedFSEPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
+correctedFSEPath = currentPath / "data_for_plots_cvxopt_fse.npz"
 results = np.load(correctedFSEPath)
 ncp_for_each_mass = results["all_ncp_for_each_mass"][0]
 
 # ncp_m = [row[0] for row in ncp_for_each_mass if (np.min(row[0])<0)]
 # print("No of ncp with negative value: ", len(ncp_m))
 
+negWingSpecIdx = []
+print(ncp_for_each_mass.shape)
 for i, row in enumerate(ncp_for_each_mass):
     if np.min(row[0]) < 0:
-        print(i)
+        negWingSpecIdx.append(i)
+if negWingSpecIdx:
+    print(negWingSpecIdx)
+else:
+    print("No NCP is negative")
+    
 
 
 
@@ -29,7 +36,7 @@ def plotFSE(loadPaths, signs, colors, lines):
 
     for path, sign, color, line in zip(loadPaths, signs, colors, lines):
         results = np.load(path)
-        spec = 37
+        spec = 25
         try:
             x = results["all_dataX"][0, spec]
             ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
@@ -75,45 +82,13 @@ def plotFSE(loadPaths, signs, colors, lines):
     plt.title(r"FSE = $\frac{\sigma^4}{3q} \frac{d^3}{dy^3} J(y)$ ")
     plt.show()
 
-plotSignsOfFSE = False
-plotQOfFSE = False
-plotConstrFSE = False
-plotFinalFSE = True
 
-if plotSignsOfFSE:
-    posFSEPath = currentPath / "data_for_plots_positive_fse.npz"
-    negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
-    zeroFSEPath = currentPath / "data_for_plots_no_fse.npz"
-    paths = [posFSEPath, negFSEPath, zeroFSEPath]
-    signs = [">0", "<0", "=0"]
-    colors = ["tab:blue", "tab:orange", "tab:purple"]
-    linestyles = ["solid", "dashed", "dotted"]
-    plotFSE(paths, signs, colors, linestyles)
-elif plotQOfFSE:
-    QtofPath = currentPath / "data_for_plots_negative_fse.npz"
-    QpeakPath = currentPath / "data_for_plots_neg_fse_Q_at_peak.npz"
-    originalPath =currentPath / "original_144-182_1iter.npz"
-    paths = [QpeakPath, QtofPath, originalPath]
-    labels = ["Q at peak", "Q(TOF)", "Q(TOF) Ori"]
-    colors = ["tab:blue", "tab:orange", "tab:purple"]
-    linestyles = ["solid", "dashed", "dotted"]
-    plotFSE(paths, labels, colors, linestyles)
-elif plotConstrFSE:
-    negFSEPath = currentPath / "data_for_plots_negative_fse.npz"
-    constrFSEPath = currentPath / "data_for_plots_H3_fse.npz"
-    paths = [negFSEPath, constrFSEPath]
-    labels = ["ori", "H3"]
-    colors = ["tab:blue", "tab:orange", "tab:purple"]
-    linestyles = ["solid", "dashed", "dotted"]
-    plotFSE(paths, labels, colors, linestyles)
-elif plotFinalFSE:
-    firstPath = currentPath / "data_for_plots_double_fit_fse.npz"
-    secondPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
-    #thirdPath = currentPath / "data_for_plots_no_fse.npz"
-    thirdPath = currentPath / "data_for_plots_double_fit_fse_avg_widths.npz"
-    paths = [secondPath, thirdPath]
-    labels = ["inside single fit", "double fit avg widths"]
-    colors = ["tab:orange", "tab:purple"]
-    linestyles = ["solid", "dashed", "dotted"]
-    plotFSE(paths, labels, colors, linestyles)
+secondPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
+thirdPath = currentPath / "data_for_plots_cvxopt_fse.npz"
+
+paths = [secondPath, thirdPath]
+labels = [r"k = $\frac{\sigma^4}{3}$ ", "shrinked k"]
+colors = ["tab:orange", "tab:purple"]
+linestyles = ["solid", "dashed", "dotted"]
+plotFSE(paths, labels, colors, linestyles)
 
