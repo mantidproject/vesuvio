@@ -5,7 +5,7 @@ from scipy import optimize
 import time
 from pathlib import Path
 import cvxopt as co
-
+co.solvers.options['show_progress'] = False
 #######################################################################################################################################
 #######################################################                      ##########################################################
 #######################################################     USER SECTION     ##########################################################
@@ -490,7 +490,7 @@ def calculateNcpSpec(
     
     d3JOfY = numericalThirdDerivative(ySpacesForEachMass, JOfY)
 
-    FSE, kMin = linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses)
+    FSE, kMin = linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses, widths)
 
     if kMin.shape != (1, ic.noOfMasses):
         raise ValueError("KMin has the wrong shape!")
@@ -510,7 +510,7 @@ def calculateNcpSpec(
     return ncpForEachMass, ncpTotal, FSE, kMin
 
 
-def linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses):
+def linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses, widths):
     #print("linFitFSE called")
     FSE = - masses * intensities * E0 * E0**(-0.92) * d3JOfY / deltaQ
     M = FSE.T
@@ -524,34 +524,42 @@ def linFitFSE(dataY, d3JOfY, JOfY, intensities, deltaQ, E0, masses):
         raise ValueError("y vector can not be zeros or contain nans!")
 
 
-    kMin = leastSquaresLinear(M, y)
+    # Take out zero columns from M
+    zeroColumns = np.all(M==0, axis=0)
+    M = M[:, ~zeroColumns]
+
+    h = np.power(widths, 4) / 3
+    h = h[~zeroColumns]
+
+    G = np.identity(len(h))
+
+    sol = leastSquaresLinear(M, y, G, h)
+    kMin = np.zeros((ic.noOfMasses, 1))
+    kMin[~zeroColumns] = np.array(sol["x"])
+
     kMin = kMin.reshape(masses.shape)
 
     FSEfitted = - kMin * d3JOfY / deltaQ
     return FSEfitted, kMin.T
 
 
-def leastSquaresLinear(M, y):
+def leastSquaresLinear(M, y, G, h):
     """Constrained Linear Least Squares Quadratic Problem
     Finds the closest x for which M @ x = y
     Constrained to G @ x <= h and A @ x = b
 
     y is a vertical vector
     """
-
-    linPar = np.zeros((ic.noOfMasses, 1))
-    # Take out zero columns from M
-    zeroColumns = np.all(M==0, axis=0)
-    M = M[:, ~zeroColumns]
+    G = co.matrix(G, tc="d")
+    h = co.matrix(h, tc="d")
 
     C = co.matrix(M, tc="d")
     d = co.matrix(y, tc="d")
     P = C.T * C
     q = - d.T * C
 
-    sol = co.solvers.qp(P, q.T, G=None, h=None, A=None, b=None)
-    linPar[~zeroColumns] = np.array(sol["x"])
-    return linPar
+    sol = co.solvers.qp(P, q.T, G, h, A=None, b=None)
+    return sol
 
 # Define third Hermite polynomial
 def H3(x):

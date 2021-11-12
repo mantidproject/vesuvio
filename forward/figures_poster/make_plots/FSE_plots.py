@@ -8,35 +8,26 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 plt.style.use('seaborn-poster')
 # plt.rcParams['axes.facecolor'] = (0.8, 0.8, 0.8)
 
-# Use generator to see if any ncp reaches zero
-correctedFSEPath = currentPath / "data_for_plots_cvxopt_fse.npz"
-results = np.load(correctedFSEPath)
-ncp_for_each_mass = results["all_ncp_for_each_mass"][0]
 
-# ncp_m = [row[0] for row in ncp_for_each_mass if (np.min(row[0])<0)]
-# print("No of ncp with negative value: ", len(ncp_m))
+def findNegativeWingsSpecIdx(resultsPath, method):
+    results = np.load(resultsPath)
+    ncp_for_each_mass = results["all_ncp_for_each_mass"][0]
+    negWingSpecIdx = []
+    for i, row in enumerate(ncp_for_each_mass):
+        if np.min(row[0]) < 0:
+            negWingSpecIdx.append(i)
+    if negWingSpecIdx:
+        print("Idx neg spec for "+method+": ", negWingSpecIdx)
+    else:
+        print("No NCP is negative")
+        
 
-negWingSpecIdx = []
-print(ncp_for_each_mass.shape)
-for i, row in enumerate(ncp_for_each_mass):
-    if np.min(row[0]) < 0:
-        negWingSpecIdx.append(i)
-if negWingSpecIdx:
-    print(negWingSpecIdx)
-else:
-    print("No NCP is negative")
-    
-
-
-
-
-def plotFSE(loadPaths, signs, colors, lines):
+def plotFSE(loadPaths, signs, colors, lines, spec):
     fig, ax = plt.subplots(figsize=(10, 10))
     axins = ax.inset_axes([0.59, 0.75, 0.40, 0.24])
 
     for path, sign, color, line in zip(loadPaths, signs, colors, lines):
         results = np.load(path)
-        spec = 25
         try:
             x = results["all_dataX"][0, spec]
             ncp_for_each_mass = results["all_ncp_for_each_mass"][0, spec]
@@ -86,9 +77,11 @@ def plotFSE(loadPaths, signs, colors, lines):
 secondPath = currentPath / "data_for_plots_negative_fse_factor_third.npz"
 thirdPath = currentPath / "data_for_plots_cvxopt_fse.npz"
 
+findNegativeWingsSpecIdx(secondPath, "fixed k")
+findNegativeWingsSpecIdx(thirdPath, "lin fit k")
 paths = [secondPath, thirdPath]
-labels = [r"k = $\frac{\sigma^4}{3}$ ", "shrinked k"]
+labels = [r"k = $\frac{\sigma^4}{3}$ ", "lin fit k"]
 colors = ["tab:orange", "tab:purple"]
 linestyles = ["solid", "dashed", "dotted"]
-plotFSE(paths, labels, colors, linestyles)
+plotFSE(paths, labels, colors, linestyles, 13)
 

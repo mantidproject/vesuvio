@@ -21,7 +21,7 @@ print("means:\n", mean, "\nstd:\n", std)
 kMins[np.abs(kMins-mean)>std] = np.nan
 
 fig, ax = plt.subplots()
-ax.scatter(x, kMins[1], alpha=0.5, label=f"H")
+ax.scatter(x, kMins[0], alpha=0.5, label=f"H")
 
 # for i, kMass in enumerate(kMins):
 #     ax.scatter(x, kMass, alpha=0.5, label=f"{i}")
