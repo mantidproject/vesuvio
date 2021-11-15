@@ -34,35 +34,36 @@ class InitialConditions:
         return None
 
     # Parameters for Raw and Empty Workspaces
-    name = "starch_80_RD_"
-    userWsRawPath = r"./input_ws/starch_80_RD_raw.nxs"
-    userWsEmptyPath = r"./input_ws/starch_80_RD_raw.nxs"
+    userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
+    userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
 
-    runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-    spectra='144-182'                               # Spectra to be analysed
-    tof_binning="110,1.,430"                    # Binning of ToF spectra
-    mode='SingleDifference'
-    ipfile=r'./ip2018_3.par'
-    rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
+    name = "starch_80_RD_backward"
+    runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
+    empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
+    spectra='3-134'                            # Spectra to be analysed
+    tof_binning='275.,1.,420'                    # Binning of ToF spectra
+    mode='DoubleDifference'
+    ipfile=r'./ip2019.par' 
+
+    def getRawAndEmptyWsConfigs(self):    
+        return [self.name, self.runs, self.empty_runs, self.spectra, self.tof_binning, self.mode, self.ipfile]
 
     # Masses, instrument parameters and initial fitting parameters
-    masses = np.array([1.0079, 12, 16, 27]).reshape(4, 1, 1)  #TODO change to shape(4, 1) in the future
-    noOfMasses = len(masses)
+    masses = np.array([12, 16, 27]).reshape(3, 1, 1)  #TODO change to shape(4, 1) in the future
+    noOfMasses = 3
+
     InstrParsPath = repoPath / 'ip2018_3.par'
 
     initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers
-        1, 4.7, 0.,   
-        1, 12.71, 0.,    
-        1, 8.76, 0.,   
-        1, 13.897, 0.    
+    # Intensities, NCP widths, NCP centers   
+        1, 12, 0.,    
+        1, 12, 0.,   
+        1, 12.5, 0.    
     ])
     bounds = np.array([
-        [0, np.nan], [3, 6], [-3, 1],
-        [0, np.nan], [12.71, 12.71], [-3, 1],
-        [0, np.nan], [8.76, 8.76], [-3, 1],
-        [0, np.nan], [13.897, 13.897], [-3, 1]
+        [0, np.nan], [8, 16], [-3, 1],
+        [0, np.nan], [8, 16], [-3, 1],
+        [0, np.nan], [11, 14], [-3, 1]
     ])
     constraints = ()
 
@@ -72,27 +73,32 @@ class InitialConditions:
     # Multiscaterring Correction Parameters
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5   
-    hydrogen_peak = False                 # Hydrogen multiple scattering
-    hydrogen_to_mass0_ratio = 0
+    hydrogen_peak = True                 # Hydrogen multiple scattering
+    hydrogen_to_mass0_ratio = 19.0620008206
     # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-    mulscatPars = [hydrogen_peak, hydrogen_to_mass0_ratio, transmission_guess, multiple_scattering_order, number_of_events]
+    
+    def getMulScatPars(self):
+        return [self.hydrogen_peak, self.hydrogen_to_mass0_ratio, self.transmission_guess, 
+                self.multiple_scattering_order, self.number_of_events]
 
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-    slabPars = [name, vertical_width, horizontal_width, thickness]
+    
+    def getSlabPars(self):
+        return [self.name, self.vertical_width, self.horizontal_width, self.thickness]
 
     # Choose type of scattering, both or either one works
     backScatteringProcedure = True
     forwardScatteringProcedure = True
 
     # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "fixatures" / "testing_full_scripts"
+    pathForTesting = repoPath / "tests" / "fixatures" 
     forwardScatteringSavePath = pathForTesting / "opt_frontScat.npz" 
     backScatteringSavePath = pathForTesting / "opt_backScat.npz"
 
     noOfMSIterations = 1     #4
-    firstSpec = 144    #144
-    lastSpec = 182     #182
+    firstSpec = 3    #3
+    lastSpec = 134    #134
 
     # Boolean Flags to control script
     userpathInitWsFlag = True
@@ -102,27 +108,46 @@ class InitialConditions:
     MSCorrectionFlag = False
     GammaCorrectionFlag = False
 
-    symmetriseHProfileUsingAveragesFlag = False
-    useScipyCurveFitToHProfileFlag = False
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"
-    singleGaussFitToHProfile = True
+    def getFirstIdx(self):
+        specOffset = self.firstSpec
+        return self.firstSpec - specOffset
 
-    specOffset = firstSpec
-    firstIdx = firstSpec - specOffset
-    lastIdx = lastSpec - specOffset
-    maskedSpecNo = maskedSpecNo[
-        (maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)
+    def getLastIdx(self):
+        specOffset = self.firstSpec
+        return self.lastSpec - specOffset
+
+    def getMaskedSpecNo(self):
+        return self.maskedSpecNo[
+            (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
         ]
-    maskedDetectorIdx = maskedSpecNo - specOffset
+
+    def getMaskedDetectorIdx(self):
+        specOffset = self.firstSpec
+        maskedSpecNo =  self.maskedSpecNo[
+            (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
+        ]
+        return maskedSpecNo - specOffset
+
+    # specOffset = firstSpec
+    # firstIdx = firstSpec - specOffset
+    # lastIdx = lastSpec - specOffset
+    # maskedSpecNo = maskedSpecNo[
+    #     (maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)
+    #     ]
+    # maskedDetectorIdx = maskedSpecNo - specOffset
     
-    scalingFactors = np.ones(initPars.shape)
-    if scaleParsFlag:        # Option to scale fitting parameters using initial values
-            initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-            scalingFactors = 1 / initPars
+    def prepareScalingFactors(self):
+        self.scalingFactors = np.ones(self.initPars.shape)
+        if self.scaleParsFlag:        # Option to scale fitting parameters using initial values
+                self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
+                self.scalingFactors = 1 / self.initPars
+
 
     def changeInitialParametersForForwardScattering(self):
-        name = self.name + "_front_"
+        self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
+        self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
 
+        name = "starch_80_RD_forward_"
         runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
         empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
         spectra='144-182'                               # Spectra to be analysed
@@ -133,8 +158,8 @@ class InitialConditions:
 
         self.hydrogen_to_mass0_ratio = 0
 
-        self.firstSpec = 144
-        self.lastSpec = 182
+        self.firstSpec = 144   #144
+        self.lastSpec = 182    #182
 
         self.symmetriseHProfileUsingAveragesFlag = False
         self.useScipyCurveFitToHProfileFlag = False
@@ -151,11 +176,15 @@ def main():
         backScatteringResults.save(ic.backScatteringSavePath)
 
         # Alter ic parameters according to results
-        backMeanWidths, backMeanIntensities = backScatteringResults.getMeanWidthsAndIntensities()
-        ic.masses = np.append([1.0079], ic.masses)
-        ic.initPars[1::3] = backMeanWidths
-        ic.bounds[1::3, :] = backMeanWidths[:, np.newaxis] * np.ones((1, 2))
+        backMeanWidths = backScatteringResults.resultsList[0][-1]
+        ic.masses = np.append([1.0079], ic.masses).reshape(4, 1, 1)
 
+        ic.initPars = np.append([1, 4.7, 0], ic.initPars)
+        ic.initPars[4::3] = backMeanWidths
+
+        ic.bounds = np.append([[0, np.nan], [3, 6], [-3, 1]], ic.bounds, axis=0)
+        ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+ 
         ic.changeInitialParametersForForwardScattering()
 
 
@@ -170,6 +199,7 @@ def iterativeFitForDataReduction():
     wsToBeFittedUncropped = loadWorkspaceToBeFitted()
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
     createSlabGeometry(ic.slabPars)
+    ic.prepareScalingFactors()
 
     # Initialize arrays to store script results
     thisScriptResults = resultsObject(wsToBeFitted)
@@ -186,7 +216,7 @@ def iterativeFitForDataReduction():
             CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
             if ic.MSCorrectionFlag:
-                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.mulscatPars)
+                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.getMulscatPars)
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
                       OutputWorkspace="tmpNameWs")
 
@@ -251,7 +281,7 @@ def loadVesuvioDataWorkspaces():
 
 
 def loadRawAndEmptyWsFromUserPath():
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.rawAndEmptyWsConfigs
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs
 
     print('\n', 'Loading the sample runs: ', runs, '\n')
     Load(Filename=ic.userWsRawPath, OutputWorkspace=name+"raw")
@@ -273,7 +303,7 @@ def loadRawAndEmptyWsFromUserPath():
 
 
 def loadRawAndEmptyWsVesuvio():
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.rawAndEmptyWsConfigs
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs
     
     print('\n', 'Loading the sample runs: ', runs, '\n')
     LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode,
@@ -298,13 +328,13 @@ def cropCloneAndMaskWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
     ws = CropWorkspace(
         InputWorkspace=ws.name(), 
-        StartWorkspaceIndex=ic.firstIdx, EndWorkspaceIndex=ic.lastIdx, 
+        StartWorkspaceIndex=ic.getFirstIdx, EndWorkspaceIndex=ic.getLastIdx, 
         OutputWorkspace=ws.name()
         )
     wsToBeFitted = CloneWorkspace(
         InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0"
         )
-    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.getMaskedDetectorIdx)
     return wsToBeFitted
 
 
@@ -937,7 +967,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
      # Safeguard against possible NaNs
-    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.maskedSpecNo)    
+    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.getMaskedSpecNo)    
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
         raise ValueError("The workspace for the isolated H data countains NaNs, \
