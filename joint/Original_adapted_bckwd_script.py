@@ -74,7 +74,7 @@ def fun_derivative4(x,fun): # not used at present. Can be used for the H4 polyno
 
 def load_ip_file(spectrum):
     #print "Loading parameters from file: ", namedtuple
-    ipfile = repoPath / 'ip2018.par'
+    ipfile = repoPath / 'ip2018_3.par'
     f = open(ipfile, 'r')
     data = f.read()
     lines = data.split('\n')
@@ -573,7 +573,7 @@ plot_iterations = True                      # If True, plots all the time-of-fli
 number_of_iterations = 1 #4               # This is the number of iterations for the reduction analysis in time-of-flight.
 
 
-name='starch_80_DD_'  
+name='starch_80_DD_backward'  
 runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
 empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
 spectra='3-134'                                             # Spectra to be analysed
@@ -588,13 +588,13 @@ detectors_masked=[18, 34, 42, 43, 59, 60, 62, 118, 119, 133]
 if (name+'raw' not in mtd):
     print('\n', 'Loading the sample runs: ', runs, '\n')
     #LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile,OutputWorkspace=name+'raw')
-    Load(Filename= r"./input_ws/starch_80_RD_raw_backward.nxs", OutputWorkspace="starch_80_RD_raw_backward")
+    Load(Filename= r"./input_ws/starch_80_RD_raw_backward.nxs", OutputWorkspace=name+'raw')
     Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
     SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
 if (name+'empty' not in mtd):
     print('\n', 'Loading the empty runs: ', empty_runs, '\n')
     #LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile,OutputWorkspace=name+'empty')
-    Load(Filename= r"./input_ws/starch_80_RD_empty_backward.nxs", OutputWorkspace="starch_80_RD_empty_backward")
+    Load(Filename= r"./input_ws/starch_80_RD_empty_backward.nxs", OutputWorkspace=name+'empty')
     Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty') 
     
 Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
@@ -715,7 +715,7 @@ for i in range(number_of_iterations):
 
 ##-------------------save results-------------------
 
-savepath = repoPath / "tests" / "fixatures" / "adapted_original_1iter_testing"
+savepath = repoPath / "tests" / "fixatures" / "original" / "1iter_backward.npz"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \

@@ -12,10 +12,14 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-pathToOriginal = currentPath / "fixatures" / "testing_full_scripts" / "original_144-182_1iter.npz" 
-# pathToOriginal = currentPath / "fixatures" / "ori_spec3-134_iter4_ncp.npz"
+testForward = True
+if testForward:
+    pathToOriginal = currentPath / "fixatures" / "original" / "1iter_forward.npz" 
+    pathToOptimized = currentPath / "fixatures" / "opt_frontScat.npz" 
 
-pathToOptimized = currentPath / "fixatures" / "testing_full_scripts" / "optimized_144-182_1iter.npz" 
+else:
+    pathToOriginal = currentPath / "fixatures" / "original" / "1iter_backward.npz" 
+    pathToOptimized = currentPath / "fixatures" / "opt_backScat.npz" 
 
 #--------------------- Problem to solve
 # The same original script ran in Mantid 6.2 gives different results for

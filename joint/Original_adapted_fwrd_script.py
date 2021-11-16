@@ -543,14 +543,14 @@ first_spectrum, last_spectrum = 144, 182   #144, 182
 masses = [1.0079,12,16,27]
 abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
 
-simple_gaussian_fit = False
+simple_gaussian_fit = True
 
 if load_data:
     spectrum_list=str(first_spectrum)+'-'+str(last_spectrum)
     runs='43066-43076'
     ipfile = r'./ip2018_3.par'
     # LoadVesuvio(Filename=runs,SpectrumList=spectrum_list,Mode="SingleDifference",SumSpectra=False,InstrumentParFile=ipfile, OutputWorkspace=ws_name_raw)
-    Load(Filename= r"./input_ws/starch_80_RD_raw.nxs", OutputWorkspace=ws_name_raw)
+    Load(Filename= r"./input_ws/starch_80_RD_raw_forward.nxs", OutputWorkspace=ws_name_raw)
     Rebin(InputWorkspace=ws_name_raw,Params="110,1.,430",OutputWorkspace=ws_name_raw)
     SumSpectra(InputWorkspace=ws_name_raw, OutputWorkspace=ws_name_raw+'_sum')
     CloneWorkspace(InputWorkspace = ws_name_raw, OutputWorkspace = ws_name)
@@ -776,7 +776,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = repoPath / "tests" / "fixatures" / "testing_full_scripts" / "original_144-182_1iter_DGauss.npz"
+savepath = repoPath / "tests" / "fixatures" / "original" / "1iter_forward.npz"
 
 wsJoY = mtd[ws_name+'joy_sum']
 resolution = mtd["resolution_sum"].extractY()

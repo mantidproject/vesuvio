@@ -128,13 +128,6 @@ class InitialConditions:
         ]
         return maskedSpecNo - specOffset
 
-    # specOffset = firstSpec
-    # firstIdx = firstSpec - specOffset
-    # lastIdx = lastSpec - specOffset
-    # maskedSpecNo = maskedSpecNo[
-    #     (maskedSpecNo >= firstSpec) & (maskedSpecNo <= lastSpec)
-    #     ]
-    # maskedDetectorIdx = maskedSpecNo - specOffset
     
     def prepareScalingFactors(self):
         self.scalingFactors = np.ones(self.initPars.shape)
@@ -147,15 +140,15 @@ class InitialConditions:
         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
 
-        name = "starch_80_RD_forward_"
-        runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
-        empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-        spectra='144-182'                               # Spectra to be analysed
-        tof_binning="110,1.,430"                    # Binning of ToF spectra
-        mode='SingleDifference'
-        ipfile=r'./ip2018_3.par'
-        self.rawAndEmptyWsConfigs = [name, runs, empty_runs, spectra, tof_binning, mode, ipfile]
+        self.name = "starch_80_RD_forward_"
+        self.runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
+        self.empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
+        self.spectra='144-182'                               # Spectra to be analysed
+        self.tof_binning="110,1.,430"                    # Binning of ToF spectra
+        self.mode='SingleDifference'
+        self.ipfile=r'./ip2018_3.par'
 
+        self.noOfMasses = 4
         self.hydrogen_to_mass0_ratio = 0
 
         self.firstSpec = 144   #144
@@ -175,8 +168,9 @@ def main():
         wsFinal, backScatteringResults = iterativeFitForDataReduction()
         backScatteringResults.save(ic.backScatteringSavePath)
 
-        # Alter ic parameters according to results
+        # Alter ic parameters according to mean widhts from backscattering
         backMeanWidths = backScatteringResults.resultsList[0][-1]
+        backMeanWidths = np.array([12.71, 8.76, 13.897])
         ic.masses = np.append([1.0079], ic.masses).reshape(4, 1, 1)
 
         ic.initPars = np.append([1, 4.7, 0], ic.initPars)
@@ -184,7 +178,7 @@ def main():
 
         ic.bounds = np.append([[0, np.nan], [3, 6], [-3, 1]], ic.bounds, axis=0)
         ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
- 
+
         ic.changeInitialParametersForForwardScattering()
 
 
@@ -198,7 +192,7 @@ def iterativeFitForDataReduction():
 
     wsToBeFittedUncropped = loadWorkspaceToBeFitted()
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
-    createSlabGeometry(ic.slabPars)
+    createSlabGeometry(ic.getSlabPars())
     ic.prepareScalingFactors()
 
     # Initialize arrays to store script results
@@ -216,7 +210,7 @@ def iterativeFitForDataReduction():
             CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
             if ic.MSCorrectionFlag:
-                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.getMulscatPars)
+                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.getMulscatPars())
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
                       OutputWorkspace="tmpNameWs")
 
@@ -281,7 +275,7 @@ def loadVesuvioDataWorkspaces():
 
 
 def loadRawAndEmptyWsFromUserPath():
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs
+    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs()
 
     print('\n', 'Loading the sample runs: ', runs, '\n')
     Load(Filename=ic.userWsRawPath, OutputWorkspace=name+"raw")
@@ -328,13 +322,13 @@ def cropCloneAndMaskWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
     ws = CropWorkspace(
         InputWorkspace=ws.name(), 
-        StartWorkspaceIndex=ic.getFirstIdx, EndWorkspaceIndex=ic.getLastIdx, 
+        StartWorkspaceIndex=ic.getFirstIdx(), EndWorkspaceIndex=ic.getLastIdx(), 
         OutputWorkspace=ws.name()
         )
     wsToBeFitted = CloneWorkspace(
         InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0"
         )
-    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.getMaskedDetectorIdx)
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.getMaskedDetectorIdx())
     return wsToBeFitted
 
 
@@ -967,7 +961,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
      # Safeguard against possible NaNs
-    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.getMaskedSpecNo)    
+    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.getMaskedSpecNo())    
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
         raise ValueError("The workspace for the isolated H data countains NaNs, \
@@ -1071,7 +1065,11 @@ def calculateMantidResolution(ws, mass):
             else:
                 AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
 
-    SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
+    try:
+        SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
+    except ValueError:
+        raise ValueError ("All the rows from the workspace to be fitted are Nan!")
+
     normalise_workspace("resolution")
     DeleteWorkspace("tmp")
     return mtd["resolution"]
