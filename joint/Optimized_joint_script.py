@@ -33,40 +33,6 @@ class InitialConditions:
     def __init__(self):
         return None
 
-    # Parameters for Raw and Empty Workspaces
-    userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
-    userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
-
-    name = "starch_80_RD_backward"
-    runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
-    empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
-    spectra='3-134'                            # Spectra to be analysed
-    tof_binning='275.,1.,420'                    # Binning of ToF spectra
-    mode='DoubleDifference'
-    ipfile=r'./ip2019.par' 
-
-    def getRawAndEmptyWsConfigs(self):    
-        return [self.name, self.runs, self.empty_runs, self.spectra, self.tof_binning, self.mode, self.ipfile]
-
-    # Masses, instrument parameters and initial fitting parameters
-    masses = np.array([12, 16, 27]).reshape(3, 1, 1)  #TODO change to shape(4, 1) in the future
-    noOfMasses = 3
-
-    InstrParsPath = repoPath / 'ip2018_3.par'
-
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers   
-        1, 12, 0.,    
-        1, 12, 0.,   
-        1, 12.5, 0.    
-    ])
-    bounds = np.array([
-        [0, np.nan], [8, 16], [-3, 1],
-        [0, np.nan], [8, 16], [-3, 1],
-        [0, np.nan], [11, 14], [-3, 1]
-    ])
-    constraints = ()
-
     # Masked detectors
     maskedSpecNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133, 173, 174, 179])
 
@@ -74,31 +40,13 @@ class InitialConditions:
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5   
     hydrogen_peak = True                 # Hydrogen multiple scattering
-    hydrogen_to_mass0_ratio = 19.0620008206
-    # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
     
-    def getMulScatPars(self):
-        return [self.hydrogen_peak, self.hydrogen_to_mass0_ratio, self.transmission_guess, 
-                self.multiple_scattering_order, self.number_of_events]
-
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-    
-    def getSlabPars(self):
-        return [self.name, self.vertical_width, self.horizontal_width, self.thickness]
-
-    # Choose type of scattering, both or either one works
+  
+    # Choose type of scattering, when both True, the mean widths from back are used in ic of front
     backScatteringProcedure = True
     forwardScatteringProcedure = True
-
-    # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "fixatures" 
-    forwardScatteringSavePath = pathForTesting / "opt_frontScat.npz" 
-    backScatteringSavePath = pathForTesting / "opt_backScat.npz"
-
-    noOfMSIterations = 1     #4
-    firstSpec = 3    #3
-    lastSpec = 134    #134
 
     # Boolean Flags to control script
     userpathInitWsFlag = True
@@ -108,18 +56,120 @@ class InitialConditions:
     MSCorrectionFlag = False
     GammaCorrectionFlag = False
 
+    # Paths to save results for back and forward scattering
+    pathForTesting = repoPath / "tests" / "fixatures" 
+    forwardScatteringSavePath = pathForTesting / "opt_frontScat.npz" 
+    backScatteringSavePath = pathForTesting / "opt_backScat.npz"
+
+
+    def setBackscatteringInitialConditions(self):
+        # Parameters for Raw and Empty Workspaces
+        self.userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
+        self.userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
+
+        self.name = "starch_80_RD_backward"
+        self.runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
+        self.empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
+        self.spectra='3-134'                            # Spectra to be analysed
+        self.tof_binning='275.,1.,420'                    # Binning of ToF spectra
+        self.mode='DoubleDifference'
+        self.ipfile=r'./ip2019.par' 
+
+        # Masses, instrument parameters and initial fitting parameters
+        self.masses = np.array([12, 16, 27])
+        self.noOfMasses = len(self.masses)
+        # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
+        self.hydrogen_to_mass0_ratio = 19.0620008206
+        self.InstrParsPath = repoPath / 'ip2018_3.par'
+
+        self.initPars = np.array([ 
+        # Intensities, NCP widths, NCP centers   
+            1, 12, 0.,    
+            1, 12, 0.,   
+            1, 12.5, 0.    
+        ])
+        self.bounds = np.array([
+            [0, np.nan], [8, 16], [-3, 1],
+            [0, np.nan], [8, 16], [-3, 1],
+            [0, np.nan], [11, 14], [-3, 1]
+        ])
+        self.constraints = ()
+
+        self.noOfMSIterations = 1     #4
+        self.firstSpec = 3    #3
+        self.lastSpec = 134    #134
+
+
+    def setForwardScatteringInitialConditions(self):
+        self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
+        self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
+
+        self.name = "starch_80_RD_forward_"
+        self.runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
+        self.empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
+        self.spectra='144-182'                               # Spectra to be analysed
+        self.tof_binning="110,1.,430"                    # Binning of ToF spectra
+        self.mode='SingleDifference'
+        self.ipfile=r'./ip2018_3.par'
+
+        self.masses = np.array([1.0079, 12, 16, 27]) # Changed this recently from shape (4, 1, 1)
+        self.noOfMasses = len(self.masses)
+        self.hydrogen_to_mass0_ratio = 0
+        self.InstrParsPath = repoPath / 'ip2018_3.par'
+
+        self.initPars = np.array([ 
+        # Intensities, NCP widths, NCP centers  
+            1, 4.7, 0, 
+            1, 12.71, 0.,    
+            1, 8.76, 0.,   
+            1, 13.897, 0.    
+        ])
+        self.bounds = np.array([
+            [0, np.nan], [3, 6], [-3, 1],
+            [0, np.nan], [12.71, 12.71], [-3, 1],
+            [0, np.nan], [8.76, 8.76], [-3, 1],
+            [0, np.nan], [13.897, 13.897], [-3, 1]
+        ])
+        self.constraints = ()
+
+        self.noOfMSIterations = 1     #4
+        self.firstSpec = 144   #144
+        self.lastSpec = 182    #182
+
+        self.symmetriseHProfileUsingAveragesFlag = False
+        self.useScipyCurveFitToHProfileFlag = False
+        self.rebinParametersForYSpaceFit = "-20, 0.5, 20"
+        self.singleGaussFitToHProfile = True 
+
+
+    def getRawAndEmptyWsConfigs(self):    
+        return [self.name, self.runs, self.empty_runs, self.spectra, self.tof_binning, self.mode, self.ipfile]
+
+
+    def getMulScatPars(self):
+        return [self.hydrogen_peak, self.hydrogen_to_mass0_ratio, self.transmission_guess, 
+                self.multiple_scattering_order, self.number_of_events]
+
+
+    def getSlabPars(self):
+        return [self.name, self.vertical_width, self.horizontal_width, self.thickness]
+
+
     def getFirstIdx(self):
         specOffset = self.firstSpec
         return self.firstSpec - specOffset
+
 
     def getLastIdx(self):
         specOffset = self.firstSpec
         return self.lastSpec - specOffset
 
+
     def getMaskedSpecNo(self):
         return self.maskedSpecNo[
             (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
         ]
+
 
     def getMaskedDetectorIdx(self):
         specOffset = self.firstSpec
@@ -136,56 +186,36 @@ class InitialConditions:
                 self.scalingFactors = 1 / self.initPars
 
 
-    def changeInitialParametersForForwardScattering(self):
-        self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
-        self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
-
-        self.name = "starch_80_RD_forward_"
-        self.runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
-        self.empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-        self.spectra='144-182'                               # Spectra to be analysed
-        self.tof_binning="110,1.,430"                    # Binning of ToF spectra
-        self.mode='SingleDifference'
-        self.ipfile=r'./ip2018_3.par'
-
-        self.noOfMasses = 4
-        self.hydrogen_to_mass0_ratio = 0
-
-        self.firstSpec = 144   #144
-        self.lastSpec = 182    #182
-
-        self.symmetriseHProfileUsingAveragesFlag = False
-        self.useScipyCurveFitToHProfileFlag = False
-        self.rebinParametersForYSpaceFit = "-20, 0.5, 20"
-        self.singleGaussFitToHProfile = True     
-
-
 ic = InitialConditions() 
 
 
 def main():
     if ic.backScatteringProcedure:
+        ic.setBackscatteringInitialConditions()
         wsFinal, backScatteringResults = iterativeFitForDataReduction()
         backScatteringResults.save(ic.backScatteringSavePath)
 
-        # Alter ic parameters according to mean widhts from backscattering
-        backMeanWidths = backScatteringResults.resultsList[0][-1]
-        backMeanWidths = np.array([12.71, 8.76, 13.897])
-        ic.masses = np.append([1.0079], ic.masses).reshape(4, 1, 1)
-
-        ic.initPars = np.append([1, 4.7, 0], ic.initPars)
-        ic.initPars[4::3] = backMeanWidths
-
-        ic.bounds = np.append([[0, np.nan], [3, 6], [-3, 1]], ic.bounds, axis=0)
-        ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-
-        ic.changeInitialParametersForForwardScattering()
-
-
     if ic.forwardScatteringProcedure:
+        ic.setForwardScatteringInitialConditions()
+
+        try:  
+            backMeanWidths = backScatteringResults.resultsList[0][-1]
+            ic.initPars[4::3] = backMeanWidths
+            ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+            print("\nChanged ic according to mean widhts from backscattering:\n",
+                "Forward scattering initial fitting parameters:\n", ic.initPars,
+                "\nForward scattering initial fitting bounds:\n", ic.bounds)
+        except UnboundLocalError:
+            print("Using the unchanged ic for forward scattering ...")
+            pass
+
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
         fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
         forwardScatteringResults.save(ic.forwardScatteringSavePath)
+
+""""
+All the functions required to run main() are listed below, in order of appearance
+"""
 
 
 def iterativeFitForDataReduction():
@@ -214,7 +244,7 @@ def iterativeFitForDataReduction():
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
                       OutputWorkspace="tmpNameWs")
 
-            if ic.GammaCorrectionFlag:
+            if ic.GammaCorrectionFlag:  #TODO Clean up this section, ie put everything into the function
                 SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', 
                                         ParameterType='Number', Value='24.0')
                 SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', 
@@ -242,14 +272,6 @@ def fitInYSpaceProcedure(wsFinal, thisScriptResults):
 
     thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
 
-######################################################################################################################################
-#####################################################                          #######################################################
-#####################################################   DEVELOPMENT SECTION    #######################################################
-#####################################################                          #######################################################
-######################################################################################################################################
-""""
-All the functions required to run main() are listed below, in order of appearance
-"""
 
 def loadWorkspaceToBeFitted():
     if ic.fitSyntheticWsFlag:
@@ -345,7 +367,7 @@ def createSlabGeometry(slabPars):
     CreateSampleShape(name, xml_str)
 
 
-class resultsObject:
+class resultsObject:   #TODO Clean up this object
     """Used to store results of the script"""
 
     def __init__(self, wsToBeFitted):
