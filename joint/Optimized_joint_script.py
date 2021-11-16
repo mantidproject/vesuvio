@@ -6,25 +6,20 @@ from scipy import ndimage
 import time
 from pathlib import Path
 
-from scipy.sparse.linalg.isolve import iterative
+# Format print output of arrays
+np.set_printoptions(suppress=True, precision=4, linewidth=150)
+repoPath = Path(__file__).absolute().parent  # Path to the repository
 
-#######################################################################################################################################
-#######################################################                      ##########################################################
-#######################################################     USER SECTION     ##########################################################
-#######################################################                      ##########################################################
-#######################################################################################################################################
+
 '''
-The user section is composed of an initialisation section, an iterative analysis/reduction section
-of the spectra in the time-of-flight domain, and a final section where the analysis of the corrected
-hydrogen neutron Compton profile is possible in the Y-space domain.
+The InitialConditions class allows the user to change the starting parameters.
+The script includes everything required for forward and backscattering.
+The user can choose to perform back or forward scattering individually or to connect the results from 
+backscattering onto the initial parameters of forward scattering.
 
 The fit procedure in the time-of-flight domain is  based on the scipy.minimize.optimize() tool,
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
 '''
-
-# format print output of arrays
-np.set_printoptions(suppress=True, precision=4, linewidth=150)
-repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 class InitialConditions:
@@ -33,7 +28,7 @@ class InitialConditions:
     def __init__(self):
         return None
 
-    # Masked detectors
+    # Masked detectors for front and back scattering 
     maskedSpecNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133, 173, 174, 179])
 
     # Multiscaterring Correction Parameters
@@ -49,10 +44,8 @@ class InitialConditions:
     forwardScatteringProcedure = True
 
     # Boolean Flags to control script
-    userpathInitWsFlag = True
+    loadWsFromUserPathFlag = True
     scaleParsFlag = False
-    fitSyntheticWsFlag = False 
-    errorsForSyntheticNcpFlag = False
     MSCorrectionFlag = False
     GammaCorrectionFlag = False
 
@@ -63,7 +56,7 @@ class InitialConditions:
 
 
     def setBackscatteringInitialConditions(self):
-        # Parameters for Raw and Empty Workspaces
+        # Parameters to load Raw and Empty Workspaces
         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
 
@@ -186,6 +179,7 @@ class InitialConditions:
                 self.scalingFactors = 1 / self.initPars
 
 
+# This is the only variable with global behaviour, all functions are defined to use attributes of ic
 ic = InitialConditions() 
 
 
@@ -220,7 +214,7 @@ All the functions required to run main() are listed below, in order of appearanc
 
 def iterativeFitForDataReduction():
 
-    wsToBeFittedUncropped = loadWorkspaceToBeFitted()
+    wsToBeFittedUncropped = loadVesuvioDataWorkspaces()
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
     createSlabGeometry(ic.getSlabPars())
     ic.prepareScalingFactors()
@@ -231,6 +225,8 @@ def iterativeFitForDataReduction():
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
+
+        print("\nFitting spectra ", ic.firstSpec, " - ", ic.lastSpec, "\n.............")
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
         thisScriptResults.append(iteration, fittedNcpResults)
 
@@ -244,18 +240,8 @@ def iterativeFitForDataReduction():
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
                       OutputWorkspace="tmpNameWs")
 
-            if ic.GammaCorrectionFlag:  #TODO Clean up this section, ie put everything into the function
-                SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', 
-                                        ParameterType='Number', Value='24.0')
-                SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', 
-                                        ParameterType='Number', Value='73.0')
-
-                createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios)
-                Scale(
-                    InputWorkspace = ic.name+"_gamma_background", 
-                    OutputWorkspace = ic.name+"_gamma_background", 
-                    Factor=0.9, Operation="Multiply"
-                    )
+            if ic.GammaCorrectionFlag:  
+                createWorkspacesForGammaCorrection(meanWidths, meanIntensityRatios)
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
                       OutputWorkspace="tmpNameWs")
 
@@ -264,35 +250,12 @@ def iterativeFitForDataReduction():
     return wsFinal, thisScriptResults
 
 
-def fitInYSpaceProcedure(wsFinal, thisScriptResults):
-    ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
-    wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
-    popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
-    wsH = mtd[wsFinal.name()+"_H"]
-
-    thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
-
-
-def loadWorkspaceToBeFitted():
-    if ic.fitSyntheticWsFlag:
-        wsToBeFitted = loadSyntheticNcpWorkspace()
-    else:
-        wsToBeFitted = loadVesuvioDataWorkspaces()
-    return wsToBeFitted
-
-
-def loadSyntheticNcpWorkspace():
-    """Loads a synthetic ncpTotal workspace from previous fit results path"""
-    wsToBeFitted = Load(Filename=str(ic.syntheticResultsPath), OutputWorkspace=ic.name) 
-    return wsToBeFitted
-
-
 def loadVesuvioDataWorkspaces():
     """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-    if ic.userpathInitWsFlag:
+    if ic.loadWsFromUserPathFlag:
         wsToBeFitted =  loadRawAndEmptyWsFromUserPath()
     else:
-        wsToBeFitted = loadRawAndEmptyWsVesuvio()
+        wsToBeFitted = loadRawAndEmptyWsFromLoadVesuvio()
     return wsToBeFitted
 
 
@@ -318,7 +281,7 @@ def loadRawAndEmptyWsFromUserPath():
     return wsToBeFitted
 
 
-def loadRawAndEmptyWsVesuvio():
+def loadRawAndEmptyWsFromLoadVesuvio():
     name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs
     
     print('\n', 'Loading the sample runs: ', runs, '\n')
@@ -367,7 +330,7 @@ def createSlabGeometry(slabPars):
     CreateSampleShape(name, xml_str)
 
 
-class resultsObject:   #TODO Clean up this object
+class resultsObject: 
     """Used to store results of the script"""
 
     def __init__(self, wsToBeFitted):
@@ -377,20 +340,15 @@ class resultsObject:   #TODO Clean up this object
         lenOfSpec = wsToBeFitted.blocksize()
 
         all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
-        all_spec_best_par_chi_nit = np.zeros(
-            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3)
-            )
+        all_spec_best_par_chi_nit = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
         all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        all_ncp_for_each_mass = np.zeros(
-            (ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1)
-            )
+        all_ncp_for_each_mass = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
         all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
         all_mean_intensities = np.zeros(all_mean_widths.shape)
 
-        resultsList = [all_mean_widths, all_mean_intensities,
-                       all_spec_best_par_chi_nit, all_tot_ncp, 
-                       all_fit_workspaces, all_ncp_for_each_mass]
-        self.resultsList = resultsList
+        self.resultsList = [all_mean_widths, all_mean_intensities,
+                            all_spec_best_par_chi_nit, all_tot_ncp, 
+                            all_fit_workspaces, all_ncp_for_each_mass]
 
 
     def append(self, mulscatIter, resultsToAppend):
@@ -398,8 +356,8 @@ class resultsObject:   #TODO Clean up this object
         for i, currentMSArray in enumerate(resultsToAppend):
             self.resultsList[i][mulscatIter] = currentMSArray
 
-
-    # Currently not a very elegant way of storing this info
+    
+    # Set default of yspace fit parameters to zero
     YSpaceSymSumDataY = 0
     YSpaceSymSumDataE = 0
     resolution = 0
@@ -421,6 +379,8 @@ class resultsObject:   #TODO Clean up this object
 
 
     def save(self, savePath):
+        """Saves all of the arrays stored in this object"""
+
         all_mean_widths, all_mean_intensities, \
         all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
         all_ncp_for_each_mass = self.resultsList
@@ -500,7 +460,6 @@ def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
     spectra = data[:, 0]
     select_rows = np.where((spectra >= firstSpec) & (spectra <= lastSpec))
     instrPars = data[select_rows]
-    print("instrPars first column: \n", instrPars[:, 0])  
     return instrPars
 
 
@@ -509,31 +468,32 @@ def loadResolutionPars(instrPars):
        Output: matrix with each parameter in each column"""
     spectrums = instrPars[:, 0] 
     L = len(spectrums)
-    #for spec no below 135, back scattering detectors, in case of double difference
-    #for spec no 135 or above, front scattering detectors, in case of single difference
-    dE1 = np.where(spectrums < 135, 88.7, 73)   #meV, STD
+    #for spec no below 135, back scattering detectors, mode is double difference
+    #for spec no 135 or above, front scattering detectors, mode is single difference
+    dE1 = np.where(spectrums < 135, 88.7, 73)       #meV, STD
     dE1_lorz = np.where(spectrums < 135, 40.3, 24)  #meV, HFHM
     dTOF = np.repeat(0.37, L)      #us
     dTheta = np.repeat(0.016, L)   #rad
     dL0 = np.repeat(0.021, L)      #meters
     dL1 = np.repeat(0.023, L)      #meters
     
-    resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()  #store all parameters in a matrix
+    resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose() 
     return resolutionPars 
 
 
 def calculateKinematicsArrays(dataX, instrPars):          
     """Kinematics quantities calculated from TOF data"""   
+
     mN, Ef, en_to_vel, vf, hbar = loadConstants()    
     det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)     #each is of len(dataX)
-    t_us = dataX - T0                                         #T0 is electronic delay due to instruments
+    t_us = dataX - T0                                           #T0 is electronic delay due to instruments
     v0 = vf * L0 / ( vf * t_us - L1 )
     E0 =  np.square( v0 / en_to_vel )            #en_to_vel is a factor used to easily change velocity to energy and vice-versa
     
     delta_E = E0 - Ef  
     delta_Q2 = 2. * mN / hbar**2 * ( E0 + Ef - 2. * np.sqrt(E0*Ef) * np.cos(angle/180.*np.pi) )
     delta_Q = np.sqrt( delta_Q2 )
-    return v0, E0, delta_E, delta_Q              #shape(no_spectrums, len_spec)
+    return v0, E0, delta_E, delta_Q              #shape(no of spectrums, no of bins)
 
 
 def reshapeArrayPerSpectrum(A):
@@ -544,11 +504,15 @@ def reshapeArrayPerSpectrum(A):
 
 
 def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
-    "Calculates y spaces from TOF data, each row corresponds to one mass"   
-    dataX, delta_Q, delta_E = dataX[np.newaxis, :, :],  delta_Q[np.newaxis, :, :], delta_E[np.newaxis, :, :]   #prepare arrays to broadcast
+    "Calculates y spaces from TOF data, each row corresponds to one mass" 
+    
+    #prepare arrays to broadcast
+    dataX = dataX[np.newaxis, :, :]
+    delta_Q = delta_Q[np.newaxis, :, :]
+    delta_E = delta_E[np.newaxis, :, :]  
+
     mN, Ef, en_to_vel, vf, hbar = loadConstants()
-    noOfMasses = len(masses)
-    masses = masses.reshape(noOfMasses, 1, 1)
+    masses = masses.reshape(ic.noOfMasses, 1, 1)
 
     energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
     ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
@@ -598,8 +562,9 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
 
 
 def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
-    """Creates a synthetic C(t) to be fitted to TOF values, from J(y) and resolution functions
-       shapes: initPars (1, 12), masses (4,1,1), datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n)"""
+    """Creates a synthetic C(t) to be fitted to TOF values of a single spectrum, from J(y) and resolution functions
+       Shapes: datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n),
+       where n is no of bins"""
     
     masses, intensities, widths, centers = prepareArraysFromPars(masses, unscaledPars) 
     v0, E0, deltaE, deltaQ = kinematicArrays
@@ -640,7 +605,7 @@ def caculateResolutionForEachMass(masses, ySpacesForEachMass, centers, resolutio
 
 
 def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
-    """v0, E0, deltaE, deltaQ at the center of the ncpTotal for each mass"""
+    """v0, E0, deltaE, deltaQ at the peak of the ncpTotal for each mass"""
     noOfMasses = len(ySpacesForEachMass)
     shapeOfArrays = (noOfMasses, 1)
 
@@ -664,7 +629,7 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
 
 
 def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
-    """Currently the function that takes the most time in the fitting"""
+    # Currently the function that takes the most time in the fitting
 
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
@@ -764,8 +729,8 @@ def numericalThirdDerivative(x, fun):
     dev /= 12**3
 
     derivative = np.zeros(fun.shape)
-    # need to pad with zeros left and right to return array with same shape
     derivative[:, 6:-6] = dev
+    # Padded with zeros left and right to return array with same shape
     return derivative
 
 
@@ -783,9 +748,11 @@ class FitParameters:
         self.centers = mainPars[:, 2::3]
         self.mainPars = mainPars
 
+
     def printPars(self):
         print("[Spec Intensities----Widths----Centers Chi2 Nit]:\n\n", 
               np.hstack((self.spec, self.intensities, self.widths, self.centers, self.chi2, self.nit)))
+
 
     def getMeanWidthsAndIntensities(self):
         noOfMasses = ic.noOfMasses
@@ -835,10 +802,6 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     dataX = ws.extractX()
     dataE = np.zeros(dataX.shape)
-
-    if ic.errorsForSyntheticNcpFlag:   # Generates synthetic ncp data with homoscedastic error bars
-        wsDataE = ws.extractE()
-        dataE = np.mean(wsDataE, axis=1)[:, np.newaxis] * np.ones((1, len(dataX[0])))
 
     # Original script does not have this step to multiply by histogram widths
     histWidths = dataX[:, 1:] - dataX[:, :-1]
@@ -930,13 +893,23 @@ def createMulScatWorkspaces(wsName, sampleProperties, mulscatPars):
   # The only remaining workspaces are the _MulScattering and _TotScattering
 
 
-def createWorkspcaesForGammaCorrection(meanWidths, meanIntensityRatios):
+def createWorkspacesForGammaCorrection(meanWidths, meanIntensityRatios):
     """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
+
+    # I do not know why, but setting these instrument parameters is required
+    SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', 
+                            ParameterType='Number', Value='24.0')
+    SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', 
+                            ParameterType='Number', Value='73.0')
+
     profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
     background, corrected = VesuvioCalculateGammaBackground(
         InputWorkspace=ic.name, ComptonFunction=profiles
         )
     RenameWorkspace(InputWorkspace= background, OutputWorkspace = ic.name+"_gamma_background")
+    Scale(InputWorkspace = ic.name+"_gamma_background", OutputWorkspace = ic.name+"_gamma_background", 
+        Factor=0.9, Operation="Multiply")
+
     DeleteWorkspace(corrected)
 
 
@@ -952,6 +925,15 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
     return profiles
 
 
+def fitInYSpaceProcedure(wsFinal, thisScriptResults):
+    ncpForEachMass = thisScriptResults.resultsList[5][-1]  # Select last iteration
+    wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
+    popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
+    wsH = mtd[wsFinal.name()+"_H"]
+
+    thisScriptResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
+
+
 def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
     massH = 1.0079
     wsRes = calculateMantidResolution(wsFinal, massH)  
@@ -959,6 +941,36 @@ def isolateHProfileInYSpace(wsFinal, ncpForEachMass):
     wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
     averagedSpectraYSpace = averageJOfYOverAllSpectra(wsSubMass, massH) 
     return averagedSpectraYSpace, wsRes
+
+
+def calculateMantidResolution(ws, mass):
+    rebinPars=ic.rebinParametersForYSpaceFit
+    for index in range(ws.getNumberHistograms()):
+        if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
+            pass
+        else:
+            VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
+            Rebin(InputWorkspace="tmp", Params=rebinPars, OutputWorkspace="tmp")
+
+            if index == 0:   # Ensures that workspace has desired units
+                RenameWorkspace("tmp","resolution")
+            else:
+                AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
+
+    try:
+        SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
+    except ValueError:
+        raise ValueError ("All the rows from the workspace to be fitted are Nan!")
+
+    normalise_workspace("resolution")
+    DeleteWorkspace("tmp")
+    return mtd["resolution"]
+
+    
+def normalise_workspace(ws_name):
+    tmp_norm = Integration(ws_name)
+    Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
+    DeleteWorkspace("tmp_norm")
 
 
 def subtractAllMassesExceptFirst(ws, ncpForEachMass):
@@ -1037,6 +1049,7 @@ def SymetriseWorkspace(wsYSpace):
         wsYSym.dataE(i)[:] = dataE[i, :]
     return wsYSym
 
+
 def symetriseArrayUsingAverages(dataY):
     # Code below works as long as dataX is symetric
     # Need to account for kinematic cut-offs
@@ -1044,6 +1057,7 @@ def symetriseArrayUsingAverages(dataY):
     # With zeros being masked, can perform the average
     dataY = (dataY + np.flip(dataY, axis=1)) / 2
     return dataY
+
 
 def symetriseArrayNegMirrorsPos(dataX, dataY):
     dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
@@ -1067,36 +1081,6 @@ def replaceNonZeroNanValuesByOnesInWs(wsYSym):
     return wsOnes
 
 
-def normalise_workspace(ws_name):
-    tmp_norm = Integration(ws_name)
-    Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
-    DeleteWorkspace("tmp_norm")
-
-
-def calculateMantidResolution(ws, mass):
-    rebinPars=ic.rebinParametersForYSpaceFit
-    for index in range(ws.getNumberHistograms()):
-        if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
-            pass
-        else:
-            VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-            Rebin(InputWorkspace="tmp", Params=rebinPars, OutputWorkspace="tmp")
-
-            if index == 0:   # Ensures that workspace has desired units
-                RenameWorkspace("tmp","resolution")
-            else:
-                AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
-
-    try:
-        SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
-    except ValueError:
-        raise ValueError ("All the rows from the workspace to be fitted are Nan!")
-
-    normalise_workspace("resolution")
-    DeleteWorkspace("tmp")
-    return mtd["resolution"]
-
-
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
     if ic.useScipyCurveFitToHProfileFlag:
         popt, pcov = fitProfileCurveFit(wsYSpaceSym, wsRes)
@@ -1107,6 +1091,7 @@ def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
         popt, perr = fitProfileMantidFit(wsYSpaceSym, wsRes)
     
     return popt, perr
+
 
 def fitProfileCurveFit(wsYSpaceSym, wsRes):
     res = wsRes.extractY()[0]

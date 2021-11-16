@@ -25,6 +25,12 @@ else:
 # The same original script ran in Mantid 6.2 gives different results for
 # the intensities, but it should give very similar results
 
+def displayMask(mask, rtol, string):
+    noDiff = np.sum(mask)
+    maskSize = mask.size
+    print("\nNo of different "+string+f", rtol={rtol}:\n",
+        noDiff, " out of ", maskSize,
+        f"ie {100*noDiff/maskSize:.1f} %")    
 
 
 class TestFitParameters(unittest.TestCase):
@@ -92,14 +98,6 @@ class TestFitParameters(unittest.TestCase):
             )
         totalDiffMask = ~ totalMask
         displayMask(totalDiffMask, self.rtol, "intensities")
-
-
-def displayMask(mask, rtol, string):
-    noDiff = np.sum(mask)
-    maskSize = mask.size
-    print("\nNo of different "+string+f", rtol={rtol}:\n",
-        noDiff, " out of ", maskSize,
-        f"ie {100*noDiff/maskSize:.1f} %")    
 
 
 class TestNcp(unittest.TestCase):
