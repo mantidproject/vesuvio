@@ -532,13 +532,13 @@ is not needed as a result of the symmetrisation.
 load_data=True                             # If data have already been loaded, it can be put to Fasle to save time;
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 1              # This is the number of iterations for the reduction analysis in time-of-flight.
+number_of_iterations = 4              # This is the number of iterations for the reduction analysis in time-of-flight.
 fit_in_Y_space = True      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
 
 ws_name="starch_80_RD_"
 ws_name_raw="starch_80_RD_raw_"
 ws_name_empty="starch_80_RD_empty_"
-first_spectrum, last_spectrum = 144, 182   #144, 182
+first_spectrum, last_spectrum = 144, 182  #144, 182
 
 masses = [1.0079,12,16,27]
 abs_cross_sections = [] # This should be a vector of absorprion-to-scattering cross sections for each mass.
@@ -649,7 +649,6 @@ for iteration in range(number_of_iterations):
         correct_for_gamma_background(ws_name)
         Scale(InputWorkspace = str(ws_name)+"_gamma_background", OutputWorkspace = str(ws_name)+"_gamma_background", Factor=0.9, Operation = "Multiply")
         # evaluate multiple scattering correction --------- This creates a background workspace with ws_name :  str(ws_name)+"_MulScattering"
-        # skip the multiscattering correction for now
         sample_properties = calculate_sample_properties(masses, mean_widths, mean_intensity_ratios, "MultipleScattering", verbose)
         correct_for_multiple_scattering(ws_name, first_spectrum,last_spectrum, sample_properties, transmission_guess, multiple_scattering_order, number_of_events)
         # Create corrected workspace
@@ -776,7 +775,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = repoPath / "tests" / "fixatures" / "original" / "1iter_forward.npz"
+savepath = repoPath / "tests" / "fixatures" / "original" / "4iter_forward_GB_MS.npz"
 
 wsJoY = mtd[ws_name+'joy_sum']
 resolution = mtd["resolution_sum"].extractY()

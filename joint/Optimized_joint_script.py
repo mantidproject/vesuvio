@@ -14,8 +14,8 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 '''
 The InitialConditions class allows the user to change the starting parameters.
 The script includes everything required for forward and backscattering.
-The user can choose to perform back or forward scattering individually or to connect the results from 
-backscattering onto the initial parameters of forward scattering.
+The user can choose to perform back or forward scattering individually or to connect the mean widths from 
+backscattering onto the initial parameters for forward scattering.
 
 The fit procedure in the time-of-flight domain is  based on the scipy.minimize.optimize() tool,
 used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
@@ -40,19 +40,13 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
     # Choose type of scattering, when both True, the mean widths from back are used in ic of front
-    backScatteringProcedure = True
+    backScatteringProcedure = False
     forwardScatteringProcedure = True
 
-    # Boolean Flags to control script
-    loadWsFromUserPathFlag = True
-    scaleParsFlag = False
-    MSCorrectionFlag = False
-    GammaCorrectionFlag = False
-
     # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "fixatures" 
-    forwardScatteringSavePath = pathForTesting / "opt_frontScat.npz" 
-    backScatteringSavePath = pathForTesting / "opt_backScat.npz"
+    pathForTesting = repoPath / "tests" / "cleaning" 
+    forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
+    backScatteringSavePath = pathForTesting / "current_backward.npz"
 
 
     def setBackscatteringInitialConditions(self):
@@ -88,9 +82,31 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 4     #4
         self.firstSpec = 3    #3
-        self.lastSpec = 134    #134
+        self.lastSpec = 8    #134
+
+        # Boolean Flags to control script
+        self.loadWsFromUserPathFlag = True
+        self.scaleParsFlag = False
+        self.MSCorrectionFlag = False
+        self.GammaCorrectionFlag = True
+
+        self.firstSpecIdx = 0
+        self.lastSpecIdx = self.firstSpec - self.lastSpec
+
+        # Consider only the masked spectra between first and last spectrum
+        self.maskedSpecNo = self.maskedSpecNo[
+            (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
+        ]
+        self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
+
+        # Set scaling factors for the fitting parameters, default is ones
+        self.scalingFactors = np.ones(self.initPars.shape)
+        if self.scaleParsFlag:        # Scale fitting parameters using initial values
+                self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
+                self.scalingFactors = 1 / self.initPars
+
 
 
     def setForwardScatteringInitialConditions(self):
@@ -125,58 +141,37 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 2     #4
         self.firstSpec = 144   #144
-        self.lastSpec = 182    #182
+        self.lastSpec = 160    #182
 
+        # Boolean Flags to control script
+        self.loadWsFromUserPathFlag = True
+        self.scaleParsFlag = False
+        self.MSCorrectionFlag = True
+        self.GammaCorrectionFlag = True
+
+        # Parameters to control fit in Y-Space
         self.symmetriseHProfileUsingAveragesFlag = False
         self.useScipyCurveFitToHProfileFlag = False
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"
         self.singleGaussFitToHProfile = True 
 
+        self.firstSpecIdx = 0
+        self.lastSpecIdx = self.lastSpec - self.firstSpec
 
-    def getRawAndEmptyWsConfigs(self):    
-        return [self.name, self.runs, self.empty_runs, self.spectra, self.tof_binning, self.mode, self.ipfile]
-
-
-    def getMulScatPars(self):
-        return [self.hydrogen_peak, self.hydrogen_to_mass0_ratio, self.transmission_guess, 
-                self.multiple_scattering_order, self.number_of_events]
-
-
-    def getSlabPars(self):
-        return [self.name, self.vertical_width, self.horizontal_width, self.thickness]
-
-
-    def getFirstIdx(self):
-        specOffset = self.firstSpec
-        return self.firstSpec - specOffset
-
-
-    def getLastIdx(self):
-        specOffset = self.firstSpec
-        return self.lastSpec - specOffset
-
-
-    def getMaskedSpecNo(self):
-        return self.maskedSpecNo[
+        # Consider only the masked spectra between first and last spectrum
+        self.maskedSpecNo = self.maskedSpecNo[
             (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
         ]
+        self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
 
-
-    def getMaskedDetectorIdx(self):
-        specOffset = self.firstSpec
-        maskedSpecNo =  self.maskedSpecNo[
-            (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
-        ]
-        return maskedSpecNo - specOffset
-
-    
-    def prepareScalingFactors(self):
+        # Set scaling factors for the fitting parameters, default is ones
         self.scalingFactors = np.ones(self.initPars.shape)
-        if self.scaleParsFlag:        # Option to scale fitting parameters using initial values
+        if self.scaleParsFlag:        # Scale fitting parameters using initial values
                 self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
                 self.scalingFactors = 1 / self.initPars
+
 
 
 # This is the only variable with global behaviour, all functions are defined to use attributes of ic
@@ -207,7 +202,8 @@ def main():
         fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
         forwardScatteringResults.save(ic.forwardScatteringSavePath)
 
-""""
+
+"""
 All the functions required to run main() are listed below, in order of appearance
 """
 
@@ -216,8 +212,7 @@ def iterativeFitForDataReduction():
 
     wsToBeFittedUncropped = loadVesuvioDataWorkspaces()
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
-    createSlabGeometry(ic.getSlabPars())
-    ic.prepareScalingFactors()
+    createSlabGeometry()
 
     # Initialize arrays to store script results
     thisScriptResults = resultsObject(wsToBeFitted)
@@ -236,7 +231,7 @@ def iterativeFitForDataReduction():
             CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
             if ic.MSCorrectionFlag:
-                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, ic.getMulscatPars())
+                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios)
                 Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
                       OutputWorkspace="tmpNameWs")
 
@@ -260,46 +255,44 @@ def loadVesuvioDataWorkspaces():
 
 
 def loadRawAndEmptyWsFromUserPath():
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs()
 
-    print('\n', 'Loading the sample runs: ', runs, '\n')
-    Load(Filename=ic.userWsRawPath, OutputWorkspace=name+"raw")
-    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
-          OutputWorkspace=name+'raw')
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-    wsToBeFitted = CloneWorkspace(InputWorkspace=name+'raw', OutputWorkspace=name)
+    print('\n', 'Loading the sample runs: ', ic.runs, '\n')
+    Load(Filename=ic.userWsRawPath, OutputWorkspace=ic.name+"raw")
+    Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
+          OutputWorkspace=ic.name+'raw')
+    SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
+    wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name)
 
-    if mode=="DoubleDifference":
-        print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-        Load(Filename=ic.userWsEmptyPath, OutputWorkspace=name+"empty")
-        Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-            OutputWorkspace=name+'empty')
-        wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty',
-                            OutputWorkspace=name)
+    if ic.mode=="DoubleDifference":
+        print('\n', 'Loading the empty runs: ', ic.empty_runs, '\n')
+        Load(Filename=ic.userWsEmptyPath, OutputWorkspace=ic.name+"empty")
+        Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
+            OutputWorkspace=ic.name+'empty')
+        wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
+                            OutputWorkspace=ic.name)
 
     print(wsToBeFitted.name())
     return wsToBeFitted
 
 
 def loadRawAndEmptyWsFromLoadVesuvio():
-    name, runs, empty_runs, spectra, tof_binning, mode, ipfile = ic.getRawAndEmptyWsConfigs
     
-    print('\n', 'Loading the sample runs: ', runs, '\n')
-    LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode,
-                InstrumentParFile=ipfile, OutputWorkspace=name+'raw')
-    Rebin(InputWorkspace=name+'raw', Params=tof_binning,
-          OutputWorkspace=name+'raw')
-    SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
-    wsToBeFitted = CloneWorkspace(InputWorkspace=name+'raw', OutputWorkspace=name)
+    print('\n', 'Loading the sample runs: ', ic.runs, '\n')
+    LoadVesuvio(Filename=ic.runs, SpectrumList=ic.spectra, Mode=ic.mode,
+                InstrumentParFile=ic.ipfile, OutputWorkspace=ic.name+'raw')
+    Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
+          OutputWorkspace=ic.name+'raw')
+    SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
+    wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name)
 
-    if mode=="DoubleDifference":
-        print('\n', 'Loading the empty runs: ', empty_runs, '\n')
-        LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode,
-                    InstrumentParFile=ipfile, OutputWorkspace=name+'empty')
-        Rebin(InputWorkspace=name+'empty', Params=tof_binning,
-            OutputWorkspace=name+'empty')
-        wsToBeFitted = Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', 
-                            OutputWorkspace=name)
+    if ic.mode=="DoubleDifference":
+        print('\n', 'Loading the empty runs: ', ic.empty_runs, '\n')
+        LoadVesuvio(Filename=ic.empty_runs, SpectrumList=ic.spectra, Mode=ic.mode,
+                    InstrumentParFile=ic.ipfile, OutputWorkspace=ic.name+'empty')
+        Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
+            OutputWorkspace=ic.name+'empty')
+        wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty', 
+                            OutputWorkspace=ic.name)
     return wsToBeFitted
 
 
@@ -307,19 +300,18 @@ def cropCloneAndMaskWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
     ws = CropWorkspace(
         InputWorkspace=ws.name(), 
-        StartWorkspaceIndex=ic.getFirstIdx(), EndWorkspaceIndex=ic.getLastIdx(), 
+        StartWorkspaceIndex=ic.firstSpecIdx, EndWorkspaceIndex=ic.lastSpecIdx, 
         OutputWorkspace=ws.name()
         )
     wsToBeFitted = CloneWorkspace(
         InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0"
         )
-    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.getMaskedDetectorIdx())
+    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
     return wsToBeFitted
 
 
-def createSlabGeometry(slabPars):
-    name, vertical_width, horizontal_width, thickness = slabPars
-    half_height, half_width, half_thick = 0.5*vertical_width, 0.5*horizontal_width, 0.5*thickness
+def createSlabGeometry():
+    half_height, half_width, half_thick = 0.5*ic.vertical_width, 0.5*ic.horizontal_width, 0.5*ic.thickness
     xml_str = \
         " <cuboid id=\"sample-shape\"> " \
         + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
@@ -327,7 +319,7 @@ def createSlabGeometry(slabPars):
         + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
-    CreateSampleShape(name, xml_str)
+    CreateSampleShape(ic.name, xml_str)
 
 
 class resultsObject: 
@@ -531,7 +523,7 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
     result = optimize.minimize(
         errorFunction, 
         scaledPars, 
-        args=(ic.masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
+        args=(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays),
         method='SLSQP', 
         bounds = scaledBounds, 
         constraints=ic.constraints
@@ -545,11 +537,11 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
     return np.append(specFitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
 
 
-def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
+def errorFunction(scaledPars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Error function to be minimized, operates in TOF space"""
 
     unscaledPars = scaledPars / ic.scalingFactors
-    ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
+    ncpForEachMass, ncpTotal = calculateNcpSpec(unscaledPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is not usually satisfied but in the exceptional case that it is,
@@ -561,12 +553,12 @@ def errorFunction(scaledPars, masses, dataY, dataE, ySpacesForEachMass, resoluti
     return np.sum(chi2)
 
 
-def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
+def calculateNcpSpec(unscaledPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
     """Creates a synthetic C(t) to be fitted to TOF values of a single spectrum, from J(y) and resolution functions
        Shapes: datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n),
        where n is no of bins"""
     
-    masses, intensities, widths, centers = prepareArraysFromPars(masses, unscaledPars) 
+    masses, intensities, widths, centers = prepareArraysFromPars(ic.masses, unscaledPars) 
     v0, E0, deltaE, deltaQ = kinematicArrays
     
     gaussRes, lorzRes = caculateResolutionForEachMass(
@@ -584,8 +576,10 @@ def calculateNcpSpec(unscaledPars, masses, ySpacesForEachMass, resolutionPars, i
 
 
 def prepareArraysFromPars(masses, initPars):
-    noOfMasses = len(masses)
-    shapeOfArrays = (noOfMasses, 1)
+    """Extracts the intensities, widths and centers from the fitting parameters
+        Reshapes all of the arrays to collumns, for the calculation of the ncp,"""
+
+    shapeOfArrays = (ic.noOfMasses, 1)
     masses = masses.reshape(shapeOfArrays)    
     intensities = initPars[::3].reshape(shapeOfArrays)
     widths = initPars[1::3].reshape(shapeOfArrays)
@@ -606,9 +600,8 @@ def caculateResolutionForEachMass(masses, ySpacesForEachMass, centers, resolutio
 
 def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
     """v0, E0, deltaE, deltaQ at the peak of the ncpTotal for each mass"""
-    noOfMasses = len(ySpacesForEachMass)
-    shapeOfArrays = (noOfMasses, 1)
 
+    shapeOfArrays = (ic.noOfMasses, 1)
     proximityToYCenters = np.abs(ySpacesForEachMass - centers)
     yClosestToCenters = proximityToYCenters.min(axis=1).reshape(shapeOfArrays)
     yCentersMask = proximityToYCenters == yClosestToCenters
@@ -630,6 +623,8 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
 
 def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
     # Currently the function that takes the most time in the fitting
+    if masses.shape != (ic.noOfMasses, 1):
+        raise ValueError("The shape of the masses array needs to be a collumn!")
 
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
@@ -662,6 +657,9 @@ def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, ins
 
 
 def calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
+    if masses.shape != (ic.noOfMasses, 1):
+        raise ValueError("The shape of the masses array needs to be a collumn!")
+        
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
     mN, Ef, en_to_vel, vf, hbar = loadConstants()
@@ -791,7 +789,7 @@ def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, ki
     if np.all(np.isnan(initPars)):
         return np.full(ySpacesForEachMass.shape, np.nan)
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ic.masses, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
 
 
@@ -824,24 +822,24 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios, mulscatPars):
+def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
-    sampleProperties = calcMSCorrectionSampleProperties(
-        ic.masses, meanWidths, meanIntensityRatios, mulscatPars
-        )
-    createMulScatWorkspaces(ic.name, sampleProperties, mulscatPars)
+
+    sampleProperties = calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios)
+    print("\n The sample properties for Multiple Scattering correction are:\n ", 
+            sampleProperties)
+    createMulScatWorkspaces(ic.name, sampleProperties)
 
 
-def calcMSCorrectionSampleProperties(masses, meanWidths, meanIntensityRatios, mulscatPars):
-    masses = masses.reshape(4)
-    hydrogen_peak, hydrogen_to_mass0_ratio = mulscatPars[:2]
+def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
+    masses = ic.masses.flatten()
 
-    if hydrogen_peak:
+    if ic.hydrogen_peak:
         # ADDITION OF THE HYDROGEN intensities AS PROPORTIONAL TO A FITTED NCP (OXYGEN HERE)
         masses = np.append(masses, 1.0079)
         meanWidths = np.append(meanWidths, 5.0)
         meanIntensityRatios = np.append(
-            meanIntensityRatios, hydrogen_to_mass0_ratio * meanIntensityRatios[0]
+            meanIntensityRatios, ic.hydrogen_to_mass0_ratio * meanIntensityRatios[0]
             )
         meanIntensityRatios /= np.sum(meanIntensityRatios)
 
@@ -850,22 +848,20 @@ def calcMSCorrectionSampleProperties(masses, meanWidths, meanIntensityRatios, mu
     MSProperties[1::3] = meanIntensityRatios
     MSProperties[2::3] = meanWidths
     sampleProperties = list(MSProperties)   
-    print("\n The sample properties for Multiple Scattering correction are:\n ", 
-            sampleProperties)
+    return sampleProperties
 
 
-def createMulScatWorkspaces(wsName, sampleProperties, mulscatPars):
+def createMulScatWorkspaces(wsName, sampleProperties):
     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
 
     print("Evaluating the Multiple Scattering Correction.")
-    transmission_guess, multiple_scattering_order, number_of_events = mulscatPars[2:]
     # selects only the masses, every 3 numbers
     MS_masses = sampleProperties[::3]
     # same as above, but starts at first intensities
     MS_amplitudes = sampleProperties[1::3]
 
     dens, trans = VesuvioThickness(
-        Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=transmission_guess, Thickness=0.1
+        Masses=MS_masses, Amplitudes=MS_amplitudes, TransmissionGuess=ic.transmission_guess, Thickness=0.1
         )
 
     _TotScattering, _MulScattering = VesuvioCalculateMS(
@@ -874,8 +870,8 @@ def createMulScatWorkspaces(wsName, sampleProperties, mulscatPars):
         SampleDensity=dens.cell(9, 1),
         AtomicProperties=sampleProperties, 
         BeamRadius=2.5,
-        NumScatters=multiple_scattering_order,
-        NumEventsPerRun=int(number_of_events)
+        NumScatters=ic.multiple_scattering_order,
+        NumEventsPerRun=int(ic.number_of_events)
         )
 
     data_normalisation = Integration(wsName)
@@ -995,7 +991,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
      # Safeguard against possible NaNs
-    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.getMaskedSpecNo())    
+    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.maskedSpecNo)    
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
         raise ValueError("The workspace for the isolated H data countains NaNs, \

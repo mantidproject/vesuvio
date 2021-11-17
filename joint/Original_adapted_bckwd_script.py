@@ -383,8 +383,9 @@ def calculate_sample_properties(masses,mean_widths,mean_intensity_ratios, mode, 
                 mean_widths_with_H[m] = mean_widths[m]
                 
             mean_intensity_ratios_with_H.append(hydrogen_to_mass0_ratio * mean_intensity_ratios[0])
-            mean_intensity_ratios_with_H = map(lambda x: x / np.sum(mean_intensity_ratios_with_H), mean_intensity_ratios_with_H)
-            
+            mean_intensity_ratios_with_H = list(map(lambda x: x / np.sum(mean_intensity_ratios_with_H), mean_intensity_ratios_with_H))
+            # Original does not have the list()
+
             masses_with_H.append(1.0079)
             mean_widths_with_H.append(5.0)
             
@@ -445,10 +446,10 @@ def correct_for_multiple_scattering(ws_name,first_spectrum,last_spectrum, sample
                                                         transmission_guess, multiple_scattering_order, number_of_events):
     
 
-    MS_masses = [0] * (len(sample_properties)/3)
-    MS_amplitudes = [0] * (len(sample_properties)/3)
+    MS_masses = [0] * int(len(sample_properties)/3)
+    MS_amplitudes = [0] * int(len(sample_properties)/3)
     
-    for m in range(len(sample_properties)/3):
+    for m in range(int(len(sample_properties)/3)):
         MS_masses[m]=sample_properties[3*m]
         MS_amplitudes[m] = sample_properties[3*m+1]
 
@@ -570,14 +571,14 @@ is not needed as a result of the symmetrisation.
 '''
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 1 #4               # This is the number of iterations for the reduction analysis in time-of-flight.
+number_of_iterations = 4 #4               # This is the number of iterations for the reduction analysis in time-of-flight.
 
 
 name='starch_80_DD_backward'  
 runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
 empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
 spectra='3-134'                                             # Spectra to be analysed
-first_spectrum,last_spectrum = 3, 134
+first_spectrum,last_spectrum = 3, 134   #3, 134
 tof_binning='275.,1.,420'                    # Binning of ToF spectra
 mode='DoubleDifference'
 ipfile='ip2019.par' # Optional instrument parameter file
@@ -715,7 +716,7 @@ for i in range(number_of_iterations):
 
 ##-------------------save results-------------------
 
-savepath = repoPath / "tests" / "fixatures" / "original" / "1iter_backward.npz"
+savepath = repoPath / "tests" / "fixatures" / "original" / "4iter_backward_MS.npz"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \

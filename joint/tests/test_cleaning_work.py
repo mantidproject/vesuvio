@@ -12,8 +12,8 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-pathToOriginal = currentPath / "fixatures" / "opt_frontScat.npz" 
-pathToOptimized = currentPath / "fixatures" / "opt_cleaningWork.npz" 
+pathToOriginal = currentPath / "cleaning" / "starter_forward.npz" 
+pathToOptimized = currentPath / "cleaning" / "current_forward.npz" 
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
