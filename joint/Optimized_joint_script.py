@@ -40,8 +40,8 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
     # Choose type of scattering, when both True, the mean widths from back are used in ic of front
-    backScatteringProcedure = True
-    forwardScatteringProcedure = False
+    backScatteringProcedure = False
+    forwardScatteringProcedure = True
 
     # Paths to save results for back and forward scattering
     pathForTesting = repoPath / "tests" / "fixatures" / "optimized" 
@@ -141,9 +141,9 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 2     #4
+        self.noOfMSIterations = 4     #4
         self.firstSpec = 144   #144
-        self.lastSpec = 160    #182
+        self.lastSpec = 182    #182
 
         # Boolean Flags to control script
         self.loadWsFromUserPathFlag = True

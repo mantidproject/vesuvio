@@ -5,17 +5,20 @@ import numpy.testing as nptest
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-plt.style.use('fivethirtyeight')
+plt.style.use('seaborn-poster')
+# plt.style.use('fivethirtyeight')
+plt.rcParams['axes.facecolor'] = (0.9, 0.9, 0.9)
+plt.rcParams.update({"axes.grid" : True, "grid.color": "white"})
 
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 # plt.style.use('dark_background')
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testForward = False
+testForward = True
 if testForward:
-    pathToOriginal = currentPath / "fixatures" / "original" / "1iter_forward.npz" 
-    pathToOptimized = currentPath / "fixatures" / "opt_frontScat.npz" 
+    pathToOriginal = currentPath / "fixatures" / "original" / "4iter_forward_GB_MS.npz" 
+    pathToOptimized = currentPath / "fixatures" / "optimized" / "4iter_forward_GB_MS_opt.npz" 
 
 else:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_backward_MS.npz" 
@@ -131,11 +134,10 @@ class TestNcp(unittest.TestCase):
         totalDiffMask = ~ totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "ncp")
         
-        plotNcp = True
+        plotNcp = False
         if plotNcp:
             noOfIter = len(self.orincp)
             fig, axs = plt.subplots(1, noOfIter)
-            x = range(noOfIter)
             for i, ax in enumerate(axs):
                 ax.imshow(totalMask[i], aspect="auto", cmap=plt.cm.RdYlGn, 
                         interpolation="nearest", norm=None)
@@ -157,31 +159,41 @@ class TestMeanWidths(unittest.TestCase):
             "\nori: ", self.orimeanwidths[-1], 
             "\nopt: ", self.optmeanwidths[-1])
 
-    def plotMeanWidhs(self):  # Figure out later why this is not working
-        noOfIter = len(self.orimeanwidths)
-        fig, axs = plt.subplots(1, noOfIter)
-        x = range(noOfIter)
-        for i in range(noOfIter):
-            axs[0, i].plot(x, self.orimeanwidths[i], label="ori mean widths")
-            axs[0, i].plot(x, self.optmeanwidths[i], label="opt mean widths")
-        plt.title("Evolution of mean widths over iterations")
-        plt.legend()
+        noOfMasses = len(self.orimeanwidths[0])
+        fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
+        x = range(len(self.orimeanwidths))
+        for i, ax in enumerate(axs):
+            ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.7)
+            ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.7)
+
+        fig.suptitle("Evolution of mean widths over iterations")
+        plt.legend(loc="upper left", bbox_to_anchor = (1,1))
         plt.show()
 
 
 class TestMeanIntensities(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orimeanintensities = originalResults["all_mean_intensities"][-1]
+        self.orimeanintensities = originalResults["all_mean_intensities"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optmeanintensities = optimizedResults["all_mean_intensities"][-1]
+        self.optmeanintensities = optimizedResults["all_mean_intensities"]
     
     def test_intensities(self):
         print("\nFinal mean intensity ratios:",
-            "\nori: ", self.orimeanintensities, 
-            "\nopt: ", self.optmeanintensities)
+            "\nori: ", self.orimeanintensities[-1], 
+            "\nopt: ", self.optmeanintensities[-1])
 
+        noOfMasses = len(self.orimeanintensities[0])
+        fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
+        x = range(len(self.orimeanintensities))
+        for i, ax in enumerate(axs):
+            ax.plot(x, self.orimeanintensities[:, i], "bo--", label="ori", alpha=0.7)
+            ax.plot(x, self.optmeanintensities[:, i], "ro-", label="opt", alpha=0.7)
+
+        fig.suptitle("Evolution of mean intensity ratios over iterations")
+        plt.legend(loc="upper left", bbox_to_anchor = (1,1))
+        plt.show()
 
 class TestFitWorkspaces(unittest.TestCase):
     def setUp(self):
