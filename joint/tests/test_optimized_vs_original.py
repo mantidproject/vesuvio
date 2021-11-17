@@ -5,8 +5,8 @@ import numpy.testing as nptest
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-from jupyterthemes import jtplot
-jtplot.style()
+plt.style.use('fivethirtyeight')
+
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 # plt.style.use('dark_background')
 
@@ -18,8 +18,8 @@ if testForward:
     pathToOptimized = currentPath / "fixatures" / "opt_frontScat.npz" 
 
 else:
-    pathToOriginal = currentPath / "fixatures" / "original" / "1iter_backward.npz" 
-    pathToOptimized = currentPath / "fixatures" / "opt_backScat.npz" 
+    pathToOriginal = currentPath / "fixatures" / "original" / "4iter_backward_MS.npz" 
+    pathToOptimized = currentPath / "fixatures" / "optimized" / "4iter_backward_MS_opt.npz" 
 
 #--------------------- Problem to solve
 # The same original script ran in Mantid 6.2 gives different results for
@@ -36,8 +36,8 @@ def displayMask(mask, rtol, string):
 def displayMaskAllIter(mask, rtol, string):
     print("\nNo of different "+string+f", rtol={rtol}:")
     for i, mask_i in enumerate(mask):
-        noDiff = np.sum(mask)
-        maskSize = mask.size
+        noDiff = np.sum(mask_i)
+        maskSize = mask_i.size
         print(f"iter {i}: ", noDiff, " out of ", maskSize, f"ie {100*noDiff/maskSize:.1f} %")    
 
 
@@ -131,28 +131,42 @@ class TestNcp(unittest.TestCase):
         totalDiffMask = ~ totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "ncp")
         
-        plotNcp = False
+        plotNcp = True
         if plotNcp:
-            plt.figure()
-            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+            noOfIter = len(self.orincp)
+            fig, axs = plt.subplots(1, noOfIter)
+            x = range(noOfIter)
+            for i, ax in enumerate(axs):
+                ax.imshow(totalMask[i], aspect="auto", cmap=plt.cm.RdYlGn, 
                         interpolation="nearest", norm=None)
-            plt.title("Comparison between ori and opt ncp")
-            plt.ylabel("Spectra")
+            fig.suptitle("Comparison between ori and opt ncp")
+            axs[0].set_ylabel("Spectra")
             plt.show()
 
 
 class TestMeanWidths(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orimeanwidths = originalResults["all_mean_widths"][-1]
+        self.orimeanwidths = originalResults["all_mean_widths"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optmeanwidths = optimizedResults["all_mean_widths"][-1]
+        self.optmeanwidths = optimizedResults["all_mean_widths"]
     
     def test_widths(self):
         print("\nFinal mean widths:",
-            "\nori: ", self.orimeanwidths, 
-            "\nopt: ", self.optmeanwidths)
+            "\nori: ", self.orimeanwidths[-1], 
+            "\nopt: ", self.optmeanwidths[-1])
+
+    def plotMeanWidhs(self):  # Figure out later why this is not working
+        noOfIter = len(self.orimeanwidths)
+        fig, axs = plt.subplots(1, noOfIter)
+        x = range(noOfIter)
+        for i in range(noOfIter):
+            axs[0, i].plot(x, self.orimeanwidths[i], label="ori mean widths")
+            axs[0, i].plot(x, self.optmeanwidths[i], label="opt mean widths")
+        plt.title("Evolution of mean widths over iterations")
+        plt.legend()
+        plt.show()
 
 
 class TestMeanIntensities(unittest.TestCase):

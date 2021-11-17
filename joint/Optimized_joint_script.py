@@ -40,13 +40,13 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
     # Choose type of scattering, when both True, the mean widths from back are used in ic of front
-    backScatteringProcedure = False
-    forwardScatteringProcedure = True
+    backScatteringProcedure = True
+    forwardScatteringProcedure = False
 
     # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "cleaning" 
-    forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
-    backScatteringSavePath = pathForTesting / "current_backward.npz"
+    pathForTesting = repoPath / "tests" / "fixatures" / "optimized" 
+    forwardScatteringSavePath = pathForTesting / "4iter_forward_GB_MS_opt.npz" 
+    backScatteringSavePath = pathForTesting / "4iter_backward_MS_opt.npz"
 
 
     def setBackscatteringInitialConditions(self):
@@ -84,16 +84,16 @@ class InitialConditions:
 
         self.noOfMSIterations = 4     #4
         self.firstSpec = 3    #3
-        self.lastSpec = 8    #134
+        self.lastSpec = 134    #134
 
         # Boolean Flags to control script
         self.loadWsFromUserPathFlag = True
         self.scaleParsFlag = False
-        self.MSCorrectionFlag = False
-        self.GammaCorrectionFlag = True
+        self.MSCorrectionFlag = True
+        self.GammaCorrectionFlag = False
 
         self.firstSpecIdx = 0
-        self.lastSpecIdx = self.firstSpec - self.lastSpec
+        self.lastSpecIdx = self.lastSpec - self.firstSpec
 
         # Consider only the masked spectra between first and last spectrum
         self.maskedSpecNo = self.maskedSpecNo[
@@ -320,74 +320,6 @@ def createSlabGeometry():
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
     CreateSampleShape(ic.name, xml_str)
-
-
-class resultsObject: 
-    """Used to store results of the script"""
-
-    def __init__(self, wsToBeFitted):
-        """Initializes arrays full of zeros"""
-
-        noOfSpec = wsToBeFitted.getNumberHistograms()
-        lenOfSpec = wsToBeFitted.blocksize()
-
-        all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
-        all_spec_best_par_chi_nit = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
-        all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        all_ncp_for_each_mass = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
-        all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
-        all_mean_intensities = np.zeros(all_mean_widths.shape)
-
-        self.resultsList = [all_mean_widths, all_mean_intensities,
-                            all_spec_best_par_chi_nit, all_tot_ncp, 
-                            all_fit_workspaces, all_ncp_for_each_mass]
-
-
-    def append(self, mulscatIter, resultsToAppend):
-        """Append results at a given MS iteration"""
-        for i, currentMSArray in enumerate(resultsToAppend):
-            self.resultsList[i][mulscatIter] = currentMSArray
-
-    
-    # Set default of yspace fit parameters to zero
-    YSpaceSymSumDataY = 0
-    YSpaceSymSumDataE = 0
-    resolution = 0
-    finalRawDataY = 0
-    finalRawDataE = 0
-    HdataY = 0
-    popt = 0
-    perr = 0
-
-    def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
-        self.finalRawDataY = wsFinal.extractY()
-        self.finalRawDataE = wsFinal.extractE()
-        self.HdataY = wsH.extractY()
-        self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
-        self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-        self.resolution = wsRes.extractY()
-        self.popt = popt
-        self.perr = perr
-
-
-    def save(self, savePath):
-        """Saves all of the arrays stored in this object"""
-
-        all_mean_widths, all_mean_intensities, \
-        all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
-        all_ncp_for_each_mass = self.resultsList
-        np.savez(savePath,
-                 all_fit_workspaces=all_fit_workspaces,
-                 all_spec_best_par_chi_nit=all_spec_best_par_chi_nit,
-                 all_mean_widths=all_mean_widths,
-                 all_mean_intensities=all_mean_intensities,
-                 all_tot_ncp=all_tot_ncp,
-                 all_ncp_for_each_mass=all_ncp_for_each_mass,
-                 YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-                 YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-                 resolution=self.resolution, HdataY=self.HdataY,
-                 finalRawDataY=self.finalRawDataY, finalRawDataE=self.finalRawDataE,
-                 popt=self.popt, perr=self.perr)
 
 
 def fitNcpToWorkspace(ws):
@@ -910,13 +842,13 @@ def createWorkspacesForGammaCorrection(meanWidths, meanIntensityRatios):
 
 
 def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
-    masses = masses.reshape(4)
+    masses = masses.flatten()
     profiles = ""
     for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
         profiles += "name=GaussianComptonProfile,Mass="   \
                     + str(mass) + ",Width=" + str(width)  \
                     + ",Intensity=" + str(intensity) + ';'
-    print("\n The sample properties for Gamma Correction are: ",
+    print("\n The sample properties for Gamma Correction are:\n",
             profiles)
     return profiles
 
@@ -1187,6 +1119,74 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
         # print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))   # Selects the wrong parameter in the case of the double gaussian
     print("\nFitting ------ \npopt:\n", popt, "\nperr:\n", perr)
     return popt, perr
+
+
+class resultsObject: 
+    """Used to store results of the script"""
+
+    def __init__(self, wsToBeFitted):
+        """Initializes arrays full of zeros"""
+
+        noOfSpec = wsToBeFitted.getNumberHistograms()
+        lenOfSpec = wsToBeFitted.blocksize()
+
+        all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
+        all_spec_best_par_chi_nit = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
+        all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
+        all_ncp_for_each_mass = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
+        all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
+        all_mean_intensities = np.zeros(all_mean_widths.shape)
+
+        self.resultsList = [all_mean_widths, all_mean_intensities,
+                            all_spec_best_par_chi_nit, all_tot_ncp, 
+                            all_fit_workspaces, all_ncp_for_each_mass]
+
+
+    def append(self, mulscatIter, resultsToAppend):
+        """Append results at a given MS iteration"""
+        for i, currentMSArray in enumerate(resultsToAppend):
+            self.resultsList[i][mulscatIter] = currentMSArray
+
+    
+    # Set default of yspace fit parameters to zero
+    YSpaceSymSumDataY = 0
+    YSpaceSymSumDataE = 0
+    resolution = 0
+    finalRawDataY = 0
+    finalRawDataE = 0
+    HdataY = 0
+    popt = 0
+    perr = 0
+
+    def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
+        self.finalRawDataY = wsFinal.extractY()
+        self.finalRawDataE = wsFinal.extractE()
+        self.HdataY = wsH.extractY()
+        self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
+        self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
+        self.resolution = wsRes.extractY()
+        self.popt = popt
+        self.perr = perr
+
+
+    def save(self, savePath):
+        """Saves all of the arrays stored in this object"""
+
+        all_mean_widths, all_mean_intensities, \
+        all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
+        all_ncp_for_each_mass = self.resultsList
+        np.savez(savePath,
+                 all_fit_workspaces=all_fit_workspaces,
+                 all_spec_best_par_chi_nit=all_spec_best_par_chi_nit,
+                 all_mean_widths=all_mean_widths,
+                 all_mean_intensities=all_mean_intensities,
+                 all_tot_ncp=all_tot_ncp,
+                 all_ncp_for_each_mass=all_ncp_for_each_mass,
+                 YSpaceSymSumDataY=self.YSpaceSymSumDataY,
+                 YSpaceSymSumDataE=self.YSpaceSymSumDataE,
+                 resolution=self.resolution, HdataY=self.HdataY,
+                 finalRawDataY=self.finalRawDataY, finalRawDataE=self.finalRawDataE,
+                 popt=self.popt, perr=self.perr)
 
 
 #if __name__=="__main__":
