@@ -18,7 +18,7 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 testForward = False
 if testForward:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_forward_GB_MS.npz" 
-    pathToOptimized = currentPath / "fixatures" / "optimized" / "4iter_forward_GB_MS_opt.npz" 
+    pathToOptimized = currentPath / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
 
 else:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_backward_MS.npz" 
@@ -163,9 +163,12 @@ class TestMeanWidths(unittest.TestCase):
         noOfMasses = len(self.orimeanwidths[0])
         fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
         x = range(len(self.orimeanwidths))
+        relativeDifference = abs(self.optmeanwidths - self.orimeanwidths) / self.orimeanwidths
+
         for i, ax in enumerate(axs):
-            ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.6)
-            ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.6)
+            ax.plot(x, relativeDifference[:, i], "bo--", label="realtive diff")
+            # ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.6)
+            # ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.6)
 
         fig.suptitle("Evolution of mean widths over iterations")
         plt.legend(loc="upper left", bbox_to_anchor = (1,1))
