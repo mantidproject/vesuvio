@@ -15,14 +15,15 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testForward = True
+testForward = False
 if testForward:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_forward_GB_MS.npz" 
     pathToOptimized = currentPath / "fixatures" / "optimized" / "4iter_forward_GB_MS_opt.npz" 
 
 else:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_backward_MS.npz" 
-    pathToOptimized = currentPath / "fixatures" / "optimized" / "4iter_backward_MS_opt.npz" 
+    pathToOptimized = currentPath / "fixatures" / "4iter_backward_MS_opt.npz" 
+    # pathToOptimized = currentPath / "MS" / "fixatures" / "2iter_backward_MS_opt.npz" 
 
 #--------------------- Problem to solve
 # The same original script ran in Mantid 6.2 gives different results for
@@ -163,8 +164,8 @@ class TestMeanWidths(unittest.TestCase):
         fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
         x = range(len(self.orimeanwidths))
         for i, ax in enumerate(axs):
-            ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.7)
-            ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.7)
+            ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.6)
+            ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.6)
 
         fig.suptitle("Evolution of mean widths over iterations")
         plt.legend(loc="upper left", bbox_to_anchor = (1,1))
@@ -188,8 +189,8 @@ class TestMeanIntensities(unittest.TestCase):
         fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
         x = range(len(self.orimeanintensities))
         for i, ax in enumerate(axs):
-            ax.plot(x, self.orimeanintensities[:, i], "bo--", label="ori", alpha=0.7)
-            ax.plot(x, self.optmeanintensities[:, i], "ro-", label="opt", alpha=0.7)
+            ax.plot(x, self.optmeanintensities[:, i], "ro-", label="opt", alpha=0.6)
+            ax.plot(x, self.orimeanintensities[:, i], "bo--", label="ori", alpha=0.6)
 
         fig.suptitle("Evolution of mean intensity ratios over iterations")
         plt.legend(loc="upper left", bbox_to_anchor = (1,1))

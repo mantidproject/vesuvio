@@ -40,11 +40,11 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
     # Choose type of scattering, when both True, the mean widths from back are used in ic of front
-    backScatteringProcedure = False
-    forwardScatteringProcedure = True
+    backScatteringProcedure = True
+    forwardScatteringProcedure = False
 
     # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "fixatures" / "optimized" 
+    pathForTesting = repoPath / "tests" / "fixatures"  
     forwardScatteringSavePath = pathForTesting / "4iter_forward_GB_MS_opt.npz" 
     backScatteringSavePath = pathForTesting / "4iter_backward_MS_opt.npz"
 
@@ -54,7 +54,7 @@ class InitialConditions:
         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
 
-        self.name = "starch_80_RD_backward"
+        self.name = "starch_80_RD_backward_"
         self.runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
         self.empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
         self.spectra='3-134'                            # Spectra to be analysed
@@ -212,6 +212,7 @@ def iterativeFitForDataReduction():
 
     wsToBeFittedUncropped = loadVesuvioDataWorkspaces()
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
+    CloneWorkspace(InputWorkspace=wsToBeFitted, OutputWorkspace=ic.name)
     createSlabGeometry()
 
     # Initialize arrays to store script results
