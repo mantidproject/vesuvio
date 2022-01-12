@@ -1,13 +1,14 @@
 import numpy as np
 import mantid
 from mantid.simpleapi import *
+from numpy.core.numeric import True_
 from scipy import optimize
 from scipy import ndimage
 import time
 from pathlib import Path
 
 # Format print output of arrays
-np.set_printoptions(suppress=True, precision=4, linewidth=150)
+np.set_printoptions(suppress=True, precision=4, linewidth=150, threshold=sys.maxsize)
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
@@ -27,9 +28,6 @@ class InitialConditions:
     # Initialize object to use self methods
     def __init__(self):
         return None
-
-    # Masked detectors for front and back scattering 
-    maskedSpecNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133, 173, 174, 179])
 
     # Multiscaterring Correction Parameters
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
@@ -96,8 +94,9 @@ class InitialConditions:
         self.lastSpecIdx = self.lastSpec - self.firstSpec
 
         # Consider only the masked spectra between first and last spectrum
-        self.maskedSpecNo = self.maskedSpecNo[
-            (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
+        maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
+        self.maskedSpecNo = maskedSpecAllNo[
+            (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
         ]
         self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
 
@@ -161,8 +160,9 @@ class InitialConditions:
         self.lastSpecIdx = self.lastSpec - self.firstSpec
 
         # Consider only the masked spectra between first and last spectrum
-        self.maskedSpecNo = self.maskedSpecNo[
-            (self.maskedSpecNo >= self.firstSpec) & (self.maskedSpecNo <= self.lastSpec)
+        maskedSpecAllNo = np.array([173, 174, 179])
+        self.maskedSpecNo = maskedSpecAllNo[
+            (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
         ]
         self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
 
@@ -171,7 +171,6 @@ class InitialConditions:
         if self.scaleParsFlag:        # Scale fitting parameters using initial values
                 self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
                 self.scalingFactors = 1 / self.initPars
-
 
 
 # This is the only variable with global behaviour, all functions are defined to use attributes of ic
@@ -212,7 +211,8 @@ def iterativeFitForDataReduction():
 
     wsToBeFittedUncropped = loadVesuvioDataWorkspaces()
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
-    CloneWorkspace(InputWorkspace=wsToBeFitted, OutputWorkspace=ic.name)
+    # Line below is probably unecessary
+    # CloneWorkspace(InputWorkspace=wsToBeFitted, OutputWorkspace=ic.name)    
     createSlabGeometry()
 
     # Initialize arrays to store script results
@@ -338,7 +338,6 @@ def fitNcpToWorkspace(ws):
         dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )))
     fitParsObj = FitParameters(fitPars)
-    # fitParsObj.printPars()
     meanWidths, meanIntensityRatios, stdWidths, stdIntensityRatios = fitParsObj.getMeanAndStdWidthsAndIntensities()
 
     # Create ncpTotal workspaces
@@ -1030,6 +1029,8 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
     resX = wsRes. extractX()[0]
 
     # Interpolate Resolution to get single peak at zero
+    # Otherwise if the resolution has two data points at the peak,
+    # the convolution will be skewed.
     start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
     resNewX = np.arange(start, end, interval)
     res = np.interp(resNewX, resX, res)
@@ -1093,8 +1094,8 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
 
     print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
-    for i, minimizer_sum in enumerate(['Levenberg-Marquardt','Simplex']):
-        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = ic.name+minimizer_sum+'_joy_sum_fitted')
+    for i, minimizer in enumerate(['Levenberg-Marquardt','Simplex']):
+        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = ic.name+minimizer+'_joy_sum_fitted')
         
         if ic.singleGaussFitToHProfile:
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
@@ -1110,18 +1111,14 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
         Fit(
             Function=function, 
-            InputWorkspace=ic.name+minimizer_sum+'_joy_sum_fitted',
-            Output=ic.name+minimizer_sum+'_joy_sum_fitted',
-            Minimizer=minimizer_sum
+            InputWorkspace=ic.name+minimizer+'_joy_sum_fitted',
+            Output=ic.name+minimizer+'_joy_sum_fitted',
+            Minimizer=minimizer
             )
         
-        ws=mtd[ic.name+minimizer_sum+'_joy_sum_fitted_Parameters']
+        ws=mtd[ic.name+minimizer+'_joy_sum_fitted_Parameters']
         popt[i] = ws.column("Value")
         perr[i] = ws.column("Error")
-
-        # print('Using the minimizer: ',minimizer_sum)
-        # print('Hydrogen standard deviation: ',ws.cell(3,1),' +/- ',ws.cell(3,2))   # Selects the wrong parameter in the case of the double gaussian
-    # print("\nFitting ------ \npopt:\n", popt, "\nperr:\n", perr)
     return popt, perr
 
 
@@ -1150,7 +1147,7 @@ class resultsObject:
 
 
     def append(self, mulscatIter, resultsToAppend):
-        """Append results at a given MS iteration"""
+        """Append results from all arrays at a given MS iteration"""
         for i, currentMSArray in enumerate(resultsToAppend):
             self.resultsList[i][mulscatIter] = currentMSArray
 
