@@ -151,10 +151,10 @@ class InitialConditions:
         self.GammaCorrectionFlag = True
 
         # Parameters to control fit in Y-Space
-        self.symmetriseHProfileUsingAveragesFlag = False
-        self.useScipyCurveFitToHProfileFlag = False
+        self.symmetriseHProfileUsingAveragesFlag = False      # When False, use mirror sym
+        self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"
-        self.singleGaussFitToHProfile = True 
+        self.singleGaussFitToHProfile = True        # When False, use Hermite expansion
 
         self.firstSpecIdx = 0
         self.lastSpecIdx = self.lastSpec - self.firstSpec
@@ -1040,7 +1040,7 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
     dataE = wsYSpaceSym.extractE()[0]
 
     if ic.singleGaussFitToHProfile:
-        def convolvedGaussian(x, y0, x0, A, sigma):
+        def convolvedFunction(x, y0, x0, A, sigma):
             histWidths = x[1:] - x[:-1]
             if ~ (np.max(histWidths)==np.min(histWidths)):
                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
@@ -1051,24 +1051,42 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
         p0 = [0, 0, 1, 5]
 
     else:
-        def convolvedGaussian(x, y0, x0, A, sigma):
+        # # Double Gaussian
+        # def convolvedFunction(x, y0, x0, A, sigma):
+        #     histWidths = x[1:] - x[:-1]
+        #     if ~ (np.max(histWidths)==np.min(histWidths)):
+        #         raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+
+        #     gaussFunc = gaussianFit(x, y0, x0, A, 4.76) + gaussianFit(x, 0, x0, 0.054*A, sigma)
+        #     convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
+        #     return convGauss
+        # p0 = [0, 0, 0.7143, 5]
+
+        def HermitePolynomial(x, sigma1, c4, c6):
+            return np.exp(-x**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+                    *(1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
+                    -48*(x/np.sqrt(2)/sigma1)**2+12) \
+                    +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
+                    -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+        
+        def convolvedFunction(x, sigma1, c4, c6):
             histWidths = x[1:] - x[:-1]
             if ~ (np.max(histWidths)==np.min(histWidths)):
                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
-            gaussFunc = gaussianFit(x, y0, x0, A, 4.76) + gaussianFit(x, 0, x0, 0.054*A, sigma)
-            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
-            return convGauss
-        p0 = [0, 0, 0.7143, 5]
+            hermiteFunc = HermitePolynomial(x, sigma1, c4, c6)
+            convFunc = ndimage.convolve1d(hermiteFunc, res, mode="constant") * histWidths[0]
+            return convFunc
+        p0 = [6, 0, 0]       
 
     popt, pcov = optimize.curve_fit(
-        convolvedGaussian, 
+        convolvedFunction, 
         dataX, 
         dataY, 
         p0=p0,
         sigma=dataE
     )
-    yfit = convolvedGaussian(dataX, *popt)
+    yfit = convolvedFunction(dataX, *popt)
     Residuals = dataY - yfit
     
     # Create Workspace with the fit results
@@ -1090,7 +1108,8 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
     if ic.singleGaussFitToHProfile:
         popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
     else:
-        popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
+        # popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
+        popt, perr = np.zeros((2, 4)), np.zeros((2, 4))
 
 
     print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
@@ -1103,11 +1122,21 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()'''
         else:
-            function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution,WorkspaceIndex=0;
-            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
-            +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
-            y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
+            # # Function for Double Gaussian
+            # function='''composite=Convolution,FixResolution=true,NumDeriv=true;
+            # name=Resolution,Workspace=resolution,WorkspaceIndex=0;
+            # name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
+            # +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
+            # y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
+
+            function = """
+            composite=Convolution,FixResolution=true,NumDeriv=true;
+            name=Resolution,Workspace=resolution,WorkspaceIndex=0,X=(),Y=();
+            name=UserFunction,Formula=exp( -x^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
+            *(1.+c4/32.*(16.*(x/sqrt(2)/sigma1)^4-48.*(x/sqrt(2)/sigma1)^2+12)+c6/384*(64*(x/sqrt(2)/sigma1)^6 - 480*(x/sqrt(2)/sigma1)^4 + 720*(x/sqrt(2)/sigma1)^2 - 120)),
+            sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
+            """
+
 
         Fit(
             Function=function, 
