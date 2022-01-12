@@ -153,7 +153,7 @@ class InitialConditions:
         # Parameters to control fit in Y-Space
         self.symmetriseHProfileUsingAveragesFlag = False      # When False, use mirror sym
         self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
-        self.rebinParametersForYSpaceFit = "-20, 0.5, 20"
+        self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
         self.singleGaussFitToHProfile = True        # When False, use Hermite expansion
 
         self.firstSpecIdx = 0
@@ -190,8 +190,8 @@ def main():
             backMeanWidths = backScatteringResults.resultsList[0][-1]
             ic.initPars[4::3] = backMeanWidths
             ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-            print("\nChanged ic according to mean widhts from backscattering:\n",
-                "Forward scattering initial fitting parameters:\n", ic.initPars,
+            print("\nChanged ic according to mean widhts from backscattering.\n",
+                "\nForward scattering initial fitting parameters:\n", ic.initPars,
                 "\nForward scattering initial fitting bounds:\n", ic.bounds)
         except UnboundLocalError:
             print("Using the unchanged ic for forward scattering ...")
@@ -768,7 +768,7 @@ def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
     masses = ic.masses.flatten()
 
     if ic.hydrogen_peak:
-        # ADDITION OF THE HYDROGEN intensities AS PROPORTIONAL TO A FITTED NCP (OXYGEN HERE)
+        # TODO: Check if forward scattering needs this procedure
         masses = np.append(masses, 1.0079)
         meanWidths = np.append(meanWidths, 5.0)
         meanIntensityRatios = np.append(
@@ -781,6 +781,7 @@ def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
     MSProperties[1::3] = meanIntensityRatios
     MSProperties[2::3] = meanWidths
     sampleProperties = list(MSProperties)   
+
     return sampleProperties
 
 
