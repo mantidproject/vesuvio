@@ -30,6 +30,8 @@ class InitialConditions:
         return None
 
     # Multiscaterring Correction Parameters
+    hydrogen_to_mass0_ratio = 19.0620008206
+
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5   
     hydrogen_peak = True                 # Hydrogen multiple scattering
@@ -64,7 +66,7 @@ class InitialConditions:
         self.masses = np.array([12, 16, 27])
         self.noOfMasses = len(self.masses)
         # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-        self.hydrogen_to_mass0_ratio = 19.0620008206
+        # self.hydrogen_to_mass0_ratio = 19.0620008206
         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
@@ -80,7 +82,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 2     #4
         self.firstSpec = 3    #3
         self.lastSpec = 134    #134
 
@@ -123,7 +125,7 @@ class InitialConditions:
         # The Hydrogen mass needs to be as 1.0079, otherwise conditional for MS sample properties fails
         self.masses = np.array([1.0079, 12, 16, 27]) 
         self.noOfMasses = len(self.masses)
-        self.hydrogen_to_mass0_ratio = 0
+        # self.hydrogen_to_mass0_ratio = 0
         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
@@ -153,7 +155,7 @@ class InitialConditions:
 
         # Parameters to control fit in Y-Space
         self.symmetriseHProfileUsingAveragesFlag = False      # When False, use mirror sym
-        self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
+        # self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
         self.singleGaussFitToHProfile = True       # When False, use Hermite expansion
 
@@ -201,6 +203,85 @@ def main():
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
         fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
         forwardScatteringResults.save(ic.forwardScatteringSavePath)
+
+
+def runOnlyBackScattering():
+    ic.setBackscatteringInitialConditions()
+    wsFinal, backScatteringResults = iterativeFitForDataReduction()
+    backScatteringResults.save(ic.backScatteringSavePath) 
+
+
+def runOnlyForwardScattering():
+    ic.setForwardScatteringInitialConditions()
+    wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
+    fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
+    forwardScatteringResults.save(ic.forwardScatteringSavePath)
+
+
+def runSequenceForKnownRatio():
+    # If H to first mass ratio is known, can run MS correction for backscattering
+    # Back scattering produces precise results for widhts and intensity ratios 
+    # for non-H masses
+    ic.setBackscatteringInitialConditions()
+    wsFinal, backScatteringResults = iterativeFitForDataReduction()
+    backScatteringResults.save(ic.backScatteringSavePath) 
+
+    ic.setForwardScatteringInitialConditions()
+    setInitialFwdParsFromBackScatteringResults(backScatteringResults)
+    wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
+    fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
+    forwardScatteringResults.save(ic.forwardScatteringSavePath)
+
+
+def runSequenceRatioNotKnown():
+    # Run forward first with a good guess for the widths of non-H masses
+    ic.setForwardScatteringInitialConditions()
+    wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
+    for i in range(2):
+
+        # Get first estimate of H to mass0 ratio
+        fwdMeanIntensityRatios = forwardScatteringResults.resultsList[1][-1] 
+        ic.hydrogen_to_mass0_ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
+       
+        # Run backward procedure with this estimate
+        ic.setBackscatteringInitialConditions()
+        print("Starting backscattering procedure with H to first mass ratio:\n",
+                ic.hydrogen_to_mass0_ratio)
+        wsFinal, backScatteringResults = iterativeFitForDataReduction()
+
+        ic.setForwardScatteringInitialConditions()
+        setInitialFwdParsFromBackScatteringResults(backScatteringResults)
+        wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
+
+    fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
+    backScatteringResults.save(ic.backScatteringSavePath)
+    forwardScatteringResults.save(ic.forwardScatteringSavePath)
+
+
+def setInitialFwdParsFromBackScatteringResults(backScatteringResults):
+    """Takes widths and intensity ratios obtained in backscattering
+    and uses them as the initial conditions for forward scattering """
+
+    # Get widts and intensity ratios from backscattering results
+    backMeanWidths = backScatteringResults.resultsList[0][-1]
+    backMeanIntensityRatios = backScatteringResults.resultsList[1][-1] 
+
+    HIntensity = ic.hydrogen_to_mass0_ratio * backMeanIntensityRatios[0]
+    initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
+    initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
+
+    # Set starting conditions for forward scattering
+    # Fix known widths and intensity ratios from back scattering results
+    ic.initPars[4::3] = backMeanWidths
+    ic.initPars[0::3] = initialFwdIntensityRatios
+    ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+    ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
+
+    print("\nChanged ic according to mean widhts and intensity ratios from backscattering.\n",
+        "\nForward scattering initial fitting parameters:\n", ic.initPars,
+        "\nForward scattering initial fitting bounds:\n", ic.bounds)
+    return
+
 
 
 """
@@ -1261,6 +1342,7 @@ class resultsObject:
 
 #if __name__=="__main__":
 start_time = time.time()
-main()
+runSequenceRatioNotKnown()
+# main()
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
