@@ -205,7 +205,8 @@ class Testpopt(unittest.TestCase):
         self.oripopt = originalResults["popt"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optpopt = optimizedResults["popt"]
+        # Select only Fit results due to Mantid Fit
+        self.optpopt = optimizedResults["popt"][1:]
     
     def test_intensities(self):
         nptest.assert_array_equal(self.oripopt, self.optpopt)
@@ -217,7 +218,7 @@ class Testperr(unittest.TestCase):
         self.oriperr = originalResults["perr"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optperr = optimizedResults["perr"]
+        self.optperr = optimizedResults["perr"][1:]
     
     def test_intensities(self):
         nptest.assert_array_equal( self.oriperr, self.optperr)

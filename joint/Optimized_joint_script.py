@@ -154,7 +154,7 @@ class InitialConditions:
         self.symmetriseHProfileUsingAveragesFlag = False      # When False, use mirror sym
         self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-        self.singleGaussFitToHProfile = True        # When False, use Hermite expansion
+        self.singleGaussFitToHProfile = True       # When False, use Hermite expansion
 
         self.firstSpecIdx = 0
         self.lastSpecIdx = self.lastSpec - self.firstSpec
@@ -856,7 +856,7 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
 
 
 def fitInYSpaceProcedure(wsFinal, thisScriptResults):
-    # TODO: Make this independent of the order of the elements in the list
+    # TODO: Make this independent of the order of the elements in the resultslist
     ncpForEachMass = thisScriptResults.resultsList[-1][-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
     popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
@@ -981,7 +981,7 @@ def SymetriseWorkspace(wsYSpace):
         wsYSym.dataE(i)[:] = dataE[i, :]
     return wsYSym
 
-
+#TODO: Implement weighted nan mean symetrization
 def symetriseArrayUsingAverages(dataY):
     # Code below works as long as dataX is symetric
     # Need to account for kinematic cut-offs
@@ -1014,14 +1014,19 @@ def replaceNonZeroNanValuesByOnesInWs(wsYSym):
 
 
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
-    if ic.useScipyCurveFitToHProfileFlag:
-        popt, pcov = fitProfileCurveFit(wsYSpaceSym, wsRes)
-        # print("popt:\n", popt)
-        # print("pcov:\n", pcov)
-        perr = np.sqrt(np.diag(pcov))
-    else:
-        popt, perr = fitProfileMantidFit(wsYSpaceSym, wsRes)
+    # if ic.useScipyCurveFitToHProfileFlag:
+    poptCurveFit, pcovCurveFit = fitProfileCurveFit(wsYSpaceSym, wsRes)
+    perrCurveFit = np.sqrt(np.diag(pcovCurveFit))
+    # else:
+    poptMantidFit, perrMantidFit = fitProfileMantidFit(wsYSpaceSym, wsRes)
     
+    #TODO: Add the Chi2 as the last parameter
+    poptCurveFit = np.append(poptCurveFit, np.nan)
+    perrCurveFit = np.append(perrCurveFit, np.nan)
+
+    popt = np.vstack((poptCurveFit, poptMantidFit))
+    perr = np.vstack((perrCurveFit, perrMantidFit))
+
     return popt, perr
 
 
@@ -1041,7 +1046,7 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
     dataE = wsYSpaceSym.extractE()[0]
 
     if ic.singleGaussFitToHProfile:
-        def convolvedFunction(x, y0, x0, A, sigma):
+        def convolvedFunction(x, y0, A, x0, sigma):
             histWidths = x[1:] - x[:-1]
             if ~ (np.max(histWidths)==np.min(histWidths)):
                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
@@ -1049,7 +1054,8 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
             gaussFunc = gaussianFit(x, y0, x0, A, sigma)
             convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]  
             return convGauss
-        p0 = [0, 0, 1, 5]
+        p0 = [0, 1, 0, 5]
+        bounds = [-np.inf, np.inf]  # Applied to all parameters
 
     else:
         # # Double Gaussian
@@ -1078,14 +1084,18 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
             hermiteFunc = HermitePolynomial(x, sigma1, c4, c6)
             convFunc = ndimage.convolve1d(hermiteFunc, res, mode="constant") * histWidths[0]
             return convFunc
-        p0 = [6, 0, 0]       
+        p0 = [4, 0, 0]     
+        # The bounds on curve_fit() are set up diferently than on minimize()
+        bounds = [[-np.inf, 0, 0], [np.inf, np.inf, np.inf]] 
+
 
     popt, pcov = optimize.curve_fit(
         convolvedFunction, 
         dataX, 
         dataY, 
         p0=p0,
-        sigma=dataE
+        sigma=dataE,
+        bounds=bounds
     )
     yfit = convolvedFunction(dataX, *popt)
     Residuals = dataY - yfit
@@ -1223,6 +1233,7 @@ class resultsObject:
 
     def printYSpaceFitResults(self):
         print("\nFit in Y Space results:")
+        print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
         print("\npopt:\n", self.popt)
         print("\nperr:\n", self.perr, "\n")
 
