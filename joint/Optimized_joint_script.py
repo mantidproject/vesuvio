@@ -113,14 +113,15 @@ class InitialConditions:
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
 
         self.name = "starch_80_RD_forward_"
-        self.runs='43066-43076'         # 100K             # The numbers of the runs to be analysed
-        self.empty_runs='43868-43911'   # 100K             # The numbers of the empty runs to be subtracted
-        self.spectra='144-182'                               # Spectra to be analysed
-        self.tof_binning="110,1.,430"                    # Binning of ToF spectra
+        self.runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
+        self.empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+        self.spectra='144-182'                        # Spectra to be analysed
+        self.tof_binning="110,1.,430"                 # Binning of ToF spectra
         self.mode='SingleDifference'
         self.ipfile=r'./ip2018_3.par'
 
-        self.masses = np.array([1.0079, 12, 16, 27]) # Changed this recently from shape (4, 1, 1)
+        # The Hydrogen mass needs to be as 1.0079, otherwise conditional for MS sample properties fails
+        self.masses = np.array([1.0079, 12, 16, 27]) 
         self.noOfMasses = len(self.masses)
         self.hydrogen_to_mass0_ratio = 0
         self.InstrParsPath = repoPath / 'ip2018_3.par'
@@ -140,7 +141,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 2     #4
         self.firstSpec = 144   #144
         self.lastSpec = 182    #182
 
@@ -680,11 +681,6 @@ class FitParameters:
         self.mainPars = mainPars
 
 
-    # def printPars(self):
-    #     print("[Spec Intensities----Widths----Centers Chi2 Nit]:\n\n", 
-    #           np.hstack((self.spec, self.intensities, self.widths, self.centers, self.chi2, self.nit)))
-
-
     def getMeanAndStdWidthsAndIntensities(self):
         noOfMasses = ic.noOfMasses
         widths = self.widths.T
@@ -709,9 +705,6 @@ class FitParameters:
         meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
         stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
 
-        # print("\nMasses: ", ic.masses.reshape(1, noOfMasses),
-        #     "\nMean Widths: ", meanWidths,
-        #     "\nMean Intensity Ratios: ", meanIntensityRatios)
         return meanWidths, meanIntensityRatios, stdWidths, stdIntensityRatios
 
 
@@ -760,21 +753,23 @@ def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios):
 
     sampleProperties = calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios)
     print("\n The sample properties for Multiple Scattering correction are:\n ", 
-            sampleProperties)
+            sampleProperties, "\n")
     createMulScatWorkspaces(ic.name, sampleProperties)
 
 
 def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
     masses = ic.masses.flatten()
 
-    if ic.hydrogen_peak:
-        # TODO: Check if forward scattering needs this procedure
-        masses = np.append(masses, 1.0079)
-        meanWidths = np.append(meanWidths, 5.0)
-        meanIntensityRatios = np.append(
-            meanIntensityRatios, ic.hydrogen_to_mass0_ratio * meanIntensityRatios[0]
-            )
-        meanIntensityRatios /= np.sum(meanIntensityRatios)
+    # If H not present, add it to sample properties
+    if 1.0079 not in masses:   
+        if ic.hydrogen_peak:
+            # TODO: Check if forward scattering needs this procedure
+            masses = np.append(masses, 1.0079)
+            meanWidths = np.append(meanWidths, 5.0)
+            meanIntensityRatios = np.append(
+                meanIntensityRatios, ic.hydrogen_to_mass0_ratio * meanIntensityRatios[0]
+                )
+            meanIntensityRatios /= np.sum(meanIntensityRatios)
 
     MSProperties = np.zeros(3*len(masses))
     MSProperties[::3] = masses
