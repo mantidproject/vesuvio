@@ -1,5 +1,6 @@
 import numpy as np
 import mantid
+from mantid.api import AnalysisDataService
 from mantid.simpleapi import *
 from numpy.core.numeric import True_
 from scipy import optimize
@@ -30,7 +31,7 @@ class InitialConditions:
         return None
 
     # Multiscaterring Correction Parameters
-    hydrogen_to_mass0_ratio = 19.0620008206
+    HToMass0Ratio = 19.0620008206
 
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5   
@@ -40,8 +41,9 @@ class InitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
     # Choose type of scattering, when both True, the mean widths from back are used in ic of front
-    backScatteringProcedure = False
-    forwardScatteringProcedure = True
+    # backScatteringProcedure = False
+    # forwardScatteringProcedure = True
+    modeRunning = "None"     # Stores wether is running forward or backward
 
     # Paths to save results for back and forward scattering
     pathForTesting = repoPath / "tests" / "cleaning"  
@@ -50,6 +52,8 @@ class InitialConditions:
 
 
     def setBackscatteringInitialConditions(self):
+        self.modeRunning = "BACKWARD"
+
         # Parameters to load Raw and Empty Workspaces
         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
@@ -66,7 +70,7 @@ class InitialConditions:
         self.masses = np.array([12, 16, 27])
         self.noOfMasses = len(self.masses)
         # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-        # self.hydrogen_to_mass0_ratio = 19.0620008206
+        # self.HToMass0Ratio = 19.0620008206
         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
@@ -82,7 +86,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 2     #4
+        self.noOfMSIterations = 1     #4
         self.firstSpec = 3    #3
         self.lastSpec = 134    #134
 
@@ -111,6 +115,8 @@ class InitialConditions:
 
 
     def setForwardScatteringInitialConditions(self):
+        self.modeRunning = "FORWARD"
+
         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
 
@@ -125,7 +131,7 @@ class InitialConditions:
         # The Hydrogen mass needs to be as 1.0079, otherwise conditional for MS sample properties fails
         self.masses = np.array([1.0079, 12, 16, 27]) 
         self.noOfMasses = len(self.masses)
-        # self.hydrogen_to_mass0_ratio = 0
+        # self.HToMass0Ratio = 0
         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
@@ -143,7 +149,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 2     #4
+        self.noOfMSIterations = 1     #4
         self.firstSpec = 144   #144
         self.lastSpec = 182    #182
 
@@ -176,81 +182,99 @@ class InitialConditions:
                 self.scalingFactors = 1 / self.initPars
 
 
+    def printInitialParameters(self):
+        print("\nRUNNING ", self.modeRunning, " SCATTERING.")
+        print("\n\nH to first mass ratio: ", self.HToMass0Ratio,
+                "\n\nForward scattering initial fitting parameters:\n", 
+                self.initPars.reshape((self.masses.size, 3)),
+                "\n\nForward scattering initial fitting bounds:\n", 
+                self.bounds, "\n")
+
+
 # This is the only variable with global behaviour, all functions are defined to use attributes of ic
 ic = InitialConditions() 
 
 
-def main():
-    if ic.backScatteringProcedure:
-        ic.setBackscatteringInitialConditions()
-        wsFinal, backScatteringResults = iterativeFitForDataReduction()
-        backScatteringResults.save(ic.backScatteringSavePath)
+# def main():
+#     if ic.backScatteringProcedure:
+#         ic.setBackscatteringInitialConditions()
+#         wsFinal, backScatteringResults = iterativeFitForDataReduction()
+#         backScatteringResults.save(ic.backScatteringSavePath)
 
-    if ic.forwardScatteringProcedure:
-        ic.setForwardScatteringInitialConditions()
+#     if ic.forwardScatteringProcedure:
+#         ic.setForwardScatteringInitialConditions()
 
-        try:  
-            backMeanWidths = backScatteringResults.resultsList[0][-1]
-            ic.initPars[4::3] = backMeanWidths
-            ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-            print("\nChanged ic according to mean widhts from backscattering.\n",
-                "\nForward scattering initial fitting parameters:\n", ic.initPars,
-                "\nForward scattering initial fitting bounds:\n", ic.bounds)
-        except UnboundLocalError:
-            print("Using the unchanged ic for forward scattering ...")
-            pass
+#         try:  
+#             backMeanWidths = backScatteringResults.resultsList[0][-1]
+#             ic.initPars[4::3] = backMeanWidths
+#             ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+#             print("\nChanged ic according to mean widhts from backscattering.\n",
+#                 "\nForward scattering initial fitting parameters:\n", ic.initPars,
+#                 "\nForward scattering initial fitting bounds:\n", ic.bounds)
+#         except UnboundLocalError:
+#             print("Using the unchanged ic for forward scattering ...")
+#             pass
 
-        wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
-        fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
-        forwardScatteringResults.save(ic.forwardScatteringSavePath)
+#         wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
+#         fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
+#         forwardScatteringResults.save(ic.forwardScatteringSavePath)
 
 
 def runOnlyBackScattering():
+    AnalysisDataService.clear()
     ic.setBackscatteringInitialConditions()
+    ic.printInitialParameters()
     wsFinal, backScatteringResults = iterativeFitForDataReduction()
     backScatteringResults.save(ic.backScatteringSavePath) 
 
 
 def runOnlyForwardScattering():
+    AnalysisDataService.clear()
     ic.setForwardScatteringInitialConditions()
+    ic.printInitialParameters()
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
     fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
     forwardScatteringResults.save(ic.forwardScatteringSavePath)
 
 
 def runSequenceForKnownRatio():
+    AnalysisDataService.clear()
     # If H to first mass ratio is known, can run MS correction for backscattering
     # Back scattering produces precise results for widhts and intensity ratios 
     # for non-H masses
     ic.setBackscatteringInitialConditions()
+    ic.printInitialParameters()
     wsFinal, backScatteringResults = iterativeFitForDataReduction()
     backScatteringResults.save(ic.backScatteringSavePath) 
 
     ic.setForwardScatteringInitialConditions()
     setInitialFwdParsFromBackScatteringResults(backScatteringResults)
+    ic.printInitialParameters()
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
     fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
     forwardScatteringResults.save(ic.forwardScatteringSavePath)
 
 
 def runSequenceRatioNotKnown():
-    # Run forward first with a good guess for the widths of non-H masses
+    # Run preliminary forward with a good guess for the widths of non-H masses
     ic.setForwardScatteringInitialConditions()
+    ic.printInitialParameters()
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
-    for i in range(2):
+    for i in range(2):    # Loop until convergence is achieved
+        AnalysisDataService.clear()    # Clears all Workspaces
 
         # Get first estimate of H to mass0 ratio
         fwdMeanIntensityRatios = forwardScatteringResults.resultsList[1][-1] 
-        ic.hydrogen_to_mass0_ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
+        ic.HToMass0Ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
        
         # Run backward procedure with this estimate
         ic.setBackscatteringInitialConditions()
-        print("Starting backscattering procedure with H to first mass ratio:\n",
-                ic.hydrogen_to_mass0_ratio)
+        ic.printInitialParameters()
         wsFinal, backScatteringResults = iterativeFitForDataReduction()
 
         ic.setForwardScatteringInitialConditions()
         setInitialFwdParsFromBackScatteringResults(backScatteringResults)
+        ic.printInitialParameters()
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
 
     fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
@@ -266,7 +290,7 @@ def setInitialFwdParsFromBackScatteringResults(backScatteringResults):
     backMeanWidths = backScatteringResults.resultsList[0][-1]
     backMeanIntensityRatios = backScatteringResults.resultsList[1][-1] 
 
-    HIntensity = ic.hydrogen_to_mass0_ratio * backMeanIntensityRatios[0]
+    HIntensity = ic.HToMass0Ratio * backMeanIntensityRatios[0]
     initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
     initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
 
@@ -275,17 +299,16 @@ def setInitialFwdParsFromBackScatteringResults(backScatteringResults):
     ic.initPars[4::3] = backMeanWidths
     ic.initPars[0::3] = initialFwdIntensityRatios
     ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-    ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
+    # ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
 
-    print("\nChanged ic according to mean widhts and intensity ratios from backscattering.\n",
-        "\nForward scattering initial fitting parameters:\n", ic.initPars,
-        "\nForward scattering initial fitting bounds:\n", ic.bounds)
+    print("\nChanged initial conditions of forward scattering \
+        according to mean widhts and intensity ratios from backscattering.\n")
     return
 
 
 
 """
-All the functions required to run main() are listed below, in order of appearance
+All the functions required for the procedures above are listed below, in order of appearance
 """
 
 
@@ -833,7 +856,7 @@ def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
 
     sampleProperties = calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios)
-    print("\n The sample properties for Multiple Scattering correction are:\n ", 
+    print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
             sampleProperties, "\n")
     createMulScatWorkspaces(ic.name, sampleProperties)
 
@@ -841,16 +864,14 @@ def createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios):
 def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
     masses = ic.masses.flatten()
 
-    # If H not present, add it to sample properties
-    if 1.0079 not in masses:   
-        if ic.hydrogen_peak:
-            # TODO: Check if forward scattering needs this procedure
-            masses = np.append(masses, 1.0079)
-            meanWidths = np.append(meanWidths, 5.0)
-            meanIntensityRatios = np.append(
-                meanIntensityRatios, ic.hydrogen_to_mass0_ratio * meanIntensityRatios[0]
-                )
-            meanIntensityRatios /= np.sum(meanIntensityRatios)
+    # If H not present ie backward scattering, add it to sample properties
+    if (ic.modeRunning == "BACKWARD") and ic.hydrogen_peak:   
+        masses = np.append(masses, 1.0079)
+        meanWidths = np.append(meanWidths, 5.0)
+
+        HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]
+        meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
+        meanIntensityRatios /= np.sum(meanIntensityRatios)
 
     MSProperties = np.zeros(3*len(masses))
     MSProperties[::3] = masses
@@ -864,7 +885,7 @@ def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
 def createMulScatWorkspaces(wsName, sampleProperties):
     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
 
-    print("Evaluating the Multiple Scattering Correction.")
+    print("\nEvaluating the Multiple Scattering Correction...\n")
     # selects only the masses, every 3 numbers
     MS_masses = sampleProperties[::3]
     # same as above, but starts at first intensities
@@ -1215,7 +1236,8 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
             # name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
             # +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
             # y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
-
+            
+            # TODO: Check that this function is correct
             function = """
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace=resolution,WorkspaceIndex=0,X=(),Y=();
@@ -1342,7 +1364,11 @@ class resultsObject:
 
 #if __name__=="__main__":
 start_time = time.time()
-runSequenceRatioNotKnown()
+# runSequenceRatioNotKnown()
+# runSequenceForKnownRatio()
+runOnlyBackScattering()
+runOnlyForwardScattering()
+
 # main()
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
