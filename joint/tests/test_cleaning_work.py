@@ -128,11 +128,11 @@ class TestSymSumYSpace(unittest.TestCase):
         self.decimal = 6
 
     def test_YSpaceDataY(self):
-        nptest.assert_array_equal(self.oridataY, self.optdataY)
+        nptest.assert_allclose(self.oridataY, self.optdataY)
 
  
     def test_YSpaceDataE(self):
-        nptest.assert_array_equal(self.oridataE, self.optdataE)
+        nptest.assert_allclose(self.oridataE, self.optdataE)
 
 
 class TestResolution(unittest.TestCase):

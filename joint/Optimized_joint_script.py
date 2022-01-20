@@ -299,6 +299,7 @@ def setInitialFwdParsFromBackScatteringResults(backScatteringResults):
     ic.initPars[4::3] = backMeanWidths
     ic.initPars[0::3] = initialFwdIntensityRatios
     ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+    # Fix the intensity ratios 
     # ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
 
     print("\nChanged initial conditions of forward scattering \
@@ -1035,15 +1036,36 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
 def averageJOfYOverAllSpectra(ws0, mass):
     wsYSpace = convertToYSpace(ws0, mass)
     wsYSpaceSym = SymetriseWorkspace(wsYSpace)
-    wsOnes = replaceNonZeroNanValuesByOnesInWs(wsYSpaceSym)
-    wsOnesSum = SumSpectra(wsOnes)
 
-    wsYSpaceSymSum = SumSpectra(wsYSpaceSym)
-    averagedSpectraYSpace = Divide(
-         LHSWorkspace=wsYSpaceSymSum, RHSWorkspace=wsOnesSum,
-         OutputWorkspace=ws0.name()+"_JOfY_symetrized_averaged"
-    )
+    # wsOnes = replaceNonZeroNanValuesByOnesInWs(wsYSpaceSym)
+    # wsOnesSum = SumSpectra(wsOnes)
+
+    # wsYSpaceSymSum = SumSpectra(wsYSpaceSym)
+    # averagedSpectraYSpace = Divide(
+    #      LHSWorkspace=wsYSpaceSymSum, RHSWorkspace=wsOnesSum,
+    #      OutputWorkspace=ws0.name()+"_JOfY_symetrized_averaged"
+    # )
+    averagedSpectraYSpace = weightedAvg(wsYSpaceSym)
     return averagedSpectraYSpace
+
+
+def weightedAvg(wsYSpace):
+    dataY = wsYSpace.extractY()
+    dataE = wsYSpace.extractE()
+
+    npErr = np.sqrt(np.nansum(np.square(dataE), axis=0))
+    ySum = np.sum(dataY, axis=0)
+    npCount = np.sum(dataY!=0, axis=0)
+
+    meanY = ySum / npCount
+    meanE = npErr / npCount
+
+    tempWs = SumSpectra(wsYSpace)
+    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_averaged")
+    newWs.dataY(0)[:] = meanY
+    newWs.dataE(0)[:] = meanE
+    DeleteWorkspace(tempWs)
+    return newWs
 
 
 def convertToYSpace(ws0, mass):
@@ -1093,21 +1115,21 @@ def symetriseArrayNegMirrorsPos(dataX, dataY):
     return dataY
 
 
-def replaceNonZeroNanValuesByOnesInWs(wsYSym):
-    dataY = wsYSym.extractY()
-    dataE = wsYSym.extractE()
+# def replaceNonZeroNanValuesByOnesInWs(wsYSym):
+#     dataY = wsYSym.extractY()
+#     dataE = wsYSym.extractE()
     
-    dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
-    nonZerosMask = ~(dataY==0)
-    dataYones = np.where(nonZerosMask, 1, 0)
-    dataE = np.full(dataE.shape, 0.000001)  # Value from original script
+#     dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
+#     nonZerosMask = ~(dataY==0)
+#     dataYones = np.where(nonZerosMask, 1, 0)
+#     dataE = np.full(dataE.shape, 0.000001)  # Value from original script
 
-    # Build Workspaces, couldn't find a method for this in Mantid
-    wsOnes = CloneWorkspace(wsYSym)
-    for i in range(wsYSym.getNumberHistograms()):
-        wsOnes.dataY(i)[:] = dataYones[i, :]
-        wsOnes.dataE(i)[:] = dataE[i, :]
-    return wsOnes
+#     # Build Workspaces, couldn't find a method for this in Mantid
+#     wsOnes = CloneWorkspace(wsYSym)
+#     for i in range(wsYSym.getNumberHistograms()):
+#         wsOnes.dataY(i)[:] = dataYones[i, :]
+#         wsOnes.dataE(i)[:] = dataE[i, :]
+#     return wsOnes
 
 
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
@@ -1366,7 +1388,7 @@ class resultsObject:
 start_time = time.time()
 # runSequenceRatioNotKnown()
 # runSequenceForKnownRatio()
-runOnlyBackScattering()
+# runOnlyBackScattering()
 runOnlyForwardScattering()
 
 # main()
