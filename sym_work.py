@@ -53,7 +53,7 @@ def originalProcedure(wsYSpace):
         )
     return averagedYSpace
 
-def myProcedure(wsYSpace):
+def myNormalAvg(wsYSpace):
     dataY = wsYSpace.extractY()
     dataE = wsYSpace.extractE()
     npErr = np.sqrt(np.nansum(np.square(dataE), axis=0))
@@ -68,6 +68,25 @@ def myProcedure(wsYSpace):
     newWs.dataY(0)[:] = meanY
     newWs.dataE(0)[:] = meanE
     return newWs
+
+
+def myWeightedAvg(wsYSpace):
+    dataY = wsYSpace.extractY()
+    dataE = wsYSpace.extractE()
+
+    dataY[dataY==0] = np.nan
+    dataE[dataE==0] = np.nan
+
+    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
+    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+
+    tempWs = SumSpectra(wsYSpace)
+    newWs = CloneWorkspace(tempWs)
+    newWs.dataY(0)[:] = meanY
+    newWs.dataE(0)[:] = meanE
+    DeleteWorkspace(tempWs)
+    return newWs
+
 
 def avgSymmetrize(avgYSpace):
     dataX = avgYSpace.extractX()
@@ -94,7 +113,7 @@ MaskDetectors(Workspace=ws, SpectraList=[173, 174, 179])
 wsYSpace = convertToYSpace(ws, 1)
 
 ori = originalProcedure(wsYSpace)
-opt = myProcedure(wsYSpace)
+opt = myWeightedAvg(wsYSpace)
 CompareWorkspaces(ori, opt)
 
 Symmetric = avgSymmetrize(opt)

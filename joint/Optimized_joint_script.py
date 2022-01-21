@@ -160,7 +160,8 @@ class InitialConditions:
         self.GammaCorrectionFlag = True
 
         # Parameters to control fit in Y-Space
-        self.symmetriseHProfileUsingAveragesFlag = False      # When False, use mirror sym
+        self.symmetrisationFlag = True
+        self.symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
         # self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
         self.singleGaussFitToHProfile = True       # When False, use Hermite expansion
@@ -327,6 +328,7 @@ def iterativeFitForDataReduction():
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
+        SumSpectra(InputWorkspace=wsToBeFitted, OutputWorkspace=wsToBeFitted.name()+"_sum")
 
         print("\nFitting spectra ", ic.firstSpec, " - ", ic.lastSpec, "\n.............")
         fittedNcpResults = fitNcpToWorkspace(wsToBeFitted)
@@ -553,8 +555,8 @@ def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
-    if np.all(dataY == 0) | np.all(np.isnan(dataY)): 
-        return np.full(len(ic.initPars)+3, np.nan)
+    if np.all(dataY == 0) : #| np.all(np.isnan(dataY)): 
+        return np.zeros(len(ic.initPars)+3)  #np.full(len(ic.initPars)+3, np.nan)
     
     scaledPars = ic.initPars * ic.scalingFactors
     scaledBounds = ic.bounds * ic.scalingFactors[:, np.newaxis]
@@ -788,8 +790,16 @@ class FitParameters:
 
     def getMeanAndStdWidthsAndIntensities(self):
         noOfMasses = ic.noOfMasses
-        widths = self.widths.T
-        intensities = self.intensities.T
+        widths = self.widths.T.copy()   # copy arrays to avoid changing stored values
+        intensities = self.intensities.T.copy()
+
+        # Replace zeros from masked spectra with nans
+        widths[:, ic.maskedDetectorIdx] = np.nan
+        intensities[:, ic.maskedDetectorIdx] = np.nan
+
+        # if (np.sum(widths==0)!=0) | (np.sum(intensities==0)!=0):
+        #     raise ValueError("There are zeros in widhts or intensity ratios not being \
+        #         replaced by nans during the calculation of means and std.")
 
         meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
         stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
@@ -817,8 +827,8 @@ def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, ki
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
 
-    if np.all(np.isnan(initPars)):
-        return np.full(ySpacesForEachMass.shape, np.nan)
+    if np.all(initPars==0):   #np.all(np.isnan(initPars)):
+        return np.zeros(ySpacesForEachMass.shape) #np.full(ySpacesForEachMass.shape, np.nan)
     
     ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
@@ -838,12 +848,15 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
     dataY = ncpTotal * histWidths
     dataE = dataE[:, :-1] * histWidths
 
-    CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), DataE=dataE.flatten(),
+    ncpTotWs = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), DataE=dataE.flatten(),
                      Nspec=len(dataX), OutputWorkspace=ws.name()+"_tof_fitted_profiles")
+    SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_sum" )
 
     for i, ncp_m in enumerate(ncpForEachMass):
-        CreateWorkspace(DataX=dataX.flatten(), DataY=ncp_m.flatten(), Nspec=len(dataX),
+        ncpMWs = CreateWorkspace(DataX=dataX.flatten(), DataY=ncp_m.flatten(), Nspec=len(dataX),
                         OutputWorkspace=ws.name()+"_tof_fitted_profile_"+str(i+1))
+        SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_sum" )
+
 
 
 def switchFirstTwoAxis(A):
@@ -1035,7 +1048,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
 
 def averageJOfYOverAllSpectra(ws0, mass):
     wsYSpace = convertToYSpace(ws0, mass)
-    wsYSpaceSym = SymetriseWorkspace(wsYSpace)
+    # wsYSpaceSym = SymetriseWorkspace(wsYSpace)
 
     # wsOnes = replaceNonZeroNanValuesByOnesInWs(wsYSpaceSym)
     # wsOnesSum = SumSpectra(wsOnes)
@@ -1045,27 +1058,12 @@ def averageJOfYOverAllSpectra(ws0, mass):
     #      LHSWorkspace=wsYSpaceSymSum, RHSWorkspace=wsOnesSum,
     #      OutputWorkspace=ws0.name()+"_JOfY_symetrized_averaged"
     # )
-    averagedSpectraYSpace = weightedAvg(wsYSpaceSym)
+    averagedSpectraYSpace = weightedAvg(wsYSpace)
+    
+    if ic.symmetrisationFlag == True:
+        symAvgdSpecYSpace = symmetrizeWs(averagedSpectraYSpace)
+        return symAvgdSpecYSpace
     return averagedSpectraYSpace
-
-
-def weightedAvg(wsYSpace):
-    dataY = wsYSpace.extractY()
-    dataE = wsYSpace.extractE()
-
-    npErr = np.sqrt(np.nansum(np.square(dataE), axis=0))
-    ySum = np.sum(dataY, axis=0)
-    npCount = np.sum(dataY!=0, axis=0)
-
-    meanY = ySum / npCount
-    meanE = npErr / npCount
-
-    tempWs = SumSpectra(wsYSpace)
-    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_averaged")
-    newWs.dataY(0)[:] = meanY
-    newWs.dataE(0)[:] = meanE
-    DeleteWorkspace(tempWs)
-    return newWs
 
 
 def convertToYSpace(ws0, mass):
@@ -1082,37 +1080,89 @@ def convertToYSpace(ws0, mass):
     return mtd[ws0.name()+"_JoY"]
 
 
-def SymetriseWorkspace(wsYSpace):
-    dataY = wsYSpace.extractY() 
+def weightedAvg(wsYSpace):
+    dataY = wsYSpace.extractY()
     dataE = wsYSpace.extractE()
-    dataX = wsYSpace.extractX()
+
+    dataY[dataY==0] = np.nan
+    dataE[dataE==0] = np.nan
+
+    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
+    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+
+    tempWs = SumSpectra(wsYSpace)
+    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_weighted_avg")
+    newWs.dataY(0)[:] = meanY
+    newWs.dataE(0)[:] = meanE
+    DeleteWorkspace(tempWs)
+    return newWs
+
+
+def symmetrizeWs(avgYSpace):
+    """Symmetrizes workspace with only one spectrum,
+       Needs to have symmetric binning"""
+
+    dataX = avgYSpace.extractX()
+    dataY = avgYSpace.extractY()
+    dataE = avgYSpace.extractE()
+
+    yFlip = np.flip(dataY)
+    eFlip = np.flip(dataE)
 
     if ic.symmetriseHProfileUsingAveragesFlag:
-        dataY = symetriseArrayUsingAverages(dataY)
-        dataE = symetriseArrayUsingAverages(dataE)
+        # Inverse variance weighting
+        dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
+        dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
     else:
-        dataY = symetriseArrayNegMirrorsPos(dataX, dataY)
-        dataE = symetriseArrayNegMirrorsPos(dataX, dataE)
+        # Mirroring positive values from negative ones
+        dataYSym = np.where(dataX>0, yFlip, dataY)
+        dataESym = np.where(dataX>0, eFlip, dataE)
 
-    wsYSym = CloneWorkspace(wsYSpace)
-    for i in range(wsYSpace.getNumberHistograms()):
-        wsYSym.dataY(i)[:] = dataY[i, :]
-        wsYSym.dataE(i)[:] = dataE[i, :]
-    return wsYSym
+    Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_symmetrised")
+    Sym.dataY(0)[:] = dataYSym
+    Sym.dataE(0)[:] = dataESym
+    return Sym
 
-#TODO: Implement weighted nan mean symetrization
-def symetriseArrayUsingAverages(dataY):
-    # Code below works as long as dataX is symetric
-    # Need to account for kinematic cut-offs
-    dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
-    # With zeros being masked, can perform the average
-    dataY = (dataY + np.flip(dataY, axis=1)) / 2
-    return dataY
+# def mirrorSymmetrizeWs(avgYSpace):
+#     """"""
+
+#     dataX = avgYSpace.extractX()
+#     dataY = avgYSpace.extractY()
+#     dataE = avgYSpace.extractE()
+
+#     dataYSym =  np.where(dataX>0, np.flip(dataY, axis=1), dataY)
+
+# def SymetriseWorkspace(wsYSpace):
+#     dataY = wsYSpace.extractY() 
+#     dataE = wsYSpace.extractE()
+#     dataX = wsYSpace.extractX()
+
+#     if ic.symmetriseHProfileUsingAveragesFlag:
+#         dataY = symetriseArrayUsingAverages(dataY)
+#         dataE = symetriseArrayUsingAverages(dataE)
+#     else:
+#         dataY = symetriseArrayNegMirrorsPos(dataX, dataY)
+#         dataE = symetriseArrayNegMirrorsPos(dataX, dataE)
+
+#     wsYSym = CloneWorkspace(wsYSpace)
+#     for i in range(wsYSpace.getNumberHistograms()):
+#         wsYSym.dataY(i)[:] = dataY[i, :]
+#         wsYSym.dataE(i)[:] = dataE[i, :]
+#     return wsYSym
+
+# #TODO: Implement weighted nan mean symetrization
+# def symetriseArrayUsingAverages(dataY):
+#     # Code below works as long as dataX is symetric
+#     # Need to account for kinematic cut-offs
+#     dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
+#     # With zeros being masked, can perform the average
+#     dataY = (dataY + np.flip(dataY, axis=1)) / 2
+#     return dataY
 
 
-def symetriseArrayNegMirrorsPos(dataX, dataY):
-    dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
-    return dataY
+# def symetriseArrayNegMirrorsPos(dataX, dataY):
+#     dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
+#     return dataY
 
 
 # def replaceNonZeroNanValuesByOnesInWs(wsYSym):
@@ -1224,7 +1274,7 @@ def fitProfileCurveFit(wsYSpaceSym, wsRes):
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, yfit, Residuals)), 
                     NSpec=3,
-                    OutputWorkspace="CurveFitResults")
+                    OutputWorkspace=wsYSpaceSym.name()+"_fitted_CurveFit")
     return popt, pcov
 
 
@@ -1244,7 +1294,8 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
     print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
     for i, minimizer in enumerate(['Levenberg-Marquardt','Simplex']):
-        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = ic.name+minimizer+'_joy_sum_fitted')
+        outputName = wsYSpaceSym.name()+"_fitted_"+minimizer
+        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
         if ic.singleGaussFitToHProfile:
             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
@@ -1271,12 +1322,12 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 
         Fit(
             Function=function, 
-            InputWorkspace=ic.name+minimizer+'_joy_sum_fitted',
-            Output=ic.name+minimizer+'_joy_sum_fitted',
+            InputWorkspace=outputName,
+            Output=outputName,
             Minimizer=minimizer
             )
         
-        ws=mtd[ic.name+minimizer+'_joy_sum_fitted_Parameters']
+        ws=mtd[outputName+"_Parameters"]
         popt[i] = ws.column("Value")
         perr[i] = ws.column("Error")
     return popt, perr
@@ -1354,6 +1405,7 @@ class resultsObject:
     def printYSpaceFitResults(self):
         print("\nFit in Y Space results:")
         print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
+        print("\nOrder: [y0, A, x0, sigma]")
         print("\npopt:\n", self.popt)
         print("\nperr:\n", self.perr, "\n")
 
