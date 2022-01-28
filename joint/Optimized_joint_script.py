@@ -46,9 +46,9 @@ class InitialConditions:
     modeRunning = "None"     # Stores wether is running forward or backward
 
     # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "cleaning"  
-    forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
-    backScatteringSavePath = pathForTesting / "current_backward.npz"
+    # pathForTesting = repoPath / "tests" / "cleaning"  
+    forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
+    backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz" 
 
 
     def setBackscatteringInitialConditions(self):
@@ -86,7 +86,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 4     #4
         self.firstSpec = 3    #3
         self.lastSpec = 134    #134
 
@@ -149,7 +149,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 4     #4
         self.firstSpec = 144   #144
         self.lastSpec = 182    #182
 
@@ -882,7 +882,6 @@ def calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios):
     if (ic.modeRunning == "BACKWARD") and ic.hydrogen_peak:   
         masses = np.append(masses, 1.0079)
         meanWidths = np.append(meanWidths, 5.0)
-
         HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]
         meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
         meanIntensityRatios /= np.sum(meanIntensityRatios)
@@ -1417,6 +1416,12 @@ class resultsObject:
         all_std_widths, all_std_intensities, \
         all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
         all_ncp_for_each_mass = self.resultsList
+
+        # Because original results were recently saved with nans, mask spectra with nans
+        all_spec_best_par_chi_nit[:, ic.maskedDetectorIdx, :] = np.nan
+        all_ncp_for_each_mass[:, ic.maskedDetectorIdx, :, :] = np.nan
+        all_tot_ncp[:, ic.maskedDetectorIdx, :] = np.nan
+
         np.savez(savePath,
                  all_fit_workspaces=all_fit_workspaces,
                  all_spec_best_par_chi_nit=all_spec_best_par_chi_nit,
@@ -1440,7 +1445,7 @@ class resultsObject:
 start_time = time.time()
 # runSequenceRatioNotKnown()
 # runSequenceForKnownRatio()
-# runOnlyBackScattering()
+runOnlyBackScattering()
 runOnlyForwardScattering()
 
 # main()
