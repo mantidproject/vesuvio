@@ -12,8 +12,14 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-pathToOriginal = currentPath / "cleaning" / "starter_backward.npz" 
-pathToOptimized = currentPath / "cleaning" / "current_backward.npz" 
+forward = True
+if forward:
+    pathToOriginal = currentPath / "cleaning" / "starter_forward.npz" 
+    pathToOptimized = currentPath / "cleaning" / "current_forward.npz" 
+else:
+    pathToOriginal = currentPath / "cleaning" / "starter_backward.npz" 
+    pathToOptimized = currentPath / "cleaning" / "current_backward.npz"
+
 
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
@@ -208,7 +214,7 @@ class Testpopt(unittest.TestCase):
 
         optimizedResults = np.load(pathToOptimized)
         # Select only Fit results due to Mantid Fit
-        self.optpopt = optimizedResults["popt"][1:]
+        self.optpopt = optimizedResults["popt"]
     
     def test_opt(self):
         nptest.assert_array_equal(self.oripopt, self.optpopt)
@@ -220,7 +226,7 @@ class Testperr(unittest.TestCase):
         self.oriperr = originalResults["perr"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optperr = optimizedResults["perr"][1:]
+        self.optperr = optimizedResults["perr"]
     
     def test_perr(self):
         nptest.assert_array_equal( self.oriperr, self.optperr)

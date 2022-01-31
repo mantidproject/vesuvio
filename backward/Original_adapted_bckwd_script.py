@@ -654,7 +654,9 @@ bounds     += (  (0, None),  (9.8,10),  (-10., 10.))
 #  Ge cross section * stoichiometry = 8.6*12 = 103.2	 barn
 
 
-constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] },{'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
+constraints =  ({'type': 'eq', 'fun': lambda par:  par[0] -2.94/46.84*par[3] },
+                {'type': 'eq', 'fun': lambda par:  par[0] -2.94/103.2*par[6] })
+                
 #constraints =  ()
 fit_arguments = [bounds, constraints]
 

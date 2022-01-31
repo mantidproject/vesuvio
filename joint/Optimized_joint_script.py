@@ -1,3 +1,4 @@
+import enum
 import numpy as np
 import mantid
 from mantid.api import AnalysisDataService
@@ -40,18 +41,18 @@ class InitialConditions:
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
-    # Choose type of scattering, when both True, the mean widths from back are used in ic of front
-    # backScatteringProcedure = False
-    # forwardScatteringProcedure = True
     modeRunning = "None"     # Stores wether is running forward or backward
 
     # Paths to save results for back and forward scattering
-    pathForTesting = repoPath / "tests" / "cleaning"  
-    # forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
-    # backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz"
-    forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
-    backScatteringSavePath = pathForTesting / "current_backward.npz" 
-
+    testingCleaning = True
+    if testingCleaning:     
+        pathForTesting = repoPath / "tests" / "cleaning"  
+        forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
+        backScatteringSavePath = pathForTesting / "current_backward.npz" 
+    else:
+        forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
+        backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz"
+    
 
     def setBackscatteringInitialConditions(self):
         self.modeRunning = "BACKWARD"
@@ -71,8 +72,6 @@ class InitialConditions:
         # Masses, instrument parameters and initial fitting parameters
         self.masses = np.array([12, 16, 27])
         self.noOfMasses = len(self.masses)
-        # Hydrogen-to-mass[0] ratio obtaiend from the preliminary fit of forward scattering  0.77/0.02 =38.5
-        # self.HToMass0Ratio = 19.0620008206
         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
@@ -88,7 +87,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 2     #4
         self.firstSpec = 3    #3
         self.lastSpec = 134    #134
 
@@ -117,7 +116,7 @@ class InitialConditions:
 
 
     def setForwardScatteringInitialConditions(self):
-        self.modeRunning = "FORWARD"
+        self.modeRunning = "FORWARD"  # Used to control MS correction
 
         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
         self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
@@ -130,10 +129,8 @@ class InitialConditions:
         self.mode='SingleDifference'
         self.ipfile=r'./ip2018_3.par'
 
-        # The Hydrogen mass needs to be as 1.0079, otherwise conditional for MS sample properties fails
         self.masses = np.array([1.0079, 12, 16, 27]) 
         self.noOfMasses = len(self.masses)
-        # self.HToMass0Ratio = 0
         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
@@ -151,7 +148,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 1     #4
+        self.noOfMSIterations = 2     #4
         self.firstSpec = 144   #144
         self.lastSpec = 182    #182
 
@@ -164,9 +161,8 @@ class InitialConditions:
         # Parameters to control fit in Y-Space
         self.symmetrisationFlag = True
         self.symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
-        # self.useScipyCurveFitToHProfileFlag = False       # When False, use Mantid Fit
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-        self.singleGaussFitToHProfile = True       # When False, use Hermite expansion
+        self.singleGaussFitToHProfile = True      # When False, use Hermite expansion
 
         self.firstSpecIdx = 0
         self.lastSpecIdx = self.lastSpec - self.firstSpec
@@ -198,31 +194,6 @@ class InitialConditions:
 ic = InitialConditions() 
 
 
-# def main():
-#     if ic.backScatteringProcedure:
-#         ic.setBackscatteringInitialConditions()
-#         wsFinal, backScatteringResults = iterativeFitForDataReduction()
-#         backScatteringResults.save(ic.backScatteringSavePath)
-
-#     if ic.forwardScatteringProcedure:
-#         ic.setForwardScatteringInitialConditions()
-
-#         try:  
-#             backMeanWidths = backScatteringResults.resultsList[0][-1]
-#             ic.initPars[4::3] = backMeanWidths
-#             ic.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-#             print("\nChanged ic according to mean widhts from backscattering.\n",
-#                 "\nForward scattering initial fitting parameters:\n", ic.initPars,
-#                 "\nForward scattering initial fitting bounds:\n", ic.bounds)
-#         except UnboundLocalError:
-#             print("Using the unchanged ic for forward scattering ...")
-#             pass
-
-#         wsFinal, forwardScatteringResults = iterativeFitForDataReduction()
-#         fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
-#         forwardScatteringResults.save(ic.forwardScatteringSavePath)
-
-
 def runOnlyBackScattering():
     AnalysisDataService.clear()
     ic.setBackscatteringInitialConditions()
@@ -243,8 +214,7 @@ def runOnlyForwardScattering():
 def runSequenceForKnownRatio():
     AnalysisDataService.clear()
     # If H to first mass ratio is known, can run MS correction for backscattering
-    # Back scattering produces precise results for widhts and intensity ratios 
-    # for non-H masses
+    # Back scattering produces precise results for widhts and intensity ratios for non-H masses
     ic.setBackscatteringInitialConditions()
     ic.printInitialParameters()
     wsFinal, backScatteringResults = iterativeFitForDataReduction()
@@ -318,12 +288,10 @@ All the functions required for the procedures above are listed below, in order o
 
 def iterativeFitForDataReduction():
 
-    wsToBeFittedUncropped = loadVesuvioDataWorkspaces()
-    # Need to mask detectors!
-    MaskDetectors(Workspace=wsToBeFittedUncropped, WorkspaceIndexList=ic.maskedDetectorIdx)
-    wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
-    # Line below is probably unecessary
-    # CloneWorkspace(InputWorkspace=wsToBeFitted, OutputWorkspace=ic.name)    
+    initialWs = loadVesuvioDataWorkspaces()   # Workspace with ic.name()
+    cropAndMaskWorkspace(initialWs)
+    wsToBeFitted = CloneWorkspace(InputWorkspace=initialWs, OutputWorkspace=initialWs.name()+"0")
+   
     createSlabGeometry()
 
     # Initialize arrays to store script results
@@ -339,24 +307,26 @@ def iterativeFitForDataReduction():
         thisScriptResults.append(iteration, fittedNcpResults)
         thisScriptResults.printResults(iteration)
 
-        # if iteration == ic.noOfMSIterations - 1:
-        #   break
-        if (iteration < ic.noOfMSIterations - 1):  
+        # Previously: if (iteration < ic.noOfMSIterations - 1): 
+        # When last iteration, skip MS and GC
+        if iteration == ic.noOfMSIterations - 1:
+          break 
 
-            meanWidths, meanIntensityRatios = fittedNcpResults[:2]
-            CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
+        meanWidths, meanIntensityRatios = fittedNcpResults[:2]
+        CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
-            if ic.MSCorrectionFlag:
-                createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios)
-                Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
-                      OutputWorkspace="tmpNameWs")
+        if ic.MSCorrectionFlag:
+            createWorkspacesForMSCorrection(meanWidths, meanIntensityRatios)
+            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
+                    OutputWorkspace="tmpNameWs")
 
-            if ic.GammaCorrectionFlag:  
-                createWorkspacesForGammaCorrection(meanWidths, meanIntensityRatios)
-                Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
-                      OutputWorkspace="tmpNameWs")
+        if ic.GammaCorrectionFlag:  
+            createWorkspacesForGammaCorrection(meanWidths, meanIntensityRatios)
+            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
+                    OutputWorkspace="tmpNameWs")
 
-            RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
+        RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
+
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
     return wsFinal, thisScriptResults
 
@@ -386,8 +356,6 @@ def loadRawAndEmptyWsFromUserPath():
             OutputWorkspace=ic.name+'empty')
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
                             OutputWorkspace=ic.name)
-
-    print(wsToBeFitted.name())
     return wsToBeFitted
 
 
@@ -412,18 +380,15 @@ def loadRawAndEmptyWsFromLoadVesuvio():
     return wsToBeFitted
 
 
-def cropCloneAndMaskWorkspace(ws):
+def cropAndMaskWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
-    ws = CropWorkspace(
+    CropWorkspace(
         InputWorkspace=ws.name(), 
         StartWorkspaceIndex=ic.firstSpecIdx, EndWorkspaceIndex=ic.lastSpecIdx, 
         OutputWorkspace=ws.name()
         )
-    wsToBeFitted = CloneWorkspace(
-        InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"0"
-        )
-    MaskDetectors(Workspace=wsToBeFitted, WorkspaceIndexList=ic.maskedDetectorIdx)
-    return wsToBeFitted
+    MaskDetectors(Workspace=ws, WorkspaceIndexList=ic.maskedDetectorIdx)
+    return 
 
 
 def createSlabGeometry():
@@ -796,16 +761,13 @@ class FitParameters:
 
     def getMeanAndStdWidthsAndIntensities(self):
         noOfMasses = ic.noOfMasses
-        widths = self.widths.T.copy()   # copy arrays to avoid changing stored values
+        # Copy arrays to avoid changing stored values
+        widths = self.widths.T.copy() 
         intensities = self.intensities.T.copy()
 
         # Replace zeros from masked spectra with nans
         widths[:, ic.maskedDetectorIdx] = np.nan
         intensities[:, ic.maskedDetectorIdx] = np.nan
-
-        # if (np.sum(widths==0)!=0) | (np.sum(intensities==0)!=0):
-        #     raise ValueError("There are zeros in widhts or intensity ratios not being \
-        #         replaced by nans during the calculation of means and std.")
 
         meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
         stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
@@ -833,8 +795,8 @@ def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, ki
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
 
-    if np.all(initPars==0):   #np.all(np.isnan(initPars)):
-        return np.zeros(ySpacesForEachMass.shape) #np.full(ySpacesForEachMass.shape, np.nan)
+    if np.all(initPars==0):  
+        return np.zeros(ySpacesForEachMass.shape) 
     
     ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
@@ -1052,21 +1014,12 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
 
 def averageJOfYOverAllSpectra(ws0, mass):
     wsYSpace = convertToYSpace(ws0, mass)
-    # wsYSpaceSym = SymetriseWorkspace(wsYSpace)
-
-    # wsOnes = replaceNonZeroNanValuesByOnesInWs(wsYSpaceSym)
-    # wsOnesSum = SumSpectra(wsOnes)
-
-    # wsYSpaceSymSum = SumSpectra(wsYSpaceSym)
-    # averagedSpectraYSpace = Divide(
-    #      LHSWorkspace=wsYSpaceSymSum, RHSWorkspace=wsOnesSum,
-    #      OutputWorkspace=ws0.name()+"_JOfY_symetrized_averaged"
-    # )
     averagedSpectraYSpace = weightedAvg(wsYSpace)
     
     if ic.symmetrisationFlag == True:
         symAvgdSpecYSpace = symmetrizeWs(averagedSpectraYSpace)
         return symAvgdSpecYSpace
+
     return averagedSpectraYSpace
 
 
@@ -1126,64 +1079,6 @@ def symmetrizeWs(avgYSpace):
     Sym.dataY(0)[:] = dataYSym
     Sym.dataE(0)[:] = dataESym
     return Sym
-
-# def mirrorSymmetrizeWs(avgYSpace):
-#     """"""
-
-#     dataX = avgYSpace.extractX()
-#     dataY = avgYSpace.extractY()
-#     dataE = avgYSpace.extractE()
-
-#     dataYSym =  np.where(dataX>0, np.flip(dataY, axis=1), dataY)
-
-# def SymetriseWorkspace(wsYSpace):
-#     dataY = wsYSpace.extractY() 
-#     dataE = wsYSpace.extractE()
-#     dataX = wsYSpace.extractX()
-
-#     if ic.symmetriseHProfileUsingAveragesFlag:
-#         dataY = symetriseArrayUsingAverages(dataY)
-#         dataE = symetriseArrayUsingAverages(dataE)
-#     else:
-#         dataY = symetriseArrayNegMirrorsPos(dataX, dataY)
-#         dataE = symetriseArrayNegMirrorsPos(dataX, dataE)
-
-#     wsYSym = CloneWorkspace(wsYSpace)
-#     for i in range(wsYSpace.getNumberHistograms()):
-#         wsYSym.dataY(i)[:] = dataY[i, :]
-#         wsYSym.dataE(i)[:] = dataE[i, :]
-#     return wsYSym
-
-
-# def symetriseArrayUsingAverages(dataY):
-#     # Code below works as long as dataX is symetric
-#     # Need to account for kinematic cut-offs
-#     dataY = np.where(dataY==0, np.flip(dataY, axis=1), dataY)
-#     # With zeros being masked, can perform the average
-#     dataY = (dataY + np.flip(dataY, axis=1)) / 2
-#     return dataY
-
-
-# def symetriseArrayNegMirrorsPos(dataX, dataY):
-#     dataY = np.where(dataX<0, np.flip(dataY, axis=1), dataY)
-#     return dataY
-
-
-# def replaceNonZeroNanValuesByOnesInWs(wsYSym):
-#     dataY = wsYSym.extractY()
-#     dataE = wsYSym.extractE()
-    
-#     dataY[np.isnan(dataY)] = 0   # Safeguard agaist nans
-#     nonZerosMask = ~(dataY==0)
-#     dataYones = np.where(nonZerosMask, 1, 0)
-#     dataE = np.full(dataE.shape, 0.000001)  # Value from original script
-
-#     # Build Workspaces, couldn't find a method for this in Mantid
-#     wsOnes = CloneWorkspace(wsYSym)
-#     for i in range(wsYSym.getNumberHistograms()):
-#         wsOnes.dataY(i)[:] = dataYones[i, :]
-#         wsOnes.dataE(i)[:] = dataE[i, :]
-#     return wsOnes
 
 
 def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
@@ -1323,7 +1218,6 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
             sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
             """
 
-
         Fit(
             Function=function, 
             InputWorkspace=outputName,
@@ -1408,10 +1302,21 @@ class resultsObject:
 
     def printYSpaceFitResults(self):
         print("\nFit in Y Space results:")
-        print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
-        print("\nOrder: [y0, A, x0, sigma]")
-        print("\npopt:\n", self.popt)
-        print("\nperr:\n", self.perr, "\n")
+        # print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
+        # print("\nOrder: [y0, A, x0, sigma]")
+        # print("\npopt:\n", self.popt)
+        # print("\nperr:\n", self.perr, "\n")
+
+        if ic.singleGaussFitToHProfile:
+            for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+                print(f"\n{fit:15s}")
+                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:", "Cost Fun:"], self.popt[i], self.perr[i]):
+                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
+        else:
+            for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+                print(f"\n{fit:15s}")
+                for par, popt, perr in zip(["sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
+                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
 
 
     def save(self, savePath):
@@ -1450,7 +1355,7 @@ class resultsObject:
 start_time = time.time()
 # runSequenceRatioNotKnown()
 # runSequenceForKnownRatio()
-runOnlyBackScattering()
+# runOnlyBackScattering()
 runOnlyForwardScattering()
 
 # main()

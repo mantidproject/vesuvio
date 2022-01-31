@@ -218,44 +218,6 @@ class TestFitWorkspaces(unittest.TestCase):
         displayMaskAllIter(totalDiffMask, self.rtol, "workspaces to be fitted")
 
 
-class TestSymSumYSpace(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.oridataY = originalResults["YSpaceSymSumDataY"]
-        self.oridataE = originalResults["YSpaceSymSumDataE"]
-
-        optimizedResults = np.load(pathToOptimized)
-        self.optdataY = optimizedResults["YSpaceSymSumDataY"]
-        self.optdataE = optimizedResults["YSpaceSymSumDataE"]
-        self.rtol = 0.000001
-        self.equal_nan = True
-        self.decimal = 6
-
-    def test_YSpaceDataY(self):
-        nptest.assert_almost_equal(self.oridataY, self.optdataY, decimal=self.decimal)
-        print(f"\nSummed Spectra in YSpace is equal up to decimal={self.decimal}")
-
-        totalMask = np.isclose(
-            self.oridataY, self.optdataY, rtol=self.rtol, equal_nan=self.equal_nan
-            )
-        totalDiffMask = ~ totalMask
-        displayMask(totalDiffMask, self.rtol, "sym sum dataY YSpace")
-
-
-        plotSumSpectra = False
-        if plotSumSpectra:            
-            plt.figure()
-            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-                        interpolation="nearest", norm=None)
-            plt.title("YSpace difference dataY")
-            plt.ylabel("Summed Spectra")
-            plt.show()     
-           
-    def test_YSpaceDataE(self):
-        nptest.assert_almost_equal(self.oridataE, self.optdataE, decimal=self.decimal)
-        print(f"\nErrors of Summed Spectra in YSpace is equal up to decimal={self.decimal}")
-
-
 class TestResolution(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
@@ -382,33 +344,73 @@ class TestFinalRawDataE(unittest.TestCase):
         nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE, decimal=self.decimal)
         print(f"\nFinal DataE in TOF is equal up to decimal={self.decimal}")
 
-class Testpopt(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.oripopt = originalResults["popt"]
+# Don't do the tests below anymore because changed the averaging and symetrizing in yspace
 
-        optimizedResults = np.load(pathToOptimized)
-        self.optpopt = optimizedResults["popt"]
+# class TestSymSumYSpace(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.oridataY = originalResults["YSpaceSymSumDataY"]
+#         self.oridataE = originalResults["YSpaceSymSumDataE"]
+
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optdataY = optimizedResults["YSpaceSymSumDataY"]
+#         self.optdataE = optimizedResults["YSpaceSymSumDataE"]
+#         self.rtol = 0.000001
+#         self.equal_nan = True
+#         self.decimal = 6
+
+#     def test_YSpaceDataY(self):
+#         nptest.assert_almost_equal(self.oridataY, self.optdataY, decimal=self.decimal)
+#         print(f"\nSummed Spectra in YSpace is equal up to decimal={self.decimal}")
+
+#         totalMask = np.isclose(
+#             self.oridataY, self.optdataY, rtol=self.rtol, equal_nan=self.equal_nan
+#             )
+#         totalDiffMask = ~ totalMask
+#         displayMask(totalDiffMask, self.rtol, "sym sum dataY YSpace")
+
+
+#         plotSumSpectra = False
+#         if plotSumSpectra:            
+#             plt.figure()
+#             plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+#                         interpolation="nearest", norm=None)
+#             plt.title("YSpace difference dataY")
+#             plt.ylabel("Summed Spectra")
+#             plt.show()     
+           
+#     def test_YSpaceDataE(self):
+#         nptest.assert_almost_equal(self.oridataE, self.optdataE, decimal=self.decimal)
+#         print(f"\nErrors of Summed Spectra in YSpace is equal up to decimal={self.decimal}")
+
+
+# class Testpopt(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.oripopt = originalResults["popt"]
+
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optpopt = optimizedResults["popt"]
     
-    def test_intensities(self):
-        print("\nFit parameters LM:\nori:",
-                self.oripopt[0], "\nopt:", self.optpopt[0])
-        print("\nFit parameters Simplex:\nori:",
-                self.oripopt[1], "\nopt:", self.optpopt[1])
+#     def test_intensities(self):
+#         print("\nFit parameters LM:\nori:",
+#                 self.oripopt[0], "\nopt:", self.optpopt[0])
+#         print("\nFit parameters Simplex:\nori:",
+#                 self.oripopt[1], "\nopt:", self.optpopt[1])
 
-class Testperr(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.oriperr = originalResults["perr"]
+# class Testperr(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.oriperr = originalResults["perr"]
 
-        optimizedResults = np.load(pathToOptimized)
-        self.optperr = optimizedResults["perr"]
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optperr = optimizedResults["perr"]
     
-    def test_intensities(self):
-        print("\nError in parameters LM:\nori:",
-                self.oriperr[0], "\nopt:", self.optperr[0])
-        print("\nError in parameters Simplex:\nori:",
-                self.oriperr[1], "\nopt:", self.optperr[1])
+#     def test_intensities(self):
+#         print("\nError in parameters LM:\nori:",
+#                 self.oriperr[0], "\nopt:", self.optperr[0])
+#         print("\nError in parameters Simplex:\nori:",
+#                 self.oriperr[1], "\nopt:", self.optperr[1])
 
 if __name__ == "__main__":
     unittest.main()
