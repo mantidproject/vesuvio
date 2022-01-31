@@ -329,9 +329,9 @@ class TestFinalRawDataY(unittest.TestCase):
 
         self.rtol = 1e-6
         self.equal_nan = True
-        self.decimal = 10
+        self.decimal = 7
 
-    def test_HdataY(self):
+    def test_finalDataY(self):
         totalMask = np.isclose(
             self.oriFinalDataY, self.optFinalDataY, rtol=self.rtol, equal_nan=self.equal_nan
             )
@@ -361,9 +361,9 @@ class TestFinalRawDataE(unittest.TestCase):
 
         self.rtol = 1e-6
         self.equal_nan = True
-        self.decimal = 10
+        self.decimal = 7
 
-    def test_HdataY(self):
+    def test_finalDataE(self):
         totalMask = np.isclose(
             self.oriFinalDataE, self.optFinalDataE, rtol=self.rtol, equal_nan=self.equal_nan
             )

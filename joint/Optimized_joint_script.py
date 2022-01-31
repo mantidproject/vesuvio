@@ -46,9 +46,11 @@ class InitialConditions:
     modeRunning = "None"     # Stores wether is running forward or backward
 
     # Paths to save results for back and forward scattering
-    # pathForTesting = repoPath / "tests" / "cleaning"  
-    forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
-    backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz" 
+    pathForTesting = repoPath / "tests" / "cleaning"  
+    # forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
+    # backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz"
+    forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
+    backScatteringSavePath = pathForTesting / "current_backward.npz" 
 
 
     def setBackscatteringInitialConditions(self):
@@ -86,7 +88,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 4     #4
+        self.noOfMSIterations = 1     #4
         self.firstSpec = 3    #3
         self.lastSpec = 134    #134
 
@@ -149,7 +151,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 4     #4
+        self.noOfMSIterations = 1     #4
         self.firstSpec = 144   #144
         self.lastSpec = 182    #182
 
@@ -317,6 +319,8 @@ All the functions required for the procedures above are listed below, in order o
 def iterativeFitForDataReduction():
 
     wsToBeFittedUncropped = loadVesuvioDataWorkspaces()
+    # Need to mask detectors!
+    MaskDetectors(Workspace=wsToBeFittedUncropped, WorkspaceIndexList=ic.maskedDetectorIdx)
     wsToBeFitted = cropCloneAndMaskWorkspace(wsToBeFittedUncropped)
     # Line below is probably unecessary
     # CloneWorkspace(InputWorkspace=wsToBeFitted, OutputWorkspace=ic.name)    
@@ -335,6 +339,8 @@ def iterativeFitForDataReduction():
         thisScriptResults.append(iteration, fittedNcpResults)
         thisScriptResults.printResults(iteration)
 
+        # if iteration == ic.noOfMSIterations - 1:
+        #   break
         if (iteration < ic.noOfMSIterations - 1):  
 
             meanWidths, meanIntensityRatios = fittedNcpResults[:2]
@@ -1027,16 +1033,15 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
 
     dataY, dataX = ws.extractY(), ws.extractX() 
     
+    # Subtract the ncp of all masses exept first to dataY
     dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
-    # Although original cuts two last columns and this optimized cuts only last one,
-    # I have tested it and this effect is not significant
 
     # Pass the data onto a Workspace, clone to preserve properties
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
-     # Safeguard against possible NaNs
+     # Mask spectra again, to be seen as masked from Mantid's perspective
     MaskDetectors(Workspace=wsSubMass, SpectraList=ic.maskedSpecNo)    
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
@@ -1149,7 +1154,7 @@ def symmetrizeWs(avgYSpace):
 #         wsYSym.dataE(i)[:] = dataE[i, :]
 #     return wsYSym
 
-# #TODO: Implement weighted nan mean symetrization
+
 # def symetriseArrayUsingAverages(dataY):
 #     # Code below works as long as dataX is symetric
 #     # Need to account for kinematic cut-offs
