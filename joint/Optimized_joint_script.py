@@ -72,7 +72,7 @@ class InitialConditions:
         # Masses, instrument parameters and initial fitting parameters
         self.masses = np.array([12, 16, 27])
         self.noOfMasses = len(self.masses)
-        self.InstrParsPath = repoPath / 'ip2018_3.par'
+        # self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
         # Intensities, NCP widths, NCP centers   
@@ -132,7 +132,7 @@ class InitialConditions:
 
         self.masses = np.array([1.0079, 12, 16, 27]) 
         self.noOfMasses = len(self.masses)
-        self.InstrParsPath = repoPath / 'ip2018_3.par'
+        # self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
         # Intensities, NCP widths, NCP centers  
@@ -150,8 +150,8 @@ class InitialConditions:
         self.constraints = ()
 
         self.noOfMSIterations = 2     #4
-        self.firstSpec = 144   #144
-        self.lastSpec = 182    #182
+        self.firstSpec = 164   #144
+        self.lastSpec = 175    #182
 
         # Boolean Flags to control script
         self.loadWsFromUserPathFlag = True
@@ -455,7 +455,7 @@ def loadWorkspaceIntoArrays(ws):
 
 
 def prepareFitArgs(dataX):
-    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)       
+    instrPars = loadInstrParsFileIntoArray(ic.ipfile, ic.firstSpec, ic.lastSpec)       
     resolutionPars = loadResolutionPars(instrPars)                                   
 
     v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   
@@ -467,8 +467,14 @@ def prepareFitArgs(dataX):
     return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
 
 
-def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
+def loadInstrParsFileIntoArray(IPFileString, firstSpec, lastSpec):
     """Loads instrument parameters into array, from the file in the specified path"""
+
+    # For some odd reason, np.loadtxt() is only working with Path object
+    # So transform string path into Path object
+    IPFileName = IPFileString.split("/")[-1]
+    InstrParsPath = repoPath / IPFileName
+
     data = np.loadtxt(InstrParsPath, dtype=str)[1:].astype(float)
 
     spectra = data[:, 0]
@@ -536,8 +542,8 @@ def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
-    if np.all(dataY == 0) : #| np.all(np.isnan(dataY)): 
-        return np.zeros(len(ic.initPars)+3)  #np.full(len(ic.initPars)+3, np.nan)
+    if np.all(dataY == 0) : 
+        return np.zeros(len(ic.initPars)+3)  
     
     scaledPars = ic.initPars * ic.scalingFactors
     scaledBounds = ic.bounds * ic.scalingFactors[:, np.newaxis]
@@ -1014,7 +1020,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
      # Mask spectra again, to be seen as masked from Mantid's perspective
-    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.maskedSpecNo)    
+    MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx) #SpectraList=ic.maskedSpecNo)    
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
         raise ValueError("The workspace for the isolated H data countains NaNs, \
