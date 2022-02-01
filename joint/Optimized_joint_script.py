@@ -96,12 +96,13 @@ class InitialConditions:
         self.scaleParsFlag = False
         self.MSCorrectionFlag = True
         self.GammaCorrectionFlag = False
+        maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
+        # Parameters below are not to be changed
         self.firstSpecIdx = 0
         self.lastSpecIdx = self.lastSpec - self.firstSpec
 
         # Consider only the masked spectra between first and last spectrum
-        maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
         self.maskedSpecNo = maskedSpecAllNo[
             (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
         ]
@@ -163,12 +164,13 @@ class InitialConditions:
         self.symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
         self.singleGaussFitToHProfile = True      # When False, use Hermite expansion
+        maskedSpecAllNo = np.array([173, 174, 179])
 
+        # Parameters below are not to be changed
         self.firstSpecIdx = 0
         self.lastSpecIdx = self.lastSpec - self.firstSpec
 
         # Consider only the masked spectra between first and last spectrum
-        maskedSpecAllNo = np.array([173, 174, 179])
         self.maskedSpecNo = maskedSpecAllNo[
             (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
         ]
@@ -289,8 +291,8 @@ All the functions required for the procedures above are listed below, in order o
 def iterativeFitForDataReduction():
 
     initialWs = loadVesuvioDataWorkspaces()   # Workspace with ic.name()
-    cropAndMaskWorkspace(initialWs)
-    wsToBeFitted = CloneWorkspace(InputWorkspace=initialWs, OutputWorkspace=initialWs.name()+"0")
+    cropedWs = cropAndMaskWorkspace(initialWs)
+    wsToBeFitted = CloneWorkspace(InputWorkspace=cropedWs, OutputWorkspace=cropedWs.name()+"0")
    
     createSlabGeometry()
 
@@ -347,7 +349,7 @@ def loadRawAndEmptyWsFromUserPath():
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
           OutputWorkspace=ic.name+'raw')
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
-    wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name)
+    wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
     if ic.mode=="DoubleDifference":
         print('\n', 'Loading the empty runs: ', ic.empty_runs, '\n')
@@ -355,7 +357,7 @@ def loadRawAndEmptyWsFromUserPath():
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
-                            OutputWorkspace=ic.name)
+                            OutputWorkspace=ic.name+"uncroped_unmasked")
     return wsToBeFitted
 
 
@@ -367,7 +369,7 @@ def loadRawAndEmptyWsFromLoadVesuvio():
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
           OutputWorkspace=ic.name+'raw')
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
-    wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name)
+    wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
     if ic.mode=="DoubleDifference":
         print('\n', 'Loading the empty runs: ', ic.empty_runs, '\n')
@@ -376,19 +378,27 @@ def loadRawAndEmptyWsFromLoadVesuvio():
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty', 
-                            OutputWorkspace=ic.name)
+                            OutputWorkspace=ic.name+"uncroped_unmasked")
     return wsToBeFitted
 
 
 def cropAndMaskWorkspace(ws):
     """Returns cloned and cropped workspace with modified name"""
-    CropWorkspace(
-        InputWorkspace=ws.name(), 
-        StartWorkspaceIndex=ic.firstSpecIdx, EndWorkspaceIndex=ic.lastSpecIdx, 
-        OutputWorkspace=ws.name()
+    # Read initial Spectrum number
+    wsFirstSpec = ws.getSpectrumNumbers()[0]
+    assert ic.firstSpec >= wsFirstSpec, "Can't crop workspace, firstSpec < first spectrum in workspace."
+    
+    initialIdx = ic.firstSpec - wsFirstSpec
+    lastIdx = ic.lastSpec - wsFirstSpec
+    
+    newWsName = ws.name().split("uncroped")[0]  # Retrieve original name
+    cropedWs = CropWorkspace(
+        InputWorkspace=ws, 
+        StartWorkspaceIndex=initialIdx, EndWorkspaceIndex=lastIdx, 
+        OutputWorkspace=newWsName
         )
-    MaskDetectors(Workspace=ws, WorkspaceIndexList=ic.maskedDetectorIdx)
-    return 
+    MaskDetectors(Workspace=cropedWs, WorkspaceIndexList=ic.maskedDetectorIdx)
+    return cropedWs
 
 
 def createSlabGeometry():
