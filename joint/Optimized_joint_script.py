@@ -291,7 +291,7 @@ All the functions required for the procedures above are listed below, in order o
 
 def iterativeFitForDataReduction():
 
-    initialWs = loadVesuvioDataWorkspaces()   # Workspace with ic.name()
+    initialWs = loadVesuvioDataWorkspaces()   
     cropedWs = cropAndMaskWorkspace(initialWs)
     wsToBeFitted = CloneWorkspace(InputWorkspace=cropedWs, OutputWorkspace=cropedWs.name()+"0")
    
@@ -423,7 +423,6 @@ def fitNcpToWorkspace(ws, fittingResults, MSIter):
     then iterates over each spectrum
     """
     wsDataY = ws.extractY()       #DataY unaltered
-    
     fittingResults.addDataY(wsDataY, MSIter)
 
     dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
@@ -524,8 +523,8 @@ class resultsObject:
 
         for i, mass in enumerate(ic.masses):
             print(f"\nMass = {mass:.2f} amu:")
-            print(f"Width:     {self.all_mean_widths[MSIter, i]:.3f} pm {self.all_std_widths[MSIter, i]:.3f} ")
-            print(f"Intensity: {self.all_mean_intensities[MSIter, i]:.3f} pm {self.all_std_intensities[MSIter, i]:.3f} ")
+            print(f"Width:     {self.all_mean_widths[MSIter, i]:.3f} \u00B1 {self.all_std_widths[MSIter, i]:.3f} ")
+            print(f"Intensity: {self.all_mean_intensities[MSIter, i]:.3f} \u00B1 {self.all_std_intensities[MSIter, i]:.3f} ")
 
         print("\nCheck masses are correct:\n")
         print(self.all_mean_widths[MSIter])
@@ -1111,7 +1110,6 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
 
 
 def fitInYSpaceProcedure(wsFinal, fittingResults):
-    # TODO: Make this independent of the order of the elements in the resultslist
     ncpForEachMass = fittingResults.all_ncp_for_each_mass[-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
     popt, perr = fitTheHProfileInYSpace(wsYSpaceSymSum, wsRes)
@@ -1181,7 +1179,7 @@ def subtractAllMassesExceptFirst(ws, ncpForEachMass):
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
      # Mask spectra again, to be seen as masked from Mantid's perspective
-    MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx) #SpectraList=ic.maskedSpecNo)    
+    MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
 
     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
         raise ValueError("The workspace for the isolated H data countains NaNs, \
