@@ -47,10 +47,6 @@ class TestFitParameters(unittest.TestCase):
         self.equal_nan = True
 
     def test_mainPars(self):
-        mask = np.isclose(self.orimainPars[-1], self.optmainPars[-1], rtol=1e-9)
-        plt.imshow(mask, aspect="auto", cmap=plt.cm.RdYlGn, 
-                        interpolation="nearest", norm=None)
-        plt.show()
         nptest.assert_array_equal(self.orimainPars, self.optmainPars)
 
     def test_chi2(self):

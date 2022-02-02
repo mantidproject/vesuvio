@@ -45,7 +45,7 @@ class InitialConditions:
     modeRunning = "None"     # Stores wether is running forward or backward
 
     # Paths to save results for back and forward scattering
-    testingCleaning = False
+    testingCleaning = True
     if testingCleaning:     
         pathForTesting = repoPath / "tests" / "cleaning"  
         forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
@@ -150,9 +150,9 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 4     #4
-        self.firstSpec = 144 #164   #144
-        self.lastSpec = 182 #175    #182
+        self.noOfMSIterations = 2     #4
+        self.firstSpec = 164   #144
+        self.lastSpec = 175    #182
 
         # Boolean Flags to control script
         self.loadWsFromUserPathFlag = True
@@ -920,53 +920,6 @@ def numericalThirdDerivative(x, fun):
     return derivative
 
 
-# class FitParameters:
-#     """Stores the fitted parameters from map and defines methods to extract information"""
-
-#     def __init__(self, fitPars):
-#         self.spec = fitPars[:, 0][:, np.newaxis]
-#         self.chi2 = fitPars[:, -2][:, np.newaxis]
-#         self.nit = fitPars[:, -1][:, np.newaxis]
-
-#         mainPars = fitPars[:, 1:-2]
-#         self.intensities = mainPars[:, 0::3]
-#         self.widths = mainPars[:, 1::3]
-#         self.centers = mainPars[:, 2::3]
-#         self.mainPars = mainPars
-
-
-#     def getMeanAndStdWidthsAndIntensities(self):
-#         noOfMasses = ic.noOfMasses
-#         # Copy arrays to avoid changing stored values
-#         widths = self.widths.T.copy() 
-#         intensities = self.intensities.T.copy()
-
-#         # Replace zeros from masked spectra with nans
-#         widths[:, ic.maskedDetectorIdx] = np.nan
-#         intensities[:, ic.maskedDetectorIdx] = np.nan
-
-#         meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-#         stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
-
-#         # Subtraction row by row
-#         widthDeviation = np.abs(widths - meanWidths)
-#         # Where True, replace by nan
-#         betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
-#         betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
-
-#         meanWidths = np.nanmean(betterWidths, axis=1)  
-#         stdWidths = np.nanstd(betterWidths, axis=1)
-
-#         # Not nansum(), to propagate nan
-#         normalization = np.sum(betterIntensities, axis=0)
-#         intensityRatios = betterIntensities / normalization
-
-#         meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
-#         stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
-
-#         return meanWidths, meanIntensityRatios, stdWidths, stdIntensityRatios
-
-
 def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
@@ -1406,133 +1359,11 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
     return popt, perr
 
 
-# class resultsObject: 
-#     """Used to store results of the script"""
-
-#     def __init__(self, wsToBeFitted):
-#         """Initializes arrays full of zeros"""
-
-#         noOfSpec = wsToBeFitted.getNumberHistograms()
-#         lenOfSpec = wsToBeFitted.blocksize()
-
-#         all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
-#         all_spec_best_par_chi_nit = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
-#         all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
-#         all_ncp_for_each_mass = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
-#         all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
-#         all_mean_intensities = np.zeros(all_mean_widths.shape)
-#         all_std_widths = np.zeros(all_mean_widths.shape)
-#         all_std_intensities = np.zeros(all_mean_widths.shape)
-
-#         self.resultsList = [all_mean_widths, all_mean_intensities,
-#                             all_std_widths, all_std_intensities,
-#                             all_spec_best_par_chi_nit, all_tot_ncp, 
-#                             all_fit_workspaces, all_ncp_for_each_mass]
-
-
-#     def append(self, mulscatIter, resultsToAppend):
-#         """Append results from all arrays at a given MS iteration"""
-#         for i, currentMSArray in enumerate(resultsToAppend):
-#             self.resultsList[i][mulscatIter] = currentMSArray
-
-
-#     def printResults(self, mulscatIter):
-#         all_mean_widths, all_mean_intensities, \
-#         all_std_widths, all_std_intensities, \
-#         all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
-#         all_ncp_for_each_mass = self.resultsList
-
-#         print("\n\nSpec ------- Main Pars ----------- Chi Nit:\n")
-#         print(all_spec_best_par_chi_nit[mulscatIter])
-
-#         print("\nWidths:")
-#         print("Means: ", all_mean_widths[mulscatIter])
-#         print("Std:   ", all_std_widths[mulscatIter])
-
-#         print("\nIntensity Ratios:")
-#         print("Means: ", all_mean_intensities[mulscatIter])
-#         print("Std:   ", all_std_intensities[mulscatIter], "\n\n")
-
-#     # Set default of yspace fit parameters to zero, in case they don't get used
-#     YSpaceSymSumDataY = 0
-#     YSpaceSymSumDataE = 0
-#     resolution = 0
-#     finalRawDataY = 0
-#     finalRawDataE = 0
-#     HdataY = 0
-#     popt = 0
-#     perr = 0
-
-
-#     def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
-#         self.finalRawDataY = wsFinal.extractY()
-#         self.finalRawDataE = wsFinal.extractE()
-#         self.HdataY = wsH.extractY()
-#         self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
-#         self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-#         self.resolution = wsRes.extractY()
-#         self.popt = popt
-#         self.perr = perr
-
-
-#     def printYSpaceFitResults(self):
-#         print("\nFit in Y Space results:")
-#         # print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
-#         # print("\nOrder: [y0, A, x0, sigma]")
-#         # print("\npopt:\n", self.popt)
-#         # print("\nperr:\n", self.perr, "\n")
-
-#         if ic.singleGaussFitToHProfile:
-#             for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-#                 print(f"\n{fit:15s}")
-#                 for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:", "Cost Fun:"], self.popt[i], self.perr[i]):
-#                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-#         else:
-#             for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-#                 print(f"\n{fit:15s}")
-#                 for par, popt, perr in zip(["sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
-#                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-
-
-#     def save(self, savePath):
-#         """Saves all of the arrays stored in this object"""
-
-#         all_mean_widths, all_mean_intensities, \
-#         all_std_widths, all_std_intensities, \
-#         all_spec_best_par_chi_nit, all_tot_ncp, all_fit_workspaces, \
-#         all_ncp_for_each_mass = self.resultsList
-
-#         # Because original results were recently saved with nans, mask spectra with nans
-#         all_spec_best_par_chi_nit[:, ic.maskedDetectorIdx, :] = np.nan
-#         all_ncp_for_each_mass[:, ic.maskedDetectorIdx, :, :] = np.nan
-#         all_tot_ncp[:, ic.maskedDetectorIdx, :] = np.nan
-
-#         np.savez(savePath,
-#                  all_fit_workspaces=all_fit_workspaces,
-#                  all_spec_best_par_chi_nit=all_spec_best_par_chi_nit,
-#                  all_mean_widths=all_mean_widths,
-#                  all_mean_intensities=all_mean_intensities,
-#                  all_std_widths=all_std_widths,
-#                  all_std_intensities=all_std_intensities,
-#                  all_tot_ncp=all_tot_ncp,
-#                  all_ncp_for_each_mass=all_ncp_for_each_mass,
-#                  YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-#                  YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-#                  resolution=self.resolution, 
-#                  HdataY=self.HdataY,
-#                  finalRawDataY=self.finalRawDataY, 
-#                  finalRawDataE=self.finalRawDataE,
-#                  popt=self.popt, 
-#                  perr=self.perr)
-
-
-#if __name__=="__main__":
 start_time = time.time()
 # runSequenceRatioNotKnown()
 # runSequenceForKnownRatio()
-runOnlyBackScattering()
+# runOnlyBackScattering()
 runOnlyForwardScattering()
 
-# main()
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
