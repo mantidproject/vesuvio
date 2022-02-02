@@ -6,6 +6,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
+import matplotlib.ticker as mtick
 # plt.style.use('fivethirtyeight')
 plt.rcParams['axes.facecolor'] = (0.9, 0.9, 0.9)
 plt.rcParams.update({"axes.grid" : True, "grid.color": "white"})
@@ -15,7 +16,7 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testForward = True
+testForward = False
 if testForward:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_forward_GB_MS.npz" 
     pathToOptimized = currentPath / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
@@ -141,6 +142,7 @@ class TestNcp(unittest.TestCase):
                         interpolation="nearest", norm=None)
             fig.suptitle("Comparison between ori and opt ncp")
             axs[0].set_ylabel("Spectra")
+            # axs.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
             plt.show()
 
 
@@ -159,16 +161,20 @@ class TestMeanWidths(unittest.TestCase):
 
         noOfMasses = len(self.orimeanwidths[0])
         fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
+        # fig.tight_layout()
         x = range(len(self.orimeanwidths))
         relativeDifference = abs(self.optmeanwidths - self.orimeanwidths) / self.orimeanwidths
 
         for i, ax in enumerate(axs):
             ax.plot(x, relativeDifference[:, i], "bo--", label="relErr")
+            ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+            # ax.set_xlabel("Iterations")
             # ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.6)
             # ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.6)
 
+        axs[0].set_ylabel("Relative Error")
         fig.suptitle("Evolution of mean widths over iterations")
-        plt.legend(loc="upper left", bbox_to_anchor = (1,1))
+        # plt.legend(loc="upper left", bbox_to_anchor = (1,1))
         plt.show()
 
 
@@ -191,11 +197,13 @@ class TestMeanIntensities(unittest.TestCase):
         relativeDifference = abs(self.optmeanintensities - self.orimeanintensities) / self.orimeanintensities
         for i, ax in enumerate(axs):
             ax.plot(x, relativeDifference[:, i], "bo--", label="relErr")
+            ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
             # ax.plot(x, self.optmeanintensities[:, i], "ro-", label="opt", alpha=0.6)
             # ax.plot(x, self.orimeanintensities[:, i], "bo--", label="ori", alpha=0.6)
 
         fig.suptitle("Evolution of mean intensity ratios over iterations")
-        plt.legend(loc="upper left", bbox_to_anchor = (1,1))
+        # plt.legend(loc="upper left", bbox_to_anchor = (1,1))
+        axs[0].set_ylabel("Relative Error")
         plt.show()
 
 class TestFitWorkspaces(unittest.TestCase):
