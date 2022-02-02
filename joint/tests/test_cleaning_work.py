@@ -24,29 +24,33 @@ else:
 class TestFitParameters(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        oriPars = originalResults["all_spec_best_par_chi_nit"][0]
-        self.orispec = oriPars[:, 0]
-        self.orichi2 = oriPars[:, -2]
-        self.orinit = oriPars[:, -1]
-        self.orimainPars = oriPars[:, 1:-2]
-        self.oriintensities = self.orimainPars[:, 0::3]
-        self.oriwidths = self.orimainPars[:, 1::3]
-        self.oricenters = self.orimainPars[:, 2::3]
+        oriPars = originalResults["all_spec_best_par_chi_nit"]
+        self.orispec = oriPars[:, :, 0]
+        self.orichi2 = oriPars[:, :, -2]
+        self.orinit = oriPars[:, :, -1]
+        self.orimainPars = oriPars[:, :, 1:-2]
+        self.oriintensities = self.orimainPars[:, :, 0::3]
+        self.oriwidths = self.orimainPars[:, :, 1::3]
+        self.oricenters = self.orimainPars[:, :, 2::3]
 
         optimizedResults = np.load(pathToOptimized)
-        optPars = optimizedResults["all_spec_best_par_chi_nit"][0]
-        self.optspec = optPars[:, 0]
-        self.optchi2 = optPars[:, -2]
-        self.optnit = optPars[:, -1]
-        self.optmainPars = optPars[:, 1:-2]
-        self.optintensities = self.optmainPars[:, 0::3]
-        self.optwidths = self.optmainPars[:, 1::3]
-        self.optcenters = self.optmainPars[:, 2::3]
+        optPars = optimizedResults["all_spec_best_par_chi_nit"]
+        self.optspec = optPars[:, :, 0]
+        self.optchi2 = optPars[:, :, -2]
+        self.optnit = optPars[:, :, -1]
+        self.optmainPars = optPars[:, :, 1:-2]
+        self.optintensities = self.optmainPars[:, :, 0::3]
+        self.optwidths = self.optmainPars[:, :, 1::3]
+        self.optcenters = self.optmainPars[:, :, 2::3]
 
         self.rtol = 0.0001
         self.equal_nan = True
 
     def test_mainPars(self):
+        mask = np.isclose(self.orimainPars[-1], self.optmainPars[-1], rtol=1e-9)
+        plt.imshow(mask, aspect="auto", cmap=plt.cm.RdYlGn, 
+                        interpolation="nearest", norm=None)
+        plt.show()
         nptest.assert_array_equal(self.orimainPars, self.optmainPars)
 
     def test_chi2(self):

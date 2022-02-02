@@ -45,7 +45,7 @@ class InitialConditions:
     modeRunning = "None"     # Stores wether is running forward or backward
 
     # Paths to save results for back and forward scattering
-    testingCleaning = True
+    testingCleaning = False
     if testingCleaning:     
         pathForTesting = repoPath / "tests" / "cleaning"  
         forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
@@ -73,7 +73,7 @@ class InitialConditions:
         # Masses, instrument parameters and initial fitting parameters
         self.masses = np.array([12, 16, 27])
         self.noOfMasses = len(self.masses)
-        # self.InstrParsPath = repoPath / 'ip2018_3.par'
+        self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
         # Intensities, NCP widths, NCP centers   
@@ -88,7 +88,7 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 2     #4
+        self.noOfMSIterations = 4     #4
         self.firstSpec = 3    #3
         self.lastSpec = 134    #134
 
@@ -133,7 +133,7 @@ class InitialConditions:
 
         self.masses = np.array([1.0079, 12, 16, 27]) 
         self.noOfMasses = len(self.masses)
-        # self.InstrParsPath = repoPath / 'ip2018_3.par'
+        self.InstrParsPath = repoPath / 'ip2018_3.par'
 
         self.initPars = np.array([ 
         # Intensities, NCP widths, NCP centers  
@@ -150,9 +150,9 @@ class InitialConditions:
         ])
         self.constraints = ()
 
-        self.noOfMSIterations = 2     #4
-        self.firstSpec = 164   #144
-        self.lastSpec = 175    #182
+        self.noOfMSIterations = 4     #4
+        self.firstSpec = 144 #164   #144
+        self.lastSpec = 182 #175    #182
 
         # Boolean Flags to control script
         self.loadWsFromUserPathFlag = True
@@ -615,7 +615,7 @@ def loadWorkspaceIntoArrays(ws):
 
 
 def prepareFitArgs(dataX):
-    instrPars = loadInstrParsFileIntoArray(ic.ipfile, ic.firstSpec, ic.lastSpec)       
+    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)       
     resolutionPars = loadResolutionPars(instrPars)                                   
 
     v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   
@@ -627,13 +627,13 @@ def prepareFitArgs(dataX):
     return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
 
 
-def loadInstrParsFileIntoArray(IPFileString, firstSpec, lastSpec):
+def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
     """Loads instrument parameters into array, from the file in the specified path"""
 
     # For some odd reason, np.loadtxt() is only working with Path object
     # So transform string path into Path object
-    IPFileName = IPFileString.split("/")[-1]
-    InstrParsPath = repoPath / IPFileName
+    # IPFileName = IPFileString.split("/")[-1]
+    # InstrParsPath = repoPath / IPFileName
 
     data = np.loadtxt(InstrParsPath, dtype=str)[1:].astype(float)
 
@@ -1530,7 +1530,7 @@ def fitProfileMantidFit(wsYSpaceSym, wsRes):
 start_time = time.time()
 # runSequenceRatioNotKnown()
 # runSequenceForKnownRatio()
-# runOnlyBackScattering()
+runOnlyBackScattering()
 runOnlyForwardScattering()
 
 # main()
