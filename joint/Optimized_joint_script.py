@@ -443,7 +443,7 @@ def fitNcpToWorkspace(ws, fittingResults, MSIter):
     )))
     ncpTotal = np.sum(ncpForEachMass, axis=1)  
     createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
-    # Adds ncp, calculates individual and total
+    # Adds individual and total ncp
     fittingResults.addNCP(ncpForEachMass, ncpTotal, MSIter)
 
  
@@ -1263,7 +1263,7 @@ def fitTheHProfileInYSpace(wsYSpaceSym, wsRes):
     # else:
     poptMantidFit, perrMantidFit = fitProfileMantidFit(wsYSpaceSym, wsRes)
     
-    #TODO: Add the Chi2 as the last parameter
+    #TODO: Add the Cost function as the last parameter
     poptCurveFit = np.append(poptCurveFit, np.nan)
     perrCurveFit = np.append(perrCurveFit, np.nan)
 

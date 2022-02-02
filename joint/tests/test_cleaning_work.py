@@ -70,10 +70,10 @@ def displayMask(mask, rtol, string):
 class TestNcp(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orincp = originalResults["all_tot_ncp"][0]
+        self.orincp = originalResults["all_tot_ncp"]
         
         optimizedResults = np.load(pathToOptimized)
-        self.optncp = optimizedResults["all_tot_ncp"][0]
+        self.optncp = optimizedResults["all_tot_ncp"]
 
         self.rtol = 0.001
         self.equal_nan = True
@@ -85,36 +85,36 @@ class TestNcp(unittest.TestCase):
 class TestMeanWidths(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orimeanwidths = originalResults["all_mean_widths"][0]
+        self.orimeanwidths = originalResults["all_mean_widths"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optmeanwidths = optimizedResults["all_mean_widths"][0]
+        self.optmeanwidths = optimizedResults["all_mean_widths"]
     
     def test_widths(self):
-        nptest.assert_allclose(self.orimeanwidths, self.optmeanwidths)
-        # nptest.assert_array_equal(self.orimeanwidths, self.optmeanwidths)
+        # nptest.assert_allclose(self.orimeanwidths, self.optmeanwidths)
+        nptest.assert_array_equal(self.orimeanwidths, self.optmeanwidths)
 
 
 class TestMeanIntensities(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orimeanintensities = originalResults["all_mean_intensities"][0]
+        self.orimeanintensities = originalResults["all_mean_intensities"]
 
         optimizedResults = np.load(pathToOptimized)
-        self.optmeanintensities = optimizedResults["all_mean_intensities"][0]
-    
+        self.optmeanintensities = optimizedResults["all_mean_intensities"]
+
     def test_intensities(self):
-        nptest.assert_allclose(self.orimeanintensities, self.optmeanintensities)
-        # nptest.assert_array_equal(self.orimeanintensities, self.optmeanintensities)
+        # nptest.assert_allclose(self.orimeanintensities, self.optmeanintensities)
+        nptest.assert_array_equal(self.orimeanintensities, self.optmeanintensities)
 
 
 class TestFitWorkspaces(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.oriws = originalResults["all_fit_workspaces"][0]
+        self.oriws = originalResults["all_fit_workspaces"]
         
         optimizedResults = np.load(pathToOptimized)
-        self.optws = optimizedResults["all_fit_workspaces"][0]
+        self.optws = optimizedResults["all_fit_workspaces"]
 
         self.decimal = 8
 
@@ -172,6 +172,10 @@ class TestHdataY(unittest.TestCase):
         self.decimal = 4
 
     def test_HdataY(self):
+        # mask = np.isclose(self.oriHdataY, self.optHdataY, rtol=1e-9)
+        # plt.imshow(mask, aspect="auto", cmap=plt.cm.RdYlGn, 
+        #                 interpolation="nearest", norm=None)
+        # plt.show()
         nptest.assert_array_equal(self.oriHdataY, self.optHdataY)
 
 
@@ -187,7 +191,7 @@ class TestFinalRawDataY(unittest.TestCase):
         self.equal_nan = True
         self.decimal = 10
 
-    def test_HdataY(self):
+    def test_FinalDataY(self):
         nptest.assert_array_equal(self.oriFinalDataY, self.optFinalDataY)
 
 
