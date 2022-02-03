@@ -19,7 +19,7 @@ def runOnlyForwardScattering(fwdIC):
     # ic.setForwardScatteringInitialConditions()
     printInitialParameters(fwdIC)
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults)
+    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
     forwardScatteringResults.save()
 
 
@@ -34,7 +34,7 @@ def runSequenceForKnownRatio(bckwdIC, fwdIC):
     setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
     printInitialParameters(fwdIC)
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults)
+    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
     forwardScatteringResults.save()
 
 
@@ -60,7 +60,7 @@ def runSequenceRatioNotKnown(bckwdIC, fwdIC):
         printInitialParameters(fwdIC)
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
 
-    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults)
+    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
     backScatteringResults.save()
     forwardScatteringResults.save()
 

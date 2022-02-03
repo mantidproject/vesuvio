@@ -7,10 +7,11 @@ if testingCleaning:
     pathForTesting = repoPath / "tests" / "cleaning"  
     forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
     backScatteringSavePath = pathForTesting / "current_backward.npz" 
+    ySpaceFitSavePath = pathForTesting / "yspace_fit" / "current_yspacefit.npz"
 else:
     forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
     backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz"
-
+    ySpaceFitSavePath = repoPath / "tests" / "fixatures" / "yspacefit_results.npz"
 
 class BackwardInitialConditions:
     # Multiscaterring Correction Parameters
@@ -87,6 +88,7 @@ class BackwardInitialConditions:
 class ForwardInitialConditions:
 
     resultsSavePath = forwardScatteringSavePath
+    ySpaceFitSavePath = ySpaceFitSavePath
 
     HToMass0Ratio = None
 

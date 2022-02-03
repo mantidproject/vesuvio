@@ -451,18 +451,16 @@ class resultsObject:
 
     def __init__(self, ic):
         """Initializes arrays full of zeros"""
-        # noOfSpec = wsToBeFitted.getNumberHistograms()
-        # lenOfSpec = wsToBeFitted.blocksize()
 
-        self.all_fit_workspaces = None #np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
-        self.all_spec_best_par_chi_nit = None #np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
-        self.all_tot_ncp = None #np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        self.all_ncp_for_each_mass = None # np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
+        self.all_fit_workspaces = None 
+        self.all_spec_best_par_chi_nit = None 
+        self.all_tot_ncp = None 
+        self.all_ncp_for_each_mass = None
         
-        self.all_mean_widths = None #np.zeros((ic.noOfMSIterations, ic.noOfMasses))
-        self.all_mean_intensities = None #np.zeros(self.all_mean_widths.shape)
-        self.all_std_widths = None #np.zeros(self.all_mean_widths.shape)
-        self.all_std_intensities = None #np.zeros(self.all_mean_widths.shape)
+        self.all_mean_widths = None
+        self.all_mean_intensities = None 
+        self.all_std_widths = None 
+        self.all_std_intensities = None 
 
         # Pass all attributes of ic into attributes to be used whithin this object
         self.maskedDetectorIdx = ic.maskedDetectorIdx
@@ -570,34 +568,34 @@ class resultsObject:
     # perr = 0
 
 
-    def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
-        self.finalRawDataY = wsFinal.extractY()
-        self.finalRawDataE = wsFinal.extractE()
-        self.HdataY = wsH.extractY()
-        self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
-        self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-        self.resolution = wsRes.extractY()
-        self.popt = popt
-        self.perr = perr
+    # def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
+    #     self.finalRawDataY = wsFinal.extractY()
+    #     self.finalRawDataE = wsFinal.extractE()
+    #     self.HdataY = wsH.extractY()
+    #     self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
+    #     self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
+    #     self.resolution = wsRes.extractY()
+    #     self.popt = popt
+    #     self.perr = perr
 
 
-    def printYSpaceFitResults(self):
-        print("\nFit in Y Space results:")
-        # print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
-        # print("\nOrder: [y0, A, x0, sigma]")
-        # print("\npopt:\n", self.popt)
-        # print("\nperr:\n", self.perr, "\n")
+    # def printYSpaceFitResults(self):
+    #     print("\nFit in Y Space results:")
+    #     # print("Fit algorithm rows: \nCurve Fit \nMantid Fit LM \nMantid Fit Simplex")
+    #     # print("\nOrder: [y0, A, x0, sigma]")
+    #     # print("\npopt:\n", self.popt)
+    #     # print("\nperr:\n", self.perr, "\n")
 
-        if self.singleGaussFitToHProfile:
-            for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-                print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:", "Cost Fun:"], self.popt[i], self.perr[i]):
-                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-        else:
-            for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-                print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
-                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
+    #     if self.singleGaussFitToHProfile:
+    #         for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+    #             print(f"\n{fit:15s}")
+    #             for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:", "Cost Fun:"], self.popt[i], self.perr[i]):
+    #                 print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
+    #     else:
+    #         for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+    #             print(f"\n{fit:15s}")
+    #             for par, popt, perr in zip(["sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
+    #                 print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
 
 
     def save(self):
@@ -608,7 +606,7 @@ class resultsObject:
         self.all_spec_best_par_chi_nit[:, self.maskedDetectorIdx, :] = np.nan
         self.all_ncp_for_each_mass[:, self.maskedDetectorIdx, :, :] = np.nan
         self.all_tot_ncp[:, self.maskedDetectorIdx, :] = np.nan
-        
+
         savePath = self.resultsSavePath
         np.savez(savePath,
                  all_fit_workspaces=self.all_fit_workspaces,
@@ -618,15 +616,15 @@ class resultsObject:
                  all_std_widths=self.all_std_widths,
                  all_std_intensities=self.all_std_intensities,
                  all_tot_ncp=self.all_tot_ncp,
-                 all_ncp_for_each_mass=self.all_ncp_for_each_mass,
-                 YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-                 YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-                 resolution=self.resolution, 
-                 HdataY=self.HdataY,
-                 finalRawDataY=self.finalRawDataY, 
-                 finalRawDataE=self.finalRawDataE,
-                 popt=self.popt, 
-                 perr=self.perr)
+                 all_ncp_for_each_mass=self.all_ncp_for_each_mass)
+                #  YSpaceSymSumDataY=self.YSpaceSymSumDataY,
+                #  YSpaceSymSumDataE=self.YSpaceSymSumDataE,
+                #  resolution=self.resolution, 
+                #  HdataY=self.HdataY,
+                #  finalRawDataY=self.finalRawDataY, 
+                #  finalRawDataE=self.finalRawDataE,
+                #  popt=self.popt, 
+                #  perr=self.perr)
 
     
 

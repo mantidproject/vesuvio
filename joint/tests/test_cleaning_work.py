@@ -122,8 +122,12 @@ class TestFitWorkspaces(unittest.TestCase):
         nptest.assert_array_equal(self.optws, self.oriws)
 
 
+# TODO: Solve this in a more elegant way later
+
 class TestSymSumYSpace(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+        
         originalResults = np.load(pathToOriginal)
         self.oridataY = originalResults["YSpaceSymSumDataY"]
         self.oridataE = originalResults["YSpaceSymSumDataE"]
@@ -145,6 +149,8 @@ class TestSymSumYSpace(unittest.TestCase):
 
 class TestResolution(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+        
         originalResults = np.load(pathToOriginal)
         self.orires = originalResults["resolution"]
 
@@ -161,6 +167,8 @@ class TestResolution(unittest.TestCase):
 
 class TestHdataY(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+        
         originalResults = np.load(pathToOriginal)
         self.oriHdataY = originalResults["HdataY"]
 
@@ -181,6 +189,8 @@ class TestHdataY(unittest.TestCase):
 
 class TestFinalRawDataY(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+        
         originalResults = np.load(pathToOriginal)
         self.oriFinalDataY = originalResults["finalRawDataY"]
 
@@ -197,6 +207,8 @@ class TestFinalRawDataY(unittest.TestCase):
 
 class TestFinalRawDataE(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+        
         originalResults = np.load(pathToOriginal)
         self.oriFinalDataE = originalResults["finalRawDataE"]
 
@@ -213,6 +225,8 @@ class TestFinalRawDataE(unittest.TestCase):
 
 class Testpopt(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+        
         originalResults = np.load(pathToOriginal)
         self.oripopt = originalResults["popt"]
 
@@ -226,6 +240,8 @@ class Testpopt(unittest.TestCase):
 
 class Testperr(unittest.TestCase):
     def setUp(self):
+        pathToOptimized = currentPath / "cleaning" / "yspace_fit" / "current_yspacefit.npz" 
+
         originalResults = np.load(pathToOriginal)
         self.oriperr = originalResults["perr"]
 
