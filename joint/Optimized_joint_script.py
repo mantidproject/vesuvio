@@ -1,188 +1,188 @@
-import enum
-from sys import stdin
+# import enum
+# from sys import stdin
 import numpy as np
-import mantid
-from mantid.api import AnalysisDataService
+# import mantid
+# from mantid.api import AnalysisDataService
 from mantid.simpleapi import *
-from numpy.core.numeric import True_
+# from numpy.core.numeric import True_
 from scipy import optimize
-from scipy import ndimage
-import time
-from pathlib import Path
+# from scipy import ndimage
+# import time
+# from pathlib import Path
 from functools import partial
 
 # Format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=150, threshold=sys.maxsize)
-repoPath = Path(__file__).absolute().parent  # Path to the repository
+# repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-'''
-The InitialConditions class allows the user to change the starting parameters.
-The script includes everything required for forward and backscattering.
-The user can choose to perform back or forward scattering individually or to connect the mean widths from 
-backscattering onto the initial parameters for forward scattering.
+# '''
+# The InitialConditions class allows the user to change the starting parameters.
+# The script includes everything required for forward and backscattering.
+# The user can choose to perform back or forward scattering individually or to connect the mean widths from 
+# backscattering onto the initial parameters for forward scattering.
 
-The fit procedure in the time-of-flight domain is  based on the scipy.minimize.optimize() tool,
-used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
-'''
+# The fit procedure in the time-of-flight domain is  based on the scipy.minimize.optimize() tool,
+# used with the SLSQP minimizer, that can handle both boundaries and constraints for fitting parameters.
+# '''
 
 
-class InitialConditions:
+# class InitialConditions:
 
-    # Initialize object to use self methods
-    def __init__(self):
-        return None
+#     # Initialize object to use self methods
+#     def __init__(self):
+#         return None
 
-    # Multiscaterring Correction Parameters
-    HToMass0Ratio = 19.0620008206
+#     # Multiscaterring Correction Parameters
+#     HToMass0Ratio = 19.0620008206
 
-    transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5   
-    hydrogen_peak = True                 # Hydrogen multiple scattering
+#     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
+#     multiple_scattering_order, number_of_events = 2, 1.e5   
+#     hydrogen_peak = True                 # Hydrogen multiple scattering
     
-    # Sample slab parameters
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+#     # Sample slab parameters
+#     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
   
-    modeRunning = "None"     # Stores wether is running forward or backward
+#     modeRunning = "None"     # Stores wether is running forward or backward
 
-    # Paths to save results for back and forward scattering
-    testingCleaning = True
-    if testingCleaning:     
-        pathForTesting = repoPath / "tests" / "cleaning"  
-        forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
-        backScatteringSavePath = pathForTesting / "current_backward.npz" 
-    else:
-        forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
-        backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz"
+#     # Paths to save results for back and forward scattering
+#     testingCleaning = True
+#     if testingCleaning:     
+#         pathForTesting = repoPath / "tests" / "cleaning"  
+#         forwardScatteringSavePath = pathForTesting / "current_forward.npz" 
+#         backScatteringSavePath = pathForTesting / "current_backward.npz" 
+#     else:
+#         forwardScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
+#         backScatteringSavePath = repoPath / "tests" / "fixatures" / "4iter_backward_MS_opt.npz"
     
 
-    def setBackscatteringInitialConditions(self):
-        self.modeRunning = "BACKWARD"
+#     def setBackscatteringInitialConditions(self):
+#         self.modeRunning = "BACKWARD"
 
-        # Parameters to load Raw and Empty Workspaces
-        self.userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
-        self.userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
+#         # Parameters to load Raw and Empty Workspaces
+#         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_backward.nxs"
+#         self.userWsEmptyPath = r"./input_ws/starch_80_RD_empty_backward.nxs"
 
-        self.name = "starch_80_RD_backward_"
-        self.runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
-        self.empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
-        self.spectra='3-134'                            # Spectra to be analysed
-        self.tof_binning='275.,1.,420'                    # Binning of ToF spectra
-        self.mode='DoubleDifference'
-        self.ipfile=r'./ip2019.par' 
+#         self.name = "starch_80_RD_backward_"
+#         self.runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
+#         self.empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
+#         self.spectra='3-134'                            # Spectra to be analysed
+#         self.tof_binning='275.,1.,420'                    # Binning of ToF spectra
+#         self.mode='DoubleDifference'
+#         self.ipfile=r'./ip2019.par' 
 
-        # Masses, instrument parameters and initial fitting parameters
-        self.masses = np.array([12, 16, 27])
-        self.noOfMasses = len(self.masses)
-        self.InstrParsPath = repoPath / 'ip2018_3.par'
+#         # Masses, instrument parameters and initial fitting parameters
+#         self.masses = np.array([12, 16, 27])
+#         self.noOfMasses = len(self.masses)
+#         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
-        self.initPars = np.array([ 
-        # Intensities, NCP widths, NCP centers   
-            1, 12, 0.,    
-            1, 12, 0.,   
-            1, 12.5, 0.    
-        ])
-        self.bounds = np.array([
-            [0, np.nan], [8, 16], [-3, 1],
-            [0, np.nan], [8, 16], [-3, 1],
-            [0, np.nan], [11, 14], [-3, 1]
-        ])
-        self.constraints = ()
+#         self.initPars = np.array([ 
+#         # Intensities, NCP widths, NCP centers   
+#             1, 12, 0.,    
+#             1, 12, 0.,   
+#             1, 12.5, 0.    
+#         ])
+#         self.bounds = np.array([
+#             [0, np.nan], [8, 16], [-3, 1],
+#             [0, np.nan], [8, 16], [-3, 1],
+#             [0, np.nan], [11, 14], [-3, 1]
+#         ])
+#         self.constraints = ()
 
-        self.noOfMSIterations = 4     #4
-        self.firstSpec = 3    #3
-        self.lastSpec = 134    #134
+#         self.noOfMSIterations = 4     #4
+#         self.firstSpec = 3    #3
+#         self.lastSpec = 134    #134
 
-        # Boolean Flags to control script
-        self.loadWsFromUserPathFlag = True
-        self.scaleParsFlag = False
-        self.MSCorrectionFlag = True
-        self.GammaCorrectionFlag = False
-        maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
+#         # Boolean Flags to control script
+#         self.loadWsFromUserPathFlag = True
+#         self.scaleParsFlag = False
+#         self.MSCorrectionFlag = True
+#         self.GammaCorrectionFlag = False
+#         maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
-        # Parameters below are not to be changed
-        self.firstSpecIdx = 0
-        self.lastSpecIdx = self.lastSpec - self.firstSpec
+#         # Parameters below are not to be changed
+#         self.firstSpecIdx = 0
+#         self.lastSpecIdx = self.lastSpec - self.firstSpec
 
-        # Consider only the masked spectra between first and last spectrum
-        self.maskedSpecNo = maskedSpecAllNo[
-            (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
-        ]
-        self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
+#         # Consider only the masked spectra between first and last spectrum
+#         self.maskedSpecNo = maskedSpecAllNo[
+#             (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
+#         ]
+#         self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
 
-        # Set scaling factors for the fitting parameters, default is ones
-        self.scalingFactors = np.ones(self.initPars.shape)
-        if self.scaleParsFlag:        # Scale fitting parameters using initial values
-                self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-                self.scalingFactors = 1 / self.initPars
+#         # Set scaling factors for the fitting parameters, default is ones
+#         self.scalingFactors = np.ones(self.initPars.shape)
+#         if self.scaleParsFlag:        # Scale fitting parameters using initial values
+#                 self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
+#                 self.scalingFactors = 1 / self.initPars
 
 
 
-    def setForwardScatteringInitialConditions(self):
-        self.modeRunning = "FORWARD"  # Used to control MS correction
+#     def setForwardScatteringInitialConditions(self):
+#         self.modeRunning = "FORWARD"  # Used to control MS correction
 
-        self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
-        self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
+#         self.userWsRawPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
+#         self.userWsEmptyPath = r"./input_ws/starch_80_RD_raw_forward.nxs"
 
-        self.name = "starch_80_RD_forward_"
-        self.runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
-        self.empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-        self.spectra='144-182'                        # Spectra to be analysed
-        self.tof_binning="110,1.,430"                 # Binning of ToF spectra
-        self.mode='SingleDifference'
-        self.ipfile=r'./ip2018_3.par'
+#         self.name = "starch_80_RD_forward_"
+#         self.runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
+#         self.empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+#         self.spectra='144-182'                        # Spectra to be analysed
+#         self.tof_binning="110,1.,430"                 # Binning of ToF spectra
+#         self.mode='SingleDifference'
+#         self.ipfile=r'./ip2018_3.par'
 
-        self.masses = np.array([1.0079, 12, 16, 27]) 
-        self.noOfMasses = len(self.masses)
-        self.InstrParsPath = repoPath / 'ip2018_3.par'
+#         self.masses = np.array([1.0079, 12, 16, 27]) 
+#         self.noOfMasses = len(self.masses)
+#         self.InstrParsPath = repoPath / 'ip2018_3.par'
 
-        self.initPars = np.array([ 
-        # Intensities, NCP widths, NCP centers  
-            1, 4.7, 0, 
-            1, 12.71, 0.,    
-            1, 8.76, 0.,   
-            1, 13.897, 0.    
-        ])
-        self.bounds = np.array([
-            [0, np.nan], [3, 6], [-3, 1],
-            [0, np.nan], [12.71, 12.71], [-3, 1],
-            [0, np.nan], [8.76, 8.76], [-3, 1],
-            [0, np.nan], [13.897, 13.897], [-3, 1]
-        ])
-        self.constraints = ()
+#         self.initPars = np.array([ 
+#         # Intensities, NCP widths, NCP centers  
+#             1, 4.7, 0, 
+#             1, 12.71, 0.,    
+#             1, 8.76, 0.,   
+#             1, 13.897, 0.    
+#         ])
+#         self.bounds = np.array([
+#             [0, np.nan], [3, 6], [-3, 1],
+#             [0, np.nan], [12.71, 12.71], [-3, 1],
+#             [0, np.nan], [8.76, 8.76], [-3, 1],
+#             [0, np.nan], [13.897, 13.897], [-3, 1]
+#         ])
+#         self.constraints = ()
 
-        self.noOfMSIterations = 2     #4
-        self.firstSpec = 164   #144
-        self.lastSpec = 175    #182
+#         self.noOfMSIterations = 2     #4
+#         self.firstSpec = 164   #144
+#         self.lastSpec = 175    #182
 
-        # Boolean Flags to control script
-        self.loadWsFromUserPathFlag = True
-        self.scaleParsFlag = False
-        self.MSCorrectionFlag = True
-        self.GammaCorrectionFlag = True
+#         # Boolean Flags to control script
+#         self.loadWsFromUserPathFlag = True
+#         self.scaleParsFlag = False
+#         self.MSCorrectionFlag = True
+#         self.GammaCorrectionFlag = True
 
-        # Parameters to control fit in Y-Space
-        self.symmetrisationFlag = True
-        self.symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
-        self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-        self.singleGaussFitToHProfile = True      # When False, use Hermite expansion
-        maskedSpecAllNo = np.array([173, 174, 179])
+#         # Parameters to control fit in Y-Space
+#         self.symmetrisationFlag = True
+#         self.symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
+#         self.rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+#         self.singleGaussFitToHProfile = True      # When False, use Hermite expansion
+#         maskedSpecAllNo = np.array([173, 174, 179])
 
-        # Parameters below are not to be changed
-        self.firstSpecIdx = 0
-        self.lastSpecIdx = self.lastSpec - self.firstSpec
+#         # Parameters below are not to be changed
+#         self.firstSpecIdx = 0
+#         self.lastSpecIdx = self.lastSpec - self.firstSpec
 
-        # Consider only the masked spectra between first and last spectrum
-        self.maskedSpecNo = maskedSpecAllNo[
-            (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
-        ]
-        self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
+#         # Consider only the masked spectra between first and last spectrum
+#         self.maskedSpecNo = maskedSpecAllNo[
+#             (maskedSpecAllNo >= self.firstSpec) & (maskedSpecAllNo <= self.lastSpec)
+#         ]
+#         self.maskedDetectorIdx = self.maskedSpecNo - self.firstSpec
 
-        # Set scaling factors for the fitting parameters, default is ones
-        self.scalingFactors = np.ones(self.initPars.shape)
-        if self.scaleParsFlag:        # Scale fitting parameters using initial values
-                self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-                self.scalingFactors = 1 / self.initPars
+#         # Set scaling factors for the fitting parameters, default is ones
+#         self.scalingFactors = np.ones(self.initPars.shape)
+#         if self.scaleParsFlag:        # Scale fitting parameters using initial values
+#                 self.initPars[2::3] = np.ones((1, self.noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
+#                 self.scalingFactors = 1 / self.initPars
 
 
 def printInitialParameters(ic):
@@ -198,96 +198,94 @@ def printInitialParameters(ic):
 # ic = InitialConditions() 
 
 
-def runOnlyBackScattering(bckwdIC):
-    AnalysisDataService.clear()
-    # ic.setBackscatteringInitialConditions()
-    printInitialParameters(bckwdIC)
-    wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
-    backScatteringResults.save(bckwdIC.backScatteringSavePath) 
+# def runOnlyBackScattering(bckwdIC):
+#     AnalysisDataService.clear()
+#     # ic.setBackscatteringInitialConditions()
+#     printInitialParameters(bckwdIC)
+#     wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
+#     backScatteringResults.save(bckwdIC) 
 
 
-def runOnlyForwardScattering(fwdIC):
-    AnalysisDataService.clear()
-    # ic.setForwardScatteringInitialConditions()
-    printInitialParameters(fwdIC)
-    wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
-    forwardScatteringResults.save(fwdIC.forwardScatteringSavePath)
+# def runOnlyForwardScattering(fwdIC):
+#     AnalysisDataService.clear()
+#     # ic.setForwardScatteringInitialConditions()
+#     printInitialParameters(fwdIC)
+#     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
+#     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults)
+#     forwardScatteringResults.save(fwdIC)
 
 
-def runSequenceForKnownRatio(bckwdIC, fwdIC):
-    AnalysisDataService.clear()
-    # If H to first mass ratio is known, can run MS correction for backscattering
-    # Back scattering produces precise results for widhts and intensity ratios for non-H masses
-    # ic.setBackscatteringInitialConditions()
-    printInitialParameters(bckwdIC)
-    wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
-    backScatteringResults.save(bckwdIC.backScatteringSavePath) 
+# def runSequenceForKnownRatio(bckwdIC, fwdIC):
+#     AnalysisDataService.clear()
+#     # If H to first mass ratio is known, can run MS correction for backscattering
+#     # Back scattering produces precise results for widhts and intensity ratios for non-H masses
+#     printInitialParameters(bckwdIC)
+#     wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
+#     backScatteringResults.save(bckwdIC) 
 
-    # setForwardScatteringInitialConditions()
-    setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
-    printInitialParameters(fwdIC)
-    wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
-    forwardScatteringResults.save(fwdIC.forwardScatteringSavePath)
+#     setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
+#     printInitialParameters(fwdIC)
+#     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
+#     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults)
+#     forwardScatteringResults.save(fwdIC)
 
 
-def runSequenceRatioNotKnown(bckwdIC, fwdIC):
-    # Run preliminary forward with a good guess for the widths of non-H masses
-    # ic.setForwardScatteringInitialConditions()
-    printInitialParameters(fwdIC)
-    wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    for i in range(2):    # Loop until convergence is achieved
-        AnalysisDataService.clear()    # Clears all Workspaces
+# def runSequenceRatioNotKnown(bckwdIC, fwdIC):
+#     # Run preliminary forward with a good guess for the widths of non-H masses
+#     # ic.setForwardScatteringInitialConditions()
+#     printInitialParameters(fwdIC)
+#     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
+#     for i in range(2):    # Loop until convergence is achieved
+#         AnalysisDataService.clear()    # Clears all Workspaces
 
-        # Get first estimate of H to mass0 ratio
-        fwdMeanIntensityRatios = forwardScatteringResults.all_mean_intensities[-1] 
-        bckwdIC.HToMass0Ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
+#         # Get first estimate of H to mass0 ratio
+#         fwdMeanIntensityRatios = forwardScatteringResults.all_mean_intensities[-1] 
+#         bckwdIC.HToMass0Ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
        
-        # Run backward procedure with this estimate
-        # ic.setBackscatteringInitialConditions()
-        printInitialParameters(bckwdIC)
-        wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
+#         # Run backward procedure with this estimate
+#         # ic.setBackscatteringInitialConditions()
+#         printInitialParameters(bckwdIC)
+#         wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
 
-        # ic.setForwardScatteringInitialConditions()
-        setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
-        printInitialParameters(fwdIC)
-        wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
+#         # ic.setForwardScatteringInitialConditions()
+#         setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
+#         printInitialParameters(fwdIC)
+#         wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
 
-    fitInYSpaceProcedure(wsFinal, forwardScatteringResults)
-    backScatteringResults.save(bckwdIC.backScatteringSavePath)
-    forwardScatteringResults.save(fwdIC.forwardScatteringSavePath)
-
-
-def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
-    """Takes widths and intensity ratios obtained in backscattering
-    and uses them as the initial conditions for forward scattering """
-
-    # Get widts and intensity ratios from backscattering results
-    backMeanWidths = backScatteringResults.all_mean_widths[-1]
-    backMeanIntensityRatios = backScatteringResults.all_mean_intensities[-1] 
-
-    HIntensity = HToMass0Ratio * backMeanIntensityRatios[0]
-    initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
-    initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
-
-    # Set starting conditions for forward scattering
-    # Fix known widths and intensity ratios from back scattering results
-    fwdIC.initPars[4::3] = backMeanWidths
-    fwdIC.initPars[0::3] = initialFwdIntensityRatios
-    fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-    # Fix the intensity ratios 
-    # ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
-
-    print("\nChanged initial conditions of forward scattering \
-        according to mean widhts and intensity ratios from backscattering.\n")
-    return
+#     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults)
+#     backScatteringResults.save(bckwdIC)
+#     forwardScatteringResults.save(fwdIC)
 
 
+# def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
+#     """Takes widths and intensity ratios obtained in backscattering
+#     and uses them as the initial conditions for forward scattering """
 
-"""
-All the functions required for the procedures above are listed below, in order of appearance
-"""
+#     # Get widts and intensity ratios from backscattering results
+#     backMeanWidths = backScatteringResults.all_mean_widths[-1]
+#     backMeanIntensityRatios = backScatteringResults.all_mean_intensities[-1] 
+
+#     HIntensity = HToMass0Ratio * backMeanIntensityRatios[0]
+#     initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
+#     initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
+
+#     # Set starting conditions for forward scattering
+#     # Fix known widths and intensity ratios from back scattering results
+#     fwdIC.initPars[4::3] = backMeanWidths
+#     fwdIC.initPars[0::3] = initialFwdIntensityRatios
+#     fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+#     # Fix the intensity ratios 
+#     # ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
+
+#     print("\nChanged initial conditions of forward scattering \
+#         according to mean widhts and intensity ratios from backscattering.\n")
+#     return
+
+
+
+# """
+# All the functions required for the procedures above are listed below, in order of appearance
+# """
 
 
 def iterativeFitForDataReduction(ic):
@@ -299,7 +297,7 @@ def iterativeFitForDataReduction(ic):
     createSlabGeometry(ic)
 
     # Initialize arrays to store script results
-    fittingResults = resultsObject(ic, wsToBeFitted)
+    fittingResults = resultsObject(ic)
 
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
@@ -309,10 +307,10 @@ def iterativeFitForDataReduction(ic):
         print("\nFitting spectra ", ic.firstSpec, " - ", ic.lastSpec, "\n.............")
         
         # The fitting procedure stores results in the fittingResults object
-        fitNcpToWorkspace(ic, wsToBeFitted, fittingResults, iteration)
+        fitNcpToWorkspace(ic, wsToBeFitted, fittingResults)
         
-        fittingResults.calculateMeansAndStd(iteration)
-        fittingResults.printResults(iteration)
+        fittingResults.calculateMeansAndStd()
+        fittingResults.printCurrentIrerationResults()
 
         # When last iteration, skip MS and GC
         if iteration == ic.noOfMSIterations - 1:
@@ -419,12 +417,12 @@ def createSlabGeometry(ic):
     CreateSampleShape(ic.name, xml_str)
 
 
-def fitNcpToWorkspace(ic, ws, fittingResults, MSIter):
+def fitNcpToWorkspace(ic, ws, fittingResults):
     """Firstly calculates matrices for all spectrums,
     then iterates over each spectrum
     """
     wsDataY = ws.extractY()       #DataY unaltered
-    fittingResults.addDataY(wsDataY, MSIter)
+    fittingResults.addDataY(wsDataY)
 
     dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
@@ -434,62 +432,84 @@ def fitNcpToWorkspace(ic, ws, fittingResults, MSIter):
         partial(fitNcpToSingleSpec, ic=ic), 
         dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )))
-    fittingResults.addFitPars(fitPars, MSIter)
+    fittingResults.addFitPars(fitPars)
 
     # Create ncpTotal workspaces
-    mainPars = fittingResults.getMainPars(MSIter)
+    mainPars = fittingResults.getMainPars()
     ncpForEachMass = np.array(list(map(
-        buildNcpFromSpec, 
+        partial(buildNcpFromSpec, ic=ic), 
         mainPars , ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )))
     ncpTotal = np.sum(ncpForEachMass, axis=1)  
     createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
     # Adds individual and total ncp
-    fittingResults.addNCP(ncpForEachMass, ncpTotal, MSIter)
+    fittingResults.addNCP(ncpForEachMass, ncpTotal)
 
  
 class resultsObject:
     """Used to store fitting results of the script at each iteration"""
 
-    def __init__(self, ic, wsToBeFitted):
+    def __init__(self, ic):
         """Initializes arrays full of zeros"""
-        noOfSpec = wsToBeFitted.getNumberHistograms()
-        lenOfSpec = wsToBeFitted.blocksize()
+        # noOfSpec = wsToBeFitted.getNumberHistograms()
+        # lenOfSpec = wsToBeFitted.blocksize()
 
-        self.all_fit_workspaces = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
-        self.all_spec_best_par_chi_nit = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
-        self.all_tot_ncp = np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
-        self.all_ncp_for_each_mass = np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
+        self.all_fit_workspaces = None #np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec))
+        self.all_spec_best_par_chi_nit = None #np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses*3+3))
+        self.all_tot_ncp = None #np.zeros((ic.noOfMSIterations, noOfSpec, lenOfSpec - 1))
+        self.all_ncp_for_each_mass = None # np.zeros((ic.noOfMSIterations, noOfSpec, ic.noOfMasses, lenOfSpec - 1))
         
-        self.all_mean_widths = np.zeros((ic.noOfMSIterations, ic.noOfMasses))
-        self.all_mean_intensities = np.zeros(self.all_mean_widths.shape)
-        self.all_std_widths = np.zeros(self.all_mean_widths.shape)
-        self.all_std_intensities = np.zeros(self.all_mean_widths.shape)
-    
-    def addDataY(self, dataY, MSiter):
-        self.all_fit_workspaces[MSiter] = dataY
-    
-    def addFitPars(self, fitPars, MSiter):
-        self.all_spec_best_par_chi_nit[MSiter] = fitPars
-    
-    def getMainPars(self, MSIter):
-        # Since only want a reading, use copy() not to risk changing the array
-        return self.all_spec_best_par_chi_nit[MSIter][:, 1:-2].copy()
-    
-    def addNCP(self, ncpForEachMass, ncpTotal, MSIter):
-        self.all_ncp_for_each_mass[MSIter] = ncpForEachMass
-        self.all_tot_ncp[MSIter] = ncpTotal
+        self.all_mean_widths = None #np.zeros((ic.noOfMSIterations, ic.noOfMasses))
+        self.all_mean_intensities = None #np.zeros(self.all_mean_widths.shape)
+        self.all_std_widths = None #np.zeros(self.all_mean_widths.shape)
+        self.all_std_intensities = None #np.zeros(self.all_mean_widths.shape)
 
-    def calculateMeansAndStd(self, MSIter):
+        # Pass all attributes of ic into attributes to be used whithin this object
+        self.maskedDetectorIdx = ic.maskedDetectorIdx
+        self.masses = ic.masses
+        self.noOfMasses = ic.noOfMasses
+        self.resultsSavePath = ic.resultsSavePath
+        self.singleGaussFitToHProfile = ic.singleGaussFitToHProfile
+
+    def addDataY(self, dataY):
+        if self.all_fit_workspaces is None:
+            self.all_fit_workspaces = dataY[np.newaxis, :, :]
+        else:
+            self.all_fit_workspaces = np.append(self.all_fit_workspaces, dataY[np.newaxis, :, :], axis=0)
+        # self.all_fit_workspaces[MSiter] = dataY
+    
+
+    def addFitPars(self, fitPars):
+        if self.all_spec_best_par_chi_nit is None:
+            self.all_spec_best_par_chi_nit = fitPars[np.newaxis, :, :]
+        else:
+            self.all_spec_best_par_chi_nit = np.append(self.all_spec_best_par_chi_nit, fitPars[np.newaxis, :, :], axis=0)
+       
+ 
+    def getMainPars(self):
+        # Since only want a reading, use copy() not to risk changing the array
+        return self.all_spec_best_par_chi_nit[-1][:, 1:-2].copy()
+    
+
+    def addNCP(self, ncpForEachMass, ncpTotal):
+        if self.all_tot_ncp is None:
+            self.all_ncp_for_each_mass = ncpForEachMass[np.newaxis, :, :, :]
+            self.all_tot_ncp = ncpTotal[np.newaxis, :, :]
+        else:
+            self.all_ncp_for_each_mass = np.append(self.all_ncp_for_each_mass, ncpForEachMass[np.newaxis, :, :, :], axis=0)
+            self.all_tot_ncp = np.append(self.all_tot_ncp, ncpTotal[np.newaxis, :, :], axis=0)
+
+
+    def calculateMeansAndStd(self):
         # Copy arrays to avoid changing stored values
         # Transpose to horizontal shape
-        intensities = self.all_spec_best_par_chi_nit[MSIter][:, 1:-2:3].copy().T
-        widths = self.all_spec_best_par_chi_nit[MSIter][:, 2:-2:3].copy().T
-        noOfMasses = ic.noOfMasses
+        intensities = self.all_spec_best_par_chi_nit[-1][:, 1:-2:3].copy().T
+        widths = self.all_spec_best_par_chi_nit[-1][:, 2:-2:3].copy().T
+        noOfMasses = self.noOfMasses
 
         # Replace zeros from masked spectra with nans
-        widths[:, ic.maskedDetectorIdx] = np.nan
-        intensities[:, ic.maskedDetectorIdx] = np.nan
+        widths[:, self.maskedDetectorIdx] = np.nan
+        intensities[:, self.maskedDetectorIdx] = np.nan
 
         meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
         stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
@@ -503,45 +523,51 @@ class resultsObject:
         meanWidths = np.nanmean(betterWidths, axis=1)  
         stdWidths = np.nanstd(betterWidths, axis=1)
 
-        self.all_mean_widths[MSIter] = meanWidths 
-        self.all_std_widths[MSIter] = stdWidths
-
         # Not nansum(), to propagate nan
         normalization = np.sum(betterIntensities, axis=0)
         intensityRatios = betterIntensities / normalization
 
         meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
-        stdIntensityRatios = np.nanstd(intensityRatios, axis=1)    
+        stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
 
-        self.all_mean_intensities[MSIter] = meanIntensityRatios
-        self.all_std_intensities[MSIter] = stdIntensityRatios
+        # Append in the same fashion as above
+        if self.all_mean_intensities is None:
+            self.all_mean_widths = meanWidths[np.newaxis, :]
+            self.all_std_widths = stdWidths[np.newaxis, :]
+            self.all_mean_intensities = meanIntensityRatios[np.newaxis, :]
+            self.all_std_intensities = stdIntensityRatios[np.newaxis, :]
+        else:
+            self.all_mean_widths = np.append(self.all_mean_widths, meanWidths[np.newaxis, :], axis=0) 
+            self.all_std_widths = np.append(self.all_std_widths, stdWidths[np.newaxis, :], axis=0)
+            self.all_mean_intensities = np.append(self.all_mean_intensities, meanIntensityRatios[np.newaxis, :], axis=0)
+            self.all_std_intensities = np.append(self.all_std_intensities, stdIntensityRatios[np.newaxis, :], axis=0)
 
 
-    def printResults(self, MSIter):
+    def printCurrentIrerationResults(self):
 
         print("\n\nSpec ------- Main Pars ----------- Chi Nit:\n")
-        print(self.all_spec_best_par_chi_nit[MSIter])
+        print(self.all_spec_best_par_chi_nit[-1])
 
-        for i, mass in enumerate(ic.masses):
+        for i, mass in enumerate(self.masses):
             print(f"\nMass = {mass:.2f} amu:")
-            print(f"Width:     {self.all_mean_widths[MSIter, i]:.3f} \u00B1 {self.all_std_widths[MSIter, i]:.3f} ")
-            print(f"Intensity: {self.all_mean_intensities[MSIter, i]:.3f} \u00B1 {self.all_std_intensities[MSIter, i]:.3f} ")
+            print(f"Width:     {self.all_mean_widths[-1, i]:.3f} \u00B1 {self.all_std_widths[-1, i]:.3f} ")
+            print(f"Intensity: {self.all_mean_intensities[-1, i]:.3f} \u00B1 {self.all_std_intensities[-1, i]:.3f} ")
 
         print("\nCheck masses are correct:\n")
-        print(self.all_mean_widths[MSIter])
-        print(self.all_std_widths[MSIter])
-        print(self.all_mean_intensities[MSIter])
-        print(self.all_std_intensities[MSIter])
+        print(self.all_mean_widths[-1])
+        print(self.all_std_widths[-1])
+        print(self.all_mean_intensities[-1])
+        print(self.all_std_intensities[-1])
 
     # Set default of yspace fit parameters to zero, in case they don't get used
-    YSpaceSymSumDataY = 0
-    YSpaceSymSumDataE = 0
-    resolution = 0
-    finalRawDataY = 0
-    finalRawDataE = 0
-    HdataY = 0
-    popt = 0
-    perr = 0
+    # YSpaceSymSumDataY = 0
+    # YSpaceSymSumDataE = 0
+    # resolution = 0
+    # finalRawDataY = 0
+    # finalRawDataE = 0
+    # HdataY = 0
+    # popt = 0
+    # perr = 0
 
 
     def storeResultsOfYSpaceFit(self, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
@@ -562,7 +588,7 @@ class resultsObject:
         # print("\npopt:\n", self.popt)
         # print("\nperr:\n", self.perr, "\n")
 
-        if ic.singleGaussFitToHProfile:
+        if self.singleGaussFitToHProfile:
             for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
                 print(f"\n{fit:15s}")
                 for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:", "Cost Fun:"], self.popt[i], self.perr[i]):
@@ -574,14 +600,16 @@ class resultsObject:
                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
 
 
-    def save(self, savePath):
+    def save(self):
         """Saves all of the arrays stored in this object"""
 
+        # TODO: Take out nans next time when running original results
         # Because original results were recently saved with nans, mask spectra with nans
-        self.all_spec_best_par_chi_nit[:, ic.maskedDetectorIdx, :] = np.nan
-        self.all_ncp_for_each_mass[:, ic.maskedDetectorIdx, :, :] = np.nan
-        self.all_tot_ncp[:, ic.maskedDetectorIdx, :] = np.nan
-
+        self.all_spec_best_par_chi_nit[:, self.maskedDetectorIdx, :] = np.nan
+        self.all_ncp_for_each_mass[:, self.maskedDetectorIdx, :, :] = np.nan
+        self.all_tot_ncp[:, self.maskedDetectorIdx, :] = np.nan
+        
+        savePath = self.resultsSavePath
         np.savez(savePath,
                  all_fit_workspaces=self.all_fit_workspaces,
                  all_spec_best_par_chi_nit=self.all_spec_best_par_chi_nit,
@@ -811,7 +839,7 @@ def kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays):
 
 def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
     # Currently the function that takes the most time in the fitting
-    assert masses.shape != (masses.size, 1), f"masses.shape: {masses.shape}. The shape of the masses array needs to be a collumn!"
+    assert masses.shape == (masses.size, 1), f"masses.shape: {masses.shape}. The shape of the masses array needs to be a collumn!"
 
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
@@ -844,7 +872,7 @@ def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, ins
 
 
 def calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
-    assert masses.shape != (masses.size, 1), "The shape of the masses array needs to be a collumn!"
+    assert masses.shape == (masses.size, 1), "The shape of the masses array needs to be a collumn!"
         
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
@@ -918,14 +946,14 @@ def numericalThirdDerivative(x, fun):
     return derivative
 
 
-def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
+def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
 
     if np.all(initPars==0):  
         return np.zeros(ySpacesForEachMass.shape) 
     
-    ncpForEachMass, ncpTotal = calculateNcpSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
     return ncpForEachMass
 
 
@@ -1060,308 +1088,308 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
     return profiles
 
 
-def fitInYSpaceProcedure(ic, wsFinal, fittingResults):
-    ncpForEachMass = fittingResults.all_ncp_for_each_mass[-1]  # Select last iteration
-    wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(wsFinal, ncpForEachMass)
-    popt, perr = fitTheHProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
-    wsH = mtd[wsFinal.name()+"_H"]
+# def fitInYSpaceProcedure(ic, wsFinal, fittingResults):
+#     ncpForEachMass = fittingResults.all_ncp_for_each_mass[-1]  # Select last iteration
+#     wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(ic, wsFinal, ncpForEachMass)
+#     popt, perr = fitTheHProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
+#     wsH = mtd[wsFinal.name()+"_H"]
 
-    fittingResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
-    fittingResults.printYSpaceFitResults()
-
-
-def isolateHProfileInYSpace(ic, wsFinal, ncpForEachMass):
-    massH = 1.0079
-    wsRes = calculateMantidResolution(ic, wsFinal, massH)  
-
-    wsSubMass = subtractAllMassesExceptFirst(wsFinal, ncpForEachMass)
-    averagedSpectraYSpace = averageJOfYOverAllSpectra(ic, wsSubMass, massH) 
-    return averagedSpectraYSpace, wsRes
+#     fittingResults.storeResultsOfYSpaceFit(wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
+#     fittingResults.printYSpaceFitResults(ic)
 
 
-def calculateMantidResolution(ic, ws, mass):
-    rebinPars=ic.rebinParametersForYSpaceFit
-    for index in range(ws.getNumberHistograms()):
-        if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
-            pass
-        else:
-            VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-            Rebin(InputWorkspace="tmp", Params=rebinPars, OutputWorkspace="tmp")
+# def isolateHProfileInYSpace(ic, wsFinal, ncpForEachMass):
+#     massH = 1.0079
+#     wsRes = calculateMantidResolution(ic, wsFinal, massH)  
 
-            if index == 0:   # Ensures that workspace has desired units
-                RenameWorkspace("tmp","resolution")
-            else:
-                AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
+#     wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
+#     averagedSpectraYSpace = averageJOfYOverAllSpectra(ic, wsSubMass, massH) 
+#     return averagedSpectraYSpace, wsRes
 
-    try:
-        SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
-    except ValueError:
-        raise ValueError ("All the rows from the workspace to be fitted are Nan!")
 
-    normalise_workspace("resolution")
-    DeleteWorkspace("tmp")
-    return mtd["resolution"]
+# def calculateMantidResolution(ic, ws, mass):
+#     rebinPars=ic.rebinParametersForYSpaceFit
+#     for index in range(ws.getNumberHistograms()):
+#         if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
+#             pass
+#         else:
+#             VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
+#             Rebin(InputWorkspace="tmp", Params=rebinPars, OutputWorkspace="tmp")
+
+#             if index == 0:   # Ensures that workspace has desired units
+#                 RenameWorkspace("tmp","resolution")
+#             else:
+#                 AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
+
+#     try:
+#         SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
+#     except ValueError:
+#         raise ValueError ("All the rows from the workspace to be fitted are Nan!")
+
+#     normalise_workspace("resolution")
+#     DeleteWorkspace("tmp")
+#     return mtd["resolution"]
 
     
-def normalise_workspace(ws_name):
-    tmp_norm = Integration(ws_name)
-    Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
-    DeleteWorkspace("tmp_norm")
+# def normalise_workspace(ws_name):
+#     tmp_norm = Integration(ws_name)
+#     Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
+#     DeleteWorkspace("tmp_norm")
 
 
-def subtractAllMassesExceptFirst(ws, ncpForEachMass):
-    """Input: workspace from last iteration, ncpTotal for each mass
-       Output: workspace with all the ncpTotal subtracted except for the first mass"""
+# def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
+#     """Input: workspace from last iteration, ncpTotal for each mass
+#        Output: workspace with all the ncpTotal subtracted except for the first mass"""
 
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    # Select all masses other than the first one
-    ncpForEachMass = ncpForEachMass[1:, :, :]
-    # Sum the ncpTotal for remaining masses
-    ncpTotal = np.sum(ncpForEachMass, axis=0)
+#     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
+#     # Select all masses other than the first one
+#     ncpForEachMass = ncpForEachMass[1:, :, :]
+#     # Sum the ncpTotal for remaining masses
+#     ncpTotal = np.sum(ncpForEachMass, axis=0)
 
-    dataY, dataX = ws.extractY(), ws.extractX() 
+#     dataY, dataX = ws.extractY(), ws.extractX() 
     
-    # Subtract the ncp of all masses exept first to dataY
-    dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
+#     # Subtract the ncp of all masses exept first to dataY
+#     dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
 
-    # Pass the data onto a Workspace, clone to preserve properties
-    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
-    for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
-        wsSubMass.dataY(i)[:] = dataY[i, :]
+#     # Pass the data onto a Workspace, clone to preserve properties
+#     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
+#     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
+#         wsSubMass.dataY(i)[:] = dataY[i, :]
 
-     # Mask spectra again, to be seen as masked from Mantid's perspective
-    MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
+#      # Mask spectra again, to be seen as masked from Mantid's perspective
+#     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
 
-    if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
-        raise ValueError("The workspace for the isolated H data countains NaNs, \
-                            might cause problems!")
-    return wsSubMass
+#     if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
+#         raise ValueError("The workspace for the isolated H data countains NaNs, \
+#                             might cause problems!")
+#     return wsSubMass
 
 
-def averageJOfYOverAllSpectra(ic, ws0, mass):
-    wsYSpace = convertToYSpace(ic, ws0, mass)
-    averagedSpectraYSpace = weightedAvg(wsYSpace)
+# def averageJOfYOverAllSpectra(ic, ws0, mass):
+#     wsYSpace = convertToYSpace(ic, ws0, mass)
+#     averagedSpectraYSpace = weightedAvg(wsYSpace)
     
-    if ic.symmetrisationFlag == True:
-        symAvgdSpecYSpace = symmetrizeWs(ic, averagedSpectraYSpace)
-        return symAvgdSpecYSpace
+#     if ic.symmetrisationFlag == True:
+#         symAvgdSpecYSpace = symmetrizeWs(ic, averagedSpectraYSpace)
+#         return symAvgdSpecYSpace
 
-    return averagedSpectraYSpace
-
-
-def convertToYSpace(ic, ws0, mass):
-    ConvertToYSpace(
-        InputWorkspace=ws0, Mass=mass, 
-        OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
-        )
-    rebinPars=ic.rebinParametersForYSpaceFit
-    Rebin(
-        InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
-        FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
-        )
-    normalise_workspace(ws0.name()+"_JoY")
-    return mtd[ws0.name()+"_JoY"]
+#     return averagedSpectraYSpace
 
 
-def weightedAvg(wsYSpace):
-    dataY = wsYSpace.extractY()
-    dataE = wsYSpace.extractE()
-
-    dataY[dataY==0] = np.nan
-    dataE[dataE==0] = np.nan
-
-    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
-    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
-
-    tempWs = SumSpectra(wsYSpace)
-    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_weighted_avg")
-    newWs.dataY(0)[:] = meanY
-    newWs.dataE(0)[:] = meanE
-    DeleteWorkspace(tempWs)
-    return newWs
+# def convertToYSpace(ic, ws0, mass):
+#     ConvertToYSpace(
+#         InputWorkspace=ws0, Mass=mass, 
+#         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
+#         )
+#     rebinPars=ic.rebinParametersForYSpaceFit
+#     Rebin(
+#         InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
+#         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
+#         )
+#     normalise_workspace(ws0.name()+"_JoY")
+#     return mtd[ws0.name()+"_JoY"]
 
 
-def symmetrizeWs(ic, avgYSpace):
-    """Symmetrizes workspace with only one spectrum,
-       Needs to have symmetric binning"""
+# def weightedAvg(wsYSpace):
+#     dataY = wsYSpace.extractY()
+#     dataE = wsYSpace.extractE()
 
-    dataX = avgYSpace.extractX()
-    dataY = avgYSpace.extractY()
-    dataE = avgYSpace.extractE()
+#     dataY[dataY==0] = np.nan
+#     dataE[dataE==0] = np.nan
 
-    yFlip = np.flip(dataY)
-    eFlip = np.flip(dataE)
+#     meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
+#     meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
 
-    if ic.symmetriseHProfileUsingAveragesFlag:
-        # Inverse variance weighting
-        dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
-        dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
-    else:
-        # Mirroring positive values from negative ones
-        dataYSym = np.where(dataX>0, yFlip, dataY)
-        dataESym = np.where(dataX>0, eFlip, dataE)
-
-    Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_symmetrised")
-    Sym.dataY(0)[:] = dataYSym
-    Sym.dataE(0)[:] = dataESym
-    return Sym
+#     tempWs = SumSpectra(wsYSpace)
+#     newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_weighted_avg")
+#     newWs.dataY(0)[:] = meanY
+#     newWs.dataE(0)[:] = meanE
+#     DeleteWorkspace(tempWs)
+#     return newWs
 
 
-def fitTheHProfileInYSpace(ic, wsYSpaceSym, wsRes):
-    # if ic.useScipyCurveFitToHProfileFlag:
-    poptCurveFit, pcovCurveFit = fitProfileCurveFit(ic, wsYSpaceSym, wsRes)
-    perrCurveFit = np.sqrt(np.diag(pcovCurveFit))
-    # else:
-    poptMantidFit, perrMantidFit = fitProfileMantidFit(ic, wsYSpaceSym, wsRes)
+# def symmetrizeWs(ic, avgYSpace):
+#     """Symmetrizes workspace with only one spectrum,
+#        Needs to have symmetric binning"""
+
+#     dataX = avgYSpace.extractX()
+#     dataY = avgYSpace.extractY()
+#     dataE = avgYSpace.extractE()
+
+#     yFlip = np.flip(dataY)
+#     eFlip = np.flip(dataE)
+
+#     if ic.symmetriseHProfileUsingAveragesFlag:
+#         # Inverse variance weighting
+#         dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
+#         dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
+#     else:
+#         # Mirroring positive values from negative ones
+#         dataYSym = np.where(dataX>0, yFlip, dataY)
+#         dataESym = np.where(dataX>0, eFlip, dataE)
+
+#     Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_symmetrised")
+#     Sym.dataY(0)[:] = dataYSym
+#     Sym.dataE(0)[:] = dataESym
+#     return Sym
+
+
+# def fitTheHProfileInYSpace(ic, wsYSpaceSym, wsRes):
+#     # if ic.useScipyCurveFitToHProfileFlag:
+#     poptCurveFit, pcovCurveFit = fitProfileCurveFit(ic, wsYSpaceSym, wsRes)
+#     perrCurveFit = np.sqrt(np.diag(pcovCurveFit))
+#     # else:
+#     poptMantidFit, perrMantidFit = fitProfileMantidFit(ic, wsYSpaceSym, wsRes)
     
-    #TODO: Add the Cost function as the last parameter
-    poptCurveFit = np.append(poptCurveFit, np.nan)
-    perrCurveFit = np.append(perrCurveFit, np.nan)
+#     #TODO: Add the Cost function as the last parameter
+#     poptCurveFit = np.append(poptCurveFit, np.nan)
+#     perrCurveFit = np.append(perrCurveFit, np.nan)
 
-    popt = np.vstack((poptCurveFit, poptMantidFit))
-    perr = np.vstack((perrCurveFit, perrMantidFit))
+#     popt = np.vstack((poptCurveFit, poptMantidFit))
+#     perr = np.vstack((perrCurveFit, perrMantidFit))
 
-    return popt, perr
+#     return popt, perr
 
 
-def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
-    res = wsRes.extractY()[0]
-    resX = wsRes. extractX()[0]
+# def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
+#     res = wsRes.extractY()[0]
+#     resX = wsRes. extractX()[0]
 
-    # Interpolate Resolution to get single peak at zero
-    # Otherwise if the resolution has two data points at the peak,
-    # the convolution will be skewed.
-    start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
-    resNewX = np.arange(start, end, interval)
-    res = np.interp(resNewX, resX, res)
+#     # Interpolate Resolution to get single peak at zero
+#     # Otherwise if the resolution has two data points at the peak,
+#     # the convolution will be skewed.
+#     start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
+#     resNewX = np.arange(start, end, interval)
+#     res = np.interp(resNewX, resX, res)
 
-    dataY = wsYSpaceSym.extractY()[0]
-    dataX = wsYSpaceSym.extractX()[0]
-    dataE = wsYSpaceSym.extractE()[0]
+#     dataY = wsYSpaceSym.extractY()[0]
+#     dataX = wsYSpaceSym.extractX()[0]
+#     dataE = wsYSpaceSym.extractE()[0]
 
-    if ic.singleGaussFitToHProfile:
-        def convolvedFunction(x, y0, A, x0, sigma):
-            histWidths = x[1:] - x[:-1]
-            if ~ (np.max(histWidths)==np.min(histWidths)):
-                raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+#     if ic.singleGaussFitToHProfile:
+#         def convolvedFunction(x, y0, A, x0, sigma):
+#             histWidths = x[1:] - x[:-1]
+#             if ~ (np.max(histWidths)==np.min(histWidths)):
+#                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
-            gaussFunc = gaussianFit(x, y0, x0, A, sigma)
-            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]  
-            return convGauss
-        p0 = [0, 1, 0, 5]
-        bounds = [-np.inf, np.inf]  # Applied to all parameters
+#             gaussFunc = gaussianFit(x, y0, x0, A, sigma)
+#             convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]  
+#             return convGauss
+#         p0 = [0, 1, 0, 5]
+#         bounds = [-np.inf, np.inf]  # Applied to all parameters
 
-    else:
-        # # Double Gaussian
-        # def convolvedFunction(x, y0, x0, A, sigma):
-        #     histWidths = x[1:] - x[:-1]
-        #     if ~ (np.max(histWidths)==np.min(histWidths)):
-        #         raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+#     else:
+#         # # Double Gaussian
+#         # def convolvedFunction(x, y0, x0, A, sigma):
+#         #     histWidths = x[1:] - x[:-1]
+#         #     if ~ (np.max(histWidths)==np.min(histWidths)):
+#         #         raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
-        #     gaussFunc = gaussianFit(x, y0, x0, A, 4.76) + gaussianFit(x, 0, x0, 0.054*A, sigma)
-        #     convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
-        #     return convGauss
-        # p0 = [0, 0, 0.7143, 5]
+#         #     gaussFunc = gaussianFit(x, y0, x0, A, 4.76) + gaussianFit(x, 0, x0, 0.054*A, sigma)
+#         #     convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
+#         #     return convGauss
+#         # p0 = [0, 0, 0.7143, 5]
 
-        def HermitePolynomial(x, sigma1, c4, c6):
-            return np.exp(-x**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
-                    *(1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
-                    -48*(x/np.sqrt(2)/sigma1)**2+12) \
-                    +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
-                    -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+#         def HermitePolynomial(x, sigma1, c4, c6):
+#             return np.exp(-x**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+#                     *(1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
+#                     -48*(x/np.sqrt(2)/sigma1)**2+12) \
+#                     +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
+#                     -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
         
-        def convolvedFunction(x, sigma1, c4, c6):
-            histWidths = x[1:] - x[:-1]
-            if ~ (np.max(histWidths)==np.min(histWidths)):
-                raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+#         def convolvedFunction(x, sigma1, c4, c6):
+#             histWidths = x[1:] - x[:-1]
+#             if ~ (np.max(histWidths)==np.min(histWidths)):
+#                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
-            hermiteFunc = HermitePolynomial(x, sigma1, c4, c6)
-            convFunc = ndimage.convolve1d(hermiteFunc, res, mode="constant") * histWidths[0]
-            return convFunc
-        p0 = [4, 0, 0]     
-        # The bounds on curve_fit() are set up diferently than on minimize()
-        bounds = [[-np.inf, 0, 0], [np.inf, np.inf, np.inf]] 
+#             hermiteFunc = HermitePolynomial(x, sigma1, c4, c6)
+#             convFunc = ndimage.convolve1d(hermiteFunc, res, mode="constant") * histWidths[0]
+#             return convFunc
+#         p0 = [4, 0, 0]     
+#         # The bounds on curve_fit() are set up diferently than on minimize()
+#         bounds = [[-np.inf, 0, 0], [np.inf, np.inf, np.inf]] 
 
 
-    popt, pcov = optimize.curve_fit(
-        convolvedFunction, 
-        dataX, 
-        dataY, 
-        p0=p0,
-        sigma=dataE,
-        bounds=bounds
-    )
-    yfit = convolvedFunction(dataX, *popt)
-    Residuals = dataY - yfit
+#     popt, pcov = optimize.curve_fit(
+#         convolvedFunction, 
+#         dataX, 
+#         dataY, 
+#         p0=p0,
+#         sigma=dataE,
+#         bounds=bounds
+#     )
+#     yfit = convolvedFunction(dataX, *popt)
+#     Residuals = dataY - yfit
     
-    # Create Workspace with the fit results
-    # TODO add DataE 
-    CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
-                    DataY=np.concatenate((dataY, yfit, Residuals)), 
-                    NSpec=3,
-                    OutputWorkspace=wsYSpaceSym.name()+"_fitted_CurveFit")
-    return popt, pcov
+#     # Create Workspace with the fit results
+#     # TODO add DataE 
+#     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
+#                     DataY=np.concatenate((dataY, yfit, Residuals)), 
+#                     NSpec=3,
+#                     OutputWorkspace=wsYSpaceSym.name()+"_fitted_CurveFit")
+#     return popt, pcov
 
 
-def gaussianFit(x, y0, x0, A, sigma):
-    """Gaussian centered at zero"""
-    return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+# def gaussianFit(x, y0, x0, A, sigma):
+#     """Gaussian centered at zero"""
+#     return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
 
-def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
+# def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
 
-    if ic.singleGaussFitToHProfile:
-        popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
-    else:
-        # popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
-        popt, perr = np.zeros((2, 4)), np.zeros((2, 4))
+#     if ic.singleGaussFitToHProfile:
+#         popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
+#     else:
+#         # popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
+#         popt, perr = np.zeros((2, 4)), np.zeros((2, 4))
 
 
-    print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
-    for i, minimizer in enumerate(['Levenberg-Marquardt','Simplex']):
-        outputName = wsYSpaceSym.name()+"_fitted_"+minimizer
-        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
+#     print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
+#     for i, minimizer in enumerate(['Levenberg-Marquardt','Simplex']):
+#         outputName = wsYSpaceSym.name()+"_fitted_"+minimizer
+#         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
-        if ic.singleGaussFitToHProfile:
-            function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution,WorkspaceIndex=0;
-            name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
-            y0=0,A=1,x0=0,sigma=5,   ties=()'''
-        else:
-            # # Function for Double Gaussian
-            # function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            # name=Resolution,Workspace=resolution,WorkspaceIndex=0;
-            # name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
-            # +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
-            # y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
+#         if ic.singleGaussFitToHProfile:
+#             function='''composite=Convolution,FixResolution=true,NumDeriv=true;
+#             name=Resolution,Workspace=resolution,WorkspaceIndex=0;
+#             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
+#             y0=0,A=1,x0=0,sigma=5,   ties=()'''
+#         else:
+#             # # Function for Double Gaussian
+#             # function='''composite=Convolution,FixResolution=true,NumDeriv=true;
+#             # name=Resolution,Workspace=resolution,WorkspaceIndex=0;
+#             # name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
+#             # +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
+#             # y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
             
-            # TODO: Check that this function is correct
-            function = """
-            composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution,WorkspaceIndex=0,X=(),Y=();
-            name=UserFunction,Formula=exp( -x^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
-            *(1.+c4/32.*(16.*(x/sqrt(2)/sigma1)^4-48.*(x/sqrt(2)/sigma1)^2+12)+c6/384*(64*(x/sqrt(2)/sigma1)^6 - 480*(x/sqrt(2)/sigma1)^4 + 720*(x/sqrt(2)/sigma1)^2 - 120)),
-            sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
-            """
+#             # TODO: Check that this function is correct
+#             function = """
+#             composite=Convolution,FixResolution=true,NumDeriv=true;
+#             name=Resolution,Workspace=resolution,WorkspaceIndex=0,X=(),Y=();
+#             name=UserFunction,Formula=exp( -x^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
+#             *(1.+c4/32.*(16.*(x/sqrt(2)/sigma1)^4-48.*(x/sqrt(2)/sigma1)^2+12)+c6/384*(64*(x/sqrt(2)/sigma1)^6 - 480*(x/sqrt(2)/sigma1)^4 + 720*(x/sqrt(2)/sigma1)^2 - 120)),
+#             sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
+#             """
 
-        Fit(
-            Function=function, 
-            InputWorkspace=outputName,
-            Output=outputName,
-            Minimizer=minimizer
-            )
+#         Fit(
+#             Function=function, 
+#             InputWorkspace=outputName,
+#             Output=outputName,
+#             Minimizer=minimizer
+#             )
         
-        ws=mtd[outputName+"_Parameters"]
-        popt[i] = ws.column("Value")
-        perr[i] = ws.column("Error")
-    return popt, perr
+#         ws=mtd[outputName+"_Parameters"]
+#         popt[i] = ws.column("Value")
+#         perr[i] = ws.column("Error")
+#     return popt, perr
 
 
-start_time = time.time()
+# start_time = time.time()
 # runSequenceRatioNotKnown()
 # runSequenceForKnownRatio()
 # runOnlyBackScattering()
 # runOnlyForwardScattering()
 
-end_time = time.time()
-print("\nRunning time: ", end_time-start_time, " seconds")
+# end_time = time.time()
+# print("\nRunning time: ", end_time-start_time, " seconds")
