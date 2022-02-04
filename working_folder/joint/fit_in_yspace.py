@@ -56,7 +56,7 @@ class ResultsYFitObject:
 
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     # ncpForEachMass = fittingResults.all_ncp_for_each_mass[-1]  # Select last iteration
-    wsYSpaceSymSum, wsRes = isolateHProfileInYSpace(ic, wsFinal, ncpForEachMass)
+    wsYSpaceSymSum, wsRes = isolateFirstMassProfileInYSpace(ic, wsFinal, ncpForEachMass)
     popt, perr = fitTheHProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
     wsH = mtd[wsFinal.name()+"_H"]
 
@@ -64,12 +64,13 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
-def isolateHProfileInYSpace(ic, wsFinal, ncpForEachMass):
-    massH = 1.0079
-    wsRes = calculateMantidResolution(ic, wsFinal, massH)  
+def isolateFirstMassProfileInYSpace(ic, wsFinal, ncpForEachMass):
+
+    firstMass = ic.masses[0]
+    wsRes = calculateMantidResolution(ic, wsFinal, firstMass)  
 
     wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
-    averagedSpectraYSpace = averageJOfYOverAllSpectra(ic, wsSubMass, massH) 
+    averagedSpectraYSpace = averageJOfYOverAllSpectra(ic, wsSubMass, firstMass) 
     return averagedSpectraYSpace, wsRes
 
 

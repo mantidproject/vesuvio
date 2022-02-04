@@ -1,4 +1,8 @@
-from experiments.starch_80_RD.initial_parameters import bckwdIC, fwdIC
+
+# Set desired initial conditions file
+# from experiments.starch_80_RD.initial_parameters import bckwdIC, fwdIC
+from experiments.D_HMT.initial_parameters import bckwdIC, fwdIC
+
 from analysis_functions import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from fit_in_yspace import fitInYSpaceProcedure
@@ -51,26 +55,34 @@ def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
     backMeanWidths = backScatteringResults.all_mean_widths[-1]
     backMeanIntensityRatios = backScatteringResults.all_mean_intensities[-1] 
 
-    HIntensity = HToMass0Ratio * backMeanIntensityRatios[0]
-    initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
-    initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
+    if fwdIC.masses[0] == 1.0079:
+        HIntensity = HToMass0Ratio * backMeanIntensityRatios[0]
+        initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
+        initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
+        # Set starting conditions for forward scattering
+        # Fix known widths and intensity ratios from back scattering results
+        fwdIC.initPars[4::3] = backMeanWidths
+        fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+        fwdIC.initPars[0::3] = initialFwdIntensityRatios
 
-    # Set starting conditions for forward scattering
-    # Fix known widths and intensity ratios from back scattering results
-    fwdIC.initPars[4::3] = backMeanWidths
-    fwdIC.initPars[0::3] = initialFwdIntensityRatios
-    fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
-    # Fix the intensity ratios 
-    # ic.bounds[0::3] = initialFwdIntensityRatios[:, np.newaxis] * np.ones((1,2)) 
+    else:
+        fwdIC.initPars[1::3] = backMeanWidths
+        # First width is set to vary
+        fwdIC.bounds[4::3] = backMeanWidths[1:][:, np.newaxis] * np.ones((1,2))
+        fwdIC.initPars[0::3] = backMeanIntensityRatios
 
-    print("\nChanged initial conditions of forward scattering \
-        according to mean widhts and intensity ratios from backscattering.\n")
-
+    print("\nChanged initial conditions of forward scattering according to mean widhts and intensity ratios from backscattering.\n")
 
 start_time = time.time()
 
-runOnlyForwardScattering(fwdIC)
-runOnlyBackScattering(bckwdIC)
+# Interactive section 
 
+# runOnlyForwardScattering(fwdIC)
+# runOnlyBackScattering(bckwdIC)
+
+runSequenceForKnownRatio(bckwdIC, fwdIC)
+
+
+# End of iteractive section
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")

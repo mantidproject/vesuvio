@@ -4,7 +4,7 @@ from scipy import optimize
 from functools import partial
 
 # Format print output of arrays
-np.set_printoptions(suppress=True, precision=4, linewidth=150, threshold=sys.maxsize)
+np.set_printoptions(suppress=True, precision=4, linewidth=100, threshold=sys.maxsize)
 
 
 def iterativeFitForDataReduction(ic):
@@ -198,6 +198,7 @@ class resultsObject:
         self.noOfMasses = ic.noOfMasses
         self.resultsSavePath = ic.resultsSavePath
 
+
     def addDataY(self, dataY):
         if self.all_fit_workspaces is None:
             self.all_fit_workspaces = dataY[np.newaxis, :, :]
@@ -280,11 +281,11 @@ class resultsObject:
             print(f"Width:     {self.all_mean_widths[-1, i]:.3f} \u00B1 {self.all_std_widths[-1, i]:.3f} ")
             print(f"Intensity: {self.all_mean_intensities[-1, i]:.3f} \u00B1 {self.all_std_intensities[-1, i]:.3f} ")
 
-        print("\nCheck masses are correct:\n")
-        print(self.all_mean_widths[-1])
-        print(self.all_std_widths[-1])
-        print(self.all_mean_intensities[-1])
-        print(self.all_std_intensities[-1])
+        # print("\nCheck masses are correct:\n")
+        # print(self.all_mean_widths[-1])
+        # print(self.all_std_widths[-1])
+        # print(self.all_mean_intensities[-1])
+        # print(self.all_std_intensities[-1])
 
 
     def save(self):
