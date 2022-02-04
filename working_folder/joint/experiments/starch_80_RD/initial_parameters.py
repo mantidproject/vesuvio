@@ -2,7 +2,7 @@ import numpy as np
 from pathlib import Path
 experimentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testingCleaning = True
+testingCleaning = False
 if testingCleaning:     
     cleaningPath = experimentPath / "output" / "testing" / "cleaning"
 
@@ -12,11 +12,11 @@ if testingCleaning:
     ySpaceFitSavePath = cleaningPath / "current_yspacefit.npz"
 
 else:
-    outputPath = experimentPath / "output"
+    outputPath = experimentPath / "output" / "testing" / "original" / "current_data"
 
-    forwardScatteringSavePath = outputPath / "dummy_forwawrd.npz"
-    backScatteringSavePath = outputPath / "dummy_backward.npz"
-    ySpaceFitSavePath = outputPath / "dummy_yspace.npz"
+    forwardScatteringSavePath = outputPath / "4iter_forward_GM_MS.npz"
+    backScatteringSavePath = outputPath / "4iter_backward_MS.npz"
+    ySpaceFitSavePath = outputPath / "4iter_yspacefit.npz"
 
 
 ipFilePath =  experimentPath / "ip2018_3.par"  
@@ -157,9 +157,9 @@ class ForwardInitialConditions:
     ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
-    firstSpec = 164   #144
-    lastSpec = 175    #182
+    noOfMSIterations = 4   #4
+    firstSpec = 144 #164   #144
+    lastSpec = 182 #175    #182
 
     # Boolean Flags to control script
     # loadWsFromUserPathFlag = True

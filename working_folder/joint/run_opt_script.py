@@ -70,6 +70,7 @@ def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
 start_time = time.time()
 
 runOnlyForwardScattering(fwdIC)
+runOnlyBackScattering(bckwdIC)
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")

@@ -197,7 +197,6 @@ class resultsObject:
         self.masses = ic.masses
         self.noOfMasses = ic.noOfMasses
         self.resultsSavePath = ic.resultsSavePath
-        self.singleGaussFitToHProfile = ic.singleGaussFitToHProfile
 
     def addDataY(self, dataY):
         if self.all_fit_workspaces is None:

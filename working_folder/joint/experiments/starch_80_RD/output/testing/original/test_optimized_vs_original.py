@@ -16,14 +16,15 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testForward = True
+testForward = False
 if testForward:
     pathToOriginal = currentPath / "original_data" / "4iter_forward_GB_MS.npz" 
-    pathToOptimized = currentPath / "current_data" / "4iter_forward_GB_MS_opt.npz" 
+
+    pathToOptimized = currentPath / "current_data" / "4iter_forward_GM_MS.npz" 
 
 else:
     pathToOriginal = currentPath / "original_data" / "4iter_backward_MS.npz" 
-    pathToOptimized = currentPath / "current_data" / "4iter_backward_MS_opt.npz" 
+    pathToOptimized = currentPath / "current_data" / "4iter_backward_MS.npz" 
     # pathToOptimized = currentPath / "MS" / "fixatures" / "2iter_backward_MS_opt.npz" 
 
 
