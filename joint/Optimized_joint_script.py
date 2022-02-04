@@ -289,6 +289,7 @@ def printInitialParameters(ic):
 
 
 def iterativeFitForDataReduction(ic):
+    printInitialParameters(ic)
 
     initialWs = loadVesuvioDataWorkspaces(ic)   
     cropedWs = cropAndMaskWorkspace(ic, initialWs)
@@ -334,6 +335,7 @@ def iterativeFitForDataReduction(ic):
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
 
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
+    fittingResults.save()
     return wsFinal, fittingResults
 
 

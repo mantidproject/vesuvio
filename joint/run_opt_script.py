@@ -1,5 +1,5 @@
 from build_init_pars import bckwdIC, fwdIC
-from Optimized_joint_script import iterativeFitForDataReduction, printInitialParameters
+from Optimized_joint_script import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from fit_in_yspace import fitInYSpaceProcedure
 import time
@@ -8,61 +8,39 @@ import numpy as np
 
 def runOnlyBackScattering(bckwdIC):
     AnalysisDataService.clear()
-    # ic.setBackscatteringInitialConditions()
-    printInitialParameters(bckwdIC)
     wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
-    backScatteringResults.save() 
 
 
 def runOnlyForwardScattering(fwdIC):
     AnalysisDataService.clear()
-    # ic.setForwardScatteringInitialConditions()
-    printInitialParameters(fwdIC)
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
-    forwardScatteringResults.save()
-
+ 
 
 def runSequenceForKnownRatio(bckwdIC, fwdIC):
     AnalysisDataService.clear()
     # If H to first mass ratio is known, can run MS correction for backscattering
     # Back scattering produces precise results for widhts and intensity ratios for non-H masses
-    printInitialParameters(bckwdIC)
     wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
-    backScatteringResults.save() 
-
     setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
-    printInitialParameters(fwdIC)
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
-    forwardScatteringResults.save()
 
 
 def runSequenceRatioNotKnown(bckwdIC, fwdIC):
     # Run preliminary forward with a good guess for the widths of non-H masses
-    # ic.setForwardScatteringInitialConditions()
-    printInitialParameters(fwdIC)
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
     for i in range(2):    # Loop until convergence is achieved
         AnalysisDataService.clear()    # Clears all Workspaces
-
         # Get first estimate of H to mass0 ratio
         fwdMeanIntensityRatios = forwardScatteringResults.all_mean_intensities[-1] 
         bckwdIC.HToMass0Ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
-       
         # Run backward procedure with this estimate
-        # ic.setBackscatteringInitialConditions()
-        printInitialParameters(bckwdIC)
         wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
-
-        # ic.setForwardScatteringInitialConditions()
         setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
-        printInitialParameters(fwdIC)
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-
     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
-    backScatteringResults.save()
-    forwardScatteringResults.save()
+ 
 
 
 def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
