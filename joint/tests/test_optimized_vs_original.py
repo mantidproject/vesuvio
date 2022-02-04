@@ -16,7 +16,7 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testForward = False
+testForward = True
 if testForward:
     pathToOriginal = currentPath / "fixatures" / "original" / "4iter_forward_GB_MS.npz" 
     pathToOptimized = currentPath / "fixatures" / "4iter_forward_GB_MS_opt.npz" 
@@ -146,6 +146,37 @@ class TestNcp(unittest.TestCase):
             plt.show()
 
 
+def plot_rel_errs(oriwidths, optwidths, name):
+    noOfMasses = len(oriwidths[0])
+    fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
+    relativeDifference = abs(optwidths - oriwidths) / oriwidths
+    x = range(len(oriwidths))
+
+    for i, ax in enumerate(axs):
+        ax.plot(x, relativeDifference[:, i], "bo--", label="relErr")
+        ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+
+    axs[0].set_ylabel("Relative Error")
+    fig.suptitle("Evolution of mean"+name+" over iterations")
+    plt.show()    
+
+
+def plot_values(oriwidths, optwidths, name):
+    noOfMasses = len(oriwidths[0])
+    fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
+    x = range(len(oriwidths))
+
+    for i, ax in enumerate(axs):
+        ax.plot(x, optwidths[:, i], "ro-", label="opt", alpha=0.6)
+        ax.plot(x, oriwidths[:, i], "bo--", label="ori", alpha=0.6)
+
+    axs[0].set_ylabel(name+" Values")
+    fig.suptitle("Evolution of mean "+name+" over iterations")
+    plt.legend(loc="upper left", bbox_to_anchor = (1,1))
+    plt.show() 
+
+
+
 class TestMeanWidths(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
@@ -159,23 +190,8 @@ class TestMeanWidths(unittest.TestCase):
             "\nori: ", self.orimeanwidths[-1], 
             "\nopt: ", self.optmeanwidths[-1])
 
-        noOfMasses = len(self.orimeanwidths[0])
-        fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
-        # fig.tight_layout()
-        x = range(len(self.orimeanwidths))
-        relativeDifference = abs(self.optmeanwidths - self.orimeanwidths) / self.orimeanwidths
-
-        for i, ax in enumerate(axs):
-            ax.plot(x, relativeDifference[:, i], "bo--", label="relErr")
-            ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
-            # ax.set_xlabel("Iterations")
-            # ax.plot(x, self.optmeanwidths[:, i], "ro-", label="opt", alpha=0.6)
-            # ax.plot(x, self.orimeanwidths[:, i], "bo--", label="ori", alpha=0.6)
-
-        axs[0].set_ylabel("Relative Error")
-        fig.suptitle("Evolution of mean widths over iterations")
-        # plt.legend(loc="upper left", bbox_to_anchor = (1,1))
-        plt.show()
+        plot_rel_errs(self.orimeanwidths, self.optmeanwidths, "Widths")
+        # plot_values(self.orimeanwidths, self.optmeanwidths, "Widths")
 
 
 class TestMeanIntensities(unittest.TestCase):
@@ -191,20 +207,9 @@ class TestMeanIntensities(unittest.TestCase):
             "\nori: ", self.orimeanintensities[-1], 
             "\nopt: ", self.optmeanintensities[-1])
 
-        noOfMasses = len(self.orimeanintensities[0])
-        fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
-        x = range(len(self.orimeanintensities))
-        relativeDifference = abs(self.optmeanintensities - self.orimeanintensities) / self.orimeanintensities
-        for i, ax in enumerate(axs):
-            ax.plot(x, relativeDifference[:, i], "bo--", label="relErr")
-            ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
-            # ax.plot(x, self.optmeanintensities[:, i], "ro-", label="opt", alpha=0.6)
-            # ax.plot(x, self.orimeanintensities[:, i], "bo--", label="ori", alpha=0.6)
+        plot_rel_errs(self.orimeanintensities, self.optmeanintensities, "Intensity Ratios")
+        # plot_values(self.orimeanintensities, self.optmeanintensities, "Intensity Ratios")
 
-        fig.suptitle("Evolution of mean intensity ratios over iterations")
-        # plt.legend(loc="upper left", bbox_to_anchor = (1,1))
-        axs[0].set_ylabel("Relative Error")
-        plt.show()
 
 class TestFitWorkspaces(unittest.TestCase):
     def setUp(self):
