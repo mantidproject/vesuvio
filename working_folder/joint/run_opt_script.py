@@ -1,24 +1,34 @@
 
 # Set desired initial conditions file
-# from experiments.starch_80_RD.initial_parameters import bckwdIC, fwdIC
-from experiments.D_HMT.initial_parameters import bckwdIC, fwdIC
+from experiments.starch_80_RD.initial_parameters import bckwdIC, fwdIC, yfitIC
+# from experiments.D_HMT.initial_parameters import bckwdIC, fwdIC, yfitIC
 
 from analysis_functions import iterativeFitForDataReduction
-from mantid.api import AnalysisDataService
+from mantid.api import AnalysisDataService, mtd
 from fit_in_yspace import fitInYSpaceProcedure
 import time
 import numpy as np
 
 
-def runOnlyBackScattering(bckwdIC):
+def runIndependentIterativeProcedure(IC):
+    """Runs the iterative fitting of NCP.
+    input: Backward or Forward scattering initial conditions object
+    output: Final workspace that was fitted, object with results arrays"""
+
     AnalysisDataService.clear()
-    wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
+    wsFinal, ncpFitResultsObject = iterativeFitForDataReduction(IC)
+    return wsFinal, ncpFitResultsObject
 
 
-def runOnlyForwardScattering(fwdIC):
-    AnalysisDataService.clear()
-    wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
+# def runOnlyBackScattering(bckwdIC):
+#     AnalysisDataService.clear()
+#     wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
+
+
+# def runOnlyForwardScattering(fwdIC):
+#     AnalysisDataService.clear()
+#     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
+#     fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
  
 
 def runSequenceForKnownRatio(bckwdIC, fwdIC):
@@ -28,7 +38,8 @@ def runSequenceForKnownRatio(bckwdIC, fwdIC):
     wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
     setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
+    return wsFinal, forwardScatteringResults
+    # fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
 
 
 def runSequenceRatioNotKnown(bckwdIC, fwdIC):
@@ -43,7 +54,8 @@ def runSequenceRatioNotKnown(bckwdIC, fwdIC):
         wsFinal, backScatteringResults = iterativeFitForDataReduction(bckwdIC)
         setInitFwdParsFromBackResults(backScatteringResults, bckwdIC.HToMass0Ratio, fwdIC)
         wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
-    fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
+    # fitInYSpaceProcedure(fwdIC, wsFinal, forwardScatteringResults.all_ncp_for_each_mass[-1])
+    return wsFinal, forwardScatteringResults
  
 
 
@@ -74,13 +86,33 @@ def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
     print("\nChanged initial conditions of forward scattering according to mean widhts and intensity ratios from backscattering.\n")
 
 start_time = time.time()
-
 # Interactive section 
 
-# runOnlyForwardScattering(fwdIC)
-# runOnlyBackScattering(bckwdIC)
+wsFinal, fwdResults = runIndependentIterativeProcedure(fwdIC)
+# wsFinal = mtd["starch_80_RD_forward_1"]
 
-runSequenceForKnownRatio(bckwdIC, fwdIC)
+# Choose whether to get ncp from the workspace or from results object
+# Useful when running in Mantid, can select workspace to fit 
+# by assigning it to wsFinal
+ncpFromWs = True
+if ncpFromWs:  
+    allNCP = mtd[wsFinal.name()+"_tof_fitted_profile_1"].extractY()[np.newaxis, :, :]
+    for i in range(2, fwdIC.noOfMasses+1):
+        ncpToAppend = mtd[wsFinal.name()+"_tof_fitted_profile_" + str(i)].extractY()[np.newaxis, :, :]
+        allNCP = np.append(allNCP, ncpToAppend, axis=0)
+else:
+    lastIterationNCP = fwdResults.all_ncp_for_each_mass[-1]
+    allNCP = lastIterationNCP
+
+def switchFirstTwoAxis(A):
+    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
+
+allNCP = switchFirstTwoAxis(allNCP)
+print("\nShape of all NCP: ", allNCP.shape)
+
+print("\nFitting workspace in Y Space: ", wsFinal.name())
+
+fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
 
 # End of iteractive section

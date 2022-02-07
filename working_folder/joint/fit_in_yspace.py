@@ -2,16 +2,12 @@ import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
 from scipy import ndimage
+from pathlib import Path
+repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-# def switchFirstTwoAxis(A):
-#     """Exchanges the first two indices of an array A,
-#     rearranges matrices per spectrum for iteration of main fitting procedure
-#     """
-#     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 class ResultsYFitObject:
-
 
     def __init__(self, ic, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
         self.finalRawDataY = wsFinal.extractY()
@@ -57,7 +53,7 @@ class ResultsYFitObject:
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     # ncpForEachMass = fittingResults.all_ncp_for_each_mass[-1]  # Select last iteration
     wsYSpaceSymSum, wsRes = isolateFirstMassProfileInYSpace(ic, wsFinal, ncpForEachMass)
-    popt, perr = fitTheHProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
+    popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
     wsH = mtd[wsFinal.name()+"_H"]
 
     yfitResults = ResultsYFitObject(ic, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
@@ -209,7 +205,7 @@ def symmetrizeWs(ic, avgYSpace):
     return Sym
 
 
-def fitTheHProfileInYSpace(ic, wsYSpaceSym, wsRes):
+def fitFirstMassProfileInYSpace(ic, wsYSpaceSym, wsRes):
     # if ic.useScipyCurveFitToHProfileFlag:
     poptCurveFit, pcovCurveFit = fitProfileCurveFit(ic, wsYSpaceSym, wsRes)
     perrCurveFit = np.sqrt(np.diag(pcovCurveFit))

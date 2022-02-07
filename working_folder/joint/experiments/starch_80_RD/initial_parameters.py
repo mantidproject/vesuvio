@@ -168,10 +168,10 @@ class ForwardInitialConditions:
     GammaCorrectionFlag = True
 
     # Parameters to control fit in Y-Space
-    symmetrisationFlag = True
-    symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-    singleGaussFitToHProfile = True      # When False, use Hermite expansion
+    # symmetrisationFlag = True
+    # symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
+    # rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    # singleGaussFitToHProfile = True      # When False, use Hermite expansion
     maskedSpecAllNo = np.array([173, 174, 179])
 
     # Parameters below are not to be changed
@@ -190,5 +190,18 @@ class ForwardInitialConditions:
             initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
             scalingFactors = 1 / initPars
 
+
+# Make a child class for the parameters of yspace fitting
+# This class inherits all of the atributes in ForwardInitialConditions
+class YSpaceFitInitialConditions(ForwardInitialConditions):
+    ySpaceFitSavePath = ySpaceFitSavePath
+
+    symmetrisationFlag = True
+    symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    singleGaussFitToHProfile = True      # When False, use Hermite expansion
+    
+
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
+yfitIC = YSpaceFitInitialConditions
