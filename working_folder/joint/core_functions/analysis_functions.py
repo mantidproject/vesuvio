@@ -60,10 +60,11 @@ def iterativeFitForDataReduction(ic):
 
 def printInitialParameters(ic):
     print("\nRUNNING ", ic.modeRunning, " SCATTERING.")
-    print("\n\nH to first mass ratio: ", ic.HToMass0Ratio,
-            "\n\nForward scattering initial fitting parameters:\n", 
+    if ic.modeRunning == "BACKWARD":
+        print("\n\nH to first mass ratio: ", ic.HToMass0Ratio)
+    print("\n\nInitial fitting parameters:\n", 
             ic.initPars.reshape((ic.masses.size, 3)),
-            "\n\nForward scattering initial fitting bounds:\n", 
+            "\n\nInitial fitting bounds:\n", 
             ic.bounds, "\n")
 
 
@@ -682,7 +683,7 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
     masses = ic.masses.flatten()
 
     # If H not present ie backward scattering, add it to sample properties
-    if (ic.modeRunning == "BACKWARD") and ic.hydrogen_peak:   
+    if (ic.modeRunning == "BACKWARD") and ic.addHToMS:   
         masses = np.append(masses, 1.0079)
         meanWidths = np.append(meanWidths, 5.0)
         HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]

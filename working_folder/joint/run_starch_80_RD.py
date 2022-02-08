@@ -1,22 +1,19 @@
-from ...core_functions.analysis_functions import iterativeFitForDataReduction
-from ...core_functions.fit_in_yspace import fitInYSpaceProcedure
+from core_functions.analysis_functions import iterativeFitForDataReduction, switchFirstTwoAxis
+from core_functions.fit_in_yspace import fitInYSpaceProcedure
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
 from pathlib import Path
-experimentPath = Path(__file__).absolute().parent  # Path to the repository
+experimentPath = Path(__file__).absolute().parent / "experiments" / "starch_80_RD"  # Path to the repository
 
-
-
+# Set output path
 testingCleaning = True
 if testingCleaning:     
     cleaningPath = experimentPath / "output" / "testing" / "cleaning"
 
-
     forwardScatteringSavePath = cleaningPath / "current_forward.npz" 
     backScatteringSavePath = cleaningPath / "current_backward.npz" 
     ySpaceFitSavePath = cleaningPath / "current_yspacefit.npz"
-
 else:
     outputPath = experimentPath / "output" / "testing" / "original" / "current_data"
 
@@ -26,7 +23,6 @@ else:
 
 
 ipFilePath =  experimentPath / "ip2018_3.par"  
-
 inputWsPath = experimentPath / "input_ws"
 
 # Default in case of no DoubleDifference
@@ -45,36 +41,30 @@ for wsPath in inputWsPath.iterdir():
         frontWsEmptyPath = wsPath 
 
 
-class BackwardInitialConditions:
-    # Multiscaterring Correction Parameters
-    HToMass0Ratio = 19.0620008206
-
-    resultsSavePath = backScatteringSavePath
-
-    transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5   
-    hydrogen_peak = True                 # Hydrogen multiple scattering
+class GeneralInitialConditions:
+    """Used to define initial conditions shared by both Back and Forward scattering"""
     
+    transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
+    multiple_scattering_order, number_of_events = 2, 1.e5
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
+
+class BackwardInitialConditions(GeneralInitialConditions):
+
     modeRunning = "BACKWARD"
 
-    # Parameters to Load Raw and Empty Workspaces
+    resultsSavePath = backScatteringSavePath
     userWsRawPath = str(backWsRawPath)
     userWsEmptyPath = str(backWsEmptyPath)
-    name = "starch_80_RD_backward_"
-    runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
-    empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
-    spectra='3-134'                            # Spectra to be analysed
-    tof_binning='275.,1.,420'                    # Binning of ToF spectra
-    mode='DoubleDifference'
-    # ipfile='./ip2019.par'
+    InstrParsPath = ipFilePath
+
+    addHToMS = True
+    HToMass0Ratio = 19.0620008206
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
     noOfMasses = len(masses)
-    InstrParsPath = ipFilePath
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers   
@@ -93,18 +83,25 @@ class BackwardInitialConditions:
     firstSpec = 3    #3
     lastSpec = 134    #134
 
+    maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
+
     # Boolean Flags to control script
-    # loadWsFromUserPathFlag = True
     scaleParsFlag = False
     MSCorrectionFlag = True
     GammaCorrectionFlag = False
-    maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
+
+    # Parameters of workspaces in input_ws
+    name = "starch_80_RD_backward_"
+    tof_binning='275.,1.,420'                    # Binning of ToF spectra
+    mode='DoubleDifference'
+    runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
+    empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
+    spectra='3-134'                            # Spectra to be analysed
+    # ipfile='./ip2019.par'
 
     # Parameters below are not to be changed
-    firstSpecIdx = 0
-    lastSpecIdx = lastSpec - firstSpec
 
-    # Consider only the masked spectra between first and last spectrum
+    # Masked spectra between first and last spectrum
     maskedSpecNo = maskedSpecAllNo[
         (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
     ]
@@ -117,36 +114,19 @@ class BackwardInitialConditions:
             scalingFactors = 1 / initPars
 
 
-class ForwardInitialConditions:
-
-    resultsSavePath = forwardScatteringSavePath
-    ySpaceFitSavePath = ySpaceFitSavePath
-
-    HToMass0Ratio = None
-
-    transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5   
-    hydrogen_peak = True                 # Hydrogen multiple scattering
-    
-    # Sample slab parameters
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+class ForwardInitialConditions(GeneralInitialConditions):
 
     modeRunning = "FORWARD"  # Used to control MS correction
 
+    resultsSavePath = forwardScatteringSavePath
     userWsRawPath = str(frontWsRawPath)
     userWsEmptyPath = str(frontWsEmptyPath)
+    InstrParsPath = ipFilePath
 
-    name = "starch_80_RD_forward_"
-    runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-    spectra='144-182'                        # Spectra to be analysed
-    tof_binning="110,1.,430"                 # Binning of ToF spectra
-    mode='SingleDifference'
-    # ipfile='./ip2018_3.par'
+    # HToMass0Ratio = None
 
     masses = np.array([1.0079, 12, 16, 27]) 
     noOfMasses = len(masses)
-    InstrParsPath = ipFilePath
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
@@ -168,21 +148,21 @@ class ForwardInitialConditions:
     lastSpec = 175    #182
 
     # Boolean Flags to control script
-    # loadWsFromUserPathFlag = True
     scaleParsFlag = False
     MSCorrectionFlag = True
     GammaCorrectionFlag = True
 
-    # Parameters to control fit in Y-Space
-    # symmetrisationFlag = True
-    # symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
-    # rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-    # singleGaussFitToHProfile = True      # When False, use Hermite expansion
     maskedSpecAllNo = np.array([173, 174, 179])
 
+    name = "starch_80_RD_forward_"
+    runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
+    empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+    spectra='144-182'                        # Spectra to be analysed
+    tof_binning="110,1.,430"                 # Binning of ToF spectra
+    mode='SingleDifference'
+    # ipfile='./ip2018_3.par'
+
     # Parameters below are not to be changed
-    firstSpecIdx = 0
-    lastSpecIdx = lastSpec - firstSpec
 
     # Consider only the masked spectra between first and last spectrum
     maskedSpecNo = maskedSpecAllNo[
@@ -197,7 +177,6 @@ class ForwardInitialConditions:
             scalingFactors = 1 / initPars
 
 
-# Make a child class for the parameters of yspace fitting
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
@@ -280,32 +259,29 @@ def setInitFwdParsFromBackResults(backScatteringResults, HToMass0Ratio, fwdIC):
 start_time = time.time()
 # Interactive section 
 
-wsFinal, fwdResults = runIndependentIterativeProcedure(fwdIC)
-# wsFinal = mtd["starch_80_RD_forward_1"]
+# wsFinal, fwdResults = runIndependentIterativeProcedure(fwdIC)
+wsFinal = mtd["starch_80_RD_forward_1"]
 
 # Choose whether to get ncp from the workspace or from results object
 # Useful when running in Mantid, can select workspace to fit 
 # by assigning it to wsFinal
+
 ncpFromWs = True
 if ncpFromWs:  
     allNCP = mtd[wsFinal.name()+"_tof_fitted_profile_1"].extractY()[np.newaxis, :, :]
     for i in range(2, fwdIC.noOfMasses+1):
         ncpToAppend = mtd[wsFinal.name()+"_tof_fitted_profile_" + str(i)].extractY()[np.newaxis, :, :]
         allNCP = np.append(allNCP, ncpToAppend, axis=0)
+    allNCP = switchFirstTwoAxis(allNCP)
 else:
     lastIterationNCP = fwdResults.all_ncp_for_each_mass[-1]
     allNCP = lastIterationNCP
 
-def switchFirstTwoAxis(A):
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
-
-allNCP = switchFirstTwoAxis(allNCP)
 print("\nShape of all NCP: ", allNCP.shape)
 
 print("\nFitting workspace in Y Space: ", wsFinal.name())
 
 fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
-
 
 # End of iteractive section
 end_time = time.time()
