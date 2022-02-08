@@ -28,14 +28,15 @@ class ResultsYFitObject:
         if self.singleGaussFitToHProfile:
             for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
                 print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:", "Cost Fun:"], self.popt[i], self.perr[i]):
+                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:"], self.popt[i], self.perr[i]):
                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
+                print(f"Cost function: {self.popt[i, -1]:5.3}")
         else:
             for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
                 print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
+                for par, popt, perr in zip(["A", "x0", "sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-
+                print(f"Cost function: {self.popt[i, -1]:5.3}")
 
     def save(self):
         np.savez(self.savePath,
@@ -261,24 +262,24 @@ def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
         #     return convGauss
         # p0 = [0, 0, 0.7143, 5]
 
-        def HermitePolynomial(x, sigma1, c4, c6):
-            return np.exp(-x**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
-                    *(1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
-                    -48*(x/np.sqrt(2)/sigma1)**2+12) \
-                    +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
-                    -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+        def HermitePolynomial(x, A, x0, sigma1, c4, c6):
+            return A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+                    *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
+                    -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
+                    +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
+                    -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
         
-        def convolvedFunction(x, sigma1, c4, c6):
+        def convolvedFunction(x, A, x0, sigma1, c4, c6):
             histWidths = x[1:] - x[:-1]
             if ~ (np.max(histWidths)==np.min(histWidths)):
                 raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
-            hermiteFunc = HermitePolynomial(x, sigma1, c4, c6)
+            hermiteFunc = HermitePolynomial(x, A, x0, sigma1, c4, c6)
             convFunc = ndimage.convolve1d(hermiteFunc, res, mode="constant") * histWidths[0]
             return convFunc
-        p0 = [4, 0, 0]     
+        p0 = [1, 0, 4, 0, 0]     
         # The bounds on curve_fit() are set up diferently than on minimize()
-        bounds = [[-np.inf, 0, 0], [np.inf, np.inf, np.inf]] 
+        bounds = [[0, -np.inf, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf, np.inf]] 
 
 
     popt, pcov = optimize.curve_fit(
@@ -312,7 +313,7 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
         popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
     else:
         # popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
-        popt, perr = np.zeros((2, 4)), np.zeros((2, 4))
+        popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
 
 
     print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
@@ -337,9 +338,9 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
             function = """
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace=resolution,WorkspaceIndex=0,X=(),Y=();
-            name=UserFunction,Formula=exp( -x^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
-            *(1.+c4/32.*(16.*(x/sqrt(2)/sigma1)^4-48.*(x/sqrt(2)/sigma1)^2+12)+c6/384*(64*(x/sqrt(2)/sigma1)^6 - 480*(x/sqrt(2)/sigma1)^4 + 720*(x/sqrt(2)/sigma1)^2 - 120)),
-            sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
+            name=UserFunction,Formula=A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
+            *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
+            A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
             """
 
         Fit(

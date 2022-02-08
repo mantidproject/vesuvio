@@ -7,7 +7,7 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 pathToStarter = currentPath / "current_yspacefit.npz"
-pathToOriginal = currentPath / "starter_forward.npz" 
+pathToOriginal = currentPath / "starter_yspacefit.npz" 
 
 
 class TestSymSumYSpace(unittest.TestCase):
