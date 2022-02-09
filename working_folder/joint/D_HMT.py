@@ -85,8 +85,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
     noOfMSIterations = 2     #4
-    firstSpec = 80    #3
-    lastSpec = 130    #134
+    firstSpec = 3    #3
+    lastSpec = 134    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -186,7 +186,7 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
 
     symmetrisationFlag = True
     symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     
 
@@ -200,7 +200,7 @@ start_time = time.time()
 
 runOnlyYSpaceFit = True
 if runOnlyYSpaceFit:
-    wsFinal = mtd["DHMT_300K_RD_forward_1"]
+    wsFinal = mtd["DHMT_300K_backward_1"]
     allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
     wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)

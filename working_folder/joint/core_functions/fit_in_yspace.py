@@ -52,23 +52,17 @@ class ResultsYFitObject:
 
 
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
-    # ncpForEachMass = fittingResults.all_ncp_for_each_mass[-1]  # Select last iteration
-    wsYSpaceSymSum, wsRes = isolateFirstMassProfileInYSpace(ic, wsFinal, ncpForEachMass)
+    firstMass = ic.masses[0]
+    wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
+    wsYSpaceSymSum = averageJOfYOverAllSpectra(ic, wsSubMass, firstMass) 
+    wsRes = calculateMantidResolution(ic, wsFinal, firstMass)
     popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
+    
     wsH = mtd[wsFinal.name()+"_H"]
-
     yfitResults = ResultsYFitObject(ic, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
     yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
-def isolateFirstMassProfileInYSpace(ic, wsFinal, ncpForEachMass):
-
-    firstMass = ic.masses[0]
-    wsRes = calculateMantidResolution(ic, wsFinal, firstMass)  
-
-    wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
-    averagedSpectraYSpace = averageJOfYOverAllSpectra(ic, wsSubMass, firstMass) 
-    return averagedSpectraYSpace, wsRes
 
 
 def calculateMantidResolution(ic, ws, mass):
@@ -158,7 +152,12 @@ def convertToYSpace(ic, ws0, mass):
         InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
+    Rebin(
+        InputWorkspace=ws0.name()+"_Q", Params=rebinPars, 
+        FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
+        )
     normalise_workspace(ws0.name()+"_JoY")
+    normalise_workspace(ws0.name()+"_Q")
     return mtd[ws0.name()+"_JoY"]
 
 
