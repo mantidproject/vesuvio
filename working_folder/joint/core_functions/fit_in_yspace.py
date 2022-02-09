@@ -249,6 +249,7 @@ def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
             return convGauss
         p0 = [0, 1, 0, 5]
         bounds = [-np.inf, np.inf]  # Applied to all parameters
+        constraints=()
 
     else:
         # # Double Gaussian
@@ -280,8 +281,16 @@ def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
         p0 = [1, 0, 4, 0, 0]     
         # The bounds on curve_fit() are set up diferently than on minimize()
         bounds = [[0, -np.inf, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf, np.inf]] 
+        constraints=()
 
+    # def residuals(p0, dataX, dataY, dataE):
+    #     fun = convolvedFunction(dataX, *p0)
+    #     return np.sum((dataY-dataX)**2/dataE**2)
 
+    # result = optimize.minimize(residuals, p0, args=(dataX, dataY, dataE),
+    #                             bounds=bounds, constraints=constraints)
+    # popt = result["x"]
+    
     popt, pcov = optimize.curve_fit(
         convolvedFunction, 
         dataX, 
@@ -290,6 +299,7 @@ def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
         sigma=dataE,
         bounds=bounds
     )
+
     yfit = convolvedFunction(dataX, *popt)
     Residuals = dataY - yfit
     
