@@ -282,12 +282,6 @@ class resultsObject:
             print(f"Width:     {self.all_mean_widths[-1, i]:.3f} \u00B1 {self.all_std_widths[-1, i]:.3f} ")
             print(f"Intensity: {self.all_mean_intensities[-1, i]:.3f} \u00B1 {self.all_std_intensities[-1, i]:.3f} ")
 
-        # print("\nCheck masses are correct:\n")
-        # print(self.all_mean_widths[-1])
-        # print(self.all_std_widths[-1])
-        # print(self.all_mean_intensities[-1])
-        # print(self.all_std_intensities[-1])
-
 
     def save(self):
         """Saves all of the arrays stored in this object"""
@@ -592,7 +586,8 @@ def pseudoVoigt(x, sigma, gamma):
     sigma_v, gamma_v = f/(2.*np.sqrt(2.*np.log(2.))), f / 2.
     pseudo_voigt = eta * \
         lorentizian(x, gamma_v) + (1.-eta) * gaussian(x, sigma_v)
-    norm = np.sum(pseudo_voigt)*(x[1]-x[0])
+    # TODO: Ask about this comment
+    # norm = np.sum(pseudo_voigt)*(x[1]-x[0])
     return pseudo_voigt  # /np.abs(norm)
 
 

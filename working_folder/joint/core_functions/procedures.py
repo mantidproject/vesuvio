@@ -13,7 +13,7 @@ def runIndependentIterativeProcedure(IC):
 
 
 def runJointBackAndForward(bckwdIC, fwdIC):
-    """Used when H is not present.
+    """Used when H is not present, assumes more than one mass.
     Runs backward scattering and uses the resulting widhts and intensity ratios
     to set initial forward scattering parameters."""
     # Clear all workspaces
@@ -38,7 +38,7 @@ def runJointBackAndForward(bckwdIC, fwdIC):
 
 
 def runSequenceForKnownHRatio(bckwdIC, fwdIC):
-    """When H is present and H to first mass ratio is known.
+    """When H is present and H to first mass ratio is known, assumes more than one mass.
     Runs backscattering and uses results + H to mass ratio to set up initial forward parameters."""
     AnalysisDataService.clear()
     # If H to first mass ratio is known, can run MS correction for backscattering
@@ -50,6 +50,7 @@ def runSequenceForKnownHRatio(bckwdIC, fwdIC):
 
 
 def runSequenceHRatioNotKnown(bckwdIC, fwdIC):
+    """When H is present and ratio is not known, assumes more than one mass."""
     # Run preliminary forward with a good guess for the widths of non-H masses
     wsFinal, forwardScatteringResults = iterativeFitForDataReduction(fwdIC)
     for i in range(2):    # Loop until convergence is achieved

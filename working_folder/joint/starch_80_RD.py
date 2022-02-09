@@ -193,7 +193,7 @@ bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
 
-if __name__ == "main":
+if True: #__name__ == "main":
     start_time = time.time()
     # Interactive section 
 
