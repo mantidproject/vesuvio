@@ -77,6 +77,9 @@ print(popt1)
 print(popt2)
 print(popt3)
 
+# Hessian = result["hess"]
+# invHessian = result["hess_inv"]
+# print(invHessian)
 
 # Main issue is how to compute covariance matrix from minimize()
 # pcov3 = result["hess_inv"]
