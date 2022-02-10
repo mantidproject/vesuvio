@@ -180,15 +180,15 @@ def weightedAvg(wsYSpace):
 
 
 def symmetrizeWs(ic, avgYSpace):
-    """Symmetrizes workspace with only one spectrum,
+    """Symmetrizes workspace,
        Needs to have symmetric binning"""
 
     dataX = avgYSpace.extractX()
     dataY = avgYSpace.extractY()
     dataE = avgYSpace.extractE()
 
-    yFlip = np.flip(dataY)
-    eFlip = np.flip(dataE)
+    yFlip = np.flip(dataY, axis=1)
+    eFlip = np.flip(dataE, axis=1)
 
     if ic.symmetriseHProfileUsingAveragesFlag:
         # Inverse variance weighting
@@ -200,8 +200,9 @@ def symmetrizeWs(ic, avgYSpace):
         dataESym = np.where(dataX>0, eFlip, dataE)
 
     Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_symmetrised")
-    Sym.dataY(0)[:] = dataYSym
-    Sym.dataE(0)[:] = dataESym
+    for i in range(Sym.getNumberHistograms()):
+        Sym.dataY(i)[:] = dataYSym[i]
+        Sym.dataE(i)[:] = dataESym[i]
     return Sym
 
 
