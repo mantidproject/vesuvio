@@ -52,9 +52,9 @@ Rebin(InputWorkspace=name+'q',Params=rebin_params,OutputWorkspace=name+'q')
 # RenameWorkspace(InputWorkspace="tmp",OutputWorkspace=name+"joy_symmetrised")
 
 # Normalisation 
-tmp=Integration(InputWorkspace=name+"joy_symmetrised",RangeLower='-30',RangeUpper='30')
-Divide(LHSWorkspace=name+"joy_symmetrised",RHSWorkspace='tmp',OutputWorkspace=name+"joy_symmetrised")
- 
+# tmp=Integration(InputWorkspace=name+"joy_symmetrised",RangeLower='-30',RangeUpper='30')
+# Divide(LHSWorkspace=name+"joy_symmetrised",RHSWorkspace='tmp',OutputWorkspace=name+"joy_symmetrised")
+#  
 tmp=Integration(InputWorkspace=name+"joy",RangeLower='-30',RangeUpper='30')
 Divide(LHSWorkspace=name+"joy",RHSWorkspace='tmp',OutputWorkspace=name+"joy")
     
@@ -89,18 +89,18 @@ RenameWorkspace('ws',name+'joy')
 # 
 
 # Definition of the resolution functions
-# resolution=CloneWorkspace(InputWorkspace=name+'joy')
-# resolution=Rebin(InputWorkspace='resolution',Params='-30,0.125,30')
-# for i in range(resolution.getNumberHistograms()):
-#     VesuvioResolution(Workspace=name,WorkspaceIndex=str(i), Mass=2.015, OutputWorkspaceYSpace='tmp')
-#     tmp=Rebin(InputWorkspace='tmp',Params='-30,0.125,30')
-#     for p in range (tmp.blocksize()):
-#         resolution.dataY(i)[p]=tmp.dataY(0)[p]
-# # Definition of the sum of resolution functions
-# resolution_sum=SumSpectra('resolution')
-# tmp=Integration('resolution_sum')
-# resolution_sum=Divide('resolution_sum','tmp')
-# DeleteWorkspace('tmp')        
+resolution=CloneWorkspace(InputWorkspace=name+'joy')
+resolution=Rebin(InputWorkspace='resolution',Params='-30,0.125,30')
+for i in range(resolution.getNumberHistograms()):
+    VesuvioResolution(Workspace=name,WorkspaceIndex=str(i), Mass=2.015, OutputWorkspaceYSpace='tmp')
+    tmp=Rebin(InputWorkspace='tmp',Params='-30,0.125,30')
+    for p in range (tmp.blocksize()):
+        resolution.dataY(i)[p]=tmp.dataY(0)[p]
+# Definition of the sum of resolution functions
+resolution_sum=SumSpectra('resolution')
+tmp=Integration('resolution_sum')
+resolution_sum=Divide('resolution_sum','tmp')
+DeleteWorkspace('tmp')        
 
 
 ############################################################################
@@ -161,90 +161,90 @@ for j in range(ws.getNumberHistograms()):
                 flag=False
 
 
-if __name__ == "__main__":
-    # Global fit of the H J(y) with global values of Sigma, and  FSE in the harmonic approximation
-    sample_ws = mtd[name+'joy_global']
-    resolution_ws = mtd['resolution']
 
-    #####   ----edits------
-    simple_gaussian_fit = True
-    ##### ----------
+# Global fit of the H J(y) with global values of Sigma, and  FSE in the harmonic approximation
+sample_ws = mtd[name+'joy_global']
+resolution_ws = mtd['resolution']
 
-    if (simple_gaussian_fit):
-        convolution_template = """
-        (composite=Convolution,$domains=({0});
-        name=Resolution,Workspace={1},WorkspaceIndex={0};
-        (
-        name=UserFunction,Formula=
-        A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5,
-        A=1.,x0=0.,Sigma=6.0,  ties=();
-        (
-                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace=one_over_q,WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
-                name=UserFunction,Formula=
-                Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
-                *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
-                Sigma=6.0);ties=()
-        ))"""
-    else:
-        convolution_template = """
-        (composite=Convolution,$domains=({0});
-        name=Resolution,Workspace={1},WorkspaceIndex={0};
-        (
-        name=UserFunction,Formula=
-        A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
-        *(1+c4/32*(16*((x-x0)/sqrt(2.)/Sigma)^4-48*((x-x0)/sqrt(2.)/Sigma)^2+12)),
-        A=1.,x0=0.,Sigma=6.0, c4=0, ties=();
-        (
-                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace=one_over_q,WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
-                name=UserFunction,Formula=
-                Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
-                *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
-                Sigma=6.0);ties=()
-        ))"""    
+#####   ----edits------
+simple_gaussian_fit = True
+##### ----------
 
-    print('\n','Global fit in the West domain over 8 mixed banks','\n')
-    ######################prova
-    #   GLOBAL FIT - MIXED BANKS
-    minimizer = "Simplex"
-    w=[]
-    for bank in range(8):
-        dets=[ bank, bank+8, bank+16, bank+24]
-        print(dets)
-        convolved_funcs = []
-        ties = []
-        datasets = {}
-        counter = 0
-        for i in dets:
-            spec_i = sample_ws.getSpectrum(i)
-            det_i = sample_ws.getDetector(i)
-            #print "Considering spectrum {0}".format(spec_i.getSpectrumNo())
-            if (verbose):
-                if det_i.isMasked():
-                    #print "Skipping masked spectrum {0}".format(spec_i.getSpectrumNo())
-                    continue
-            f1 = convolution_template.format(counter, resolution_ws.getName())
-            convolved_funcs.append(f1)
-            # Tie widths together for spectra together
-            if counter > 0:
-                ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
-                #ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
-                #ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
-            # Attach datasets
-            attr = 'InputWorkspace_{0}'.format(counter) if counter > 0 else 'InputWorkspace'
-            datasets[attr] = sample_ws.getName()
-            attr = 'WorkspaceIndex_{0}'.format(counter) if counter > 0 else 'WorkspaceIndex'
-            datasets[attr] = i
-            counter += 1
-    # end
-        multifit_func = 'composite=MultiDomainFunction;' + ';'.join(convolved_funcs)  + ';ties=({0},f0.f1.f1.f1.Sigma=f0.f1.f0.Sigma)'.format(','.join(ties))
-        minimizer_string=minimizer+',AbsError=0.00001,RealError=0.00001,MaxIterations=2000'
-        Fit(multifit_func,Minimizer=minimizer_string, Output=name+'joy_mixed_banks_bank_'+str(bank)+'_fit', **datasets)
-        ws=mtd[name+'joy_mixed_banks_bank_'+str(bank)+'_fit_Parameters']
+if (simple_gaussian_fit):
+    convolution_template = """
+    (composite=Convolution,$domains=({0});
+    name=Resolution,Workspace={1},WorkspaceIndex={0};
+    (
+    name=UserFunction,Formula=
+    A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5,
+    A=1.,x0=0.,Sigma=6.0,  ties=();
+    (
+            composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace=one_over_q,WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
+            name=UserFunction,Formula=
+            Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
+            *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
+            Sigma=6.0);ties=()
+    ))"""
+else:
+    convolution_template = """
+    (composite=Convolution,$domains=({0});
+    name=Resolution,Workspace={1},WorkspaceIndex={0};
+    (
+    name=UserFunction,Formula=
+    A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
+    *(1+c4/32*(16*((x-x0)/sqrt(2.)/Sigma)^4-48*((x-x0)/sqrt(2.)/Sigma)^2+12)),
+    A=1.,x0=0.,Sigma=6.0, c4=0, ties=();
+    (
+            composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace=one_over_q,WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
+            name=UserFunction,Formula=
+            Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
+            *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
+            Sigma=6.0);ties=()
+    ))"""    
+
+print('\n','Global fit in the West domain over 8 mixed banks','\n')
+######################prova
+#   GLOBAL FIT - MIXED BANKS
+minimizer = "Simplex"
+w=[]
+for bank in range(8):
+    dets=[ bank, bank+8, bank+16, bank+24]
+    print(dets)
+    convolved_funcs = []
+    ties = []
+    datasets = {}
+    counter = 0
+    for i in dets:
+        spec_i = sample_ws.getSpectrum(i)
+        det_i = sample_ws.getDetector(i)
+        #print "Considering spectrum {0}".format(spec_i.getSpectrumNo())
         if (verbose):
-            print('bank: ', str(bank), ' -- sigma= ', ws.cell(2,1), ' +/- ', ws.cell(2,2))
-        w.append(ws.cell(2,1))
-        if (not verbose):
-            DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
-            DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_Workspaces') 
-    print('Average hydrogen standard deviation: ',np.mean(w),' +/- ', np.std(w))
+            if det_i.isMasked():
+                #print "Skipping masked spectrum {0}".format(spec_i.getSpectrumNo())
+                continue
+        f1 = convolution_template.format(counter, resolution_ws.getName())
+        convolved_funcs.append(f1)
+        # Tie widths together for spectra together
+        if counter > 0:
+            ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
+            #ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
+            #ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
+        # Attach datasets
+        attr = 'InputWorkspace_{0}'.format(counter) if counter > 0 else 'InputWorkspace'
+        datasets[attr] = sample_ws.getName()
+        attr = 'WorkspaceIndex_{0}'.format(counter) if counter > 0 else 'WorkspaceIndex'
+        datasets[attr] = i
+        counter += 1
+# end
+    multifit_func = 'composite=MultiDomainFunction;' + ';'.join(convolved_funcs)  + ';ties=({0},f0.f1.f1.f1.Sigma=f0.f1.f0.Sigma)'.format(','.join(ties))
+    minimizer_string=minimizer+',AbsError=0.00001,RealError=0.00001,MaxIterations=2000'
+    Fit(multifit_func,Minimizer=minimizer_string, Output=name+'joy_mixed_banks_bank_'+str(bank)+'_fit', **datasets)
+    ws=mtd[name+'joy_mixed_banks_bank_'+str(bank)+'_fit_Parameters']
+    if (verbose):
+        print('bank: ', str(bank), ' -- sigma= ', ws.cell(2,1), ' +/- ', ws.cell(2,2))
+    w.append(ws.cell(2,1))
+    if (not verbose):
+        DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
+        DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_Workspaces') 
+print('Average hydrogen standard deviation: ',np.mean(w),' +/- ', np.std(w))
 

@@ -187,6 +187,7 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     symmetrisationFlag = True
     symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
+    resolutionRebinPars = "-30, 0.125, 30" 
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     
 

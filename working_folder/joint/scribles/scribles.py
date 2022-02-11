@@ -1,8 +1,15 @@
+
+from mantid.simpleapi import *
+from pathlib import Path
 import numpy as np
+currentPath = Path(__file__).absolute().parent 
 
-A = np.array([1])
+# Create a workspace to use
+ws = CreateSampleWorkspace()
 
-print(A.reshape((A.size, 1, 1)))
+# Get the DetectorInfo object
+info = ws.detectorInfo()
 
-B = np.arange(10)[np.newaxis, :]
-print(np.sum(B, axis=0))
+# Call setMasked
+info.setMasked(3, True)
+print(info.isMasked(0))

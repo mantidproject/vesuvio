@@ -53,26 +53,44 @@ class ResultsYFitObject:
 
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     firstMass = ic.masses[0]
+    wsRes = calculateMantidResolution(ic.resolutionRebinPars, wsFinal, firstMass)
+
     wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
-    wsYSpaceSymSum = averageJOfYOverAllSpectra(ic, wsSubMass, firstMass) 
-    wsRes = calculateMantidResolution(ic, wsFinal, firstMass)
-    popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceSymSum, wsRes)
+
+    # wsYSpaceSymSum = averageJOfYOverAllSpectra(ic, wsSubMass, firstMass) 
     
-    wsH = mtd[wsFinal.name()+"_H"]
-    yfitResults = ResultsYFitObject(ic, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr)
+    wsYSpace, wsQ = convertToYSpace(ic.rebinParametersForYSpaceFit, wsSubMass, firstMass)
+    
+    popt, perr, wsYSpaceAvg = fitAvgSpectraInYSpace(ic, wsYSpace, wsRes)
+    
+    if False:
+        fitGlobalFit(wsJoY, wsQ)
+
+
+    yfitResults = ResultsYFitObject(ic, wsFinal, wsSubMass, wsYSpaceAvg, wsRes, popt, perr)
     yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
 
 
-def calculateMantidResolution(ic, ws, mass):
-    rebinPars=ic.rebinParametersForYSpaceFit
+def fitAvgSpectraInYSpace(ic, wsYSpace, wsRes):
+    wsYSpaceAvg = weightedAvg(wsYSpace)
+    
+    if ic.symmetrisationFlag == True:
+        wsYSpaceAvg = symmetrizeWs(ic.symmetriseHProfileUsingAveragesFlag, wsYSpaceAvg)
+
+    popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceAvg, wsRes)
+    return popt, perr, wsYSpaceAvg
+
+
+
+def calculateMantidResolution(resPars, ws, mass):
     for index in range(ws.getNumberHistograms()):
         if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
             pass
         else:
             VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-            Rebin(InputWorkspace="tmp", Params=rebinPars, OutputWorkspace="tmp")
+            Rebin(InputWorkspace="tmp", Params=resPars, OutputWorkspace="tmp")
 
             if index == 0:   # Ensures that workspace has desired units
                 RenameWorkspace("tmp","resolution")
@@ -101,24 +119,31 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
 
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     # Select all masses other than the first one
-    ncpForEachMass = ncpForEachMass[1:, :, :]
+    ncpForEachMassExceptFirst = ncpForEachMass[1:, :, :]
     # Sum the ncpTotal for remaining masses
-    ncpTotal = np.sum(ncpForEachMass, axis=0)
+    ncpTotalExceptFirst = np.sum(ncpForEachMassExceptFirst, axis=0)
+
+    # TODO: Finish this or delete
+    # wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
+    # for j in range(wsSubMass.getNumberHistograms()):
+    #     binWidths = wsSubMass.dataX(j)[1:] - wsSubMass.dataX(j)[:-1]
+    #     wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst * (ws)
+    
 
     dataY, dataX = ws.extractY(), ws.extractX() 
     
     # Subtract the ncp of all masses exept first to dataY
-    dataY[:, :-1] -= ncpTotal * (dataX[:, 1:] - dataX[:, :-1])
+    dataY[:, :-1] -= ncpTotalExceptFirst * (dataX[:, 1:] - dataX[:, :-1])
 
     # Pass the data onto a Workspace, clone to preserve properties
-    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
+    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Mass0")
     for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
         wsSubMass.dataY(i)[:] = dataY[i, :]
 
      # Mask spectra again, to be seen as masked from Mantid's perspective
     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
 
-    if np.any(np.isnan(mtd[ws.name()+"_H"].extractY())):
+    if np.any(np.isnan(wsSubMass.extractY())):
         raise ValueError("The workspace for the isolated H data countains NaNs, \
                             might cause problems!")
     return wsSubMass
@@ -131,34 +156,55 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def averageJOfYOverAllSpectra(ic, ws0, mass):
-    wsYSpace = convertToYSpace(ic, ws0, mass)
-    averagedSpectraYSpace = weightedAvg(wsYSpace)
+# def averageJOfYOverAllSpectra(ic, ws0, mass):
+#     wsYSpace = convertToYSpace(ic, ws0, mass)
+#     averagedSpectraYSpace = weightedAvg(wsYSpace)
     
-    if ic.symmetrisationFlag == True:
-        symAvgdSpecYSpace = symmetrizeWs(ic, averagedSpectraYSpace)
-        return symAvgdSpecYSpace
+#     if ic.symmetrisationFlag == True:
+#         symAvgdSpecYSpace = symmetrizeWs(ic, averagedSpectraYSpace)
+#         return symAvgdSpecYSpace
 
-    return averagedSpectraYSpace
+#     return averagedSpectraYSpace
 
 
-def convertToYSpace(ic, ws0, mass):
-    ConvertToYSpace(
+# def convertToYSpace(ic, ws0, mass):
+#     ConvertToYSpace(
+#         InputWorkspace=ws0, Mass=mass, 
+#         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
+#         )
+#     rebinPars=ic.rebinParametersForYSpaceFit
+#     Rebin(
+#         InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
+#         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
+#         )
+#     Rebin(
+#         InputWorkspace=ws0.name()+"_Q", Params=rebinPars, 
+#         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
+#         )
+#     normalise_workspace(ws0.name()+"_JoY")
+#     normalise_workspace(ws0.name()+"_Q")
+#     return mtd[ws0.name()+"_JoY"]
+
+
+def convertToYSpace(rebinPars, ws0, mass):
+    wsJoY, wsQ = ConvertToYSpace(
         InputWorkspace=ws0, Mass=mass, 
         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    rebinPars=ic.rebinParametersForYSpaceFit
-    Rebin(
-        InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
+    wsJoY = Rebin(
+        InputWorkspace=wsJoY, Params=rebinPars, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
         )
-    Rebin(
-        InputWorkspace=ws0.name()+"_Q", Params=rebinPars, 
+    wsQ = Rebin(
+        InputWorkspace=wsQ, Params=rebinPars, 
         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
         )
-    normalise_workspace(ws0.name()+"_JoY")
-    normalise_workspace(ws0.name()+"_Q")
-    return mtd[ws0.name()+"_JoY"]
+    
+    # If workspace has nans present, normalization will put zeros on the full spectrum
+    assert np.any(np.isnan(wsJoY.extractY()))==False, "Nans present before normalization."
+    
+    normalise_workspace(wsJoY)
+    return wsJoY, wsQ
 
 
 def weightedAvg(wsYSpace):
@@ -179,7 +225,7 @@ def weightedAvg(wsYSpace):
     return newWs
 
 
-def symmetrizeWs(ic, avgYSpace):
+def symmetrizeWs(avgSymFlag, avgYSpace):
     """Symmetrizes workspace,
        Needs to have symmetric binning"""
 
@@ -190,7 +236,7 @@ def symmetrizeWs(ic, avgYSpace):
     yFlip = np.flip(dataY, axis=1)
     eFlip = np.flip(dataE, axis=1)
 
-    if ic.symmetriseHProfileUsingAveragesFlag:
+    if avgSymFlag:
         # Inverse variance weighting
         dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
         dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
@@ -364,3 +410,39 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
         popt[i] = ws.column("Value")
         perr[i] = ws.column("Error")
     return popt, perr
+
+
+def fitGlobalFit(wsJoY, wsQ, wsRes):
+    replaceNansWithZeros(wsJoY)
+    wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
+    wsQInv = createOneOverQWs(wsQ)
+
+
+
+def replaceNansWithZeros(ws):
+    for j in range(ws.getNumberHistograms()):
+        ws.dataY(j)[np.isnan(ws.dataY(j)[:])] = 0
+        ws.dataE(j)[np.isnan(ws.dataE(j)[:])] = 0
+
+
+def artificialErrorsInUnphysicalBins(wsJoY):
+    wsGlobal = CloneWorkspace(InputWorkspace=wsJoY, OutputWorkspace=wsJoY.name()+'_Global')
+    for j in range(wsGlobal.getNumberHistograms()):
+        wsGlobal.dataE(j)[wsGlobal.dataE(j)[:]==0] = 0.1
+    
+    assert np.any(np.isnan(wsGlobal.extractE())) == False, "Nan present in input workspace need to be replaced by zeros."
+    return wsGlobal
+
+
+def createOneOverQWs(wsQ):
+    wsInvQ = CloneWorkspace(InputWorkspace=wsQ, OutputWorkspace=wsQ.name()+"_Inverse")
+    for j in range(wsInvQ.getNumberHistograms()):
+        nonZeroFlag = wsInvQ.dataY(j)[:] != 0
+        wsInvQ.dataY(j)[nonZeroFlag] = 1 / wsInvQ.dataY(j)[nonZeroFlag]
+
+        ZeroIdxs = np.argwhere(wsInvQ.dataY(j)[:]==0)   # Indxs of zero elements
+        if ZeroIdxs.size != 0:     # When zeros are present
+            wsInvQ.dataY(j)[ZeroIdxs[0] - 1] = 0       # Put a zero before the first zero 
+    return wsInvQ
+
+
