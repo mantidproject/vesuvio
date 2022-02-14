@@ -185,12 +185,12 @@ class ForwardInitialConditions(GeneralInitialConditions):
 class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
 
-    symmetrisationFlag = True
+    symmetrisationFlag = False
     symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     resolutionRebinPars = "-30, 0.125, 30" 
-    singleGaussFitToHProfile = True      # When False, use Hermite expansion
-    globalFitFlag = True
+    singleGaussFitToHProfile = False     # When False, use Hermite expansion
+    globalFitFlag = False
     
 
 bckwdIC = BackwardInitialConditions
@@ -201,9 +201,9 @@ yfitIC = YSpaceFitInitialConditions
 start_time = time.time()
 # Start of interactive section 
 
-runOnlyYSpaceFit = False
+runOnlyYSpaceFit = True
 if runOnlyYSpaceFit:
-    wsFinal = mtd["DHMT_300K_backward_0"]
+    wsFinal = mtd["DHMT_300K_RD_forward_0"]
     allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
     # wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
