@@ -1,10 +1,11 @@
 # from core_functions.analysis_functions import iterativeFitForDataReduction, switchFirstTwoAxis
 from core_functions.fit_in_yspace import fitInYSpaceProcedure
-from core_functions.procedures import runJointBackAndForward, extractNCPFromWorkspaces
+from core_functions.procedures import runJointBackAndForward, extractNCPFromWorkspaces, runIndependentIterativeProcedure
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
 from pathlib import Path
+
 
 scriptName =  Path(__file__).name.split(".")[0]
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
@@ -84,7 +85,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -147,7 +148,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -189,6 +190,7 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     resolutionRebinPars = "-30, 0.125, 30" 
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
+    globalFitFlag = True
     
 
 bckwdIC = BackwardInitialConditions
@@ -199,12 +201,13 @@ yfitIC = YSpaceFitInitialConditions
 start_time = time.time()
 # Start of interactive section 
 
-runOnlyYSpaceFit = True
+runOnlyYSpaceFit = False
 if runOnlyYSpaceFit:
-    wsFinal = mtd["DHMT_300K_backward_1"]
+    wsFinal = mtd["DHMT_300K_backward_0"]
     allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
-    wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
+    # wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
+    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
     allNCP = lastIterationNCP
 

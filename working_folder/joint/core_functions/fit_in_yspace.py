@@ -69,7 +69,7 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     yfitResults.save()
 
     if ic.globalFitFlag:
-        fitGlobalFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile)
+        fitGlobalFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
 
 
 def calculateMantidResolution(rebinResPars, ws, mass):
@@ -113,29 +113,19 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
     # Sum the ncpTotal for remaining masses
     ncpTotalExceptFirst = np.sum(ncpForEachMassExceptFirst, axis=0)
 
-    # TODO: Finish this or delete
-    # wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_H")
-    # for j in range(wsSubMass.getNumberHistograms()):
-    #     binWidths = wsSubMass.dataX(j)[1:] - wsSubMass.dataX(j)[:-1]
-    #     wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst * (ws)
-    
-
-    dataY, dataX = ws.extractY(), ws.extractX() 
-    
-    # Subtract the ncp of all masses exept first to dataY
-    dataY[:, :-1] -= ncpTotalExceptFirst * (dataX[:, 1:] - dataX[:, :-1])
-
-    # Pass the data onto a Workspace, clone to preserve properties
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Mass0")
-    for i in range(wsSubMass.getNumberHistograms()):  # Keeps the faulty last column
-        wsSubMass.dataY(i)[:] = dataY[i, :]
+    for j in range(wsSubMass.getNumberHistograms()):
+        if wsSubMass.spectrumInfo().isMasked(j):
+            continue
+
+        binWidths = wsSubMass.dataX(j)[1:] - wsSubMass.dataX(j)[:-1]
+        wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] * binWidths
 
      # Mask spectra again, to be seen as masked from Mantid's perspective
     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
 
     if np.any(np.isnan(wsSubMass.extractY())):
-        raise ValueError("The workspace for the isolated H data countains NaNs, \
-                            might cause problems!")
+        raise ValueError("The workspace for the isolated first mass countains NaNs in non-masked spectra, might cause problems!")
     return wsSubMass
 
 
@@ -213,10 +203,9 @@ def symmetrizeWs(avgSymFlag, avgYSpace):
 
 
 def fitFirstMassProfileInYSpace(ic, wsYSpaceSym, wsRes):
-    # if ic.useScipyCurveFitToHProfileFlag:
     poptCurveFit, pcovCurveFit = fitProfileCurveFit(ic, wsYSpaceSym, wsRes)
     perrCurveFit = np.sqrt(np.diag(pcovCurveFit))
-    # else:
+    
     poptMantidFit, perrMantidFit = fitProfileMantidFit(ic, wsYSpaceSym, wsRes)
     
     #TODO: Add the Cost function as the last parameter
@@ -374,12 +363,12 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
 
 # Functions for Global Fit
 
-def fitGlobalFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag):
+def fitGlobalFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
     replaceNansWithZeros(wsJoY)
     wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
     wsQInv = createOneOverQWs(wsQ)
 
-    avgWidths = globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag)
+    avgWidths = globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
 
 
 def replaceNansWithZeros(ws):
@@ -411,7 +400,7 @@ def createOneOverQWs(wsQ):
     return wsInvQ
 
 
-def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag):
+def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
     if gaussFitFlag:
         convolution_template = """
         (composite=Convolution,$domains=({0});
@@ -447,8 +436,6 @@ def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag):
             )"""    
 
     print('\nGlobal fit in the West domain over 8 mixed banks\n')
-
-    #   GLOBAL FIT - MIXED BANKS
     widths = []  
     for bank in range(8):
         dets=[bank, bank+8, bank+16, bank+24]
@@ -486,10 +473,10 @@ def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag):
         minimizer_string = f"{minimizer}, AbsError=0.00001, RealError=0.00001, MaxIterations=2000"
 
         # Unpack dictionary as arguments
-        Fit(multifit_func, Minimizer=minimizer_string, Output=name+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
+        Fit(multifit_func, Minimizer=minimizer_string, Output=wsFirstMassName+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
         
         # Select ws with fit results
-        ws=mtd[name+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
+        ws=mtd[wsFirstMassName+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
         print(f"Bank: {str(bank)} -- sigma={ws.cell(2,1)} +/- {ws.cell(2,2)}")
         widths.append(ws.cell(2,1))
 
