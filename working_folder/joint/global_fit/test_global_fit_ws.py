@@ -9,13 +9,13 @@ wsD = Load(str(isolatedPath), OutputWorkspace='DHMT_300K_backward_deuteron_')
 rebin_params='-30,0.5,30'
 name = 'DHMT_300K_backward_deuteron_'
 
-# wsD.dataY(3)[::3] = 0
-# wsD.dataY(5)[3::2] = 0 
-# wsD.dataY(8)[:] = 0
-# 
-# wsD.dataE(3)[::3] = 0
-# wsD.dataE(5)[3::2] = 0 
-# wsD.dataE(8)[:] = 0
+wsD.dataY(3)[::3] = 0
+wsD.dataY(5)[3::2] = 0 
+wsD.dataY(8)[:] = 0
+
+wsD.dataE(3)[::3] = 0
+wsD.dataE(5)[3::2] = 0 
+wsD.dataE(8)[:] = 0
 
 # To convert this script into a unit tes, import the functions below
 
@@ -80,13 +80,13 @@ wsJoY, wsQ = convertToYSpace(rebin_params, wsD, 2.015)
 
 
 # Introduce zeros to test exceptional cases
-# wsQ.dataY(3)[::3] = np.nan
-# wsQ.dataY(5)[3::2] = 0 
-# wsQ.dataY(8)[:] = 0
-# 
-# wsJoY.dataY(3)[::3] = np.nan
-# wsJoY.dataY(5)[3::2] = 0 
-# wsJoY.dataY(8)[:] = 0
+wsQ.dataY(3)[::3] = np.nan
+wsQ.dataY(5)[3::2] = 0 
+wsQ.dataY(8)[:] = 0
+
+wsJoY.dataY(3)[::3] = np.nan
+wsJoY.dataY(5)[3::2] = 0 
+wsJoY.dataY(8)[:] = 0
 
 
 replaceNansWithZeros(wsJoY)
@@ -107,13 +107,13 @@ wsOriJoY = Divide(LHSWorkspace=name+"joy",RHSWorkspace='tmp',OutputWorkspace=nam
  
 
 # Introduce same zeros in original
-# wsOriQ.dataY(3)[::3] = np.nan
-# wsOriQ.dataY(5)[3::2] = 0 
-# wsOriQ.dataY(8)[:] = 0
-# 
-# wsOriJoY.dataY(3)[::3] = np.nan
-# wsOriJoY.dataY(5)[3::2] = 0 
-# wsOriJoY.dataY(8)[:] = 0
+wsOriQ.dataY(3)[::3] = np.nan
+wsOriQ.dataY(5)[3::2] = 0 
+wsOriQ.dataY(8)[:] = 0
+
+wsOriJoY.dataY(3)[::3] = np.nan
+wsOriJoY.dataY(5)[3::2] = 0 
+wsOriJoY.dataY(8)[:] = 0
 
 
 # Replacement of Nans with zeros
@@ -187,7 +187,7 @@ def originalResolution(resPars, ws, mass):
     resolution=CloneWorkspace(InputWorkspace=name+'joy')
     resolution=Rebin(InputWorkspace='resolution',Params=resPars)
     for i in range(resolution.getNumberHistograms()):
-        VesuvioResolution(Workspace=ws,WorkspaceIndex=str(i), Mass=2.015, OutputWorkspaceYSpace='tmp')
+        VesuvioResolution(Workspace=ws,WorkspaceIndex=str(i), Mass=mass, OutputWorkspaceYSpace='tmp')
         tmp=Rebin(InputWorkspace='tmp',Params=resPars)
         for p in range (tmp.blocksize()):
             resolution.dataY(i)[p]=tmp.dataY(0)[p]

@@ -53,58 +53,48 @@ class ResultsYFitObject:
 
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     firstMass = ic.masses[0]
-    wsRes = calculateMantidResolution(ic.resolutionRebinPars, wsFinal, firstMass)
-
+    wsResSum, wsRes = calculateMantidResolution(ic.resolutionRebinPars, wsFinal, firstMass)
+    
     wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
-
-    # wsYSpaceSymSum = averageJOfYOverAllSpectra(ic, wsSubMass, firstMass) 
+    wsYSpace, wsQ = convertToYSpace(ic.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
+    wsYSpaceAvg = weightedAvg(wsYSpace)
     
-    wsYSpace, wsQ = convertToYSpace(ic.rebinParametersForYSpaceFit, wsSubMass, firstMass)
-    
-    popt, perr, wsYSpaceAvg = fitAvgSpectraInYSpace(ic, wsYSpace, wsRes)
-    
-    if False:
-        fitGlobalFit(wsJoY, wsQ)
+    if ic.symmetrisationFlag:
+        wsYSpaceAvg = symmetrizeWs(ic.symmetriseHProfileUsingAveragesFlag, wsYSpaceAvg)
 
-
-    yfitResults = ResultsYFitObject(ic, wsFinal, wsSubMass, wsYSpaceAvg, wsRes, popt, perr)
+    popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceAvg, wsResSum)
+ 
+    yfitResults = ResultsYFitObject(ic, wsFinal, wsSubMass, wsYSpaceAvg, wsResSum, popt, perr)
     yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
+    if ic.globalFitFlag:
+        fitGlobalFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile)
 
 
-def fitAvgSpectraInYSpace(ic, wsYSpace, wsRes):
-    wsYSpaceAvg = weightedAvg(wsYSpace)
-    
-    if ic.symmetrisationFlag == True:
-        wsYSpaceAvg = symmetrizeWs(ic.symmetriseHProfileUsingAveragesFlag, wsYSpaceAvg)
+def calculateMantidResolution(rebinResPars, ws, mass):
+    #TODO: Resolution function currently skips masked spectra and outputs ws with different size
+    # Is this okay for the Global Fit?
 
-    popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceAvg, wsRes)
-    return popt, perr, wsYSpaceAvg
-
-
-
-def calculateMantidResolution(resPars, ws, mass):
     for index in range(ws.getNumberHistograms()):
         if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
             pass
         else:
             VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-            Rebin(InputWorkspace="tmp", Params=resPars, OutputWorkspace="tmp")
+            Rebin(InputWorkspace="tmp", Params=rebinResPars, OutputWorkspace="tmp")
 
             if index == 0:   # Ensures that workspace has desired units
-                RenameWorkspace("tmp","resolution")
+                RenameWorkspace("tmp",  ws.name()+"Resolution")
             else:
-                AppendSpectra("resolution", "tmp", OutputWorkspace= "resolution")
-
+                AppendSpectra(ws.name()+"Resolution", "tmp", OutputWorkspace= ws.name()+"Resolution")
     try:
-        SumSpectra(InputWorkspace="resolution",OutputWorkspace="resolution")
+        wsResSum = SumSpectra(InputWorkspace=ws.name()+"Resolution", OutputWorkspace=ws.name()+"Resolution_Sum")
     except ValueError:
         raise ValueError ("All the rows from the workspace to be fitted are Nan!")
 
-    normalise_workspace("resolution")
+    normalise_workspace(wsResSum)
     DeleteWorkspace("tmp")
-    return mtd["resolution"]
+    return wsResSum, mtd[ws.name()+"Resolution"]
 
     
 def normalise_workspace(ws_name):
@@ -154,36 +144,6 @@ def switchFirstTwoAxis(A):
     rearranges matrices per spectrum for iteration of main fitting procedure
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
-
-
-# def averageJOfYOverAllSpectra(ic, ws0, mass):
-#     wsYSpace = convertToYSpace(ic, ws0, mass)
-#     averagedSpectraYSpace = weightedAvg(wsYSpace)
-    
-#     if ic.symmetrisationFlag == True:
-#         symAvgdSpecYSpace = symmetrizeWs(ic, averagedSpectraYSpace)
-#         return symAvgdSpecYSpace
-
-#     return averagedSpectraYSpace
-
-
-# def convertToYSpace(ic, ws0, mass):
-#     ConvertToYSpace(
-#         InputWorkspace=ws0, Mass=mass, 
-#         OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
-#         )
-#     rebinPars=ic.rebinParametersForYSpaceFit
-#     Rebin(
-#         InputWorkspace=ws0.name()+"_JoY", Params=rebinPars, 
-#         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
-#         )
-#     Rebin(
-#         InputWorkspace=ws0.name()+"_Q", Params=rebinPars, 
-#         FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
-#         )
-#     normalise_workspace(ws0.name()+"_JoY")
-#     normalise_workspace(ws0.name()+"_Q")
-#     return mtd[ws0.name()+"_JoY"]
 
 
 def convertToYSpace(rebinPars, ws0, mass):
@@ -378,10 +338,10 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
         if ic.singleGaussFitToHProfile:
-            function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution,WorkspaceIndex=0;
+            function=f"""composite=Convolution,FixResolution=true,NumDeriv=true;
+            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
-            y0=0,A=1,x0=0,sigma=5,   ties=()'''
+            y0=0,A=1,x0=0,sigma=5,   ties=()"""
         else:
             # # Function for Double Gaussian
             # function='''composite=Convolution,FixResolution=true,NumDeriv=true;
@@ -391,9 +351,9 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
             # y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
             
             # TODO: Check that this function is correct
-            function = """
+            function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace=resolution,WorkspaceIndex=0,X=(),Y=();
+            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
             name=UserFunction,Formula=A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
             *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
@@ -412,11 +372,14 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
     return popt, perr
 
 
-def fitGlobalFit(wsJoY, wsQ, wsRes):
+# Functions for Global Fit
+
+def fitGlobalFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag):
     replaceNansWithZeros(wsJoY)
     wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
     wsQInv = createOneOverQWs(wsQ)
 
+    avgWidths = globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag)
 
 
 def replaceNansWithZeros(ws):
@@ -431,6 +394,7 @@ def artificialErrorsInUnphysicalBins(wsJoY):
         wsGlobal.dataE(j)[wsGlobal.dataE(j)[:]==0] = 0.1
     
     assert np.any(np.isnan(wsGlobal.extractE())) == False, "Nan present in input workspace need to be replaced by zeros."
+
     return wsGlobal
 
 
@@ -442,7 +406,94 @@ def createOneOverQWs(wsQ):
 
         ZeroIdxs = np.argwhere(wsInvQ.dataY(j)[:]==0)   # Indxs of zero elements
         if ZeroIdxs.size != 0:     # When zeros are present
-            wsInvQ.dataY(j)[ZeroIdxs[0] - 1] = 0       # Put a zero before the first zero 
+            wsInvQ.dataY(j)[ZeroIdxs[0] - 1] = 0       # Put a zero before the first zero
+    
     return wsInvQ
 
 
+def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag):
+    if gaussFitFlag:
+        convolution_template = """
+        (composite=Convolution,$domains=({0});
+        name=Resolution,Workspace={1},WorkspaceIndex={0};
+            (
+            name=UserFunction,Formula=
+            A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5,
+            A=1.,x0=0.,Sigma=6.0,  ties=();
+                (
+                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
+                name=UserFunction,Formula=
+                Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
+                *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
+                Sigma=6.0);ties=()
+                )
+            )"""
+    else:
+        convolution_template = """
+        (composite=Convolution,$domains=({0});
+        name=Resolution,Workspace={1},WorkspaceIndex={0};
+            (
+            name=UserFunction,Formula=
+            A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
+            *(1+c4/32*(16*((x-x0)/sqrt(2.)/Sigma)^4-48*((x-x0)/sqrt(2.)/Sigma)^2+12)),
+            A=1.,x0=0.,Sigma=6.0, c4=0, ties=();
+                (
+                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
+                name=UserFunction,Formula=
+                Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
+                *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
+                Sigma=6.0);ties=()
+                )
+            )"""    
+
+    print('\nGlobal fit in the West domain over 8 mixed banks\n')
+
+    #   GLOBAL FIT - MIXED BANKS
+    widths = []  
+    for bank in range(8):
+        dets=[bank, bank+8, bank+16, bank+24]
+
+        convolvedFunctionsList = []
+        ties = ["f0.f1.f1.f1.Sigma=f0.f1.f0.Sigma"]
+        datasets = {'InputWorkspace' : wsGlobal.name(),
+                    'WorkspaceIndex' : dets[0]}
+
+        print("Detectors: ", dets)
+
+        counter = 0
+        for i in dets:
+
+            print(f"Considering spectrum {wsGlobal.getSpectrumNumbers()[i]}")
+            if wsGlobal.spectrumInfo().isMasked(i):
+                print(f"Skipping masked spectrum {wsGlobal.getSpectrumNumbers()[i]}")
+                continue
+
+            thisIterationFunction = convolution_template.format(counter, wsRes.name(), wsQInv.name())
+            convolvedFunctionsList.append(thisIterationFunction)
+
+            if counter > 0:
+                ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
+                #TODO: Ask if conditional statement goes here
+                #ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
+                #ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
+
+                # Attach datasets
+                datasets[f"InputWorkspace_{counter}"] = wsGlobal.name()
+                datasets[f"WorkspaceIndex_{counter}"] = i
+            counter += 1
+
+        multifit_func = f"composite=MultiDomainFunction; {';'.join(convolvedFunctionsList)}; ties=({','.join(ties)})"
+        minimizer_string = f"{minimizer}, AbsError=0.00001, RealError=0.00001, MaxIterations=2000"
+
+        # Unpack dictionary as arguments
+        Fit(multifit_func, Minimizer=minimizer_string, Output=name+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
+        
+        # Select ws with fit results
+        ws=mtd[name+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
+        print(f"Bank: {str(bank)} -- sigma={ws.cell(2,1)} +/- {ws.cell(2,2)}")
+        widths.append(ws.cell(2,1))
+
+        # DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
+        # DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_Workspaces') 
+    print('\nAverage hydrogen standard deviation: ',np.mean(widths),' +/- ', np.std(widths))
+    return widths
