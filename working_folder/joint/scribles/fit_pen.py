@@ -77,6 +77,13 @@ print(popt1)
 print(popt2)
 print(popt3)
 
+jac = result["jac"][:, np.newaxis]
+print("\nJacobian Matrix:\n", jac)
+
+H = jac * jac.T
+print("\nHessian approx:\n", H)
+C = np.linalg.inv(H)
+print("\nCovariance matrix:\n", C)
 # Hessian = result["hess"]
 # invHessian = result["hess_inv"]
 # print(invHessian)
