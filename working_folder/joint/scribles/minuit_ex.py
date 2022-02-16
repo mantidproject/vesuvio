@@ -1,3 +1,4 @@
+# %%
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
@@ -40,15 +41,16 @@ dataY = HermitePolynomial(x, 1, 0, 5, 1, -3) + yerr * np.random.randn(x.size)
 p0 = [1, 0, 4, 0, 0]
 
 costFun = cost.LeastSquares(x, dataY, yerr, HermitePolynomial)
+
 m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
 m.limits["A"] = (0, None)
 
 m.simplex()
-# m.migrad()
 constraints = optimize.NonlinearConstraint(lambda *pars: HermitePolynomial(x, *pars), 0, np.inf)
 m.scipy(constraints=constraints)
 m.hesse()
 
+# %%
 
 # try it with scipy 
 def myCost(p0, x, dataY, yerr):
