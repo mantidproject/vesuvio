@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
@@ -58,3 +59,4 @@ plt.fill_between(x, HermitePolynomial(x, m.values), color="red", alpha=0.2, labe
 plt.fill_between(x, HermitePolynomial(x, popt3), color="green", alpha=0.2, label="Minimize[SLSQP]")
 plt.legend()
 plt.show()
+
