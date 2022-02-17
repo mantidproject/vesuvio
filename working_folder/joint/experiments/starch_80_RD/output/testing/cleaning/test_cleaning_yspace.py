@@ -109,6 +109,7 @@ class Testpopt(unittest.TestCase):
         self.optpopt = optimizedResults["popt"]
     
     def test_opt(self):
+        print("\nori:\n", self.oripopt, "\nopt:\n", self.optpopt)
         nptest.assert_array_equal(self.oripopt, self.optpopt)
 
 

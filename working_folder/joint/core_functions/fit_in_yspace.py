@@ -3,19 +3,32 @@ from mantid.simpleapi import *
 from scipy import optimize
 from scipy import ndimage
 from pathlib import Path
+from iminuit import Minuit, cost
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 
 class ResultsYFitObject:
 
-    def __init__(self, ic, wsFinal, wsH, wsYSpaceSymSum, wsRes, popt, perr):
+    def __init__(self, ic, wsFinal, wsH, wsYSpaceSymSum, wsRes):
         self.finalRawDataY = wsFinal.extractY()
         self.finalRawDataE = wsFinal.extractE()
         self.HdataY = wsH.extractY()
         self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
         self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
         self.resolution = wsRes.extractY()
+
+        # Extract best fit parameters from workspaces
+        wsFitLM = mtd[wsYSpaceSymSum.name() + "_Fitted_Levenberg-Marquardt_Parameters"]
+        wsFitSimplex = mtd[wsYSpaceSymSum.name() + "_Fitted_Simplex_Parameters"]
+        wsFitMinuit = mtd[wsYSpaceSymSum.name() + "_Fitted_Minuit_Parameters"]
+
+        noPars = len(wsFitLM.column("Value"))
+        popt = np.zeros((3, noPars))
+        perr = np.zeros((3, noPars))
+        for i, ws in enumerate([wsFitMinuit, wsFitLM, wsFitSimplex]):
+            popt[i] = ws.column("Value")
+            perr[i] = ws.column("Error")
         self.popt = popt
         self.perr = perr
 
@@ -26,13 +39,13 @@ class ResultsYFitObject:
         print("\nFit in Y Space results:")
 
         if self.singleGaussFitToHProfile:
-            for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
                 print(f"\n{fit:15s}")
                 for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:"], self.popt[i], self.perr[i]):
                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
                 print(f"Cost function: {self.popt[i, -1]:5.3}")
         else:
-            for i, fit in enumerate(["Curve Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
                 print(f"\n{fit:15s}")
                 for par, popt, perr in zip(["A", "x0", "sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
                     print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
@@ -62,9 +75,10 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     if ic.symmetrisationFlag:
         wsYSpaceAvg = symmetrizeWs(ic.symmetriseHProfileUsingAveragesFlag, wsYSpaceAvg)
 
-    popt, perr = fitFirstMassProfileInYSpace(ic, wsYSpaceAvg, wsResSum)
- 
-    yfitResults = ResultsYFitObject(ic, wsFinal, wsSubMass, wsYSpaceAvg, wsResSum, popt, perr)
+    fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
+    fitProfileMantidFit(ic, wsYSpaceAvg, wsResSum)
+    
+    yfitResults = ResultsYFitObject(ic, wsFinal, wsSubMass, wsYSpaceAvg, wsResSum)
     yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
@@ -202,24 +216,8 @@ def symmetrizeWs(avgSymFlag, avgYSpace):
     return Sym
 
 
-def fitFirstMassProfileInYSpace(ic, wsYSpaceSym, wsRes):
-    poptCurveFit, pcovCurveFit = fitProfileCurveFit(ic, wsYSpaceSym, wsRes)
-    perrCurveFit = np.sqrt(np.diag(pcovCurveFit))
-    
-    poptMantidFit, perrMantidFit = fitProfileMantidFit(ic, wsYSpaceSym, wsRes)
-    
-    #TODO: Add the Cost function as the last parameter
-    poptCurveFit = np.append(poptCurveFit, np.nan)
-    perrCurveFit = np.append(perrCurveFit, np.nan)
-
-    popt = np.vstack((poptCurveFit, poptMantidFit))
-    perr = np.vstack((perrCurveFit, perrMantidFit))
-
-    return popt, perr
-
-
-def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
-    res = wsRes.extractY()[0]
+def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
+    resY = wsRes.extractY()[0]
     resX = wsRes. extractX()[0]
 
     # Interpolate Resolution to get single peak at zero
@@ -227,67 +225,63 @@ def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
     # the convolution will be skewed.
     start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
     resNewX = np.arange(start, end, interval)
-    res = np.interp(resNewX, resX, res)
+    resolution = np.interp(resNewX, resX, resY)
 
     dataY = wsYSpaceSym.extractY()[0]
     dataX = wsYSpaceSym.extractX()[0]
     dataE = wsYSpaceSym.extractE()[0]
 
-    if ic.singleGaussFitToHProfile:
-        def convolvedFunction(x, y0, A, x0, sigma):
-            histWidths = x[1:] - x[:-1]
-            if ~ (np.max(histWidths)==np.min(histWidths)):
-                raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
+    histWidths = dataX[1:] - dataX[:-1]
+    assert (np.max(histWidths)==np.min(histWidths)), "dataX spacings in ws should be all equal for numerical convolution."
 
-            gaussFunc = gaussianFit(x, y0, x0, A, sigma)
-            convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]  
-            return convGauss
-        p0 = [0, 1, 0, 5]
-        bounds = [-np.inf, np.inf]  # Applied to all parameters
-        constraints=()
+
+    if ic.singleGaussFitToHProfile:
+        def convolvedGaussian(x, y0, A, x0, sigma):
+            gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+            histWidths = x[1] - x[0]     # Assumes all widhts are equal, take first
+            return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths
+
+        # Fit with Minuit
+        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedGaussian)
+        m = Minuit(costFun, y0=0, A=1, x0=0, sigma=5)
+        m.limits["A"] = (0, None)
+        m.simplex()
+        m.migrad()
+        m.hesse()
+
+        dataYFit = convolvedGaussian(dataX, *m.values)
+        # p0 = [0, 1, 0, 5]
+        # bounds = [-np.inf, np.inf]  # Applied to all parameters
+        # constraints=()
 
     else:
-        # # Double Gaussian
-        # def convolvedFunction(x, y0, x0, A, sigma):
-        #     histWidths = x[1:] - x[:-1]
-        #     if ~ (np.max(histWidths)==np.min(histWidths)):
-        #         raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
-
-        #     gaussFunc = gaussianFit(x, y0, x0, A, 4.76) + gaussianFit(x, 0, x0, 0.054*A, sigma)
-        #     convGauss = ndimage.convolve1d(gaussFunc, res, mode="constant") * histWidths[0]
-        #     return convGauss
-        # p0 = [0, 0, 0.7143, 5]
-
-        def HermitePolynomial(x, A, x0, sigma1, c4, c6):
-            return A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+        def convolvedGramCharlier(x, A, x0, sigma1, c4, c6):
+            gramCharlier =  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
-        
-        def convolvedFunction(x, A, x0, sigma1, c4, c6):
-            histWidths = x[1:] - x[:-1]
-            if ~ (np.max(histWidths)==np.min(histWidths)):
-                raise AssertionError("The histograms widhts need to be the same for the discrete convolution to work!")
 
-            hermiteFunc = HermitePolynomial(x, A, x0, sigma1, c4, c6)
-            convFunc = ndimage.convolve1d(hermiteFunc, res, mode="constant") * histWidths[0]
-            return convFunc
+            histWidths = x[1] - x[0]     # Assumes all widhts are equal, take first
+            return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths
+
+        # Fit with Minuit
+        # costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedGramCharlier)
+        # m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
+        # m.limits["A"] = (0, None)
+        # m.simplex()
+        # constraints = optimize.NonlinearConstraint(lambda *pars: convolvedGramCharlier(dataX, *pars), 0, np.inf)
+        # m.scipy(constraints=constraints)
+        # m.hesse()
+
+        # dataYFit = convolvedGramCharlier(dataX, *m.values)
         p0 = [1, 0, 4, 0, 0]     
         # The bounds on curve_fit() are set up diferently than on minimize()
         bounds = [[0, -np.inf, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf, np.inf]] 
         constraints=()
-
-    # def residuals(p0, dataX, dataY, dataE):
-    #     fun = convolvedFunction(dataX, *p0)
-    #     return np.sum((dataY-dataX)**2/dataE**2)
-
-    # result = optimize.minimize(residuals, p0, args=(dataX, dataY, dataE),
-    #                             bounds=bounds, constraints=constraints)
-    # popt = result["x"]
     
     popt, pcov = optimize.curve_fit(
-        convolvedFunction, 
+        convolvedGramCharlier, 
         dataX, 
         dataY, 
         p0=p0,
@@ -295,35 +289,38 @@ def fitProfileCurveFit(ic, wsYSpaceSym, wsRes):
         bounds=bounds
     )
 
-    yfit = convolvedFunction(dataX, *popt)
-    Residuals = dataY - yfit
+    dataYFit = convolvedGramCharlier(dataX, *popt)
+    Residuals = dataY - dataYFit
     
     # Create Workspace with the fit results
     # TODO add DataE 
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
-                    DataY=np.concatenate((dataY, yfit, Residuals)), 
+                    DataY=np.concatenate((dataY, dataYFit, Residuals)), 
+                    DataE=np.concatenate((dataE, np.zeros(len(dataE)), np.zeros(len(dataE)))),
                     NSpec=3,
                     OutputWorkspace=wsYSpaceSym.name()+"_fitted_CurveFit")
-    return popt, pcov
+    
+    # Create coavriance workspace
+    # Create best fit params plus errors workspace
+    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
+    tableWS.setTitle("Minuit Fit")
+    tableWS.addColumn(type='float',name="Value")
+    tableWS.addColumn(type='float',name="Error")
+    perr = np.sqrt(np.diag(pcov))
+    popt = np.append(popt, np.nan)
+    perr = np.append(perr, np.nan)
+    for po, pe in zip(popt, perr):
+        tableWS.addRow([po, pe])
 
-
-def gaussianFit(x, y0, x0, A, sigma):
-    """Gaussian centered at zero"""
-    return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+    # popt = m.values
+    # pcov = m.covariance
+    return 
 
 
 def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
-
-    if ic.singleGaussFitToHProfile:
-        popt, perr = np.zeros((2, 5)), np.zeros((2, 5))
-    else:
-        # popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
-        popt, perr = np.zeros((2, 6)), np.zeros((2, 6))
-
-
     print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
-    for i, minimizer in enumerate(['Levenberg-Marquardt','Simplex']):
-        outputName = wsYSpaceSym.name()+"_fitted_"+minimizer
+    for minimizer in ['Levenberg-Marquardt','Simplex']:
+        outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
         if ic.singleGaussFitToHProfile:
@@ -332,14 +329,6 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()"""
         else:
-            # # Function for Double Gaussian
-            # function='''composite=Convolution,FixResolution=true,NumDeriv=true;
-            # name=Resolution,Workspace=resolution,WorkspaceIndex=0;
-            # name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma1^2)/(2*3.1415*sigma1^2)^0.5
-            # +A*0.054*exp( -(x-x0)^2/2/sigma2^2)/(2*3.1415*sigma2^2)^0.5,
-            # y0=0,x0=0,A=0.7143,sigma1=4.76, sigma2=5,   ties=(sigma1=4.76)'''
-            
-            # TODO: Check that this function is correct
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -354,11 +343,8 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
             Output=outputName,
             Minimizer=minimizer
             )
-        
-        ws=mtd[outputName+"_Parameters"]
-        popt[i] = ws.column("Value")
-        perr[i] = ws.column("Error")
-    return popt, perr
+        # Fit produces output workspaces with results
+    return 
 
 
 # Functions for Global Fit
