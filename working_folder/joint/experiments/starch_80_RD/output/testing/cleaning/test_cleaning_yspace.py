@@ -109,7 +109,7 @@ class Testpopt(unittest.TestCase):
         self.optpopt = optimizedResults["popt"]
     
     def test_opt(self):
-        print("\nori:\n", self.oripopt, "\nopt:\n", self.optpopt)
+        # print("\nori:\n", self.oripopt, "\nopt:\n", self.optpopt)
         nptest.assert_array_equal(self.oripopt, self.optpopt)
 
 
@@ -122,6 +122,7 @@ class Testperr(unittest.TestCase):
         self.optperr = optimizedResults["perr"]
     
     def test_perr(self):
+        # print("\norierr:\n", self.oriperr, "\nopterr:\n", self.optperr)
         nptest.assert_array_equal( self.oriperr, self.optperr)
 
 

@@ -245,7 +245,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
                     OutputWorkspace=wsYSpaceSym.name()+"_fitted_CurveFit")
     
     # Create coavriance workspace
-    # Create best fit params plus errors workspace
+
+    # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
     tableWS.setTitle("Minuit Fit")
     tableWS.addColumn(type='float',name="Value")
@@ -298,7 +299,7 @@ class ResultsYFitObject:
         wsFinal = mtd[wsFinalName]
         wsMass0 = mtd[wsFinalName + "_Mass0"]
         wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg_Symmetrised"]
-        wsResSum = mtd[wsFinalName + "_Resolution"]
+        wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
 
         self.finalRawDataY = wsFinal.extractY()
         self.finalRawDataE = wsFinal.extractE()
