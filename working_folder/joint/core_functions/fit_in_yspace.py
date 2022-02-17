@@ -8,62 +8,6 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 
-class ResultsYFitObject:
-
-    def __init__(self, ic, wsFinal, wsH, wsYSpaceSymSum, wsRes):
-        self.finalRawDataY = wsFinal.extractY()
-        self.finalRawDataE = wsFinal.extractE()
-        self.HdataY = wsH.extractY()
-        self.YSpaceSymSumDataY = wsYSpaceSymSum.extractY()
-        self.YSpaceSymSumDataE = wsYSpaceSymSum.extractE()
-        self.resolution = wsRes.extractY()
-
-        # Extract best fit parameters from workspaces
-        wsFitLM = mtd[wsYSpaceSymSum.name() + "_Fitted_Levenberg-Marquardt_Parameters"]
-        wsFitSimplex = mtd[wsYSpaceSymSum.name() + "_Fitted_Simplex_Parameters"]
-        wsFitMinuit = mtd[wsYSpaceSymSum.name() + "_Fitted_Minuit_Parameters"]
-
-        noPars = len(wsFitLM.column("Value"))
-        popt = np.zeros((3, noPars))
-        perr = np.zeros((3, noPars))
-        for i, ws in enumerate([wsFitMinuit, wsFitLM, wsFitSimplex]):
-            popt[i] = ws.column("Value")
-            perr[i] = ws.column("Error")
-        self.popt = popt
-        self.perr = perr
-
-        self.savePath = ic.ySpaceFitSavePath
-        self.singleGaussFitToHProfile = ic.singleGaussFitToHProfile
-
-    def printYSpaceFitResults(self):
-        print("\nFit in Y Space results:")
-
-        if self.singleGaussFitToHProfile:
-            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-                print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:"], self.popt[i], self.perr[i]):
-                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-                print(f"Cost function: {self.popt[i, -1]:5.3}")
-        else:
-            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-                print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["A", "x0", "sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
-                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-                print(f"Cost function: {self.popt[i, -1]:5.3}")
-
-    def save(self):
-        np.savez(self.savePath,
-                 YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-                 YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-                 resolution=self.resolution, 
-                 HdataY=self.HdataY,
-                 finalRawDataY=self.finalRawDataY, 
-                 finalRawDataE=self.finalRawDataE,
-                 popt=self.popt, 
-                 perr=self.perr)
-
-
-
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     firstMass = ic.masses[0]
     wsResSum, wsRes = calculateMantidResolution(ic.resolutionRebinPars, wsFinal, firstMass)
@@ -78,7 +22,7 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
     fitProfileMantidFit(ic, wsYSpaceAvg, wsResSum)
     
-    yfitResults = ResultsYFitObject(ic, wsFinal, wsSubMass, wsYSpaceAvg, wsResSum)
+    yfitResults = ResultsYFitObject(ic, wsFinal.name())
     yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
@@ -89,7 +33,7 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
 def calculateMantidResolution(rebinResPars, ws, mass):
     #TODO: Resolution function currently skips masked spectra and outputs ws with different size
     # Is this okay for the Global Fit?
-
+    resName = ws.name()+"_Resolution"
     for index in range(ws.getNumberHistograms()):
         if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
             pass
@@ -98,17 +42,17 @@ def calculateMantidResolution(rebinResPars, ws, mass):
             Rebin(InputWorkspace="tmp", Params=rebinResPars, OutputWorkspace="tmp")
 
             if index == 0:   # Ensures that workspace has desired units
-                RenameWorkspace("tmp",  ws.name()+"Resolution")
+                RenameWorkspace("tmp",  resName)
             else:
-                AppendSpectra(ws.name()+"Resolution", "tmp", OutputWorkspace= ws.name()+"Resolution")
+                AppendSpectra(resName, "tmp", OutputWorkspace=resName)
     try:
-        wsResSum = SumSpectra(InputWorkspace=ws.name()+"Resolution", OutputWorkspace=ws.name()+"Resolution_Sum")
+        wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=ws.name()+"_Resolution_Sum")
     except ValueError:
         raise ValueError ("All the rows from the workspace to be fitted are Nan!")
 
     normalise_workspace(wsResSum)
     DeleteWorkspace("tmp")
-    return wsResSum, mtd[ws.name()+"Resolution"]
+    return wsResSum, mtd[resName]
 
     
 def normalise_workspace(ws_name):
@@ -182,7 +126,7 @@ def weightedAvg(wsYSpace):
     meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
 
     tempWs = SumSpectra(wsYSpace)
-    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_weighted_avg")
+    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_Weighted_Avg")
     newWs.dataY(0)[:] = meanY
     newWs.dataE(0)[:] = meanE
     DeleteWorkspace(tempWs)
@@ -209,7 +153,7 @@ def symmetrizeWs(avgSymFlag, avgYSpace):
         dataYSym = np.where(dataX>0, yFlip, dataY)
         dataESym = np.where(dataX>0, eFlip, dataE)
 
-    Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_symmetrised")
+    Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_Symmetrised")
     for i in range(Sym.getNumberHistograms()):
         Sym.dataY(i)[:] = dataYSym[i]
         Sym.dataE(i)[:] = dataESym[i]
@@ -345,6 +289,67 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
             )
         # Fit produces output workspaces with results
     return 
+
+
+class ResultsYFitObject:
+
+    def __init__(self, ic, wsFinalName):
+        # Extract most relevant information from ws
+        wsFinal = mtd[wsFinalName]
+        wsMass0 = mtd[wsFinalName + "_Mass0"]
+        wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg_Symmetrised"]
+        wsResSum = mtd[wsFinalName + "_Resolution"]
+
+        self.finalRawDataY = wsFinal.extractY()
+        self.finalRawDataE = wsFinal.extractE()
+        self.HdataY = wsMass0.extractY()
+        self.YSpaceSymSumDataY = wsJoYAvg.extractY()
+        self.YSpaceSymSumDataE = wsJoYAvg.extractE()
+        self.resolution = wsResSum.extractY()
+
+        # Extract best fit parameters from workspaces
+        wsFitLM = mtd[wsJoYAvg.name() + "_Fitted_Levenberg-Marquardt_Parameters"]
+        wsFitSimplex = mtd[wsJoYAvg.name() + "_Fitted_Simplex_Parameters"]
+        wsFitMinuit = mtd[wsJoYAvg.name() + "_Fitted_Minuit_Parameters"]
+
+        noPars = len(wsFitLM.column("Value"))
+        popt = np.zeros((3, noPars))
+        perr = np.zeros((3, noPars))
+        for i, ws in enumerate([wsFitMinuit, wsFitLM, wsFitSimplex]):
+            popt[i] = ws.column("Value")
+            perr[i] = ws.column("Error")
+        self.popt = popt
+        self.perr = perr
+
+        self.savePath = ic.ySpaceFitSavePath
+        self.singleGaussFitToHProfile = ic.singleGaussFitToHProfile
+
+    def printYSpaceFitResults(self):
+        print("\nFit in Y Space results:")
+
+        if self.singleGaussFitToHProfile:
+            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+                print(f"\n{fit:15s}")
+                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:"], self.popt[i], self.perr[i]):
+                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
+                print(f"Cost function: {self.popt[i, -1]:5.3}")
+        else:
+            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
+                print(f"\n{fit:15s}")
+                for par, popt, perr in zip(["A", "x0", "sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
+                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
+                print(f"Cost function: {self.popt[i, -1]:5.3}")
+
+    def save(self):
+        np.savez(self.savePath,
+                 YSpaceSymSumDataY=self.YSpaceSymSumDataY,
+                 YSpaceSymSumDataE=self.YSpaceSymSumDataE,
+                 resolution=self.resolution, 
+                 HdataY=self.HdataY,
+                 finalRawDataY=self.finalRawDataY, 
+                 finalRawDataE=self.finalRawDataE,
+                 popt=self.popt, 
+                 perr=self.perr)
 
 
 # Functions for Global Fit
