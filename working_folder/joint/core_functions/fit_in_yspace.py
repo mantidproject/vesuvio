@@ -165,8 +165,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     resX = wsRes. extractX()[0]
 
     # Interpolate Resolution to get single peak at zero
-    # Otherwise if the resolution has two data points at the peak,
-    # the convolution will be skewed.
+    # Otherwise if the resolution has two data points at the peak, the convolution will be skewed.
     start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
     resNewX = np.arange(start, end, interval)
     resolution = np.interp(resNewX, resX, resY)
@@ -176,7 +175,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     dataE = wsYSpaceSym.extractE()[0]
 
     histWidths = dataX[1:] - dataX[:-1]
-    assert (np.max(histWidths)==np.min(histWidths)), "dataX spacings in ws should be all equal for numerical convolution."
+    assert (np.max(histWidths)==np.min(histWidths)), "dataX spacings in ws need to be all equal for numerical convolution."
 
 
     if ic.singleGaussFitToHProfile:
@@ -192,11 +191,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         m.simplex()
         m.migrad()
         m.hesse()
-
         dataYFit = convolvedGaussian(dataX, *m.values)
-        # p0 = [0, 1, 0, 5]
-        # bounds = [-np.inf, np.inf]  # Applied to all parameters
-        # constraints=()
 
     else:
         def convolvedGramCharlier(x, A, x0, sigma1, c4, c6):
@@ -210,55 +205,36 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
             return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths
 
         # Fit with Minuit
-        # costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedGramCharlier)
-        # m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
-        # m.limits["A"] = (0, None)
-        # m.simplex()
-        # constraints = optimize.NonlinearConstraint(lambda *pars: convolvedGramCharlier(dataX, *pars), 0, np.inf)
-        # m.scipy(constraints=constraints)
-        # m.hesse()
+        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedGramCharlier)
+        m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
+        m.limits["A"] = (0, None)
+        m.simplex()
+        constraints = optimize.NonlinearConstraint(lambda *pars: convolvedGramCharlier(dataX, *pars), 0, np.inf)
+        m.scipy(constraints=constraints)
+        m.hesse()
+        dataYFit = convolvedGramCharlier(dataX, *m.values)
 
-        # dataYFit = convolvedGramCharlier(dataX, *m.values)
-        p0 = [1, 0, 4, 0, 0]     
-        # The bounds on curve_fit() are set up diferently than on minimize()
-        bounds = [[0, -np.inf, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf, np.inf]] 
-        constraints=()
-    
-    popt, pcov = optimize.curve_fit(
-        convolvedGramCharlier, 
-        dataX, 
-        dataY, 
-        p0=p0,
-        sigma=dataE,
-        bounds=bounds
-    )
-
-    dataYFit = convolvedGramCharlier(dataX, *popt)
     Residuals = dataY - dataYFit
     
     # Create Workspace with the fit results
-    # TODO add DataE 
+    # TODO add DataE for fit
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, dataYFit, Residuals)), 
                     DataE=np.concatenate((dataE, np.zeros(len(dataE)), np.zeros(len(dataE)))),
                     NSpec=3,
-                    OutputWorkspace=wsYSpaceSym.name()+"_fitted_CurveFit")
+                    OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit")
     
-    # Create coavriance workspace
+    # TODO: Create coavriance workspace
 
     # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
     tableWS.setTitle("Minuit Fit")
+    tableWS.addColumn(type='str',name="Name")
     tableWS.addColumn(type='float',name="Value")
     tableWS.addColumn(type='float',name="Error")
-    perr = np.sqrt(np.diag(pcov))
-    popt = np.append(popt, np.nan)
-    perr = np.append(perr, np.nan)
-    for po, pe in zip(popt, perr):
-        tableWS.addRow([po, pe])
-
-    # popt = m.values
-    # pcov = m.covariance
+    for p, v, e in zip(m.parameters, m.values, m.errors):
+        tableWS.addRow([p, v, e])
+    tableWS.addRow(["Cost function", m.fval / (len(dataX)-m.nfit), 0])
     return 
 
 

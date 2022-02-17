@@ -15,4 +15,8 @@ cleaningPath = experimentPath / "output" / "testing" / "cleaning"
 oriPath = cleaningPath / "starter_forward.npz"
 AllNCP = np.load(oriPath)["all_ncp_for_each_mass"][-1]
 
+
+
+
+
 fitInYSpaceProcedure(yfitIC, wsFinal, AllNCP)
