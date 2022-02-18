@@ -3,7 +3,7 @@ from mantid.simpleapi import *
 from scipy import optimize
 from scipy import ndimage
 from pathlib import Path
-from iminuit import Minuit, cost
+from iminuit import Minuit, cost, util
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
@@ -179,22 +179,20 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
 
     if ic.singleGaussFitToHProfile:
-        def convolvedGaussian(x, y0, A, x0, sigma):
+        def convolvedModel(x, y0, A, x0, sigma):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
             histWidths = x[1] - x[0]     # Assumes all widhts are equal, take first
             return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths
 
         # Fit with Minuit
-        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedGaussian)
+        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
         m = Minuit(costFun, y0=0, A=1, x0=0, sigma=5)
         m.limits["A"] = (0, None)
         m.simplex()
         m.migrad()
-        m.hesse()
-        dataYFit = convolvedGaussian(dataX, *m.values)
 
     else:
-        def convolvedGramCharlier(x, A, x0, sigma1, c4, c6):
+        def convolvedModel(x, A, x0, sigma1, c4, c6):
             gramCharlier =  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
@@ -205,26 +203,55 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
             return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths
 
         # Fit with Minuit
-        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedGramCharlier)
+        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
         m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
         m.limits["A"] = (0, None)
         m.simplex()
-        constraints = optimize.NonlinearConstraint(lambda *pars: convolvedGramCharlier(dataX, *pars), 0, np.inf)
+        constraints = optimize.NonlinearConstraint(lambda *pars: convolvedModel(dataX, *pars), 0, np.inf)
         m.scipy(constraints=constraints)
-        m.hesse()
-        dataYFit = convolvedGramCharlier(dataX, *m.values)
+
+    # Explicit calculation of Hessian after the fit
+    m.hesse()
+
+    # Weighted Chi2
+    chi2 = m.fval / (len(dataX)-m.nfit)
+
+    # Propagate error to yfit
+    # Takes in the best fit parameters and their covariance matrix
+    # Outputs the best fit curve with std in the diagonal
+    dataYFit, dataYCov = util.propagate(lambda pars: convolvedModel(dataX, *pars), m.values, m.covariance)
+    dataYSigma = np.sqrt(np.diag(dataYCov))
+
+    # Weight the confidence band
+    dataYSigma *= chi2
 
     Residuals = dataY - dataYFit
-    
-    # Create Workspace with the fit results
-    # TODO add DataE for fit
+
+    # Create workspace to store best fit curve and errors on the fit
+    # TODO: Do the errors need to be multiplied by two?
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, dataYFit, Residuals)), 
-                    DataE=np.concatenate((dataE, np.zeros(len(dataE)), np.zeros(len(dataE)))),
+                    DataE=np.concatenate((dataE, dataYSigma, np.zeros(len(dataE)))),
                     NSpec=3,
                     OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit")
     
-    # TODO: Create coavriance workspace
+    # Calculate correlation matrix
+    cov = m.covariance
+    corr = np.zeros(cov.shape)
+    for i in range(len(corr)):
+        for j in range(len(corr[0])):
+            corr[i, j] =  cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+    corr *= 100
+
+    # Create correlation tableWorkspace
+    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_NormalizedCovarianceMatrix")
+    tableWS.setTitle("Minuit Fit")
+    tableWS.addColumn(type='str',name="Name")
+    for p in m.parameters:
+        tableWS.addColumn(type='float',name=p)
+    for p, arr in zip(m.parameters, corr):
+        tableWS.addRow([p] + list(arr))
+    
 
     # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
@@ -234,7 +261,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     tableWS.addColumn(type='float',name="Error")
     for p, v, e in zip(m.parameters, m.values, m.errors):
         tableWS.addRow([p, v, e])
-    tableWS.addRow(["Cost function", m.fval / (len(dataX)-m.nfit), 0])
+    tableWS.addRow(["Cost function", chi2, 0])
     return 
 
 
