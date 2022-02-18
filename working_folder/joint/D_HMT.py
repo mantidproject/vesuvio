@@ -148,7 +148,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 2   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -185,7 +185,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
 
-    symmetrisationFlag = False
+    symmetrisationFlag = True
     symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     resolutionRebinPars = "-30, 0.125, 30" 
@@ -201,13 +201,13 @@ yfitIC = YSpaceFitInitialConditions
 start_time = time.time()
 # Start of interactive section 
 
-runOnlyYSpaceFit = True
+runOnlyYSpaceFit = False
 if runOnlyYSpaceFit:
-    wsFinal = mtd["DHMT_300K_RD_forward_0"]
+    wsFinal = mtd["DHMT_300K_RD_forward_1"]
     allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
-    # wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
-    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+    wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
+#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
     allNCP = lastIterationNCP
 

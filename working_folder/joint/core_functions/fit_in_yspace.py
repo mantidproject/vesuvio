@@ -301,7 +301,10 @@ class ResultsYFitObject:
         # Extract most relevant information from ws
         wsFinal = mtd[wsFinalName]
         wsMass0 = mtd[wsFinalName + "_Mass0"]
-        wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg_Symmetrised"]
+        if ic.symmetrisationFlag:
+            wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg_Symmetrised"]
+        else:
+            wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg"]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
 
         self.finalRawDataY = wsFinal.extractY()
