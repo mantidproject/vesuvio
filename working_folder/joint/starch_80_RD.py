@@ -61,8 +61,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     userWsEmptyPath = str(backWsEmptyPath)
     InstrParsPath = ipFilePath
 
-    addHToMS = True
-    HToMass0Ratio = 19.0620008206
+    HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
@@ -88,7 +87,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
     # Boolean Flags to control script
-    scaleParsFlag = False
     MSCorrectionFlag = True
     GammaCorrectionFlag = False
 
@@ -108,12 +106,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
         (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
     ]
     maskedDetectorIdx = maskedSpecNo - firstSpec
-
-    # Set scaling factors for the fitting parameters, default is ones
-    scalingFactors = np.ones(initPars.shape)
-    if scaleParsFlag:        # Scale fitting parameters using initial values
-            initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-            scalingFactors = 1 / initPars
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -150,7 +142,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     lastSpec = 175    #182
 
     # Boolean Flags to control script
-    scaleParsFlag = False
     MSCorrectionFlag = True
     GammaCorrectionFlag = True
 
@@ -172,12 +163,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ]
     maskedDetectorIdx = maskedSpecNo - firstSpec
 
-    # Set scaling factors for the fitting parameters, default is ones
-    scalingFactors = np.ones(initPars.shape)
-    if scaleParsFlag:        # Scale fitting parameters using initial values
-            initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-            scalingFactors = 1 / initPars
-
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions(ForwardInitialConditions):
@@ -195,24 +180,24 @@ bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
 
-if __name__ == "main":
-    start_time = time.time()
-    # Interactive section 
+# if __name__ == "main":
+start_time = time.time()
+# Interactive section 
 
-    runOnlyYSpaceFit = False
-    if runOnlyYSpaceFit:
-        wsFinal = mtd["starch_80_RD_forward_1"]
-        allNCP = extractNCPFromWorkspaces(wsFinal)
-    else:
-        wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-        lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-        allNCP = lastIterationNCP
-    
-    
-    print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-    fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+runOnlyYSpaceFit = False
+if runOnlyYSpaceFit:
+    wsFinal = mtd["starch_80_RD_forward_1"]
+    allNCP = extractNCPFromWorkspaces(wsFinal)
+else:
+    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+    allNCP = lastIterationNCP
 
 
-    # End of iteractive section
-    end_time = time.time()
-    print("\nRunning time: ", end_time-start_time, " seconds")
+print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+
+
+# End of iteractive section
+end_time = time.time()
+print("\nRunning time: ", end_time-start_time, " seconds")

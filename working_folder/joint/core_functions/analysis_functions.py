@@ -408,32 +408,27 @@ def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPa
 
     if np.all(dataY == 0) : 
         return np.zeros(len(ic.initPars)+3)  
-    
-    scaledPars = ic.initPars * ic.scalingFactors
-    scaledBounds = ic.bounds * ic.scalingFactors[:, np.newaxis]
 
     result = optimize.minimize(
         errorFunction, 
-        scaledPars, 
+        ic.initPars, 
         args=(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic),
         method='SLSQP', 
-        bounds = scaledBounds, 
+        bounds = ic.bounds, 
         constraints=ic.constraints
         )
 
-    fitScaledPars = result["x"]
-    fitPars = fitScaledPars / ic.scalingFactors
+    fitPars = result["x"]
 
     noDegreesOfFreedom = len(dataY) - len(fitPars)
     specFitPars = np.append(instrPars[0], fitPars)
     return np.append(specFitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
 
 
-def errorFunction(scaledPars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
+def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
     """Error function to be minimized, operates in TOF space"""
 
-    unscaledPars = scaledPars / ic.scalingFactors
-    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, unscaledPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
+    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is not usually satisfied but in the exceptional case that it is,
@@ -445,12 +440,12 @@ def errorFunction(scaledPars, dataY, dataE, ySpacesForEachMass, resolutionPars, 
     return np.sum(chi2)
 
 
-def calculateNcpSpec(ic, unscaledPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
+def calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
     """Creates a synthetic C(t) to be fitted to TOF values of a single spectrum, from J(y) and resolution functions
        Shapes: datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n),
        where n is no of bins"""
     
-    masses, intensities, widths, centers = prepareArraysFromPars(ic, unscaledPars) 
+    masses, intensities, widths, centers = prepareArraysFromPars(ic, pars) 
     v0, E0, deltaE, deltaQ = kinematicArrays
     
     gaussRes, lorzRes = caculateResolutionForEachMass(
@@ -677,13 +672,14 @@ def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
 def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
     masses = ic.masses.flatten()
 
-    # If H not present ie backward scattering, add it to sample properties
-    if (ic.modeRunning == "BACKWARD") and ic.addHToMS:   
-        masses = np.append(masses, 1.0079)
-        meanWidths = np.append(meanWidths, 5.0)
-        HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]
-        meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
-        meanIntensityRatios /= np.sum(meanIntensityRatios)
+    # If Backsscattering mode and H is present in the sample, add H to MS properties
+    if (ic.modeRunning == "BACKWARD"):
+        if (ic.HToMass0Ratio != None) or (ic.HToMass0Ratio != 0):
+            masses = np.append(masses, 1.0079)
+            meanWidths = np.append(meanWidths, 5.0)
+            HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]
+            meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
+            meanIntensityRatios /= np.sum(meanIntensityRatios)
 
     MSProperties = np.zeros(3*len(masses))
     MSProperties[::3] = masses

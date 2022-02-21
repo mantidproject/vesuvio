@@ -63,8 +63,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     userWsEmptyPath = str(backWsEmptyPath)
     InstrParsPath = ipFilePath
 
-    addHToMS = False
-    HToMass0Ratio = None
+    HToMass0Ratio = None   # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015, 12, 14, 27])
@@ -92,7 +91,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
     # Boolean Flags to control script
-    scaleParsFlag = False
     MSCorrectionFlag = True
     GammaCorrectionFlag = False
 
@@ -111,12 +109,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
         (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
     ]
     maskedDetectorIdx = maskedSpecNo - firstSpec
-
-    # Set scaling factors for the fitting parameters, default is ones
-    scalingFactors = np.ones(initPars.shape)
-    if scaleParsFlag:        # Scale fitting parameters using initial values
-            initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-            scalingFactors = 1 / initPars
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -153,7 +145,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     lastSpec = 182   #182
 
     # Boolean Flags to control script
-    scaleParsFlag = False
     MSCorrectionFlag = True
     GammaCorrectionFlag = True
 
@@ -173,12 +164,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
         (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
     ]
     maskedDetectorIdx = maskedSpecNo - firstSpec
-
-    # Set scaling factors for the fitting parameters, default is ones
-    scalingFactors = np.ones(initPars.shape)
-    if scaleParsFlag:        # Scale fitting parameters using initial values
-            initPars[2::3] = np.ones((1, noOfMasses))  # Main problem is that zeros have to be replaced by non zeros
-            scalingFactors = 1 / initPars
 
 
 # This class inherits all of the atributes in ForwardInitialConditions
