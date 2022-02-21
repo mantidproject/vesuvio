@@ -158,25 +158,66 @@ def fitNcpToWorkspace(ic, ws, fittingResults):
     dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
+    # Work in progress ---------
+    fitParsTable = createTableWSForFitPars(ws.name(), len(ic.initPars))
+    # fitPars = np.zeros((len(dataY), len(ic.initPars)))
+    for i in range(len(dataY)):
+        specFitPars = fitNcpToSingleSpec(
+                        dataY[i],
+                        dataE[i],
+                        ySpacesForEachMass[i],
+                        resolutionPars[i],
+                        instrPars[i],
+                        kinematicArrays[i],
+                        ic
+                        )
+        fitParsTable.addRow(specFitPars)
+
+        fitPars = specFitPars[1:-2]
+        ncpForEachMass = buildNcpFromSpec(
+                            fitPars,
+                            ySpacesForEachMass[i], 
+                            resolutionPars[i], 
+                            instrPars[i], 
+                            kinematicArrays[i],
+                            ic
+                            )
+    # TODO: Append ncp spectra to ws
+
+
     # Fit all spectrums
-    fitPars = np.array(list(map(
-        partial(fitNcpToSingleSpec, ic=ic), 
-        dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
-    )))
-    fittingResults.addFitPars(fitPars)
+    # fitPars = np.array(list(map(
+    #     partial(fitNcpToSingleSpec, ic=ic), 
+    #     dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
+    # )))
+    # fittingResults.addFitPars(fitPars)
 
     # Create ncpTotal workspaces
-    mainPars = fittingResults.getMainPars()
-    ncpForEachMass = np.array(list(map(
-        partial(buildNcpFromSpec, ic=ic), 
-        mainPars , ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
-    )))
+    # mainPars = fittingResults.getMainPars()
+    # ncpForEachMass = np.array(list(map(
+    #     partial(buildNcpFromSpec, ic=ic), 
+    #     mainPars , ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
+    # )))
     ncpTotal = np.sum(ncpForEachMass, axis=1)  
     createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
     # Adds individual and total ncp
     fittingResults.addNCP(ncpForEachMass, ncpTotal)
 
- 
+def createTableWSForFitPars(wsName, noPars):
+    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Best_Fit_NCP_Parameters")
+    tableWS.setTitle("SCIPY Fit")
+    tableWS.addColumn(type='float', name="Spec Idx")
+    for i in range(noPars/3):
+        tableWS.addColumn(type='float', name=f"Intensity {i}")
+        tableWS.addColumn(type='float', name=f"  Width {i}  ")
+        tableWS.addColumn(type='float', name=f"  Center {i} ")
+    tableWS.addColumn(type='float', name="Norm Chi2")
+    tableWS.addColumn(type='float', name="No Iter")
+    return tableWS
+
+
+
+
 class resultsObject:
     """Used to store fitting results of the script at each iteration"""
 
