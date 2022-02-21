@@ -24,15 +24,6 @@ def HermitePolynomial(x, A, x0, sigma1, c4, c6):
     return func
 
 
-# def constr(x, A, x0, sigma1, c4, c6):
-#     # x0, sigma1, c4, c6 = p0[1:]
-#     return (1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
-#                 -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
-#                 +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
-#                 -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
-
-
-
 np.random.seed(1)
 x = np.linspace(-20, 20, 100)
 yerr = np.random.rand(x.size) * 0.01

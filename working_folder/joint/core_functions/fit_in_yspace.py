@@ -1,3 +1,4 @@
+from unicodedata import name
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
@@ -223,12 +224,12 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     dataYSigma = np.sqrt(np.diag(dataYCov))
 
     # Weight the confidence band
+    # TODO: Shoud it be weighted?
     dataYSigma *= chi2
 
     Residuals = dataY - dataYFit
 
     # Create workspace to store best fit curve and errors on the fit
-    # TODO: Do the errors need to be multiplied by two?
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, dataYFit, Residuals)), 
                     DataE=np.concatenate((dataE, dataYSigma, np.zeros(len(dataE)))),
@@ -236,11 +237,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
                     OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit")
     
     # Calculate correlation matrix
-    cov = m.covariance
-    corr = np.zeros(cov.shape)
-    for i in range(len(corr)):
-        for j in range(len(corr[0])):
-            corr[i, j] =  cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
+    corr = m.covariance.correlation()
     corr *= 100
 
     # Create correlation tableWorkspace
@@ -256,12 +253,23 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
     tableWS.setTitle("Minuit Fit")
-    tableWS.addColumn(type='str',name="Name")
-    tableWS.addColumn(type='float',name="Value")
-    tableWS.addColumn(type='float',name="Error")
-    for p, v, e in zip(m.parameters, m.values, m.errors):
-        tableWS.addRow([p, v, e])
-    tableWS.addRow(["Cost function", chi2, 0])
+    tableWS.addColumn(type='str', name="Name")
+    tableWS.addColumn(type='float', name="Value")
+    tableWS.addColumn(type='float', name="Error")
+    tableWS.addColumn(type='float', name="Minos Error-")
+    tableWS.addColumn(type='float', name="Minos Error+")
+
+    try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
+        m.minos()
+        me = m.merrors
+        for p, v, e in zip(m.parameters, m.values, m.errors):
+            tableWS.addRow([p, v, e, me[p].lower, me[p].upper])  
+
+    except RuntimeError:
+        for p, v, e in zip(m.parameters, m.values, m.errors):
+            tableWS.addRow([p, v, e, 0, 0])
+
+    tableWS.addRow(["Cost function", chi2, 0, 0, 0])
     return 
 
 
