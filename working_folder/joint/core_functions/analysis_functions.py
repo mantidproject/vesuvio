@@ -1,3 +1,6 @@
+from ast import keyword
+from multiprocessing import allow_connection_pickling
+from matplotlib.pyplot import hist
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
@@ -17,27 +20,28 @@ def iterativeFitForDataReduction(ic):
     createSlabGeometry(ic)
 
     # Initialize arrays to store script results
-    fittingResults = resultsObject(ic)
+    # fittingResults = resultsObject(ic)
 
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
-        SumSpectra(InputWorkspace=wsToBeFitted, OutputWorkspace=wsToBeFitted.name()+"_sum")
+        SumSpectra(InputWorkspace=wsToBeFitted, OutputWorkspace=wsToBeFitted.name()+"_Sum")
 
         print("\nFitting spectra ", ic.firstSpec, " - ", ic.lastSpec, "\n.............")
         
         # The fitting procedure stores results in the fittingResults object
-        fitNcpToWorkspace(ic, wsToBeFitted, fittingResults)
+        fitNcpToWorkspace(ic, wsToBeFitted)
         
-        fittingResults.calculateMeansAndStd()
-        fittingResults.printCurrentIrerationResults()
+        meanWidths, meanIntensityRatios = createMeansAndStdTableWS(wsToBeFitted.name(), ic)
+        # fittingResults.calculateMeansAndStd()
+        # fittingResults.printCurrentIrerationResults()
 
         # When last iteration, skip MS and GC
         if iteration == ic.noOfMSIterations - 1:
           break 
 
-        meanWidths = fittingResults.all_mean_widths[iteration]
-        meanIntensityRatios = fittingResults.all_mean_intensities[iteration]
+        # meanWidths = fittingResults.all_mean_widths[iteration]
+        # meanIntensityRatios = fittingResults.all_mean_intensities[iteration]
         
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
@@ -54,6 +58,7 @@ def iterativeFitForDataReduction(ic):
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
 
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
+    fittingResults = resultsObject(ic)
     fittingResults.save()
     return wsFinal, fittingResults
 
@@ -148,41 +153,48 @@ def createSlabGeometry(ic):
     CreateSampleShape(ic.name, xml_str)
 
 
-def fitNcpToWorkspace(ic, ws, fittingResults):
+def fitNcpToWorkspace(ic, ws):
     """Firstly calculates matrices for all spectrums,
     then iterates over each spectrum
     """
-    wsDataY = ws.extractY()       #DataY unaltered
-    fittingResults.addDataY(wsDataY)
+    # wsDataY = ws.extractY()       #DataY unaltered
+    # fittingResults.addDataY(wsDataY)
 
     dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
-    # Work in progress ---------
-    fitParsTable = createTableWSForFitPars(ws.name(), len(ic.initPars))
-    # fitPars = np.zeros((len(dataY), len(ic.initPars)))
+    # Work in progress -----------------
+    allNcpForEachMass = []
+    fitParsTable = createTableWSForFitPars(ws.name(), ic.noOfMasses)
     for i in range(len(dataY)):
         specFitPars = fitNcpToSingleSpec(
-                        dataY[i],
-                        dataE[i],
-                        ySpacesForEachMass[i],
-                        resolutionPars[i],
-                        instrPars[i],
-                        kinematicArrays[i],
-                        ic
-                        )
+            dataY[i],
+            dataE[i],
+            ySpacesForEachMass[i],
+            resolutionPars[i],
+            instrPars[i],
+            kinematicArrays[i],
+            ic
+            )
         fitParsTable.addRow(specFitPars)
 
         fitPars = specFitPars[1:-2]
         ncpForEachMass = buildNcpFromSpec(
-                            fitPars,
-                            ySpacesForEachMass[i], 
-                            resolutionPars[i], 
-                            instrPars[i], 
-                            kinematicArrays[i],
-                            ic
-                            )
-    # TODO: Append ncp spectra to ws
+            fitPars,
+            ySpacesForEachMass[i], 
+            resolutionPars[i], 
+            instrPars[i], 
+            kinematicArrays[i],
+            ic
+            )
+        allNcpForEachMass.append(ncpForEachMass)
+        # appendNcpToWsForEachMass(ws.name(), ncpForEachMass, ws.extractX()[i])
+        # appendTotalNCPToWs(ws.name(), ncpForEachMass, ws.extractX()[i]) 
+    allNcpForEachMass = np.array(allNcpForEachMass)
+    allNcpTotal = np.sum(allNcpForEachMass, axis=1)
+    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
+    # createSumNCPWorkspaces(ws.name())
+    return
 
 
     # Fit all spectrums
@@ -198,41 +210,179 @@ def fitNcpToWorkspace(ic, ws, fittingResults):
     #     partial(buildNcpFromSpec, ic=ic), 
     #     mainPars , ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     # )))
-    ncpTotal = np.sum(ncpForEachMass, axis=1)  
-    createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
-    # Adds individual and total ncp
-    fittingResults.addNCP(ncpForEachMass, ncpTotal)
+    # ncpTotal = np.sum(ncpForEachMass, axis=1)  
+    # createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)  
+    # # Adds individual and total ncp
+    # fittingResults.addNCP(ncpForEachMass, ncpTotal)
 
-def createTableWSForFitPars(wsName, noPars):
+
+def appendNcpToWsForEachMass(wsName, ncpForEachMass, dataX):
+    histWidths = dataX[1:] - dataX[:-1]
+    for k in range(len(ncpForEachMass)):
+        tempNcp = CreateWorkspace(
+            DataX=dataX[:-1], 
+            DataY=ncpForEachMass[k]*histWidths
+            )
+        ncpWsName = wsName+f"_TOF_Fitted_Profile_{k}"
+        try:    # If workspaces exist
+            AppendSpectra(ncpWsName, tempNcp, OutputWorkspace=ncpWsName)
+            DeleteWorkspace(tempNcp)
+        except ValueError:
+            RenameWorkspace(tempNcp, ncpWsName)
+    
+def appendTotalNCPToWs(wsName, ncpForEachMass, dataX):
+    histWidths = dataX[1:] - dataX[:-1]
+    ncpTotal = np.sum(ncpForEachMass, axis=0)
+    tempTotNcp = CreateWorkspace(DataX=dataX[:-1], DataY=ncpTotal*histWidths)
+    totNcpWsName = wsName+"_TOF_Fitted_Profiles"
+    try:    # If workspaces exist
+        AppendSpectra(totNcpWsName, tempTotNcp, OutputWorkspace=totNcpWsName)
+        DeleteWorkspace(tempTotNcp)
+    except ValueError:
+        RenameWorkspace(tempTotNcp, totNcpWsName)
+
+def createSumNCPWorkspaces(wsName):
+    wsTotNcp = mtd[wsName+"_TOF_Fitted_Profiles"]
+    SumSpectra(wsTotNcp, OutputWorkspace=wsTotNcp.name()+"_Sum")
+    try:
+        k = 0
+        while True:
+            wsNcp = mtd[wsName+f"_TOF_Fitted_Profile_{k}"]
+            SumSpectra(wsNcp, OutputWorkspace=wsNcp.name()+"_Sum")
+            k += 1
+    except KeyError:
+        return
+
+
+def createTableWSForFitPars(wsName, noOfMasses):
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Best_Fit_NCP_Parameters")
     tableWS.setTitle("SCIPY Fit")
     tableWS.addColumn(type='float', name="Spec Idx")
-    for i in range(noPars/3):
+    for i in range(int(noOfMasses)):
         tableWS.addColumn(type='float', name=f"Intensity {i}")
-        tableWS.addColumn(type='float', name=f"  Width {i}  ")
-        tableWS.addColumn(type='float', name=f"  Center {i} ")
+        tableWS.addColumn(type='float', name=f"Width {i}")
+        tableWS.addColumn(type='float', name=f"Center {i}")
     tableWS.addColumn(type='float', name="Norm Chi2")
     tableWS.addColumn(type='float', name="No Iter")
     return tableWS
 
+def createMeansAndStdTableWS(wsName, ic):
+    # Extract widths and intensities from tableWorkspace
+    fitParsTable = mtd[wsName+"_Best_Fit_NCP_Parameters"]
+    widths = np.zeros((ic.noOfMasses, fitParsTable.rowCount()))
+    intensities = widths.copy()
+    for i in range(ic.noOfMasses):
+        widths[i] = fitParsTable.column(f"Width {i}")
+        intensities[i] = fitParsTable.column(f"Intensity {i}")
 
+    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
+
+    meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
+    meansTableWS.addColumn(type='float', name="Mean Widths")
+    meansTableWS.addColumn(type='float', name="Std Widths")
+    meansTableWS.addColumn(type='float', name="Mean Intensities")
+    meansTableWS.addColumn(type='float', name="Std Intensities")
+    for mw, stdw, mi, stdi in zip(meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
+        meansTableWS.addRow([mw, stdw, mi, stdi])
+    
+    return meanWidths, meanIntensityRatios
+
+
+
+def calculateMeansAndStds(widths, intensities, ic):
+    assert len(widths) == ic.noOfMasses, "widths and intensities not in correct shape!"
+    noOfMasses = ic.noOfMasses
+
+    # Replace zeros from masked spectra with nans
+    widths[:, ic.maskedDetectorIdx] = np.nan
+    intensities[:, ic.maskedDetectorIdx] = np.nan
+
+    meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
+    stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
+
+    # Subtraction row by row
+    widthDeviation = np.abs(widths - meanWidths)
+    # Where True, replace by nan
+    betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+    betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
+
+    meanWidths = np.nanmean(betterWidths, axis=1)  
+    stdWidths = np.nanstd(betterWidths, axis=1)
+
+    # Not nansum(), to propagate nan
+    normalization = np.sum(betterIntensities, axis=0)
+    intensityRatios = betterIntensities / normalization
+
+    meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
+    stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
+    return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
 
 
 class resultsObject:
     """Used to store fitting results of the script at each iteration"""
-
     def __init__(self, ic):
-        """Initializes arrays full of zeros"""
 
-        self.all_fit_workspaces = None 
-        self.all_spec_best_par_chi_nit = None 
-        self.all_tot_ncp = None 
-        self.all_ncp_for_each_mass = None
-        
-        self.all_mean_widths = None
-        self.all_mean_intensities = None 
-        self.all_std_widths = None 
-        self.all_std_intensities = None 
+        allIterNcp = []
+        allFitWs = []
+        allTotNcp = []
+        allBestPar = []
+        allMeanWidhts = []
+        allMeanIntensities = []
+        allStdWidths = []
+        allStdIntensities = []
+        j=0
+        while True:
+            try:
+                wsIterName = ic.name+str(j)
+
+                # Extract ws that were fitted
+                ws = mtd[wsIterName]
+                allFitWs.append(ws.extractY())
+
+                # Extract total ncp
+                totNcpWs = mtd[wsIterName+"_TOF_Fitted_Profiles"]
+                allTotNcp.append(totNcpWs.extractY())
+
+                # Extract best fit parameters
+                fitParTable = mtd[wsIterName+"_Best_Fit_NCP_Parameters"]
+                bestFitPars = []
+                for key in fitParTable.keys():
+                    bestFitPars.append(fitParTable.column(key))
+                allBestPar.append(np.array(bestFitPars).T)
+                
+                # Extract individual ncp 
+                allNCP = []
+                i = 0
+                while True:   # By default, looks for all ncp ws until it breaks
+                    try:
+                        ncpWsToAppend = mtd[wsIterName+"_TOF_Fitted_Profile_"+str(i)]
+                        allNCP.append(ncpWsToAppend.extractY())
+                        i += 1
+                    except KeyError:
+                        break
+                allNCP = switchFirstTwoAxis(np.array(allNCP))
+                allIterNcp.append(allNCP)
+                
+                # Extract Mean and Std Widths, Intensities
+                meansTable = mtd[wsIterName + "_Mean_Widths_And_Intensities"]
+                allMeanWidhts.append(meansTable.column("Mean Widths"))
+                allStdWidths.append(meansTable.column("Std Widths"))
+                allMeanIntensities.append(meansTable.column("Mean Intensities"))
+                allStdIntensities.append(meansTable.column("Std Intensities"))  
+                
+                j+=1
+            except KeyError:
+                break
+
+        self.all_fit_workspaces = np.array(allFitWs)
+        self.all_spec_best_par_chi_nit = np.array(allBestPar)
+        self.all_tot_ncp = np.array(allTotNcp)
+        self.all_ncp_for_each_mass = np.array(allIterNcp)
+
+        self.all_mean_widths = np.array(allMeanWidhts)
+        self.all_mean_intensities = np.array(allMeanIntensities)
+        self.all_std_widths = np.array(allStdWidths)
+        self.all_std_intensities = np.array(allStdIntensities)
 
         # Pass all attributes of ic into attributes to be used whithin this object
         self.maskedDetectorIdx = ic.maskedDetectorIdx
@@ -241,87 +391,87 @@ class resultsObject:
         self.resultsSavePath = ic.resultsSavePath
 
 
-    def addDataY(self, dataY):
-        if self.all_fit_workspaces is None:
-            self.all_fit_workspaces = dataY[np.newaxis, :, :]
-        else:
-            self.all_fit_workspaces = np.append(self.all_fit_workspaces, dataY[np.newaxis, :, :], axis=0)
-        # self.all_fit_workspaces[MSiter] = dataY
+    # def addDataY(self, dataY):
+    #     if self.all_fit_workspaces is None:
+    #         self.all_fit_workspaces = dataY[np.newaxis, :, :]
+    #     else:
+    #         self.all_fit_workspaces = np.append(self.all_fit_workspaces, dataY[np.newaxis, :, :], axis=0)
+    #     # self.all_fit_workspaces[MSiter] = dataY
     
 
-    def addFitPars(self, fitPars):
-        if self.all_spec_best_par_chi_nit is None:
-            self.all_spec_best_par_chi_nit = fitPars[np.newaxis, :, :]
-        else:
-            self.all_spec_best_par_chi_nit = np.append(self.all_spec_best_par_chi_nit, fitPars[np.newaxis, :, :], axis=0)
+    # def addFitPars(self, fitPars):
+    #     if self.all_spec_best_par_chi_nit is None:
+    #         self.all_spec_best_par_chi_nit = fitPars[np.newaxis, :, :]
+    #     else:
+    #         self.all_spec_best_par_chi_nit = np.append(self.all_spec_best_par_chi_nit, fitPars[np.newaxis, :, :], axis=0)
        
  
-    def getMainPars(self):
-        # Since only want a reading, use copy() not to risk changing the array
-        return self.all_spec_best_par_chi_nit[-1][:, 1:-2].copy()
+    # def getMainPars(self):
+    #     # Since only want a reading, use copy() not to risk changing the array
+    #     return self.all_spec_best_par_chi_nit[-1][:, 1:-2].copy()
     
 
-    def addNCP(self, ncpForEachMass, ncpTotal):
-        if self.all_tot_ncp is None:
-            self.all_ncp_for_each_mass = ncpForEachMass[np.newaxis, :, :, :]
-            self.all_tot_ncp = ncpTotal[np.newaxis, :, :]
-        else:
-            self.all_ncp_for_each_mass = np.append(self.all_ncp_for_each_mass, ncpForEachMass[np.newaxis, :, :, :], axis=0)
-            self.all_tot_ncp = np.append(self.all_tot_ncp, ncpTotal[np.newaxis, :, :], axis=0)
+    # def addNCP(self, ncpForEachMass, ncpTotal):
+    #     if self.all_tot_ncp is None:
+    #         self.all_ncp_for_each_mass = ncpForEachMass[np.newaxis, :, :, :]
+    #         self.all_tot_ncp = ncpTotal[np.newaxis, :, :]
+    #     else:
+    #         self.all_ncp_for_each_mass = np.append(self.all_ncp_for_each_mass, ncpForEachMass[np.newaxis, :, :, :], axis=0)
+    #         self.all_tot_ncp = np.append(self.all_tot_ncp, ncpTotal[np.newaxis, :, :], axis=0)
 
 
-    def calculateMeansAndStd(self):
-        # Copy arrays to avoid changing stored values
-        # Transpose to horizontal shape
-        intensities = self.all_spec_best_par_chi_nit[-1][:, 1:-2:3].copy().T
-        widths = self.all_spec_best_par_chi_nit[-1][:, 2:-2:3].copy().T
-        noOfMasses = self.noOfMasses
+    # def calculateMeansAndStd(self):
+    #     # Copy arrays to avoid changing stored values
+    #     # Transpose to horizontal shape
+    #     intensities = self.all_spec_best_par_chi_nit[-1][:, 1:-2:3].copy().T
+    #     widths = self.all_spec_best_par_chi_nit[-1][:, 2:-2:3].copy().T
+    #     noOfMasses = self.noOfMasses
 
-        # Replace zeros from masked spectra with nans
-        widths[:, self.maskedDetectorIdx] = np.nan
-        intensities[:, self.maskedDetectorIdx] = np.nan
+    #     # Replace zeros from masked spectra with nans
+    #     widths[:, self.maskedDetectorIdx] = np.nan
+    #     intensities[:, self.maskedDetectorIdx] = np.nan
 
-        meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-        stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
+    #     meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
+    #     stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
 
-        # Subtraction row by row
-        widthDeviation = np.abs(widths - meanWidths)
-        # Where True, replace by nan
-        betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
-        betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
+    #     # Subtraction row by row
+    #     widthDeviation = np.abs(widths - meanWidths)
+    #     # Where True, replace by nan
+    #     betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+    #     betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
 
-        meanWidths = np.nanmean(betterWidths, axis=1)  
-        stdWidths = np.nanstd(betterWidths, axis=1)
+    #     meanWidths = np.nanmean(betterWidths, axis=1)  
+    #     stdWidths = np.nanstd(betterWidths, axis=1)
 
-        # Not nansum(), to propagate nan
-        normalization = np.sum(betterIntensities, axis=0)
-        intensityRatios = betterIntensities / normalization
+    #     # Not nansum(), to propagate nan
+    #     normalization = np.sum(betterIntensities, axis=0)
+    #     intensityRatios = betterIntensities / normalization
 
-        meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
-        stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
+    #     meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
+    #     stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
 
-        # Append in the same fashion as above
-        if self.all_mean_intensities is None:
-            self.all_mean_widths = meanWidths[np.newaxis, :]
-            self.all_std_widths = stdWidths[np.newaxis, :]
-            self.all_mean_intensities = meanIntensityRatios[np.newaxis, :]
-            self.all_std_intensities = stdIntensityRatios[np.newaxis, :]
-        else:
-            self.all_mean_widths = np.append(self.all_mean_widths, meanWidths[np.newaxis, :], axis=0) 
-            self.all_std_widths = np.append(self.all_std_widths, stdWidths[np.newaxis, :], axis=0)
-            self.all_mean_intensities = np.append(self.all_mean_intensities, meanIntensityRatios[np.newaxis, :], axis=0)
-            self.all_std_intensities = np.append(self.all_std_intensities, stdIntensityRatios[np.newaxis, :], axis=0)
+    #     # Append in the same fashion as above
+    #     if self.all_mean_intensities is None:
+    #         self.all_mean_widths = meanWidths[np.newaxis, :]
+    #         self.all_std_widths = stdWidths[np.newaxis, :]
+    #         self.all_mean_intensities = meanIntensityRatios[np.newaxis, :]
+    #         self.all_std_intensities = stdIntensityRatios[np.newaxis, :]
+    #     else:
+    #         self.all_mean_widths = np.append(self.all_mean_widths, meanWidths[np.newaxis, :], axis=0) 
+    #         self.all_std_widths = np.append(self.all_std_widths, stdWidths[np.newaxis, :], axis=0)
+    #         self.all_mean_intensities = np.append(self.all_mean_intensities, meanIntensityRatios[np.newaxis, :], axis=0)
+    #         self.all_std_intensities = np.append(self.all_std_intensities, stdIntensityRatios[np.newaxis, :], axis=0)
 
 
-    def printCurrentIrerationResults(self):
+    # def printCurrentIrerationResults(self):
 
-        print("\n\nSpec ------- Main Pars ----------- Chi Nit:\n")
-        print(self.all_spec_best_par_chi_nit[-1])
+    #     print("\n\nSpec ------- Main Pars ----------- Chi Nit:\n")
+    #     print(self.all_spec_best_par_chi_nit[-1])
 
-        for i, mass in enumerate(self.masses):
-            print(f"\nMass = {mass:.2f} amu:")
-            print(f"Width:     {self.all_mean_widths[-1, i]:.3f} \u00B1 {self.all_std_widths[-1, i]:.3f} ")
-            print(f"Intensity: {self.all_mean_intensities[-1, i]:.3f} \u00B1 {self.all_std_intensities[-1, i]:.3f} ")
+    #     for i, mass in enumerate(self.masses):
+    #         print(f"\nMass = {mass:.2f} amu:")
+    #         print(f"Width:     {self.all_mean_widths[-1, i]:.3f} \u00B1 {self.all_std_widths[-1, i]:.3f} ")
+    #         print(f"Intensity: {self.all_mean_intensities[-1, i]:.3f} \u00B1 {self.all_std_intensities[-1, i]:.3f} ")
 
 
     def save(self):
@@ -675,22 +825,28 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
     # Need to rearrage array of yspaces into seperate arrays for each mass
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     dataX = ws.extractX()
-    dataE = np.zeros(dataX.shape)
 
     # Original script does not have this step to multiply by histogram widths
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     dataX = dataX[:, :-1]       # Cut last column to match ncpTotal length
     dataY = ncpTotal * histWidths
-    dataE = dataE[:, :-1] * histWidths
+    # Also for the individual ncp
+    ncpForEachMass *= histWidths
 
-    ncpTotWs = CreateWorkspace(DataX=dataX.flatten(), DataY=dataY.flatten(), DataE=dataE.flatten(),
-                     Nspec=len(dataX), OutputWorkspace=ws.name()+"_tof_fitted_profiles")
-    SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_sum" )
+    ncpTotWs = CreateWorkspace(
+        DataX=dataX.flatten(), 
+        DataY=dataY.flatten(),
+        Nspec=len(dataX), 
+        OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
+    SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
 
     for i, ncp_m in enumerate(ncpForEachMass):
-        ncpMWs = CreateWorkspace(DataX=dataX.flatten(), DataY=ncp_m.flatten(), Nspec=len(dataX),
-                        OutputWorkspace=ws.name()+"_tof_fitted_profile_"+str(i+1))
-        SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_sum" )
+        ncpMWs = CreateWorkspace(
+            DataX=dataX.flatten(), 
+            DataY=ncp_m.flatten(), 
+            Nspec=len(dataX),
+            OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
+        SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
 
 
 

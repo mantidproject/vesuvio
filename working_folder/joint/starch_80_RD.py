@@ -190,12 +190,12 @@ if runOnlyYSpaceFit:
     allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-    allNCP = lastIterationNCP
+#     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+#     allNCP = lastIterationNCP
 
 
-print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+# fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
 
 # End of iteractive section
