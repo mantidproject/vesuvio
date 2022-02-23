@@ -40,10 +40,13 @@ class TestFitParameters(unittest.TestCase):
         self.optwidths = self.optmainPars[:, :, 1::3]
         self.optcenters = self.optmainPars[:, :, 2::3]
 
-        self.rtol = 0.0001
+        self.rtol = 1e-7
         self.equal_nan = True
 
     def test_mainPars(self):
+        for orip, optp in zip(self.orimainPars, self.optmainPars):
+            mask = ~np.isclose(orip, optp, rtol=self.rtol, equal_nan=True)
+            displayMask(mask, self.rtol, "Main Pars")
         nptest.assert_array_equal(self.orimainPars, self.optmainPars)
 
     def test_chi2(self):
@@ -72,10 +75,13 @@ class TestNcp(unittest.TestCase):
         optimizedResults = np.load(pathToOptimized)
         self.optncp = optimizedResults["all_tot_ncp"]
 
-        self.rtol = 0.001
+        self.rtol = 1e-7
         self.equal_nan = True
 
     def test_ncp(self):
+        for orincp, optncp in zip(self.orincp, self.optncp):
+            mask = ~np.isclose(orincp, optncp, rtol=self.rtol, equal_nan=True)
+            displayMask(mask, self.rtol, "NCP")
         nptest.assert_array_equal(self.orincp, self.optncp)
 
 
@@ -114,8 +120,13 @@ class TestFitWorkspaces(unittest.TestCase):
         self.optws = optimizedResults["all_fit_workspaces"]
 
         self.decimal = 8
+        self.rtol = 1e-7
+        self.equal_nan = True
 
     def test_ws(self):
+        for oriws, optws in zip(self.oriws, self.optws):
+            mask = ~np.isclose(oriws, optws, rtol=self.rtol, equal_nan=True)
+            displayMask(mask, self.rtol, "wsFinal")
         nptest.assert_array_equal(self.optws, self.oriws)
 
 

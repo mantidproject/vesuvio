@@ -147,35 +147,23 @@ class TestNcp(unittest.TestCase):
             plt.show()
 
 
-def plot_rel_errs(oriwidths, optwidths, name):
+def plot_values_and_errors(oriwidths, optwidths, name):
     noOfMasses = len(oriwidths[0])
-    fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
+    fig, axs = plt.subplots(2, noOfMasses, figsize=(12, 8))
+    x = range(len(oriwidths))
     relativeDifference = abs(optwidths - oriwidths) / oriwidths
-    x = range(len(oriwidths))
 
-    for i, ax in enumerate(axs):
-        ax.plot(x, relativeDifference[:, i], "bo--", label="relErr")
-        ax.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
+    for i in range(noOfMasses):
+        axs[0, i].plot(x, optwidths[:, i], "ro-", label="opt", alpha=0.6)
+        axs[0, i].plot(x, oriwidths[:, i], "bo--", label="ori", alpha=0.6)
+        axs[1, i].plot(x, relativeDifference[:, i], "bo--", label="relErr")
+        axs[1, i].yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
 
-    axs[0].set_ylabel("Relative Error")
-    fig.suptitle("Evolution of mean"+name+" over iterations")
-    plt.show()    
-
-
-def plot_values(oriwidths, optwidths, name):
-    noOfMasses = len(oriwidths[0])
-    fig, axs = plt.subplots(1, noOfMasses, figsize=(12, 4))
-    x = range(len(oriwidths))
-
-    for i, ax in enumerate(axs):
-        ax.plot(x, optwidths[:, i], "ro-", label="opt", alpha=0.6)
-        ax.plot(x, oriwidths[:, i], "bo--", label="ori", alpha=0.6)
-
-    axs[0].set_ylabel(name+" Values")
-    fig.suptitle("Evolution of mean "+name+" over iterations")
+    axs[0, 0].set_ylabel(name+" Values")
+    axs[1, 0].set_ylabel("Relative Error")
+    fig.suptitle("Evolution of mean and rel errors of "+name+" over iterations")
     plt.legend(loc="upper left", bbox_to_anchor = (1,1))
-    plt.show() 
-
+    plt.show()
 
 
 class TestMeanWidths(unittest.TestCase):
@@ -191,8 +179,7 @@ class TestMeanWidths(unittest.TestCase):
             "\nori: ", self.orimeanwidths[-1], 
             "\nopt: ", self.optmeanwidths[-1])
 
-        plot_rel_errs(self.orimeanwidths, self.optmeanwidths, "Widths")
-        # plot_values(self.orimeanwidths, self.optmeanwidths, "Widths")
+        plot_values_and_errors(self.orimeanwidths, self.optmeanwidths, "Widths")
 
 
 class TestMeanIntensities(unittest.TestCase):
@@ -208,8 +195,7 @@ class TestMeanIntensities(unittest.TestCase):
             "\nori: ", self.orimeanintensities[-1], 
             "\nopt: ", self.optmeanintensities[-1])
 
-        plot_rel_errs(self.orimeanintensities, self.optmeanintensities, "Intensity Ratios")
-        # plot_values(self.orimeanintensities, self.optmeanintensities, "Intensity Ratios")
+        plot_values_and_errors(self.orimeanintensities, self.optmeanintensities, "Intensity Ratios")
 
 
 class TestFitWorkspaces(unittest.TestCase):
