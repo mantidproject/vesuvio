@@ -23,9 +23,7 @@ def iterativeFitForDataReduction(ic):
         fitNcpToWorkspace(ic, wsToBeFitted)
         
         meanWidths, meanIntensityRatios = createMeansAndStdTableWS(wsToBeFitted.name(), ic)
-        # fittingResults.calculateMeansAndStd()
-        # fittingResults.printCurrentIrerationResults()
-
+   
         # When last iteration, skip MS and GC
         if iteration == ic.noOfMSIterations - 1:
           break 
@@ -48,16 +46,6 @@ def iterativeFitForDataReduction(ic):
     fittingResults = resultsObject(ic)
     fittingResults.save()
     return wsFinal, fittingResults
-
-
-# def printInitialParameters(ic):
-#     print("\nRUNNING ", ic.modeRunning, " SCATTERING.")
-#     if ic.modeRunning == "BACKWARD":
-#         print("\n\nH to first mass ratio: ", ic.HToMass0Ratio)
-#     print("\n\nInitial fitting parameters:\n", 
-#             ic.initPars.reshape((ic.masses.size, 3)),
-#             "\n\nInitial fitting bounds:\n", 
-#             ic.bounds, "\n")
 
 
 def createTableInitialParameters(ic):
@@ -251,10 +239,10 @@ def createMeansAndStdTableWS(wsName, ic):
 
 
 def calculateMeansAndStds(widths, intensities, ic):
-    assert len(widths) == ic.noOfMasses, "widths and intensities not in correct shape!"
+    assert len(widths) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
     noOfMasses = ic.noOfMasses
 
-    widths = widths.copy()      # copy to avoid accidental changes in arrays
+    widths = widths.copy()      # Copy to avoid accidental changes in arrays
     intensities = intensities.copy()
     # Replace zeros from masked spectra with nans
     widths[:, ic.maskedDetectorIdx] = np.nan
@@ -357,8 +345,9 @@ def calculateKinematicsArrays(dataX, instrPars):
 
 
 def reshapeArrayPerSpectrum(A):
-    """Exchanges the first two indices of an array A,
-    ao rearranges array to match iteration per spectrum of main fitting map()
+    """
+    Exchanges the first two axes of an array A.
+    Rearranges array to match iteration per spectrum
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 

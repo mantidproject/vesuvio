@@ -9,7 +9,7 @@ scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
 
 # Set output path
-testingCleaning = False
+testingCleaning = True
 if testingCleaning:     
     cleaningPath = experimentPath / "output" / "testing" / "cleaning"
 
@@ -137,9 +137,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
-    firstSpec = 144 #164   #144
-    lastSpec = 182  #175    #182
+    noOfMSIterations = 2   #4
+    firstSpec = 164   #144
+    lastSpec = 175    #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
