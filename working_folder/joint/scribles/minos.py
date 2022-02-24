@@ -33,32 +33,29 @@ m.scipy(constraints=constraints)
 # m.migrad()
 
 m.hesse()
-yfit, ycov =  util.propagate(lambda pars: HermitePolynomial(x, *pars), m.values, m.covariance)
-ci = np.sqrt(np.diag(ycov)) * m.fval / (len(x)-m.nfit)
+# yfit, ycov =  util.propagate(lambda pars: HermitePolynomial(x, *pars), m.values, m.covariance)
+# ci = np.sqrt(np.diag(ycov)) * m.fval / (len(x)-m.nfit)
 
 
-m.minos()
-#%%
-cov = m.covariance
-corr = np.zeros(cov.shape)
-for i in range(len(corr)):
-    for j in range(len(corr[0])):
-        corr[i, j] =  cov[i, j] / np.sqrt(cov[i, i] * cov[j, j])
-corr *= 100
-print(corr)
-
-#%%
-plt.errorbar(x, dataY, yerr, fmt="o")
-plt.plot(x, yfit, color="red", label="Minuit with Scipy")
-plt.fill_between(x, yfit-ci, yfit+ci, color="red", alpha=0.2, label="CI")
-
-# display legend with some fit info
-fit_info = [
-    f"$\\chi^2$ / $n_\\mathrm{{dof}}$ = {m.fval:.1f} / {x.size - m.nfit}",
-]
-for p, v, e in zip(m.parameters, m.values, m.errors):
-    fit_info.append(f"{p} = ${v:.3f} \\pm {e:.3f}$")
-
-plt.legend(title="\n".join(fit_info))
-
+# m.minos()
+m.draw_mnprofile("sigma1", bound=3)
+# m.draw_contour("c4", "c6")
 plt.show()
+#%%
+# cov = m.covariance.correlation()
+
+#%%
+# plt.errorbar(x, dataY, yerr, fmt="o")
+# plt.plot(x, yfit, color="red", label="Minuit with Scipy")
+# plt.fill_between(x, yfit-ci, yfit+ci, color="red", alpha=0.2, label="CI")
+
+# # display legend with some fit info
+# fit_info = [
+#     f"$\\chi^2$ / $n_\\mathrm{{dof}}$ = {m.fval:.1f} / {x.size - m.nfit}",
+# ]
+# for p, v, e in zip(m.parameters, m.values, m.errors):
+#     fit_info.append(f"{p} = ${v:.3f} \\pm {e:.3f}$")
+
+# plt.legend(title="\n".join(fit_info))
+
+# plt.show()
