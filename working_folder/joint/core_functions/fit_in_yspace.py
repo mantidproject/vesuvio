@@ -1,4 +1,5 @@
 from unicodedata import name
+from matplotlib.pyplot import table
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
@@ -23,8 +24,9 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
     fitProfileMantidFit(ic, wsYSpaceAvg, wsResSum)
     
+    printYSpaceFitResults(wsYSpaceAvg.name())
+
     yfitResults = ResultsYFitObject(ic, wsFinal.name())
-    yfitResults.printYSpaceFitResults()
     yfitResults.save()
 
     if ic.globalFitFlag:
@@ -182,8 +184,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     if ic.singleGaussFitToHProfile:
         def convolvedModel(x, y0, A, x0, sigma):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            histWidths = x[1] - x[0]     # Assumes all widhts are equal, take first
-            return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths
+            histWidths0 = x[1] - x[0]     # Assumes all widhts are equal, take first
+            return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths0
 
         # Fit with Minuit
         costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
@@ -200,8 +202,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
 
-            histWidths = x[1] - x[0]     # Assumes all widhts are equal, take first
-            return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths
+            histWidths0 = x[1] - x[0]     # Assumes all widhts are equal, take first
+            return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths0
 
         # Fit with Minuit
         costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
@@ -303,6 +305,23 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
     return 
 
 
+def printYSpaceFitResults(wsJoYName):
+    print("\nFit in Y Space results:")
+
+    wsFitLM = mtd[wsJoYName + "_Fitted_Levenberg-Marquardt_Parameters"]
+    wsFitSimplex = mtd[wsJoYName + "_Fitted_Simplex_Parameters"]
+    wsFitMinuit = mtd[wsJoYName + "_Fitted_Minuit_Parameters"]
+
+    for tableWS in [wsFitLM, wsFitSimplex, wsFitMinuit]:
+        print("\n"+" ".join(tableWS.getName().split("_")[-3:])+":")
+        # print("    ".join(tableWS.keys()))
+        for key in tableWS.keys():
+            if key=="Name":
+                print(f"{key:12s}:  "+"  ".join([f"{elem:7.8s}" for elem in tableWS.column(key)]))
+            else:
+                print(f"{key:12s}: "+"  ".join([f"{elem:7.4f}" for elem in tableWS.column(key)]))
+
+
 class ResultsYFitObject:
 
     def __init__(self, ic, wsFinalName):
@@ -339,21 +358,6 @@ class ResultsYFitObject:
         self.savePath = ic.ySpaceFitSavePath
         self.singleGaussFitToHProfile = ic.singleGaussFitToHProfile
 
-    def printYSpaceFitResults(self):
-        print("\nFit in Y Space results:")
-
-        if self.singleGaussFitToHProfile:
-            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-                print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["y0:", "A:", "x0:", "sigma:"], self.popt[i], self.perr[i]):
-                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-                print(f"Cost function: {self.popt[i, -1]:5.3}")
-        else:
-            for i, fit in enumerate(["Minuit Fit", "Mantid Fit LM", "Mantid Fit Simplex"]):
-                print(f"\n{fit:15s}")
-                for par, popt, perr in zip(["A", "x0", "sigma:", "c4:", "c6:"], self.popt[i], self.perr[i]):
-                    print(f"{par:9s} {popt:8.4f} \u00B1 {perr:6.4f}")
-                print(f"Cost function: {self.popt[i, -1]:5.3}")
 
     def save(self):
         np.savez(self.savePath,
