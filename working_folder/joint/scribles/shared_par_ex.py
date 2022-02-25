@@ -26,7 +26,14 @@ costFun2 = cost.LeastSquares(x, dataY2, yerr2, make_with_signature(HermitePolyno
 totCostFun = costFun1 + costFun2
 print(f"{describe(totCostFun)=}")
 
-m = Minuit(totCostFun, A1=1, A2=1, x01=0, x02=0, sigma1=4, c4=0, c6=0)
+kwd = {
+    "A1":1, 
+    "A2":1, 
+    "x01":0, 
+    "x02":0
+}
+
+m = Minuit(totCostFun, **kwd, sigma1=4, c4=0, c6=0)
 
 m.simplex()
 m.migrad()
@@ -49,6 +56,7 @@ def plotSingle(costFun, minuit, ax):
 
     ax.plot(x, yfit, label="\n".join(leg))
     ax.set_ylim(-0.02, 0.1)
+
 
 fig, axs = plt.subplots(1, 2, figsize=(14, 5))
 # Add original data

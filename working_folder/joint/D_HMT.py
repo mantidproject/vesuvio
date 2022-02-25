@@ -191,8 +191,8 @@ if runOnlyYSpaceFit:
     wsFinal = mtd["DHMT_300K_RD_forward_1"]
     allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
-    wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
-#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+#     wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
+    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
     allNCP = lastIterationNCP
 
