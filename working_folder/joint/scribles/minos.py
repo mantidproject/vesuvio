@@ -1,4 +1,5 @@
 #%%
+from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 from iminuit import Minuit, cost, util
@@ -37,10 +38,66 @@ m.hesse()
 # ci = np.sqrt(np.diag(ycov)) * m.fval / (len(x)-m.nfit)
 
 
+constrMin = m.fval
+
+
 # m.minos()
-m.draw_mnprofile("sigma1", bound=3)
+# m.draw_mnprofile("sigma1", bound=2)
+
+
+# Manual Implementatino of MINOS:
+sigmaErr = m.errors["sigma1"]
+sigmaVal = m.values["sigma1"]
+bound = 2
+parSpace = np.linspace(sigmaVal-bound*sigmaErr, sigmaVal+bound*sigmaErr, 30)
+
+# Unconstrained profile
+valsMigrad = []
+for sig in parSpace:
+    m.limits["sigma1"] = (sig, sig)
+    m.migrad()           # Unconstrained function produces same result as profile
+    valsMigrad.append(m.fval)
+valsMigrad = np.array(valsMigrad)
+
+
+# Constrained profile
+valsScipy = []
+for sig in parSpace:
+    m = Minuit(costFun, A=1, x0=0, sigma1=sig, c4=0, c6=0)
+    m.limits["A"] = (0, None)
+    m.fixed["sigma1"] = True
+
+    m.simplex()
+    constraints = optimize.NonlinearConstraint(lambda *pars: HermitePolynomial(x, *pars), 0, np.inf)
+    m.scipy(constraints=constraints)   
+
+    valsScipy.append(m.fval)
+valsScipy = np.array(valsScipy)
+newParSpace = np.linspace(sigmaVal-bound*sigmaErr, sigmaVal+bound*sigmaErr, 1000)
+valsScipy = np.interp(newParSpace, parSpace, valsScipy)
+
+fig, ax = plt.subplots(1)
+
+ax.plot(parSpace, valsMigrad, label="Unconstr Migrad")
+ax.plot(newParSpace, valsScipy, label="Constr Scipy")
+ax.hlines(constrMin+1, np.min(parSpace), np.max(parSpace))
+ax.hlines(constrMin, np.min(parSpace), np.max(parSpace))
+
+idx = np.argwhere(np.diff(np.sign(valsScipy - constrMin - 1)))
+# plt.vlines(newParSpace[idx], np.min(valsMigrad), np.max(valsScipy), label=str(sigmaVal-newParSpace[idx]), color="red")
+ax.axvspan(sigmaVal-sigmaErr, sigmaVal+sigmaErr, alpha=0.2, color="grey", label="Hess error")
+ax.axvspan(newParSpace[idx][0], newParSpace[idx][1], alpha=0.2, color="red", label="Manual Minos error")
+ax.vlines(sigmaVal, np.min(valsMigrad), np.max(valsScipy), "k", "--")
 # m.draw_contour("c4", "c6")
+
+plt.legend()
 plt.show()
+
+
+
+
+
+
 #%%
 # cov = m.covariance.correlation()
 
