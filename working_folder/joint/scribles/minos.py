@@ -3,6 +3,8 @@ from functools import partial
 import numpy as np
 import matplotlib.pyplot as plt
 from iminuit import Minuit, cost, util
+from iminuit.util import describe
+
 from scipy import optimize
 
 
@@ -72,6 +74,7 @@ for sig in parSpace:
     m.scipy(constraints=constraints)   
 
     valsScipy.append(m.fval)
+
 valsScipy = np.array(valsScipy)
 newParSpace = np.linspace(sigmaVal-bound*sigmaErr, sigmaVal+bound*sigmaErr, 1000)
 valsScipy = np.interp(newParSpace, parSpace, valsScipy)

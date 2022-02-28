@@ -4,13 +4,14 @@ from iminuit import Minuit, cost, util
 from iminuit.util import make_with_signature, describe
 from pathlib import Path
 from mantid.simpleapi import Load
+from scipy import optimize
 repoPath = Path(__file__).absolute().parent
 
 joyPath = repoPath / "wsJoY.nxs"
 wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
 
 
-def HermitePolynomial(x, A, x0, sigma1, c4, c6):
+def HermitePolynomial(x, sigma1, c4, c6, A, x0):
     func = A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
             *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
             -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
@@ -53,9 +54,9 @@ def plotData(x, y, yerr, ax):
     ax.errorbar(x, y, yerr, fmt=".", label="Data")
 
 # Extract data
-dataY = wsJoY.extractY()[:10]
-dataX = wsJoY.extractX()[:10]
-dataE = wsJoY.extractE()[:10]
+dataY = wsJoY.extractY()[:20]
+dataX = wsJoY.extractX()[:20]
+dataE = wsJoY.extractE()[:20]
 
 # Remove zeros
 # dataY = dataY[np.any(dataY!=0, axis=1)]
@@ -74,6 +75,17 @@ for x, y, yerr, ax in zip(dataX, dataY, dataE, axs.flat):
 
 
 totCost, kwargs = constructTotalCostFun(dataX, dataY, dataE, HermitePolynomial)
+print(describe(totCost))
+
+def globalConstr(x, *pars):
+    sigma1, c4, c6 = pars[:3]
+    return (1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
+            -48*(x/np.sqrt(2)/sigma1)**2+12) \
+            +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
+            -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+
+constraints = optimize.NonlinearConstraint(lambda *pars: globalConstr(dataX[0], *pars), 0, np.inf)
+
 
 m = Minuit(totCost, **kwargs, sigma1=4, c4=0, c6=0)
 
@@ -82,7 +94,8 @@ for i in range(len(dataY)):
     m.limits["A"+str(i)] = (0, np.inf)
 
 m.simplex()
-m.migrad()
+# m.migrad()
+m.scipy(constraints=constraints)
 
 # The constrained fit is a bit of a nightmare though?
 # One constraint for each spectrum, maybe that is too much
@@ -93,3 +106,7 @@ for x, costF, ax in zip(dataX, totCost, axs.flat):
     ax.legend()
 plt.show()
     
+newfig, ax = plt.subplots(1)
+m.minos()
+m.draw_mnprofile("sigma1", bound=2)
+plt.show()
