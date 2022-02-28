@@ -55,27 +55,25 @@ parSpace = np.linspace(sigmaVal-bound*sigmaErr, sigmaVal+bound*sigmaErr, 30)
 
 # Unconstrained profile
 valsMigrad = []
-for sig in parSpace:
-    m.limits["sigma1"] = (sig, sig)
-    m.migrad()           # Unconstrained function produces same result as profile
-    valsMigrad.append(m.fval)
-valsMigrad = np.array(valsMigrad)
-
-
 # Constrained profile
 valsScipy = []
+
+# constraints = optimize.NonlinearConstraint(lambda *pars: HermitePolynomial(x, *pars), 0, np.inf)  
+def constrFunc(*pars):
+    return HermitePolynomial(x, *pars)
+
+m.fixed["sigma1"] = True     # sigma1 not allowed to change by fit
 for sig in parSpace:
-    m = Minuit(costFun, A=1, x0=0, sigma1=sig, c4=0, c6=0)
-    m.limits["A"] = (0, None)
-    m.fixed["sigma1"] = True
+    m.values["sigma1"] = sig
+    valsMigrad.append(m.migrad().fval)   # Unconstrained function produces same result as profile
 
-    m.simplex()
-    constraints = optimize.NonlinearConstraint(lambda *pars: HermitePolynomial(x, *pars), 0, np.inf)
-    m.scipy(constraints=constraints)   
+    # Constrained function with scipy
+    constraints = optimize.NonlinearConstraint(constrFunc, 0, np.inf)  
+    valsScipy.append(m.scipy(constraints=constraints).fval)
 
-    valsScipy.append(m.fval)
-
+valsMigrad = np.array(valsMigrad)
 valsScipy = np.array(valsScipy)
+
 newParSpace = np.linspace(sigmaVal-bound*sigmaErr, sigmaVal+bound*sigmaErr, 1000)
 valsScipy = np.interp(newParSpace, parSpace, valsScipy)
 
