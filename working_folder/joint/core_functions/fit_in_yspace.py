@@ -1,5 +1,4 @@
-from unicodedata import name
-from matplotlib.pyplot import table
+import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
@@ -205,12 +204,15 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
             histWidths0 = x[1] - x[0]     # Assumes all widhts are equal, take first
             return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths0
 
+        def constrFunc(*pars):
+            return convolvedModel(dataX, *pars)
+
         # Fit with Minuit
         costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
         m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
         m.limits["A"] = (0, None)
         m.simplex()
-        constraints = optimize.NonlinearConstraint(lambda *pars: convolvedModel(dataX, *pars), 0, np.inf)
+        constraints = optimize.NonlinearConstraint(constrFunc, 0, np.inf)
         m.scipy(constraints=constraints)
 
     # Explicit calculation of Hessian after the fit
@@ -258,20 +260,32 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     tableWS.addColumn(type='str', name="Name")
     tableWS.addColumn(type='float', name="Value")
     tableWS.addColumn(type='float', name="Error")
-    tableWS.addColumn(type='float', name="Minos Error-")
-    tableWS.addColumn(type='float', name="Minos Error+")
+    tableWS.addColumn(type='float', name="Auto Minos Error-")
+    tableWS.addColumn(type='float', name="Auto Minos Error+")
+    tableWS.addColumn(type='float', name="Manual Minos Error-")
+    tableWS.addColumn(type='float', name="Manual Minos Error+")
+
+
+    # Extract info from fit before running any MINOS
+    parameters = m.parameters
+    values = m.values
+    errors = m.errors
 
     try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
         m.minos()
         me = m.merrors
-        for p, v, e in zip(m.parameters, m.values, m.errors):
-            tableWS.addRow([p, v, e, me[p].lower, me[p].upper])  
+        for p, v, e in zip(parameters, values, errors):
+            tableWS.addRow([p, v, e, me[p].lower, me[p].upper, 0, 0])  
+        
+        plotAutoMinos(m)
 
     except RuntimeError:
-        for p, v, e in zip(m.parameters, m.values, m.errors):
-            tableWS.addRow([p, v, e, 0, 0])
+        merrors = runAndPlotManualMinos(m, constrFunc)
 
-    tableWS.addRow(["Cost function", chi2, 0, 0, 0])
+        for p, v, e in zip(parameters, values, errors):
+            tableWS.addRow([p, v, e, 0, 0, merrors[p][0], merrors[p][1]])
+
+    tableWS.addRow(["Cost function", chi2, 0, 0, 0, 0, 0])
     return 
 
 
@@ -303,6 +317,131 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
             )
         # Fit produces output workspaces with results
     return 
+
+
+def runAndPlotManualMinos(minuitObj, constrFunc):
+    # Set format of subplots
+    height = 2
+    width = int(np.ceil(len(minuitObj.parameters)/2))
+    figsize = (12, 7)
+    # Output plot to Mantid
+    fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
+    fig.canvas.set_window_title("Manual Implementation of Minos algorithm")
+
+    merrors = {}
+    for p, ax in zip(minuitObj.parameters, axs.flat):
+        lerr, uerr = runMinosForPar(minuitObj, constrFunc, p, 2, ax)
+        merrors[p] = np.array([lerr, uerr])
+
+    # Hide plots not in use:
+    for ax in axs.flat:
+        if not ax.lines:   # If empty list
+            ax.set_visible(False)
+
+    # ALl axes share same legend, so set figure legend to first axis
+    handle, label = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handle, label, loc='lower right')
+    fig.show()
+    return merrors
+
+
+def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax):
+
+    minuitObj.migrad()
+    minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
+    minuitObj.hesse()
+
+    varVal = minuitObj.values[var]
+    varErr = minuitObj.errors[var]
+    # Store fval of best fit
+    fValsMin = minuitObj.fval      # Used to calculate error bands at the end
+
+    # Initiate arrays
+    varSpace = np.linspace(varVal - bound*varErr, varVal + bound*varErr, 30)
+    fValsScipy = np.zeros(varSpace.shape)
+    fValsMigrad = np.zeros(varSpace.shape)
+
+    # Run Minos algorithm
+    minuitObj.fixed[var] = True        # Variable to be fixed at each iteration
+    for i in range(fValsScipy.size):
+        minuitObj.values[var] = varSpace[i]      # Fix variable
+
+        minuitObj.migrad()        # Unconstrained fit
+        fValsMigrad[i] = minuitObj.fval
+
+        # Constrained fit
+        minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
+        fValsScipy[i] = minuitObj.fval
+    
+    minuitObj.fixed[var] = False    # Release variable       
+
+    # Use intenpolation to create dense array of fmin values 
+    varSpaceDense = np.linspace(np.min(varSpace), np.max(varSpace), 1000)
+    fValsScipyDense = np.interp(varSpaceDense, varSpace, fValsScipy)
+    # Calculate points of intersection with line delta fmin val = 1
+    idxErr = np.argwhere(np.diff(np.sign(fValsScipyDense - fValsMin - 1)))
+    
+    if idxErr.size != 2:    # Intersections not found, there is an error somewhere
+        lerr, uerr = 0., 0.   
+    else:
+        lerr, uerr = varSpaceDense[idxErr].flatten() - varVal
+
+    ax.plot(varSpaceDense, fValsScipyDense, label="fVals Constr Scipy")
+    plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr)
+  
+    return lerr, uerr
+
+
+def plotAutoMinos(minuitObj):
+    # Set format of subplots
+    height = 2
+    width = int(np.ceil(len(minuitObj.parameters)/2))
+    figsize = (12, 7)
+    # Output plot to Mantid
+    fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
+    fig.canvas.set_window_title("Plot of automatic Minos algorithm")
+
+    for p, ax in zip(minuitObj.parameters, axs.flat):
+        loc, fvals, status = minuitObj.mnprofile(p, bound=2)
+        
+
+        minfval = minuitObj.fval
+        minp = minuitObj.values[p]
+        hessp = minuitObj.errors[p]
+        lerr = minuitObj.merrors[p].lower
+        uerr = minuitObj.merrors[p].upper
+        plotProfile(ax, p, loc, fvals, lerr, uerr, minfval, minp, hessp)
+
+    # Hide plots not in use:
+    for ax in axs.flat:
+        if not ax.lines:   # If empty list
+            ax.set_visible(False)
+
+    # ALl axes share same legend, so set figure legend to first axis
+    handle, label = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handle, label, loc='lower right')
+    fig.show()   
+
+
+def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr):
+    """
+    Plots likelihood profilef for the Migrad fvals.
+    x: varSpace;
+    y: fValsMigrad
+    """
+
+    ax.set_title(var+f" = {varVal:.3f} {lerr:.3f} {uerr:+.3f}")
+
+    ax.plot(varSpace, fValsMigrad, label="fVals Migrad")
+
+    ax.axvspan(lerr+varVal, uerr+varVal, alpha=0.2, color="red", label="Manual Minos error")
+    ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="grey", label="Hessian Std error")
+    
+    ax.axvline(varVal, 0.03, 0.97, color="k", ls="--")
+    ax.axhline(fValsMin+1, 0.03, 0.97, color="k")
+    ax.axhline(fValsMin, 0.03, 0.97, color="k")
+
+
 
 
 def printYSpaceFitResults(wsJoYName):

@@ -29,7 +29,7 @@ def runAndPlotManualMinos(minuitObj):
     handle, label = axs[0, 0].get_legend_handles_labels()
     fig.legend(handle, label, loc='lower right')
     plt.show()
-
+    return merrors
 
 def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax):
 
@@ -162,5 +162,5 @@ try:
 except RuntimeError:
     print("\nAutomatic MINOS failed because constr result away from minima")
     print("Running Manual implementation of MINOS ...\n")
-    
+
     runAndPlotManualMinos(m)
