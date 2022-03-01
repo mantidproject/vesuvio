@@ -4,14 +4,18 @@ import matplotlib.pyplot as plt
 from iminuit import Minuit, cost, util
 from iminuit.util import describe
 from scipy import optimize
+from mantid import plots
 
 
-def runManualMinos(minuitObj, constrFunc, var:str, bound:int):
+def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax):
+
+    minuitObj.migrad()
+    minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
+    minuitObj.hesse()
 
     varVal = minuitObj.values[var]
     varErr = minuitObj.errors[var]
-
-    # Before any modification to minuitObj, store fval of best fit
+    # Store fval of best fit
     fValsMin = minuitObj.fval      # Used to calculate error bands at the end
 
     # Initiate arrays
@@ -19,9 +23,10 @@ def runManualMinos(minuitObj, constrFunc, var:str, bound:int):
     fValsScipy = np.zeros(varSpace.shape)
     fValsMigrad = np.zeros(varSpace.shape)
 
-    minuitObj.fixed[var] = True        
+    # Run Minos algorithm
+    minuitObj.fixed[var] = True        # Variable to be fixed at each iteration
     for i in range(fValsScipy.size):
-        minuitObj.values[var] = varSpace[i]  
+        minuitObj.values[var] = varSpace[i]      # Fix variable
 
         minuitObj.migrad()        # Unconstrained fit
         fValsMigrad[i] = minuitObj.fval
@@ -30,31 +35,42 @@ def runManualMinos(minuitObj, constrFunc, var:str, bound:int):
         minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
         fValsScipy[i] = minuitObj.fval
     
+    minuitObj.fixed[var] = False    # Release variable       
+
     # Use intenpolation to create dense array of fmin values 
     denseVarSpace = np.linspace(np.min(varSpace), np.max(varSpace), 1000)
     denseFVals = np.interp(denseVarSpace, varSpace, fValsScipy)
 
     # Calculate points of intersection with line delta fmin val = 1
     idxErr = np.argwhere(np.diff(np.sign(denseFVals - fValsMin - 1)))
-    lerr, uerr = denseVarSpace[idxErr]
 
-    # Plot results
-    fig, ax = plt.subplots(1)
+    plotProfile(
+        ax, var, varSpace, fValsMigrad, \
+        denseVarSpace, denseFVals, idxErr, fValsMin, varVal, varErr
+    )
+
+    return denseVarSpace[idxErr] - varVal  # Array with lower and upper asymetric errors
+
+
+def plotProfile(ax, var, varSpace, fValsMigrad, denseVarSpace, denseFVals, idxErr, fValsMin, varVal, varErr):
+    """Plots likelihood profile of var in ax"""
+
+    ax.set_title(var)
     ax.plot(denseVarSpace, denseFVals, label="fVals Constr")
     ax.plot(varSpace, fValsMigrad, label="fVals Unconstr")
 
     ax.hlines(fValsMin+1, np.min(varSpace), np.max(varSpace))
     ax.hlines(fValsMin, np.min(varSpace), np.max(varSpace))
 
-    ax.axvspan(lerr, uerr, alpha=0.2, color="red", label="Manual Minos error")
+    if len(idxErr) == 2:
+        lerr, uerr = denseVarSpace[idxErr].flatten()
+        ax.axvspan(lerr, uerr, alpha=0.2, color="red", label="Manual Minos error")
+        ax.set_title(var+f" = {varVal:.3f} {lerr-varVal:.3f} {uerr-varVal:+.3f}")
+    
     ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="grey", label="Hessian Std error")
     
-    ax.vlines(varVal, np.min(fValsMigrad), np.max(fValsScipy), "k", "--")
-    plt.legend()
-    plt.show()
-
-    return denseVarSpace[idxErr] - varVal  # Array with lower and upper asymetric errors
-
+    ax.vlines(varVal, np.min(fValsMigrad), np.max(denseFVals), "k", "--")
+    
 
 
 def HermitePolynomial(x, A, x0, sigma1, c4, c6):
@@ -80,14 +96,79 @@ m = Minuit(costFun, A=1, x0=0, sigma1=6, c4=0, c6=0)
 m.limits["A"] = (0, None)
 m.simplex()
 m.scipy(constraints=constraints)
+# m.migrad()
 m.hesse()
 
-# try:
-#     m.minos()
+try:
+    m.minos()
 
-# except (RuntimeError, TypeError):
-print("\nAutomatic MINOS failed because constr result away from minima")
-print("Running Manual implementation of MINOS ...\n")
+    def plotMinos(minuitObj):
+        # Set format of subplots
+        height = 2
+        width = int(np.ceil(len(minuitObj.parameters)/2))
+        figsize = (12, 7)
+        # Output plot to Mantid
+        fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize)  #subplot_kw={'projection':'mantid'}
+        fig.canvas.set_window_title("Plot of automatic Minos algorithm")
 
-runManualMinos(m, constrFunc, "sigma1", 2)
+        for p, ax in zip(minuitObj.parameters, axs.flat):
+            loc, fvals, status = minuitObj.mnprofile(p, bound=2)
+            
+            # plotProfile(ax, p, loc, fvals, loc, fvals, )
+            ax.plot(loc, fvals, label="Original Minos")
+            
+            minfval = minuitObj.fval
+            ax.hlines(minfval, np.min(loc), np.max(loc))
+            ax.hlines(minfval+1, np.min(loc), np.max(loc))
 
+            minp = minuitObj.values[p]
+            hessp = minuitObj.errors[p]
+
+            ax.vlines(minp, np.min(fvals), np.max(fvals), "k", "--")
+            ax.axvspan(minp-hessp, minp+hessp, alpha=0.2, color="grey", label="Hessian Std error")
+            lerr = m.merrors[p].lower
+            uerr = m.merrors[p].upper
+            ax.axvspan(minp+lerr, minp+uerr, alpha=0.2, color="red", label="Minos error")
+            ax.set_title(p+f" = {minp:.3f} {lerr:.3f} {uerr:+.3f}")
+
+        # Hide plots not in use:
+        for ax in axs.flat:
+            if not ax.lines:   # If empty list
+                ax.set_visible(False)
+
+        # ALl axes share same legend, so set figure legend to first axis
+        handle, label = axs[0, 0].get_legend_handles_labels()
+        fig.legend(handle, label, loc='lower right')
+        plt.show()       
+
+    plotMinos(m)
+
+except (RuntimeError, TypeError):
+    print("\nAutomatic MINOS failed because constr result away from minima")
+    print("Running Manual implementation of MINOS ...\n")
+
+    def runAndPlotManualMinos(minuitObj):
+        # Set format of subplots
+        height = 2
+        width = int(np.ceil(len(minuitObj.parameters)/2))
+        figsize = (12, 7)
+        # Output plot to Mantid
+        fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize)  #subplot_kw={'projection':'mantid'}
+        fig.canvas.set_window_title("Manual Implementation of Minos algorithm")
+
+        merrors = {}
+        for p, ax in zip(minuitObj.parameters, axs.flat):
+            result = runMinosForPar(m, constrFunc, p, 2, ax)
+            merrors[p] = result.flatten()
+
+        # Hide plots not in use:
+        for ax in axs.flat:
+            if not ax.lines:   # If empty list
+                ax.set_visible(False)
+
+        # ALl axes share same legend, so set figure legend to first axis
+        handle, label = axs[0, 0].get_legend_handles_labels()
+        fig.legend(handle, label, loc='lower right')
+        plt.show()
+
+    runAndPlotManualMinos(m)
