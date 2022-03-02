@@ -174,6 +174,8 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     resolutionRebinPars = "-20, 0.5, 20" 
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = False
+    forceManualMinos = False
+
     
 
 bckwdIC = BackwardInitialConditions
