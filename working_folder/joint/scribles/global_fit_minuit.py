@@ -54,9 +54,9 @@ def plotData(x, y, yerr, ax):
     ax.errorbar(x, y, yerr, fmt=".", label="Data")
 
 # Extract data
-dataY = wsJoY.extractY()[:20]
-dataX = wsJoY.extractX()[:20]
-dataE = wsJoY.extractE()[:20]
+dataY = wsJoY.extractY()[10:14]
+dataX = wsJoY.extractX()[10:14]
+dataE = wsJoY.extractE()[10:14]
 
 # Remove zeros
 # dataY = dataY[np.any(dataY!=0, axis=1)]

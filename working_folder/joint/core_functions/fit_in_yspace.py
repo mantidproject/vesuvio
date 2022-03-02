@@ -118,6 +118,8 @@ def convertToYSpace(rebinPars, ws0, mass):
 
 
 def weightedAvg(wsYSpace):
+    """Returns ws with weighted avg of input ws"""
+    
     dataY = wsYSpace.extractY()
     dataE = wsYSpace.extractE()
 
@@ -211,9 +213,9 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
         m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
         m.limits["A"] = (0, None)
+        m.limits["c4"] = (0, None)      # c4 always positive
         m.simplex()
-        constraints = optimize.NonlinearConstraint(constrFunc, 0, np.inf)
-        m.scipy(constraints=constraints)
+        m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
 
     # Explicit calculation of Hessian after the fit
     m.hesse()
@@ -272,16 +274,23 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     errors = m.errors
 
     try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
+        if ic.forceManualMinos:
+            try:
+                constrFunc(*m.values)      # Check if constraint is present
+                raise(RuntimeError)        # If so, jump to Manual MINOS
+
+            except UnboundLocalError:      # Constraint not present, default to auto MINOS
+                print("\nConstraint not present, using default Automatic MINOS ...\n")
+                pass
+        
         m.minos()
         me = m.merrors
         for p, v, e in zip(parameters, values, errors):
-            tableWS.addRow([p, v, e, me[p].lower, me[p].upper, 0, 0])  
-        
+            tableWS.addRow([p, v, e, me[p].lower, me[p].upper, 0, 0])   
         plotAutoMinos(m)
 
     except RuntimeError:
-        merrors = runAndPlotManualMinos(m, constrFunc)
-
+        merrors = runAndPlotManualMinos(m, constrFunc)     # Changes values of minuit obj m, do not use m below this point
         for p, v, e in zip(parameters, values, errors):
             tableWS.addRow([p, v, e, 0, 0, merrors[p][0], merrors[p][1]])
 
@@ -290,7 +299,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
 
 def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
-    print('\n','Fitting on the sum of spectra in the West domain ...','\n')     
+    print('\nFitting on the sum of spectra in the West domain ...\n')     
     for minimizer in ['Levenberg-Marquardt','Simplex']:
         outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
@@ -376,7 +385,7 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax):
     minuitObj.fixed[var] = False    # Release variable       
 
     # Use intenpolation to create dense array of fmin values 
-    varSpaceDense = np.linspace(np.min(varSpace), np.max(varSpace), 1000)
+    varSpaceDense = np.linspace(np.min(varSpace), np.max(varSpace), 100000)
     fValsScipyDense = np.interp(varSpaceDense, varSpace, fValsScipy)
     # Calculate points of intersection with line delta fmin val = 1
     idxErr = np.argwhere(np.diff(np.sign(fValsScipyDense - fValsMin - 1)))
@@ -426,22 +435,20 @@ def plotAutoMinos(minuitObj):
 def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr):
     """
     Plots likelihood profilef for the Migrad fvals.
-    x: varSpace;
-    y: fValsMigrad
+    varSpace : x axis
+    fValsMigrad : y axis
     """
 
     ax.set_title(var+f" = {varVal:.3f} {lerr:.3f} {uerr:+.3f}")
 
     ax.plot(varSpace, fValsMigrad, label="fVals Migrad")
 
-    ax.axvspan(lerr+varVal, uerr+varVal, alpha=0.2, color="red", label="Manual Minos error")
+    ax.axvspan(lerr+varVal, uerr+varVal, alpha=0.2, color="red", label="Minos error")
     ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="grey", label="Hessian Std error")
     
     ax.axvline(varVal, 0.03, 0.97, color="k", ls="--")
     ax.axhline(fValsMin+1, 0.03, 0.97, color="k")
     ax.axhline(fValsMin, 0.03, 0.97, color="k")
-
-
 
 
 def printYSpaceFitResults(wsJoYName):
@@ -459,6 +466,7 @@ def printYSpaceFitResults(wsJoYName):
                 print(f"{key:12s}:  "+"  ".join([f"{elem:7.8s}" for elem in tableWS.column(key)]))
             else:
                 print(f"{key:12s}: "+"  ".join([f"{elem:7.4f}" for elem in tableWS.column(key)]))
+    print("\n")
 
 
 class ResultsYFitObject:

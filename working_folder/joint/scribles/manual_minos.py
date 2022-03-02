@@ -150,6 +150,7 @@ constraints = optimize.NonlinearConstraint(constrFunc, 0, np.inf)
 
 m = Minuit(costFun, A=1, x0=0, sigma1=6, c4=0, c6=0)
 m.limits["A"] = (0, None)
+m.limits["c4"] = (0, None)
 m.simplex()
 m.scipy(constraints=constraints)
 # m.migrad()
