@@ -123,6 +123,7 @@ def weightedAvg(wsYSpace):
     dataY = wsYSpace.extractY()
     dataE = wsYSpace.extractE()
 
+    # TODO: Revise this, some zeros might not be cut offs
     dataY[dataY==0] = np.nan
     dataE[dataE==0] = np.nan
 
@@ -152,6 +153,7 @@ def symmetrizeWs(avgSymFlag, avgYSpace):
         # Inverse variance weighting
         dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
         dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
+    # TODO: Maybe take out possibility of symmetrisation by mirror
     else:
         # Mirroring positive values from negative ones
         dataYSym = np.where(dataX>0, yFlip, dataY)
@@ -298,6 +300,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     return 
 
 
+# TODO: Maybe take out Mantid Fit
 def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
     print('\nFitting on the sum of spectra in the West domain ...\n')     
     for minimizer in ['Levenberg-Marquardt','Simplex']:
@@ -390,7 +393,7 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax):
     # Calculate points of intersection with line delta fmin val = 1
     idxErr = np.argwhere(np.diff(np.sign(fValsScipyDense - fValsMin - 1)))
     
-    if idxErr.size != 2:    # Intersections not found, there is an error somewhere
+    if idxErr.size != 2:    # Intersections not found, do not plot error range
         lerr, uerr = 0., 0.   
     else:
         lerr, uerr = varSpaceDense[idxErr].flatten() - varVal

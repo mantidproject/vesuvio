@@ -21,6 +21,7 @@ def HermitePolynomial(x, sigma1, c4, c6, A, x0):
             -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120)) 
     return func
 
+print(describe(HermitePolynomial))
 
 def globalConstr(x, *pars):
     sigma1, c4, c6 = pars[:3]
@@ -63,35 +64,6 @@ def plotSingle(x, costFun, minuit, ax):
 def plotData(x, y, yerr, ax):
     ax.errorbar(x, y, yerr, fmt="k.", label="Data")
 
-
-
-def fitGlobalFit(ws, wsRes, fun, constr):
-    
-    dataY = ws.extractY()
-    dataE = ws.extractE()
-    dataX = ws.extractX()
-
-    dataRes = wsRes.extractY()
-
-    totCost, kwargs = buildTotalCostFun(dataX, dataY, dataE, dataRes, fun)
-    print(describe(totCost))
-
-    m = Minuit(totCost, **kwargs, sigma1=4, c4=0, c6=0)
-    return
-
-
-def buildTotalCostFun(dataX, dataY, dataE, dataRes, fun):
-    totCost = 0
-    kwargs = {}
-    for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
-
-        def convolvedModel(*pars):
-            return ndimage.convolve1d(fun(x, *pars), res, mode="constant")
-
-        totCost += cost.LeastSquares(x, y, yerr, make_with_signature(convolvedModel, A="A"+str(i), x0="x0"+str(i)))
-        kwargs["A"+str(i)] = 1
-        kwargs["x0"+str(i)] = 0
-    return totCost, kwargs
 
 
 # Build random data with negativities
