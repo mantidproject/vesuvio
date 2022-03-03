@@ -11,7 +11,7 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     firstMass = ic.masses[0]
-    wsResSum, wsRes = calculateMantidResolution(ic.resolutionRebinPars, wsFinal, firstMass)
+    wsResSum, wsRes = calculateMantidResolution(ic, wsFinal, firstMass)
     
     wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
     wsYSpace, wsQ = convertToYSpace(ic.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
@@ -32,25 +32,26 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
         fitGlobalFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
 
 
-def calculateMantidResolution(rebinResPars, ws, mass):
+def calculateMantidResolution(ic, ws, mass):
     #TODO: Resolution function currently skips masked spectra and outputs ws with different size
     # Is this okay for the Global Fit?
     resName = ws.name()+"_Resolution"
     for index in range(ws.getNumberHistograms()):
-        if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
-            pass
-        else:
-            VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-            Rebin(InputWorkspace="tmp", Params=rebinResPars, OutputWorkspace="tmp")
+        # if np.all(ws.dataY(index)[:] == 0):  # Ignore masked spectra
+        #     pass
+        # else:
+        VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
+        Rebin(InputWorkspace="tmp", Params=ic.resolutionRebinPars, OutputWorkspace="tmp")
 
-            if index == 0:   # Ensures that workspace has desired units
-                RenameWorkspace("tmp",  resName)
-            else:
-                AppendSpectra(resName, "tmp", OutputWorkspace=resName)
-    try:
-        wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=ws.name()+"_Resolution_Sum")
-    except ValueError:
-        raise ValueError ("All the rows from the workspace to be fitted are Nan!")
+        if index == 0:   # Ensures that workspace has desired units
+            RenameWorkspace("tmp",  resName)
+        else:
+            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
+    # try:
+    MaskDetectors(resName, WorkspaceIndexList=ic.maskedDetectorIdx)
+    wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=ws.name()+"_Resolution_Sum")
+    # except ValueError:
+    #     raise ValueError ("All the rows from the workspace to be fitted might be nan.")
 
     normalise_workspace(wsResSum)
     DeleteWorkspace("tmp")
