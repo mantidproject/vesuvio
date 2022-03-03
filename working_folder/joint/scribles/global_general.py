@@ -9,42 +9,23 @@ from scipy import ndimage
 
 repoPath = Path(__file__).absolute().parent
 
-# def fitGlobalFit(ws, wsRes, fun, constr):
-    
-#     dataY = ws.extractY()
-#     dataE = ws.extractE()
-#     dataX = ws.extractX()
+def main():
 
-#     dataRes = wsRes.extractY()
-
-#     totCost, kwargs = buildTotalCostFun(dataX, dataY, dataE, dataRes, fun)
-#     print(describe(totCost))
-
-#     m = Minuit(totCost, **kwargs)
-#     return
+    joyPath = repoPath / "wsJOYsmall.nxs"
+    resPath = repoPath / "wsResSmall.nxs"
+    wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
+    wsRes = Load(str(resPath), OutputWorkspace="wsRes")
 
 
-# def totalCostFunAndArgs(dataX, dataY, dataE, dataRes, fun):
-#     totCost = 0
-#     kwargs = {}
-#     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
+    axs = plotData(wsJoY)
 
-#         def convolvedModel(x, *pars):
-#             return ndimage.convolve1d(fun(x, *pars), res, mode="constant")
+    m, totCost = fitGlobalFit(wsJoY, wsRes, True)
+    print("Sigma: ", m.values["sigma"])
 
-#         totCost += cost.LeastSquares(x, y, yerr, make_with_signature(convolvedModel, A="A"+str(i), x0="x0"+str(i)))
-    
-#     # Set initial parameters
-#     # Non shared pars
-#     for i in range(len(dataY)):
-#         kwargs["A"+str(i)] = 1
-#         kwargs["x0"+str(i)] = 0
+    plotFit(wsJoY.extractX(), totCost, m, axs)
+    plt.show()
 
-#     # Shared pars
-#     kwargs["sigma1"] = 4
-#     kwargs["c4"] = 0
-#     kwargs["c6"] = 0
-#     return totCost, kwargs
+
 
 
 def fitGlobalFit(ws, wsRes, gaussFlag):
@@ -52,22 +33,36 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
     dataY = ws.extractY()
     dataE = ws.extractE()
     dataX = ws.extractX()
-
     dataRes = wsRes.extractY()
+
+    # Removed masked spectra so that zeros are not fitted
+    zerosRowMask = np.all(dataY==0, axis=1)
+    dataY = dataY[~zerosRowMask]
+    dataE = dataE[~zerosRowMask]
+    dataX = dataX[~zerosRowMask]
+    dataRes = dataRes[~zerosRowMask]
+
+    # TODO: Possible symetrisation goes here
 
     totCost, kwargs = totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag)
     print(describe(totCost))
+    print(kwargs)
 
     m = Minuit(totCost, **kwargs)
 
     for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier
         m.limits["A"+str(i)] = (0, np.inf)
 
+    print(m.params)
     if gaussFlag:
         m.simplex()
         m.migrad()
+        print(m.params)
+        
 
     else:
+        m.limits["c4"] = (0, np.inf)
+
         x = dataX[0]
         def constr(*pars):
             """Constraint for positivity of Gram Carlier.
@@ -83,10 +78,8 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
 
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constr, 0, np.inf))
-
-
-
-    return
+    
+    return m, totCost
 
 
 def totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag):
@@ -99,7 +92,7 @@ def totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag):
             "y0" : 0,
             "A" : 1,
             "x0" : 0,
-            "sigma" : 5           
+            "sigma" : 4           
         }
 
         sharedPars = ["sigma"]
@@ -122,22 +115,26 @@ def totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag):
 
         sharedPars = ["sigma1", "c4", "c6"]        
 
-    totCost, initPars = totalCostFun(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars)
+    totCost, initPars = buildCostFun(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars)
     return totCost, initPars
 
 
-def totalCostGaussian(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars:list):
+def buildCostFun(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars:list):
     """Shared parameters are specified in a list of strings"""
 
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
     
-    unsharedPars = [key for key in defaultPars not in sharedPars]
+    unsharedPars = [key for key in defaultPars if key not in sharedPars]
 
     totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
 
-        def convolvedModel(x, *pars):    # Convolution at each spectra
-            return ndimage.convolve1d(fun(x, *pars), res, mode="constant")
+        # def convolvedModel(x, y0, A, x0, sigma):    # Convolution at each spectra
+        #     return ndimage.convolve1d(fun(x, y0, A, x0, sigma), res, mode="constant")
+        
+        def convolvedModel(x, y0, A, x0, sigma):
+            gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+            return gauss #ndimage.convolve1d(gauss, res, mode="constant")
 
         unsharedArgs = {}
         for upar in unsharedPars:
@@ -158,3 +155,44 @@ def totalCostGaussian(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars
             initPars[upar+str(i)] = defaultPars[upar]
     
     return totCost, initPars
+
+
+def plotData(ws):
+    dataY = ws.extractY()
+    dataE = ws.extractE()
+    dataX = ws.extractX()
+
+    mask = np.all(dataY==0, axis=1)
+    dataY = dataY[~mask]
+    dataE = dataE[~mask]
+    dataX = dataX[~mask]
+
+    fig, axs = plt.subplots(
+        2, int(np.ceil(len(dataY)/2)), 
+        figsize=(15, 8), 
+        tight_layout=True
+        )
+
+    for x, y, yerr, ax in zip(dataX, dataY, dataE, axs.flat):
+        ax.errorbar(x, y, yerr, fmt="k.", label="Data")
+    return axs
+
+
+def plotFit(dataX, totCost, minuit, axs):
+    for x, costFun, ax in zip(dataX, totCost, axs.flat):
+        signature = describe(costFun)
+
+        values = minuit.values[signature]
+        errors = minuit.errors[signature]
+
+        yfit = costFun.model(x, *values)
+
+        # Build a decent legend
+        leg = []
+        for p, v, e in zip(signature, values, errors):
+            leg.append(f"${p} = {v:.3f} \pm {e:.3f}$")
+
+        ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
+        ax.legend()
+
+main()
