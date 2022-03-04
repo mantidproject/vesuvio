@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from iminuit import Minuit, cost, util
 from iminuit.util import make_with_signature, describe
 from pathlib import Path
-from mantid.simpleapi import Load
+from mantid.simpleapi import Load, CropWorkspace
 from scipy import optimize
 from scipy import ndimage
 
@@ -16,6 +16,8 @@ def main():
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
 
+    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", EndWorkspaceIndex=3)
+    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", EndWorkspaceIndex=3)
 
     axs = plotData(wsJoY)
 
@@ -53,11 +55,15 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
     for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier
         m.limits["A"+str(i)] = (0, np.inf)
 
-    print(m.params)
+    # print(m.params)
     if gaussFlag:
+        #TODO Ask about the limits on y0
+
+        for i in range(len(dataY)):
+            m.limits["y0"+str(i)] = (0, np.inf)
         m.simplex()
         m.migrad()
-        print(m.params)
+        # print(m.params)
         
 
     else:
@@ -79,6 +85,7 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constr, 0, np.inf))
     
+    m.hesse()
     return m, totCost
 
 
@@ -92,7 +99,7 @@ def totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag):
             "y0" : 0,
             "A" : 1,
             "x0" : 0,
-            "sigma" : 4           
+            "sigma" : 5           
         }
 
         sharedPars = ["sigma"]
