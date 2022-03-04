@@ -161,27 +161,44 @@ def symmetrizeWs(avgSymFlag, avgYSpace):
 
 
 def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
-    resY = wsRes.extractY()[0]
-    resX = wsRes. extractX()[0]
-
-    # Interpolate Resolution to get single peak at zero
-    # Otherwise if the resolution has two data points at the peak, the convolution will be skewed.
-    start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
-    resNewX = np.arange(start, end, interval)
-    resolution = np.interp(resNewX, resX, resY)
-
     dataY = wsYSpaceSym.extractY()[0]
     dataX = wsYSpaceSym.extractX()[0]
     dataE = wsYSpaceSym.extractE()[0]
 
-    histWidths = dataX[1:] - dataX[:-1]
-    assert (np.max(histWidths)==np.min(histWidths)), "dataX spacings in ws need to be all equal for numerical convolution."
 
+    resY = wsRes.extractY()[0]
+    resX = wsRes. extractX()[0]
+
+    # TODO: Need to sort out the convolution once and for all
+    # Currently uses numerical convolution with interpolation of resolution to align peak to zero
+
+    changePeak=False
+    if changePeak:    
+        assert np.min(resX) == -np.max(resX), "Resolution needs to be in symetric range!"
+    
+        # Choose odd number of points over symetric range so that peak at zero
+        if resX.size % 2 == 0:
+            rangeRes = resX.size-1  # If even change to odd, pick either +1 or -1
+        else:
+            rangeRes = resX.size    # If odd, keep being odd
+            
+        resNewX = np.linspace(np.min(resX), np.max(resX), rangeRes)
+        histWidths0 = resNewX[1] - resNewX[0]
+        resolution = np.interp(resNewX, resX, resY)
+
+    else:
+        start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
+        resNewX = np.arange(start, end, interval)
+        resolution = np.interp(resNewX, resX, resY)
+
+        histWidths = dataX[1:] - dataX[:-1]
+        assert (np.max(histWidths)==np.min(histWidths)), "dataX spacings in ws need to be all equal for numerical convolution."
+        histWidths0 = dataX[1] - dataX[0]     # Assumes all widhts are equal, take first
+        
 
     if ic.singleGaussFitToHProfile:
         def convolvedModel(x, y0, A, x0, sigma):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            histWidths0 = x[1] - x[0]     # Assumes all widhts are equal, take first
             return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths0
 
         # Fit with Minuit
@@ -198,8 +215,6 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
-
-            histWidths0 = x[1] - x[0]     # Assumes all widhts are equal, take first
             return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths0
 
         def constrFunc(*pars):
@@ -294,7 +309,6 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     return 
 
 
-# TODO: Maybe take out Mantid Fit
 def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
     print('\nFitting on the sum of spectra in the West domain ...\n')     
     for minimizer in ['Levenberg-Marquardt','Simplex']:

@@ -23,20 +23,44 @@ if x.size % 2 == 0:
     rangeRes = x.size+1  # If even change to odd
 else:
     rangeRes = x.size    # If odd, keep being odd
-    
-xNew = np.linspace(np.min(x), np.max(x), rangeRes)
 
+rangeRes = x.size
+xNew = np.linspace(np.min(x), np.max(x), rangeRes)
+xNew0 = xNew[1] - xNew[0]
+x0 = x[1] - x[0]
 resNew = np.interp(xNew, x, res)
 
-yResIm = ndimage.convolve1d(y, resNew, mode="constant")
-yResSig = signal.convolve(y, resNew, mode="same")
+yResIm = ndimage.convolve1d(y, resNew, mode="constant") * xNew0
+yResSig = signal.convolve(y, resNew, mode="same") * x0
 
 
 plt.plot(x, y, label="Data")
 plt.plot(xNew, resNew, label="Resolution")
 plt.plot(x, yResIm, label="Res Image")
 plt.plot(x, yResSig, label="Res Signal")
+
+rangeRes = x.size+1
+xNew = np.linspace(np.min(x), np.max(x), rangeRes)
+x0 = xNew[1] - xNew[0]
+resNew = np.interp(xNew, x, res)
+yResSig = signal.convolve(y, resNew, mode="same") * x0
+plt.plot(x, yResSig, label="Res Signal +1")
+
+rangeRes = x.size-1
+xNew = np.linspace(np.min(x), np.max(x), rangeRes)
+x0 = xNew[1] - xNew[0]
+
+resNew = np.interp(xNew, x, res)
+yResSig = signal.convolve(y, resNew, mode="same") * x0
+plt.plot(x, yResSig, label="Res Signal -1")
+
 plt.vlines(0, 0, 0.3, color="k", ls="--")
 plt.legend()
 plt.show()
 
+
+fig, ax = plt.subplots(1)
+ax.plot(x, res, label="Original resolution")
+ax.plot(xNew, resNew, label="Interpolated resolution")
+plt.legend()
+plt.show()
