@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
-from scipy import ndimage
+from scipy import ndimage, signal
 from pathlib import Path
 from iminuit import Minuit, cost, util
 repoPath = Path(__file__).absolute().parent  # Path to the repository
@@ -168,38 +168,56 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
     resY = wsRes.extractY()[0]
     resX = wsRes. extractX()[0]
+    assert np.min(resX) == -np.max(resX), "Resolution needs to be in symetric range!"
 
     # TODO: Need to sort out the convolution once and for all
     # Currently uses numerical convolution with interpolation of resolution to align peak to zero
 
-    changePeak=False
-    if changePeak:    
-        assert np.min(resX) == -np.max(resX), "Resolution needs to be in symetric range!"
-    
-        # Choose odd number of points over symetric range so that peak at zero
-        if resX.size % 2 == 0:
-            rangeRes = resX.size-1  # If even change to odd, pick either +1 or -1
-        else:
-            rangeRes = resX.size    # If odd, keep being odd
+    # changePeak=False
+    # if changePeak:    
+    #     # Choose odd number of points over symetric range so that peak at zero
+    #     if resX.size % 2 == 0:
+    #         rangeRes = resX.size-1  # If even change to odd, pick either +1 or -1
+    #     else:
+    #         rangeRes = resX.size    # If odd, keep being odd
             
-        resNewX = np.linspace(np.min(resX), np.max(resX), rangeRes)
-        histWidths0 = resNewX[1] - resNewX[0]
-        resolution = np.interp(resNewX, resX, resY)
+    #     resNewX = np.linspace(np.min(resX), np.max(resX), rangeRes)
+    #     histWidths0 = resNewX[1] - resNewX[0]
+    #     resolution = np.interp(resNewX, resX, resY)
 
-    else:
-        start, interval, end = [float(i) for i in ic.rebinParametersForYSpaceFit.split(",")]
-        resNewX = np.arange(start, end, interval)
-        resolution = np.interp(resNewX, resX, resY)
+    def interpConvolution(x, y, res):
+        dens = 10000
 
-        histWidths = dataX[1:] - dataX[:-1]
-        assert (np.max(histWidths)==np.min(histWidths)), "dataX spacings in ws need to be all equal for numerical convolution."
-        histWidths0 = dataX[1] - dataX[0]     # Assumes all widhts are equal, take first
-        
+        xInterp = np.linspace(np.min(x), np.max(x), dens)
+        xDelta = xInterp[1] - xInterp[0]
+        resInterp = np.interp(xInterp, x, res)
+        yInterp = np.interp(xInterp, x, y)
+
+        convInterp = signal.convolve(yInterp, resInterp, mode="same") * xDelta
+
+        convFinal = np.interp(x, xInterp, convInterp)
+        return convFinal
+
+    def oddConvolution(x, y, res):
+        assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+        if x.size % 2 == 0:
+            rangeRes = x.size+1  # If even change to odd
+        else:
+            rangeRes = x.size    # If odd, keep being odd
+
+        xNew = np.linspace(np.min(x), np.max(x), rangeRes)
+        xNew0 = xNew[1] - xNew[0]
+        resNew = np.interp(xNew, x, res)
+
+        yResSig = signal.convolve(y, resNew, mode="same") * xNew0
+        return yResSig 
 
     if ic.singleGaussFitToHProfile:
         def convolvedModel(x, y0, A, x0, sigma):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths0
+            return oddConvolution(x, gauss, resY)
+            # return interpConvolution(x, gauss, resY)
+            # return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths0
 
         # Fit with Minuit
         costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)

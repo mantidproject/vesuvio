@@ -44,15 +44,15 @@ xNew = np.linspace(np.min(x), np.max(x), rangeRes)
 x0 = xNew[1] - xNew[0]
 resNew = np.interp(xNew, x, res)
 yResSig = signal.convolve(y, resNew, mode="same") * x0
-plt.plot(x, yResSig, label="Res Signal +1")
+plt.plot(x, yResSig, "--", linewidth=3, label="Res Signal +1")
 
-rangeRes = x.size-1
-xNew = np.linspace(np.min(x), np.max(x), rangeRes)
-x0 = xNew[1] - xNew[0]
+# rangeRes = x.size-1
+# xNew = np.linspace(np.min(x), np.max(x), rangeRes)
+# x0 = xNew[1] - xNew[0]
 
-resNew = np.interp(xNew, x, res)
-yResSig = signal.convolve(y, resNew, mode="same") * x0
-plt.plot(x, yResSig, label="Res Signal -1")
+# resNew = np.interp(xNew, x, res)
+# yResSig = signal.convolve(y, resNew, mode="same") * x0
+# plt.plot(x, yResSig, label="Res Signal -1")
 
 plt.vlines(0, 0, 0.3, color="k", ls="--")
 plt.legend()
