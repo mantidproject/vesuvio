@@ -5,7 +5,7 @@ from iminuit.util import make_with_signature, describe
 from pathlib import Path
 from mantid.simpleapi import Load, CropWorkspace
 from scipy import optimize
-from scipy import ndimage
+from scipy import ndimage, signal
 
 repoPath = Path(__file__).absolute().parent
 
@@ -15,9 +15,11 @@ def main():
     resPath = repoPath / "wsResSmall.nxs"
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
+    print("No of spec res: ", wsRes.getNumberHistograms())
 
     wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", EndWorkspaceIndex=3)
     wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", EndWorkspaceIndex=3)
+    print("No of spec res: ", wsRes.getNumberHistograms())
 
     axs = plotData(wsJoY)
 
@@ -126,6 +128,21 @@ def totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag):
     return totCost, initPars
 
 
+def oddConvolution(x, y, res):
+    assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+    if x.size % 2 == 0:
+        rangeRes = x.size+1  # If even change to odd
+    else:
+        rangeRes = x.size    # If odd, keep being odd
+
+    xInterp = np.linspace(np.min(x), np.max(x), rangeRes)
+    xDelta = xInterp[1] - xInterp[0]
+    resInterp = np.interp(xInterp, x, res)
+
+    conv = signal.convolve(y, resInterp, mode="same") * xDelta
+    return conv
+
+
 def buildCostFun(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars:list):
     """Shared parameters are specified in a list of strings"""
 
@@ -134,22 +151,24 @@ def buildCostFun(dataX, dataY, dataE, dataRes, fun, defaultPars, sharedPars:list
     unsharedPars = [key for key in defaultPars if key not in sharedPars]
 
     totCost = 0
+    print(dataRes.shape)
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
 
-        # def convolvedModel(x, y0, A, x0, sigma):    # Convolution at each spectra
-        #     return ndimage.convolve1d(fun(x, y0, A, x0, sigma), res, mode="constant")
-        
+        # Interpolate resolution
+
         def convolvedModel(x, y0, A, x0, sigma):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            return gauss #ndimage.convolve1d(gauss, res, mode="constant")
+            return oddConvolution(x, gauss, res) #ndimage.convolve1d(gauss, res, mode="constant")
 
         unsharedArgs = {}
         for upar in unsharedPars:
             unsharedArgs[upar] = upar+str(i)
 
-        totCost += cost.LeastSquares(
+        costFun = cost.LeastSquares(
             x, y, yerr, make_with_signature(convolvedModel, **unsharedArgs)
             )
+
+        totCost += costFun
 
     initPars = {}
     # Add shared parameters

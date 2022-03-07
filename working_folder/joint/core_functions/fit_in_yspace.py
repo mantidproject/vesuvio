@@ -205,12 +205,12 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         else:
             rangeRes = x.size    # If odd, keep being odd
 
-        xNew = np.linspace(np.min(x), np.max(x), rangeRes)
-        xNew0 = xNew[1] - xNew[0]
-        resNew = np.interp(xNew, x, res)
+        xInterp = np.linspace(np.min(x), np.max(x), rangeRes)
+        xDelta = xInterp[1] - xInterp[0]
+        resInterp = np.interp(xInterp, x, res)
 
-        yResSig = signal.convolve(y, resNew, mode="same") * xNew0
-        return yResSig 
+        conv = signal.convolve(y, resInterp, mode="same") * xDelta
+        return conv 
 
     if ic.singleGaussFitToHProfile:
         def convolvedModel(x, y0, A, x0, sigma):
