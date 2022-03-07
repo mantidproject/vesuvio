@@ -7,6 +7,27 @@ from mantid.simpleapi import Load
 from pathlib import Path
 repoPath = Path(__file__).absolute().parent
 
+
+class LeastSquares:
+    """
+    Generic least-squares cost function with error.
+    """
+
+    errordef = Minuit.LEAST_SQUARES # for Minuit to compute errors correctly
+
+    def __init__(self, model, x, y, err):
+        self.model = model  # model predicts y for given x
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
+        self.err = np.asarray(err)
+        self.func_code = make_func_code(describe(model)[2:])
+
+    def __call__(self, *par):  # we accept a variable number of model parameters
+        ym = self.model(self.x, *par)
+        return np.sum((self.y - ym) ** 2 / self.err ** 2)
+
+
+
 def fun(x, y0, A, x0, sigma):
             return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
@@ -26,7 +47,7 @@ def oddEvenApproach(x, y, res):
     return yResSig 
 
 
-def modelOdd(x, y0, A, x0, sigma):
+def modelOdd(x, res, y0, A, x0, sigma):
     gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
     return oddEvenApproach(x, gauss, res)
 
@@ -57,21 +78,17 @@ def main():
 
     unsharedPars = [key for key in defaultPars if key not in sharedPars]
     unsharedArgs = {}
-    totCost = []
+    totCost = 0
 
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
 
         for upar in unsharedPars:
             unsharedArgs[upar] = upar+str(i)
 
-        def modelOdd(x, y0, A, x0, sigma):
-            gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            return oddEvenApproach(x, gauss, res)
-
-        costFunInterp = cost.LeastSquares(
-            x, y, yerr, make_with_signature(modelOdd, **unsharedArgs)
+        costFunInterp = LeastSquares(
+            make_with_signature(modelOdd, **unsharedArgs), x, y, yerr
             )
-        totCost.append(costFunInterp)
+        totCost = cost.CostSum(totCost, costFunInterp)   # I will prob be missing a lot of the attributes 
 
         initPars = {}
         # Add shared parameters
@@ -83,6 +100,6 @@ def main():
             for upar in unsharedPars:
                 initPars[upar+str(i)] = defaultPars[upar]
 
-    m = Minuit(sum(totCost), **initPars)
+    m = Minuit(totCost, **initPars)
 
 main()
