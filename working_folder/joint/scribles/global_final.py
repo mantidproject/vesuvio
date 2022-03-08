@@ -1,7 +1,8 @@
+from email.policy import default
 import numpy as np
 import matplotlib.pyplot as plt
 from iminuit import Minuit, cost, util
-from iminuit.util import make_with_signature, describe
+from iminuit.util import make_with_signature, describe, make_func_code
 from pathlib import Path
 from mantid.simpleapi import Load, CropWorkspace
 from scipy import optimize
@@ -50,22 +51,38 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
     # TODO: Possible symetrisation goes here
 
 
-    if gaussFlag:
-        class MakeCostFunction():
-            def __init__(self):
-                self.totCost = 0
+    # if gaussFlag:
+        # class MakeCostFunction():
+        #     def __init__(self, dataRes):
+        #         self.totCost = 0
+        #         self.Res = dataRes
             
-            def __call__(self, x, y, yerr, res, unsharedArgs):
+        #     def __call__(self, x, y, yerr, i, unsharedArgs):
 
-                def convolvedModel(x, y0, A, x0, sigma):
-                    gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-                    return oddConvolution(x, gauss, res)
+        #         def convolvedModel(x, y0, A, x0, sigma):
+        #             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+        #             return oddConvolution(x, gauss, self.Res[i])
 
-                self.totCost += cost.LeastSquares(
-                x, y, yerr, make_with_signature(convolvedModel, **unsharedArgs)
-                )          
+        #         self.totCost += cost.LeastSquares(
+        #         x, y, yerr, make_with_signature(convolvedModel, **unsharedArgs)
+        #         )          
 
 
+
+    def calcCostFun(i, x, y, yerr, res, sharedPars):
+
+        def convolvedModel(x, y0, A, x0, sigma):
+            gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+            return oddConvolution(x, gauss, res)      
+        
+        costSig = [key if key in sharedPars else key+str(i) for key in describe(convolvedModel)]
+        convolvedModel.func_code = make_func_code(costSig)
+        print(describe(convolvedModel))
+        
+        costFun = cost.LeastSquares(x, y, yerr, convolvedModel)
+        return costFun
+      
+        #   
         # def makeCostFunction():
 
         #     totCost = 0
@@ -94,68 +111,65 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
         #     )
 
 
-        defaultPars = {
-            "y0" : 0,
-            "A" : 1,
-            "x0" : 0,
-            "sigma" : 5           
-        }
+    defaultPars = {
+        "y0" : 0,
+        "A" : 1,
+        "x0" : 0,
+        "sigma" : 5           
+    }
 
-        sharedPars = ["sigma"]
+    sharedPars = ["sigma"]
 
-    else:
-        def fun(x, sigma1, c4, c6, A, x0):
-            return A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
-                    *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
-                    -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
-                    +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
-                    -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120)) 
+    # else:
+    #     def fun(x, sigma1, c4, c6, A, x0):
+    #         return A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+    #                 *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
+    #                 -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
+    #                 +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
+    #                 -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120)) 
         
-        defaultPars = {
-            "sigma1" : 6,
-            "c4" : 0,
-            "c6" : 0,
-            "A" : 1,
-            "x0" : 0          
-        }
+    #     defaultPars = {
+    #         "sigma1" : 6,
+    #         "c4" : 0,
+    #         "c6" : 0,
+    #         "A" : 1,
+    #         "x0" : 0          
+    #     }
 
-        sharedPars = ["sigma1", "c4", "c6"]    
+    #     sharedPars = ["sigma1", "c4", "c6"]    
 
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
     
-    unsharedPars = [key for key in defaultPars if key not in sharedPars]
+    # unsharedPars = [key for key in defaultPars if key not in sharedPars]
 
-    # totCost = 0
-    summerCostFun = MakeCostFunction()
-    print(dataRes.shape)
+    totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
 
-        # def convolvedModel(x, y0, A, x0, sigma):
-        #     gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-        #     return oddConvolution(x, gauss, res) #ndimage.convolve1d(gauss, res, mode="constant")
+        # unsharedArgs = {}
+        # for upar in unsharedPars:
+        #     unsharedArgs[upar] = upar+str(i)
 
-        unsharedArgs = {}
-        for upar in unsharedPars:
-            unsharedArgs[upar] = upar+str(i)
-
-        # costFun = cost.LeastSquares(
-        #     x, y, yerr, make_with_signature(convolvedModel, **unsharedArgs)
-        #     )
-        # costFun = costGauss(res, unsharedArgs)
-        # totCost += costFun
-        summerCostFun(x, y, yerr, res, unsharedArgs)
-    print(describe(summerCostFun.totCost))
+        costFun = calcCostFun(i, x, y, yerr, res, sharedPars)
+        totCost += costFun
+    print(describe(totCost))
 
 
     initPars = {}
-    # Add shared parameters
-    for spar in sharedPars:
-        initPars[spar] = defaultPars[spar] 
+    for key in defaultPars:
+        if key in sharedPars:
+            initPars[key] = defaultPars[key]
+        else:
+            for i in range(len(dataY)):
+                initPars[key+str(i)] = defaultPars[key]
 
-    # Add unshared parameters 
-    for i in range(len(dataY)):
-        for upar in unsharedPars:
-            initPars[upar+str(i)] = defaultPars[upar]
+    # # Add shared parameters
+    # for spar in sharedPars:
+    #     initPars[spar] = defaultPars[spar] 
+
+    # # Add unshared parameters 
+    # for i in range(len(dataY)):
+    #     for upar in unsharedPars:
+    #         initPars[upar+str(i)] = defaultPars[upar]
     
     # totCost, kwargs = totalCostFun(dataX, dataY, dataE, dataRes, gaussFlag)
 

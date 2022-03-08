@@ -26,25 +26,26 @@ def oddEvenApproach(x, y, res):
     return yResSig 
 
 
-def modelOdd(x, y0, A, x0, sigma):
-    gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-    return oddEvenApproach(x, gauss, res)
+# def modelOdd(x, y0, A, x0, sigma):
+#     gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+#     return oddEvenApproach(x, gauss, res)
+
+# def main():
+resPath = repoPath / "wsResSmall.nxs"
+joyPath = repoPath / "wsJOYsmall.nxs"
+wsRes = Load(str(resPath), OutputWorkspace="wsRes")
+wsJOY = Load(str(joyPath), OutputWorkspace="wsJOY")
+
+
+dataRes = wsRes.extractY()
+dataX = wsJOY.extractX()
+dataY = wsJOY.extractY()
+dataE = wsJOY.extractE()
 
 def main():
-    resPath = repoPath / "wsResSmall.nxs"
-    joyPath = repoPath / "wsJOYsmall.nxs"
-    wsRes = Load(str(resPath), OutputWorkspace="wsRes")
-    wsJOY = Load(str(joyPath), OutputWorkspace="wsJOY")
-
-
-    dataRes = wsRes.extractY()
-    dataX = wsJOY.extractX()
-    dataY = wsJOY.extractY()
-    dataE = wsJOY.extractE()
-
-    # dataX = wsRes.dataX(0)
-    # dataE = 0.05 * np.random.random(dataX.shape)
-    # dataY = fun(dataX, 0, 1, 0, 5) + dataE * np.random.random(dataX.shape)
+# dataX = wsRes.dataX(0)
+# dataE = 0.05 * np.random.random(dataX.shape)
+# dataY = fun(dataX, 0, 1, 0, 5) + dataE * np.random.random(dataX.shape)
 
     defaultPars = {
         "y0" : 0,
@@ -57,6 +58,7 @@ def main():
 
     unsharedPars = [key for key in defaultPars if key not in sharedPars]
     unsharedArgs = {}
+    sigArgs = []
     totCost = []
 
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
@@ -64,12 +66,22 @@ def main():
         for upar in unsharedPars:
             unsharedArgs[upar] = upar+str(i)
 
+
         def modelOdd(x, y0, A, x0, sigma):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
             return oddEvenApproach(x, gauss, res)
 
+        # modelChangedSig = make_with_signature(modelOdd, **unsharedArgs)
+        for key in defaultPars:
+            if key in sharedPars:
+                sigArgs.append(key)
+            else:
+                sigArgs.append(key+str(i))
+
+        modelOdd.func_code = make_func_code(["x", *sigArgs])
+
         costFunInterp = cost.LeastSquares(
-            x, y, yerr, make_with_signature(modelOdd, **unsharedArgs)
+            x, y, yerr, modelOdd
             )
         totCost.append(costFunInterp)
 
@@ -82,7 +94,10 @@ def main():
         for i in range(len(dataY)):
             for upar in unsharedPars:
                 initPars[upar+str(i)] = defaultPars[upar]
+    return totCost, initPars
+    # m = Minuit(sum(totCost), **initPars)
 
-    m = Minuit(sum(totCost), **initPars)
-
-main()
+totCost, initPars = main()
+totCost = sum(totCost)
+m = Minuit(totCost, **initPars)
+print(describe(totCost))
