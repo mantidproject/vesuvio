@@ -36,7 +36,7 @@ def calculateMantidResolution(ic, ws, mass):
     resName = ws.name()+"_Resolution"
     for index in range(ws.getNumberHistograms()):
         VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-        Rebin(InputWorkspace="tmp", Params=ic.resolutionRebinPars, OutputWorkspace="tmp")
+        Rebin(InputWorkspace="tmp", Params=ic.rebinParametersForYSpaceFit, OutputWorkspace="tmp")
 
         if index == 0:   # Ensures that workspace has desired units
             RenameWorkspace("tmp",  resName)
@@ -200,6 +200,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
     def oddConvolution(x, y, res):
         assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+        assert x.size == res.size, " Resolution needs to have the same no of points as spectrum!"
+        
         if x.size % 2 == 0:
             rangeRes = x.size+1  # If even change to odd
         else:
@@ -233,7 +235,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
-            return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths0
+            return oddConvolution(x, gramCharlier, resY)
+            # return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths0
 
         def constrFunc(*pars):
             return convolvedModel(dataX, *pars)

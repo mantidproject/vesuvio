@@ -7,22 +7,26 @@ from pathlib import Path
 from mantid.simpleapi import Load, CropWorkspace
 from scipy import optimize
 from scipy import ndimage, signal
+import time
 
 repoPath = Path(__file__).absolute().parent
 
 def main():
 
-    joyPath = repoPath / "wsJOYsmall.nxs"
-    resPath = repoPath / "wsResSmall.nxs"
+    # joyPath = repoPath / "wsJOYsmall.nxs"
+    # resPath = repoPath / "wsResSmall.nxs"
+    joyPath = repoPath / "wsDHMTjoy.nxs"
+    resPath = repoPath / "wsDHMTres.nxs"
+    
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
     print("No of spec res: ", wsRes.getNumberHistograms())
 
-    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", EndWorkspaceIndex=11)
-    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", EndWorkspaceIndex=11)
-    print("No of spec res: ", wsRes.getNumberHistograms())
+    # wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", EndWorkspaceIndex=10)
+    # wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", EndWorkspaceIndex=10)
+    # print("No of spec res: ", wsRes.getNumberHistograms())
 
-    fitGlobalFit(wsJoY, wsRes, True)
+    fitGlobalFit(wsJoY, wsRes, False)
     plt.show()
 
 
@@ -64,6 +68,7 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
     for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier
         m.limits["A"+str(i)] = (0, np.inf)
 
+    t0 = time.time()
     if gaussFlag:
 
         #TODO Ask about the limits on y0
@@ -82,18 +87,31 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
             Format *pars to work with Minuit.
             x is defined outside function, one constraint per value of x"""
 
-            sigma1, c4, c6 = pars[:3]
-            return (1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
-                    -48*(x/np.sqrt(2)/sigma1)**2+12) \
-                    +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
-                    -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+            # sigma1, c4, c6 = pars[:3]
+            # return (1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
+            #         -48*(x/np.sqrt(2)/sigma1)**2+12) \
+            #         +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
+            #         -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+
+            sharedPars = pars[:3]    # sigma1, c4, c6
+            joinedGC = np.zeros(int((len(pars)-3)/2) * x.size)
+            for i, (A, x0) in enumerate(zip(pars[3::2], pars[4::2])):
+                joinedGC[i*x.size : (i+1)*x.size] = model(x, *sharedPars, A, x0)
+            
+            if np.any(joinedGC==0):
+                raise ValueError("Args where zero: ", np.argwhere(joinedGC==0))
+            
+            return joinedGC
 
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constr, 0, np.inf))
     
     m.hesse()
-    
-    print("Value of minimum: ", m.fval)
+    t1 = time.time()
+    print(f"Running time of fitting: {t1-t0:.2f} seconds")
+    print("Value of minimum: ", m.fval, "\n")
+    for p, v, e in zip(m.parameters, m.values, m.errors):
+        print(f"{p:7s} = {v:7.3f} +/- {e:7.3f}")
     plotFit(ws.extractX(), totCost, m, axs)
     return 
 
@@ -140,14 +158,9 @@ def selectModelAndPars(gaussFlag):
 def calcCostFun(fun, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
 
-    # Discard points at the cut-off
-    idxFirstZero = np.argwhere(y==0)[0]
-    x = x[:idxFirstZero]
-    y = y[:idxFirstZero]
-    yerr = yerr[:idxFirstZero]
-    res = res[res.size-idxFirstZero:idxFirstZero]
-    #TODO: Big issue with taking out the cut offs, because all arrays need to be symetric due to the convolution!
-    # Or maybe only the resolution needs to be symmetric, and its fine if other arrays are not
+    # Make fit ignore cut-off points, assign infinite error
+    yerr = np.where(yerr==0, np.inf, yerr)
+   
     def convolvedModel(x, *pars):
         return oddConvolution(x, fun(x, *pars), res)
 
@@ -184,8 +197,9 @@ def plotData(ws):
     dataE = dataE[~mask]
     dataX = dataX[~mask]
 
-    fig, axs = plt.subplots(
-        2, int(np.ceil(len(dataY)/2)), 
+    rows = 2
+
+    fig, axs = plt.subplots(rows, int(np.ceil(len(dataY)/rows)), 
         figsize=(15, 8), 
         tight_layout=True
         )
