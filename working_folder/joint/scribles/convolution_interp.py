@@ -45,7 +45,7 @@ wsRes = Load(str(resPath), OutputWorkspace="wsRes")
 
 res = wsRes.dataY(0)
 x = wsRes.dataX(0)
-y = gauss(x, 0, 1, 0, 5)
+y = gauss(x, 0, 1, 2, 5)
 
 t0 = time.time()
 for i in range(100):

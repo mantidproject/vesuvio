@@ -13,18 +13,18 @@ repoPath = Path(__file__).absolute().parent
 
 def main():
 
-    # joyPath = repoPath / "wsJOYsmall.nxs"
-    # resPath = repoPath / "wsResSmall.nxs"
-    joyPath = repoPath / "wsDHMTjoy.nxs"
-    resPath = repoPath / "wsDHMTres.nxs"
+    joyPath = repoPath / "wsJOYsmall.nxs"
+    resPath = repoPath / "wsResSmall.nxs"
+    # joyPath = repoPath / "wsDHMTjoy.nxs"
+    # resPath = repoPath / "wsDHMTres.nxs"
     
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
     print("No of spec res: ", wsRes.getNumberHistograms())
 
-    # wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", EndWorkspaceIndex=10)
-    # wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", EndWorkspaceIndex=10)
-    # print("No of spec res: ", wsRes.getNumberHistograms())
+    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=4, EndWorkspaceIndex=11)
+    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=4, EndWorkspaceIndex=11)
+    print("No of spec res: ", wsRes.getNumberHistograms())
 
     fitGlobalFit(wsJoY, wsRes, False)
     plt.show()
@@ -155,18 +155,18 @@ def selectModelAndPars(gaussFlag):
     return model, defaultPars, sharedPars
 
 
-def calcCostFun(fun, i, x, y, yerr, res, sharedPars):
+def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
+   
+    def convolvedModel(x, *pars):
+        return oddConvolution(x, model(x, *pars), res)
+
+    costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
+    convolvedModel.func_code = make_func_code(costSig)
+    print(describe(convolvedModel))
 
     # Make fit ignore cut-off points, assign infinite error
     yerr = np.where(yerr==0, np.inf, yerr)
-   
-    def convolvedModel(x, *pars):
-        return oddConvolution(x, fun(x, *pars), res)
-
-    costSig = [key if key in sharedPars else key+str(i) for key in describe(fun)]
-    convolvedModel.func_code = make_func_code(costSig)
-    print(describe(convolvedModel))
 
     costFun = cost.LeastSquares(x, y, yerr, convolvedModel)
     return costFun
