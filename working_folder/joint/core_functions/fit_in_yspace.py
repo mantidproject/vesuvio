@@ -118,6 +118,9 @@ def weightedAvg(wsYSpace):
     dataE = wsYSpace.extractE()
 
     # TODO: Revise this, some zeros might not be cut offs
+    # TODO: If one column is all zeros ir puts dataY=nan and dataE=inf, will throw an error when fitting
+    # Replace dataE at cut-offs by np.inf?
+    
     dataY[dataY==0] = np.nan
     dataE[dataE==0] = np.nan
 
