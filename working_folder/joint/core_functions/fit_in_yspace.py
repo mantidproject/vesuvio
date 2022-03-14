@@ -5,6 +5,8 @@ from scipy import optimize
 from scipy import ndimage, signal
 from pathlib import Path
 from iminuit import Minuit, cost, util
+from iminuit.util import make_func_code
+
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
@@ -169,76 +171,53 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     dataX = wsYSpaceSym.extractX()[0]
     dataE = wsYSpaceSym.extractE()[0]
 
-
     resY = wsRes.extractY()[0]
     resX = wsRes. extractX()[0]
-    assert np.min(resX) == -np.max(resX), "Resolution needs to be in symetric range!"
-    assert np.all(resX == dataX), "Resolution range needs to be equal to dataX"
-
-    # TODO: Need to sort out the convolution once and for all
-    # Currently uses numerical convolution with interpolation of resolution to align peak to zero
-
-    def interpConvolution(x, y, res):
-        dens = 10000
-
-        xInterp = np.linspace(np.min(x), np.max(x), dens)
-        xDelta = xInterp[1] - xInterp[0]
-        resInterp = np.interp(xInterp, x, res)
-        yInterp = np.interp(xInterp, x, y)
-
-        convInterp = signal.convolve(yInterp, resInterp, mode="same") * xDelta
-
-        convFinal = np.interp(x, xInterp, convInterp)
-        return convFinal
-
-    def oddConvolution(x, y, res):
-        # assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
-        # assert x.size == res.size, " Resolution needs to have the same no of points as spectrum!"
-        
-        if x.size % 2 == 0:
-            rangeRes = x.size+1  # If even change to odd
-        else:
-            rangeRes = x.size    # If odd, keep being odd
-
-        xInterp = np.linspace(np.min(x), np.max(x), rangeRes)
-        xDelta = xInterp[1] - xInterp[0]
-        resInterp = np.interp(xInterp, x, res)
-
-        conv = signal.convolve(y, resInterp, mode="same") * xDelta
-        return conv 
 
     if ic.singleGaussFitToHProfile:
-        def convolvedModel(x, y0, A, x0, sigma):
-            gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            return oddConvolution(x, gauss, resY)
-            # return interpConvolution(x, gauss, resY)
-            # return ndimage.convolve1d(gauss, resolution, mode="constant") * histWidths0
+        def model(x, y0, A, x0, sigma):
+            return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
-        # Fit with Minuit
-        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
-        m = Minuit(costFun, y0=0, A=1, x0=0, sigma=5)
-        m.limits["A"] = (0, None)
-        m.simplex()
-        m.migrad()
+        funcSig = ["x", "y0", "A", "x0", "sigma"]
+        initPars = {"y0":0, "A":1, "x0":0, "sigma":5}
 
     else:
-        def convolvedModel(x, A, x0, sigma1, c4, c6):
-            gramCharlier =  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+        def model(x, A, x0, sigma1, c4, c6):
+            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
-            return oddConvolution(x, gramCharlier, resY)
-            # return ndimage.convolve1d(gramCharlier, resolution, mode="constant") * histWidths0
+        
+        funcSig = ["x", "A", "x0", "sigma1", "c4", "c6"]
+        initPars = {"A":1, "x0":0, "sigma1":5, "c4":0, "c6":0}
 
+    xDense, xDelta, resDense = chooseXDense(resX, resY, True)
+
+    def convolvedModel(x, *pars):
+        convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
+        return np.interp(x, xDense, convDense)
+
+    convolvedModel.func_code = make_func_code(funcSig)
+
+    # Ignore values that are zero, eg. cut-offs
+    nonZeros = dataY != 0
+    dataXNZ = dataX[nonZeros]
+    dataYNZ = dataY[nonZeros]
+    dataENZ = dataE[nonZeros]
+
+    # Fit with Minuit
+    costFun = cost.LeastSquares(dataXNZ, dataYNZ, dataENZ, convolvedModel)
+    m = Minuit(costFun, **initPars)
+    m.limits["A"] = (0, None)
+
+    m.simplex()
+    if ic.singleGaussFitToHProfile:
+        m.migrad()
+    else:
         def constrFunc(*pars):
-            return convolvedModel(dataX, *pars)
+            return convolvedModel(dataX, *pars)   # GC > 0 after convolution
 
-        # Fit with Minuit
-        costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
-        m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
-        m.limits["A"] = (0, None)
-        m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
 
     # Explicit calculation of Hessian after the fit
@@ -329,6 +308,29 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     return 
 
 
+def chooseXDense(x, res, flag):
+    # TODO: Need to sort out the best density for the convolution
+
+    """Make high density symmetric grid for convolution"""
+
+    assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+    assert x.size == res.size, "x and res need to be the same size!"
+
+    if flag:
+        if x.size % 2 == 0:
+            dens = x.size+1  # If even change to odd
+        else:
+            dens = x.size    # If odd, keep being odd)
+    else:
+        dens = 1000
+
+    xDense = np.linspace(np.min(x), np.max(x), dens)
+    xDelta = xDense[1] - xDense[0]
+    resDense = np.interp(xDense, x, res)
+    return xDense, xDelta, resDense
+
+
+
 def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
     print('\nFitting on the sum of spectra in the West domain ...\n')     
     for minimizer in ['Levenberg-Marquardt','Simplex']:
@@ -387,16 +389,16 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs):
 
 def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, bestFitErrs):
 
-    # Set parameters close to minimum to restart procedure
+    # Set parameters to previously found minimum to restart procedure
     for p in bestFitVals:
         minuitObj.values[p] = bestFitVals[p]
-        # minuitObj.errors[p] = bestFitErrs[p]
+        minuitObj.errors[p] = bestFitErrs[p]
 
-    # Run Fitting procedures again to be on the safe side
-    minuitObj.migrad()
+    # Run Fitting procedures again to be on the safe side and reset to minimum
     minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
     minuitObj.hesse()
 
+    # Extract parameters from minimum
     varVal = minuitObj.values[var]
     varErr = minuitObj.errors[var]
     # Store fval of best fit
@@ -408,17 +410,34 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
     fValsMigrad = np.zeros(varSpace.shape)
 
     # Run Minos algorithm
-    minuitObj.fixed[var] = True        # Variable to be fixed at each iteration
-    for i in range(fValsScipy.size):
-        minuitObj.values[var] = varSpace[i]      # Fix variable
+    minuitObj.fixed[var] = True        # Variable is fixed at each iteration
 
-        minuitObj.migrad()        # Unconstrained fit
-        fValsMigrad[i] = minuitObj.fval
+    # Split variable space in two parts to start loop from minimum
+    lhsRange, rhsRange = np.split(np.arange(varSpace.size), 2)
+    betterRange = [rhsRange, np.flip(lhsRange)]  # First do rhs, then lhs, starting from minima
+    for side in betterRange:
+        # Reset values and errors to minima
+        for p in bestFitVals:
+            minuitObj.values[p] = bestFitVals[p]
+            minuitObj.errors[p] = bestFitErrs[p]
 
-        # Constrained fit
-        minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
-        fValsScipy[i] = minuitObj.fval
-    
+        # Unconstrained fit
+        for i in side.astype(int):
+            minuitObj.values[var] = varSpace[i]      # Fix variable
+            minuitObj.migrad()     
+            fValsMigrad[i] = minuitObj.fval
+
+        # Reset values and errors to minima
+        for p in bestFitVals:
+            minuitObj.values[p] = bestFitVals[p]
+            minuitObj.errors[p] = bestFitErrs[p]
+
+        # Constrained fit       
+        for i in side.astype(int):
+            minuitObj.values[var] = varSpace[i]      # Fix variable
+            minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
+            fValsScipy[i] = minuitObj.fval
+        
     minuitObj.fixed[var] = False    # Release variable       
 
     # Use intenpolation to create dense array of fmin values 

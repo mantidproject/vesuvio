@@ -42,10 +42,9 @@ currentPath = Path(__file__).absolute().parent
 #     nolist = list(no)
 #     print([name] + nolist)
 
-A = np.arange(10)
-
-for a in A:
-    print(a % 2)
+A = np.arange(30)
+firstHalf, secondHalf = np.split(A, 2)
+print(secondHalf, np.flip(firstHalf))
 
     
 

@@ -182,6 +182,7 @@ def chooseXDense(x, res, flag):
     """Make high density symmetric grid for convolution"""
 
     assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+    assert x.size == res.size, "x and res need to be the same size!"
 
     if flag:
         if x.size % 2 == 0:
