@@ -158,33 +158,43 @@ def selectModelAndPars(gaussFlag):
 def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
    
-    def convolvedModel(x, *pars):
-        return oddConvolution(x, model(x, *pars), res)
+    xDense, xDelta, resDense = chooseXDense(x, res, True)
+    def convolvedModel(xrange, *pars):
+        """Performs convolution first on high density grid and interpolates to desired x range"""
+        convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
+        return np.interp(xrange, xDense, convDense)
 
     costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
     convolvedModel.func_code = make_func_code(costSig)
     print(describe(convolvedModel))
 
-    # Make fit ignore cut-off points, assign infinite error
-    yerr = np.where(yerr==0, np.inf, yerr)
+    # Data without cut-offs
+    nonZeros = y != 0
+    xNZ = x[nonZeros]
+    yNZ = y[nonZeros]
+    yerrNZ = yerr[nonZeros]
 
-    costFun = cost.LeastSquares(x, y, yerr, convolvedModel)
+    costFun = cost.LeastSquares(xNZ, yNZ, yerrNZ, convolvedModel)
     return costFun
 
 
-def oddConvolution(x, y, res):
+def chooseXDense(x, res, flag):
+    """Make high density symmetric grid for convolution"""
+
     assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
-    if x.size % 2 == 0:
-        rangeRes = x.size+1  # If even change to odd
+
+    if flag:
+        if x.size % 2 == 0:
+            dens = x.size+1  # If even change to odd
+        else:
+            dens = x.size    # If odd, keep being odd)
     else:
-        rangeRes = x.size    # If odd, keep being odd
+        dens = 1000
 
-    xInterp = np.linspace(np.min(x), np.max(x), rangeRes)
-    xDelta = xInterp[1] - xInterp[0]
-    resInterp = np.interp(xInterp, x, res)
-
-    conv = signal.convolve(y, resInterp, mode="same") * xDelta
-    return conv
+    xDense = np.linspace(np.min(x), np.max(x), dens)
+    xDelta = xDense[1] - xDense[0]
+    resDense = np.interp(xDense, x, res)
+    return xDense, xDelta, resDense
 
 
 def plotData(ws):

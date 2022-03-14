@@ -120,7 +120,7 @@ def weightedAvg(wsYSpace):
     # TODO: Revise this, some zeros might not be cut offs
     # TODO: If one column is all zeros ir puts dataY=nan and dataE=inf, will throw an error when fitting
     # Replace dataE at cut-offs by np.inf?
-    
+
     dataY[dataY==0] = np.nan
     dataE[dataE==0] = np.nan
 
@@ -150,6 +150,7 @@ def symmetrizeWs(avgSymFlag, avgYSpace):
         # Inverse variance weighting
         dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
         dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
+
     # TODO: Maybe take out possibility of symmetrisation by mirror
     else:
         # Mirroring positive values from negative ones
@@ -172,21 +173,10 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     resY = wsRes.extractY()[0]
     resX = wsRes. extractX()[0]
     assert np.min(resX) == -np.max(resX), "Resolution needs to be in symetric range!"
+    assert np.all(resX == dataX), "Resolution range needs to be equal to dataX"
 
     # TODO: Need to sort out the convolution once and for all
     # Currently uses numerical convolution with interpolation of resolution to align peak to zero
-
-    # changePeak=False
-    # if changePeak:    
-    #     # Choose odd number of points over symetric range so that peak at zero
-    #     if resX.size % 2 == 0:
-    #         rangeRes = resX.size-1  # If even change to odd, pick either +1 or -1
-    #     else:
-    #         rangeRes = resX.size    # If odd, keep being odd
-            
-    #     resNewX = np.linspace(np.min(resX), np.max(resX), rangeRes)
-    #     histWidths0 = resNewX[1] - resNewX[0]
-    #     resolution = np.interp(resNewX, resX, resY)
 
     def interpConvolution(x, y, res):
         dens = 10000
@@ -202,8 +192,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         return convFinal
 
     def oddConvolution(x, y, res):
-        assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
-        assert x.size == res.size, " Resolution needs to have the same no of points as spectrum!"
+        # assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+        # assert x.size == res.size, " Resolution needs to have the same no of points as spectrum!"
         
         if x.size % 2 == 0:
             rangeRes = x.size+1  # If even change to odd
@@ -248,7 +238,6 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         costFun = cost.LeastSquares(dataX, dataY, dataE, convolvedModel)
         m = Minuit(costFun, A=1, x0=0, sigma1=4, c4=0, c6=0)
         m.limits["A"] = (0, None)
-        m.limits["c4"] = (0, None)      # c4 always positive
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
 
@@ -307,6 +296,13 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     parameters = m.parameters
     values = m.values
     errors = m.errors
+    
+    bestFitVals = {}
+    bestFitErrs = {}
+    for p, v, e in zip(m.parameters, m.values, m.errors):
+        bestFitVals[p] = v
+        bestFitErrs[p] = e
+    fValsMin = m.fval
 
     try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
         if ic.forceManualMinos:
@@ -325,7 +321,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         plotAutoMinos(m)
 
     except RuntimeError:
-        merrors = runAndPlotManualMinos(m, constrFunc)     # Changes values of minuit obj m, do not use m below this point
+        merrors = runAndPlotManualMinos(m, constrFunc, bestFitVals, bestFitErrs)     # Changes values of minuit obj m, do not use m below this point
         for p, v, e in zip(parameters, values, errors):
             tableWS.addRow([p, v, e, 0, 0, merrors[p][0], merrors[p][1]])
 
@@ -363,7 +359,7 @@ def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
     return 
 
 
-def runAndPlotManualMinos(minuitObj, constrFunc):
+def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs):
     # Set format of subplots
     height = 2
     width = int(np.ceil(len(minuitObj.parameters)/2))
@@ -374,7 +370,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc):
 
     merrors = {}
     for p, ax in zip(minuitObj.parameters, axs.flat):
-        lerr, uerr = runMinosForPar(minuitObj, constrFunc, p, 2, ax)
+        lerr, uerr = runMinosForPar(minuitObj, constrFunc, p, 2, ax, bestFitVals, bestFitErrs)
         merrors[p] = np.array([lerr, uerr])
 
     # Hide plots not in use:
@@ -389,8 +385,14 @@ def runAndPlotManualMinos(minuitObj, constrFunc):
     return merrors
 
 
-def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax):
+def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, bestFitErrs):
 
+    # Set parameters close to minimum to restart procedure
+    for p in bestFitVals:
+        minuitObj.values[p] = bestFitVals[p]
+        # minuitObj.errors[p] = bestFitErrs[p]
+
+    # Run Fitting procedures again to be on the safe side
     minuitObj.migrad()
     minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
     minuitObj.hesse()
