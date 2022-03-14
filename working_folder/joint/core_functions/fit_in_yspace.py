@@ -216,7 +216,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         m.migrad()
     else:
         def constrFunc(*pars):
-            return convolvedModel(dataX, *pars)   # GC > 0 after convolution
+            return model(dataX, *pars)   # GC > 0 before convolution, i.e. physical system
 
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
 
