@@ -14,6 +14,7 @@ idx = np.argsort(ipData[:, -1])
 
 dets = ipData[idx, 0]
 L1sorted = ipData[idx, -1]
+thetaDets = ipData[idx, 2]
 print(L1sorted[:5])
 
 reltol = np.abs((L1sorted[1:] - L1sorted[:-1])/L1sorted[:-1])
@@ -28,6 +29,7 @@ print("len of first half: ", len(firstHalf), "last item: ", firstHalf[-1])
 print("len of first half: ", len(secondHalf), "first item: ", secondHalf[-1])
 
 # plt.plot(L1sorted[:-1], reltol, "ko")
-plt.plot(L1sorted, np.ones(L1sorted.size), "ko")
+plt.plot(L1sorted, thetaDets, "ko")
 plt.xlabel("L1")
+plt.ylabel("Theta")
 plt.show()

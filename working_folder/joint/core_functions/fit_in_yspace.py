@@ -190,7 +190,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
         
         funcSig = ["x", "A", "x0", "sigma1", "c4", "c6"]
-        initPars = {"A":1, "x0":0, "sigma1":5, "c4":0, "c6":0}
+        initPars = {"A":1, "x0":0, "sigma1":4, "c4":0, "c6":0}
 
     xDense, xDelta, resDense = chooseXDense(resX, resY, True)
 
@@ -404,8 +404,12 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
     # Store fval of best fit
     fValsMin = minuitObj.fval      # Used to calculate error bands at the end
 
-    # Initiate arrays
-    varSpace = np.linspace(varVal - bound*varErr, varVal + bound*varErr, 30)
+    # Create variable space more dense near the minima
+    # limit = (bound*varErr)**(1/2)
+    # varSpace = np.linspace(-limit, limit, 30)
+    # varSpace = varSpace**2 * np.sign(varSpace) + varVal
+    varSpace = np.linspace(varVal-bound*varErr, varVal+bound*varErr, 30)
+
     fValsScipy = np.zeros(varSpace.shape)
     fValsMigrad = np.zeros(varSpace.shape)
 
