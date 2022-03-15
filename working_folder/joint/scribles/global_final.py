@@ -8,22 +8,27 @@ from mantid.simpleapi import Load, CropWorkspace
 from scipy import optimize
 from scipy import ndimage, signal
 import time
+import numba as nb
 
 repoPath = Path(__file__).absolute().parent
+nbkwds = {
+    "parallel" : False,
+    "fastmath" : True
+}
 
 def main():
 
-    joyPath = repoPath / "wsJOYsmall.nxs"
-    resPath = repoPath / "wsResSmall.nxs"
-    # joyPath = repoPath / "wsDHMTjoy.nxs"
-    # resPath = repoPath / "wsDHMTres.nxs"
+    # joyPath = repoPath / "wsJOYsmall.nxs"
+    # resPath = repoPath / "wsResSmall.nxs"
+    joyPath = repoPath / "wsDHMTjoy.nxs"
+    resPath = repoPath / "wsDHMTres.nxs"
     
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
     print("No of spec res: ", wsRes.getNumberHistograms())
 
-    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=4, EndWorkspaceIndex=11)
-    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=4, EndWorkspaceIndex=11)
+    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=0, EndWorkspaceIndex=8)
+    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=0, EndWorkspaceIndex=8)
     print("No of spec res: ", wsRes.getNumberHistograms())
 
     fitGlobalFit(wsJoY, wsRes, False)
@@ -56,12 +61,14 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
     print("\n", describe(totCost))
 
     initPars = {}
-    for key in defaultPars:
-        if key in sharedPars:
-            initPars[key] = defaultPars[key]
-        else:
-            for i in range(len(dataY)):
-                initPars[key+str(i)] = defaultPars[key]
+    # Populate with initial shared parameters
+    for sp in sharedPars:
+        initPars[sp] = defaultPars[sp]
+    # Add initial unshared parameters
+    unsharedPars = [key for key in defaultPars if key not in sharedPars]
+    for up in unsharedPars:
+        for i in range(len(dataY)):
+            initPars[up+str(i)] = defaultPars[up]
 
     m = Minuit(totCost, **initPars)
 
@@ -85,21 +92,16 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
             """Constraint for positivity of Gram Carlier.
             Input: All parameters defined in original function.
             Format *pars to work with Minuit.
-            x is defined outside function, one constraint per value of x"""
-
-            # sigma1, c4, c6 = pars[:3]
-            # return (1 + c4/32*(16*(x/np.sqrt(2)/sigma1)**4 \
-            #         -48*(x/np.sqrt(2)/sigma1)**2+12) \
-            #         +c6/384*(64*(x/np.sqrt(2)/sigma1)**6 \
-            #         -480*(x/np.sqrt(2)/sigma1)**4 + 720*(x/np.sqrt(2)/sigma1)**2 - 120))
+            x is defined outside function.
+            Builds array with all constraints from individual functions."""
 
             sharedPars = pars[:3]    # sigma1, c4, c6
             joinedGC = np.zeros(int((len(pars)-3)/2) * x.size)
             for i, (A, x0) in enumerate(zip(pars[3::2], pars[4::2])):
                 joinedGC[i*x.size : (i+1)*x.size] = model(x, *sharedPars, A, x0)
             
-            if np.any(joinedGC==0):
-                raise ValueError("Args where zero: ", np.argwhere(joinedGC==0))
+            # if np.any(joinedGC==0):
+            #     raise ValueError("Args where zero: ", np.argwhere(joinedGC==0))
             
             return joinedGC
 
@@ -118,16 +120,15 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
 
 def selectModelAndPars(gaussFlag):
     if gaussFlag:
-        def model(x, y0, A, x0, sigma):
+        def model(x, sigma, y0, A, x0):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
             return gauss 
 
-
         defaultPars = {
+            "sigma" : 5,
             "y0" : 0,
             "A" : 1,
-            "x0" : 0,
-            "sigma" : 5           
+            "x0" : 0,         
         }
 
         sharedPars = ["sigma"]
@@ -158,7 +159,7 @@ def selectModelAndPars(gaussFlag):
 def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
    
-    xDense, xDelta, resDense = chooseXDense(x, res, True)
+    xDense, xDelta, resDense = chooseXDense(x, res, False)
     def convolvedModel(xrange, *pars):
         """Performs convolution first on high density grid and interpolates to desired x range"""
         convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
