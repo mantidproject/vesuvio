@@ -272,9 +272,9 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
 
     # Extract info from fit before running any MINOS
-    parameters = m.parameters
-    values = m.values
-    errors = m.errors
+    parameters = list(m.parameters)
+    values = list(m.values)
+    errors = list(m.errors)
     
     bestFitVals = {}
     bestFitErrs = {}
@@ -405,10 +405,10 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
     fValsMin = minuitObj.fval      # Used to calculate error bands at the end
 
     # Create variable space more dense near the minima
-    # limit = (bound*varErr)**(1/2)
-    # varSpace = np.linspace(-limit, limit, 30)
-    # varSpace = varSpace**2 * np.sign(varSpace) + varVal
-    varSpace = np.linspace(varVal-bound*varErr, varVal+bound*varErr, 30)
+    limit = (bound*varErr)**(1/2)
+    varSpace = np.linspace(-limit, limit, 30)
+    varSpace = varSpace**2 * np.sign(varSpace) + varVal
+    # varSpace = np.linspace(varVal-bound*varErr, varVal+bound*varErr, 30)
 
     fValsScipy = np.zeros(varSpace.shape)
     fValsMigrad = np.zeros(varSpace.shape)

@@ -57,6 +57,9 @@ m.fcn([1, 0, 5, 0.1, 0.2])
 m.grad
 m.hesse()
 
+values = list(m.values)
+print(values)
+
 
 #%%
 %%timeit -r 5 -n 1
@@ -72,4 +75,7 @@ m.scipy(constraints=constraints)
 #%%
 %%timeit -r 5 -n 1
 m.hesse()
+# %%
+print(values)
+
 # %%
