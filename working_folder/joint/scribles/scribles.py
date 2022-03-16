@@ -46,5 +46,9 @@ A = np.arange(30)
 firstHalf, secondHalf = np.split(A, 2)
 print(secondHalf, np.flip(firstHalf))
 
+
+L = [[1, 2], [3, 4]]
+print(2 in L)
+
     
 
