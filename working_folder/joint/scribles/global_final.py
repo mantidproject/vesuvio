@@ -27,8 +27,8 @@ def main():
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
     print("No of spec res: ", wsRes.getNumberHistograms())
 
-    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=0, EndWorkspaceIndex=32)
-    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=0, EndWorkspaceIndex=32)
+    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=0, EndWorkspaceIndex=10)
+    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=0, EndWorkspaceIndex=10)
     print("No of spec res: ", wsRes.getNumberHistograms())
 
     fitGlobalFit(wsJoY, wsRes, False)
