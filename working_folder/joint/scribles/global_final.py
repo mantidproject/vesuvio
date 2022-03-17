@@ -22,33 +22,34 @@ def main():
     # resPath = repoPath / "wsResSmall.nxs"
     joyPath = repoPath / "wsDHMTjoy.nxs"
     resPath = repoPath / "wsDHMTres.nxs"
-    
+    ipPath = repoPath / "ip2018_3.par"  
+ 
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
     print("No of spec res: ", wsRes.getNumberHistograms())
 
-    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=0, EndWorkspaceIndex=10)
-    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=0, EndWorkspaceIndex=10)
+    firstSpec = 135
+    lastSpec = 155
+
+    firstIdx = firstSpec - 135
+    lastIdx = lastSpec - 135
+
+    wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=firstIdx, EndWorkspaceIndex=lastIdx)
+    wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=firstIdx, EndWorkspaceIndex=lastIdx)
     print("No of spec res: ", wsRes.getNumberHistograms())
 
-    fitGlobalFit(wsJoY, wsRes, False)
+    fitGlobalFit(wsJoY, wsRes, False, ipPath, firstSpec, lastSpec, 4)
     plt.show()
 
 
-def fitGlobalFit(ws, wsRes, gaussFlag):
-    axs = plotData(ws)
-    
-    dataY = ws.extractY()
-    dataE = ws.extractE()
-    dataX = ws.extractX()
-    dataRes = wsRes.extractY()
+def fitGlobalFit(ws, wsRes, gaussFlag,  InstrParsPath, firstSpec, lastSpec, nGroups):
 
-    # Removed masked spectra so that zeros are not fitted
-    zerosRowMask = np.all(dataY==0, axis=1)
-    dataY = dataY[~zerosRowMask]
-    dataE = dataE[~zerosRowMask]
-    dataX = dataX[~zerosRowMask]
-    dataRes = dataRes[~zerosRowMask]
+    dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, InstrParsPath, firstSpec, lastSpec)
+    dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
+
+    if (nGroups!=0) or (nGroups!=1):
+        idxList = groupDetectors(instrPars, nGroups)
+        dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
     # TODO: Possible symetrisation goes here
 
@@ -114,8 +115,37 @@ def fitGlobalFit(ws, wsRes, gaussFlag):
     print("Value of minimum: ", m.fval, "\n")
     for p, v, e in zip(m.parameters, m.values, m.errors):
         print(f"{p:7s} = {v:7.3f} +/- {e:7.3f}")
-    plotFit(ws.extractX(), totCost, m, axs)
+
+    axs = plotData(dataX, dataY, dataE)
+    plotFit(dataX, totCost, m, axs)
     return 
+
+
+def extractData(ws, wsRes, InstrParsPath, firstSpec, lastSpec):
+    dataY = ws.extractY()
+    dataE = ws.extractE()
+    dataX = ws.extractX()
+    dataRes = wsRes.extractY()
+    instrPars = loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec)
+    return dataX, dataY, dataE, dataRes, instrPars    
+
+
+def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
+    data = np.loadtxt(InstrParsPath, dtype=str)[1:].astype(float)
+    spectra = data[:, 0]
+    select_rows = np.where((spectra >= firstSpec) & (spectra <= lastSpec))
+    instrPars = data[select_rows]
+    return instrPars
+
+
+def takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars):
+    zerosRowMask = np.all(dataY==0, axis=1)
+    dataY = dataY[~zerosRowMask]
+    dataE = dataE[~zerosRowMask]
+    dataX = dataX[~zerosRowMask]
+    dataRes = dataRes[~zerosRowMask]
+    instrPars = instrPars[~zerosRowMask]
+    return dataX, dataY, dataE, dataRes, instrPars 
 
 
 def selectModelAndPars(gaussFlag):
@@ -199,11 +229,7 @@ def chooseXDense(x, res, flag):
     return xDense, xDelta, resDense
 
 
-def plotData(ws):
-    dataY = ws.extractY()
-    dataE = ws.extractE()
-    dataX = ws.extractX()
-
+def plotData(dataX, dataY, dataE):
     mask = np.all(dataY==0, axis=1)
     dataY = dataY[~mask]
     dataE = dataE[~mask]
@@ -237,5 +263,164 @@ def plotFit(dataX, totCost, minuit, axs):
 
         ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
         ax.legend()
+
+# ------- Groupings 
+
+def groupDetectors(ipData, nGroups):
+    """
+    Uses the method of k-means to find clusters in theta-L1 space.
+    Input: instrument parameters to extract L1 and theta of detectors.
+    Output: list of group lists containing the idx of spectra.
+    """
+    assert nGroups > 0, "Number of groups must be bigger than zero."
+    assert nGroups <= len(ipData)/2, "Number of groups should be less than half the spectra"
+        
+    L1 = ipData[:, -1]   
+    theta = ipData[:, 2]  
+
+    L1 /= np.sum(L1) * 2    # Bigger weight to L1
+    theta /= np.sum(theta)
+
+    points = np.vstack((L1, theta)).T
+    assert points.shape == (len(L1), 2), "Wrong shape."
+    centers = points[np.linspace(0, len(points)-1, nGroups).astype(int), :]
+
+    plt.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
+    plt.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
+    plt.xlabel("L1")
+    plt.ylabel("theta")
+    plt.legend()
+    plt.show()
+
+    clusters, n = kMeansClustering(points, centers)
+    idxList = formIdxList(clusters, n, len(L1))
+
+    for i in range(n):
+        clus = points[clusters==i]
+        plt.scatter(clus[:, 0], clus[:, 1], label=f"group {i}")
+    plt.xlabel("L1")
+    plt.ylabel("theta")
+    plt.legend()
+    plt.show()
+
+    return idxList
+
+
+def kMeansClustering(points, centers):
+    prevCenters = centers
+    while  True:
+        clusters, n = closestCenter(points, prevCenters)
+        centers = calculateCenters(points, clusters, n)
+        # print(centers)
+        
+        if np.all(centers == prevCenters):
+            break
+
+        assert np.isfinite(centers).all(), f"Issue with starting centers! {centers}"
+
+        prevCenters = centers
+    clusters, n = closestCenter(points, centers)
+    return clusters, n
+
+
+def closestCenter(points, centers):
+    clusters = np.zeros(len(points))
+    for p in range(len(points)):
+
+        minCenter = 0
+        minDist = pairDistance(points[p], centers[0])
+        for i in range(1, len(centers)): 
+
+            dist = pairDistance(points[p], centers[i])
+
+            if dist < minDist:
+                minDist = dist
+                minCenter = i
+        clusters[p] = minCenter
+    return clusters, len(centers)
+
+
+def pairDistance(p1, p2):
+    "pairs have shape (1, 2)"
+    return np.sqrt(np.sum(np.square(p1-p2)))
+
+
+def calculateCenters(points, clusters, n):
+    centers = np.zeros((n, 2))
+    for i in range(n):
+        centers[i] = np.mean(points[clusters==i, :], axis=0)
+    return centers
+
+
+def formIdxList(clusters, n, lenPoints):
+    # Form list with groups of idxs
+    idxList = []
+    for i in range(n):
+        idxs = np.argwhere(clusters==i).flatten()
+        idxList.append(list(idxs))
+    print("List of idexes that will be used for idexing: \n", idxList)
+
+    # Check that idexes are not repeated and not missing
+    flatList = []
+    for group in idxList:
+        for elem in group:
+            flatList.append(elem)
+    assert np.all(np.sort(np.array(flatList))==np.arange(lenPoints)), "Groupings did not work!"
+    
+    return idxList
+
+# ---------- Weighted Avgs of Groups
+
+def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
+    wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(dataY[0])))
+
+    for i, idxs in enumerate(idxList):
+        groupX, groupY, groupE, groupRes = extractArrByIdx(dataX, dataY, dataE, dataRes, idxs)
+        
+        if len(groupY) == 1:   # Cannot use weight avg in single spec, wrong results
+            meanY, meanE = groupY, groupE
+            meanRes = groupRes
+            print("Used unaltered spec")
+
+        else:
+            meanY, meanE = weightedAvgArr(groupY, groupE)
+            meanRes = np.nanmean(groupRes, axis=0)
+            print("Used weighted mean")
+
+        assert np.all(groupX[0] == np.mean(groupX, axis=0)), "X values should not change with groups"
+        
+        wDataX[i] = groupX[0]
+        wDataY[i] = meanY
+        wDataE[i] = meanE
+        wDataRes[i] = meanRes 
+    
+    assert np.all(wDataY!=0), "Some avg weights in groups are not being performed."
+
+    return wDataX, wDataY, wDataE, wDataRes
+
+
+def initiateZeroArr(shape):
+    wDataX = np.zeros(shape)
+    wDataY = np.zeros(shape)
+    wDataE = np.zeros(shape)
+    wDataRes = np.zeros(shape)  
+    return  wDataX, wDataY, wDataE, wDataRes
+
+
+def extractArrByIdx(dataX, dataY, dataE, dataRes, idxs):
+    groupE = dataE[idxs, :]
+    groupY = dataY[idxs, :]
+    groupX = dataX[idxs, :]
+    groupRes = dataRes[idxs, :]
+    return groupX, groupY, groupE, groupRes
+
+
+def weightedAvgArr(dataY, dataE):
+    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
+    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+    return meanY, meanE
+
+
+
 
 main()

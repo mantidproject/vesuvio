@@ -12,27 +12,33 @@ ipData = ipData[ipData[:,0]>=135]
 print("front dets: ", len(ipData))
 
 
-def groupDetectors(ipData):
+def groupDetectors(ipData, nGroups):
     """
     Uses the method of k-means to find clusters in theta-L1 space.
     Input: instrument parameters to extract L1 and theta of detectors.
     Output: list of group lists containing the idx of spectra.
     """
+    assert nGroups > 0, "Number of groups must be bigger than zero."
+    assert nGroups <= len(ipData)/2, "Number of groups should be less than half the spectra"
+        
 
     L1 = ipData[:, -1]   
     theta = ipData[:, 2]  
 
-    L1 /= np.sum(L1) * 2
+    L1 /= np.sum(L1) * 2    # Bigger weight to L1
     theta /= np.sum(theta)
+
 
     points = np.vstack((L1, theta)).T
     assert points.shape == (len(L1), 2), "Wrong shape."
 
-    nGroups = 16
     centers = points[np.linspace(0, len(points)-1, nGroups).astype(int), :]
 
-    plt.scatter(L1, theta)
-    plt.scatter(centers[:, 0], centers[:, 1], color="k")
+    plt.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
+    plt.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
+    plt.xlabel("L1")
+    plt.ylabel("theta")
+    plt.legend()
     plt.show()
 
     t0 = time.time()
@@ -118,4 +124,4 @@ def formIdxList(clusters, n, lenPoints):
 
 
 
-groupDetectors(ipData)
+groupDetectors(ipData, 16)

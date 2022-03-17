@@ -11,11 +11,21 @@ import matplotlib.pyplot as plt
 
 # plt.show()
 
-r = 5
-zero = 3
-n = 30
-x = np.linspace(-r**(1/3), r**(1/3), n)
-y = x**3
+# r = 5
+# zero = 3
+# n = 30
+# x = np.linspace(-r**(1/3), r**(1/3), n)
+# y = x**3
 
-print(x[:5])
-print(y[:5])
+# print(x[:5])
+# print(y[:5])
+
+
+A = np.array([
+    [1, 2, 3, 4, 5],
+    [np.nan, np.nan, np.nan, np.nan, np.nan]
+])
+
+print(A)
+print(np.nansum(A, axis=0))
+assert np.all(A == np.nansum(A, axis=0))

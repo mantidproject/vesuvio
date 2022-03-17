@@ -63,6 +63,7 @@ meany, meane = weightedAvgArr(y, e)
 # np.testing.assert_array_equal(y, meany)
 # np.testing.assert_array_equal(e, meane)
 
+# Assign masked spectra to nan before running this function
 
 def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
     wDataX = np.zeros((len(idxList), len(dataY[0])))
@@ -82,12 +83,13 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
             meanY, meanE = groupY, groupE
             meanRes = groupRes
             print("Used unaltered spec")
+
         else:
             meanY, meanE = weightedAvgArr(groupY, groupE)
-            meanRes = np.mean(groupRes, axis=0)
+            meanRes = np.nanmean(groupRes, axis=0)
             print("Used wighted mean")
 
-        np.testing.assert_array_equal(groupX[0], np.mean(groupX, axis=0))
+        np.testing.assert_array_equal(groupX[0], np.nanmean(groupX, axis=0))
         wDataX[i] = groupX[0]
         wDataY[i] = meanY
         wDataE[i] = meanE
@@ -95,8 +97,8 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
     return wDataX, wDataY, wDataE, wDataRes
 
 
-fig, axs = plt.subplots(len(idxList))
-for x, y, e, ax in zip(wDataX, wDataY, wDataE, axs.flat):
-    ax.errorbar(x, y, e, fmt="k.")
+# fig, axs = plt.subplots(len(idxList))
+# for x, y, e, ax in zip(wDataX, wDataY, wDataE, axs.flat):
+#     ax.errorbar(x, y, e, fmt="k.")
 
 plt.show()
