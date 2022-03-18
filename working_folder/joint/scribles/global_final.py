@@ -1,14 +1,14 @@
-from email.policy import default
+
 import numpy as np
 import matplotlib.pyplot as plt
-from iminuit import Minuit, cost, util
-from iminuit.util import make_with_signature, describe, make_func_code
+from iminuit import Minuit, cost
+from iminuit.util import describe, make_func_code
 from pathlib import Path
-from mantid.simpleapi import Load, CropWorkspace
+from mantid.simpleapi import Load, CropWorkspace, CloneWorkspace
 from scipy import optimize
-from scipy import ndimage, signal
+from scipy import signal
 import time
-import numba as nb
+
 
 repoPath = Path(__file__).absolute().parent
 nbkwds = {
@@ -16,7 +16,7 @@ nbkwds = {
     "fastmath" : True
 }
 
-def main():
+def main(nSpec, nGroups, showPlots):
 
     # joyPath = repoPath / "wsJOYsmall.nxs"
     # resPath = repoPath / "wsResSmall.nxs"
@@ -26,30 +26,32 @@ def main():
  
     wsJoY = Load(str(joyPath), OutputWorkspace="wsJoY")
     wsRes = Load(str(resPath), OutputWorkspace="wsRes")
-    print("No of spec res: ", wsRes.getNumberHistograms())
+    print("No of spec raw: ", wsRes.getNumberHistograms())
 
     firstSpec = 135
-    lastSpec = 155
+    lastSpec = 135+nSpec-1 #182
 
     firstIdx = firstSpec - 135
     lastIdx = lastSpec - 135
 
     wsJoY = CropWorkspace(InputWorkspace="wsJoY", OutputWorkspace="wsJoY", StartWorkspaceIndex=firstIdx, EndWorkspaceIndex=lastIdx)
     wsRes = CropWorkspace(InputWorkspace="wsRes", OutputWorkspace="wsRes", StartWorkspaceIndex=firstIdx, EndWorkspaceIndex=lastIdx)
-    print("No of spec res: ", wsRes.getNumberHistograms())
+    print("No of spec cropped: ", wsRes.getNumberHistograms())
 
-    fitGlobalFit(wsJoY, wsRes, False, ipPath, firstSpec, lastSpec, 4)
-    plt.show()
+    values, errors = fitGlobalFit(wsJoY, wsRes, False, ipPath, firstSpec, lastSpec, nGroups, showPlots)
+    if showPlots:
+        plt.show()
+    return values, errors
 
 
-def fitGlobalFit(ws, wsRes, gaussFlag,  InstrParsPath, firstSpec, lastSpec, nGroups):
+def fitGlobalFit(ws, wsRes, gaussFlag,  InstrParsPath, firstSpec, lastSpec, nGroups, showPlots):
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, InstrParsPath, firstSpec, lastSpec)
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
-    if (nGroups!=0) or (nGroups!=1):
-        idxList = groupDetectors(instrPars, nGroups)
-        dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
+    print(f"\nNumber of gropus: {nGroups}")
+    idxList = groupDetectors(instrPars, nGroups, showPlots)
+    dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
     # TODO: Possible symetrisation goes here
 
@@ -59,7 +61,8 @@ def fitGlobalFit(ws, wsRes, gaussFlag,  InstrParsPath, firstSpec, lastSpec, nGro
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
         totCost += calcCostFun(model, i, x, y, yerr, res, sharedPars)
     
-    print("\n", describe(totCost))
+    print("\nGlobal Fit Parameters:\n", describe(totCost))
+    print("\nRunning Global Fit ...\n")
 
     initPars = {}
     # Populate with initial shared parameters
@@ -111,14 +114,17 @@ def fitGlobalFit(ws, wsRes, gaussFlag,  InstrParsPath, firstSpec, lastSpec, nGro
     
     m.hesse()
     t1 = time.time()
-    print(f"Running time of fitting: {t1-t0:.2f} seconds")
-    print("Value of minimum: ", m.fval, "\n")
+    print(f"\nTime of fitting: {t1-t0:.2f} seconds")
+    print(f"Value of minimum: {m.fval:.2f}")
+    print("\nResults of Global Fit:\n")
     for p, v, e in zip(m.parameters, m.values, m.errors):
         print(f"{p:7s} = {v:7.3f} +/- {e:7.3f}")
+    print("\n")
 
-    axs = plotData(dataX, dataY, dataE)
-    plotFit(dataX, totCost, m, axs)
-    return 
+    if showPlots:
+        axs = plotData(dataX, dataY, dataE)
+        plotFit(dataX, totCost, m, axs)
+    return np.array(m.values), np.array(m.errors)
 
 
 def extractData(ws, wsRes, InstrParsPath, firstSpec, lastSpec):
@@ -189,7 +195,7 @@ def selectModelAndPars(gaussFlag):
 def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
    
-    xDense, xDelta, resDense = chooseXDense(x, res, False)
+    xDense, xDelta, resDense = chooseXDense(x, res, True)
     def convolvedModel(xrange, *pars):
         """Performs convolution first on high density grid and interpolates to desired x range"""
         convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
@@ -197,7 +203,7 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
 
     costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
     convolvedModel.func_code = make_func_code(costSig)
-    print(describe(convolvedModel))
+    # print(describe(convolvedModel))
 
     # Data without cut-offs
     nonZeros = y != 0
@@ -266,57 +272,65 @@ def plotFit(dataX, totCost, minuit, axs):
 
 # ------- Groupings 
 
-def groupDetectors(ipData, nGroups):
+def groupDetectors(ipData, nGroups, showPlots):
     """
     Uses the method of k-means to find clusters in theta-L1 space.
     Input: instrument parameters to extract L1 and theta of detectors.
     Output: list of group lists containing the idx of spectra.
     """
     assert nGroups > 0, "Number of groups must be bigger than zero."
-    assert nGroups <= len(ipData)/2, "Number of groups should be less than half the spectra"
-        
-    L1 = ipData[:, -1]   
+    assert nGroups < len(ipData), "Number of groups cannot exceed no of detectors"
+     
+    L1 = ipData[:, -1]    
     theta = ipData[:, 2]  
 
-    L1 /= np.sum(L1) * 2    # Bigger weight to L1
+    # Normalize  ranges to similar values
+    L1 /= np.sum(L1)       
     theta /= np.sum(theta)
+
+    L1 *= 2           # Bigger weight to L1
+
 
     points = np.vstack((L1, theta)).T
     assert points.shape == (len(L1), 2), "Wrong shape."
     centers = points[np.linspace(0, len(points)-1, nGroups).astype(int), :]
 
-    plt.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
-    plt.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
-    plt.xlabel("L1")
-    plt.ylabel("theta")
-    plt.legend()
-    plt.show()
+
+    if showPlots:
+        plt.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
+        plt.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
+        plt.xlabel("L1")
+        plt.ylabel("theta")
+        plt.legend()
+        plt.show()
 
     clusters, n = kMeansClustering(points, centers)
     idxList = formIdxList(clusters, n, len(L1))
 
-    for i in range(n):
-        clus = points[clusters==i]
-        plt.scatter(clus[:, 0], clus[:, 1], label=f"group {i}")
-    plt.xlabel("L1")
-    plt.ylabel("theta")
-    plt.legend()
-    plt.show()
+    if showPlots:
+        for i in range(n):
+            clus = points[clusters==i]
+            plt.scatter(clus[:, 0], clus[:, 1], label=f"group {i}")
+        plt.xlabel("L1")
+        plt.ylabel("theta")
+        plt.legend()
+        plt.show()
 
     return idxList
 
 
 def kMeansClustering(points, centers):
+    # Fails in some rare situations
     prevCenters = centers
     while  True:
-        clusters, n = closestCenter(points, prevCenters)
-        centers = calculateCenters(points, clusters, n)
+        clusters, nGroups = closestCenter(points, prevCenters)
+        centers = calculateCenters(points, clusters, nGroups)
         # print(centers)
-        
+
         if np.all(centers == prevCenters):
             break
 
-        assert np.isfinite(centers).all(), f"Issue with starting centers! {centers}"
+        assert np.isfinite(centers).all(), f"Invalid centers found:\n{centers}\nMaybe try a different number for the groupings."
 
         prevCenters = centers
     clusters, n = closestCenter(points, centers)
@@ -348,7 +362,7 @@ def pairDistance(p1, p2):
 def calculateCenters(points, clusters, n):
     centers = np.zeros((n, 2))
     for i in range(n):
-        centers[i] = np.mean(points[clusters==i, :], axis=0)
+        centers[i] = np.mean(points[clusters==i, :], axis=0)  # If cluster i is not present, returns nan
     return centers
 
 
@@ -358,7 +372,7 @@ def formIdxList(clusters, n, lenPoints):
     for i in range(n):
         idxs = np.argwhere(clusters==i).flatten()
         idxList.append(list(idxs))
-    print("List of idexes that will be used for idexing: \n", idxList)
+    print("\nList of idexes that will be used for idexing: \n", idxList)
 
     # Check that idexes are not repeated and not missing
     flatList = []
@@ -380,12 +394,10 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
         if len(groupY) == 1:   # Cannot use weight avg in single spec, wrong results
             meanY, meanE = groupY, groupE
             meanRes = groupRes
-            print("Used unaltered spec")
 
         else:
             meanY, meanE = weightedAvgArr(groupY, groupE)
             meanRes = np.nanmean(groupRes, axis=0)
-            print("Used weighted mean")
 
         assert np.all(groupX[0] == np.mean(groupX, axis=0)), "X values should not change with groups"
         
@@ -422,5 +434,5 @@ def weightedAvgArr(dataY, dataE):
 
 
 
-
-main()
+if __name__ == "__main__":
+    main(45, 4, True)    # error at 45 - 24
