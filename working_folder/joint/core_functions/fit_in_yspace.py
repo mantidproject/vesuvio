@@ -170,6 +170,9 @@ def symmetrizeArr(dataY, dataE):
     """Performs Inverse variance weighting between two oposite points."""
 
     #TODO: Deal with cut-offs by mirroring opposite data
+    dataY = dataY.copy()  # Copy arrays not to risk changing original data
+    dataE = dataE.copy()
+
     cutOffMask = dataE==0
     dataY[cutOffMask] = np.flip(dataY, axis=1)[cutOffMask]
     dataE[cutOffMask] = np.flip(dataE, axis=1)[cutOffMask]
@@ -185,8 +188,11 @@ def symmetrizeArr(dataY, dataE):
     #TODO: assert for the cut-offs
     # THIS DOES NOT MAKE SENSE
     # SYMMETRIC ARRAYS SHOULD PASS BUT THIS FAILS ANYWAY
-    assert dataYSym[cutOffMask] == np.flip(dataYSym, axis=1)[cutOffMask]
-    assert dataESym[cutOffMask] == np.flip(dataESym, axis=1)[cutOffMask]
+    assert np.all(dataYSym == np.flip(dataYSym, axis=1))
+    assert np.all(dataESym == np.flip(dataESym, axis=1))
+
+    assert np.all(dataYSym[cutOffMask] == dataY[cutOffMask])
+    assert np.all(dataESym[cutOffMask] == dataE[cutOffMask])
 
     return dataYSym, dataESym
 
@@ -225,8 +231,8 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
     convolvedModel.func_code = make_func_code(funcSig)
 
-    # Ignore values that are zero, eg. cut-offs
-    nonZeros = dataY != 0
+    # Ignore cut-off values 
+    nonZeros = dataE != 0
     dataXNZ = dataX[nonZeros]
     dataYNZ = dataY[nonZeros]
     dataENZ = dataE[nonZeros]
