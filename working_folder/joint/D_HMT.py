@@ -140,7 +140,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1 #2   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -171,13 +171,12 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
-    symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    resolutionRebinPars = "-30, 0.125, 30" 
+#     resolutionRebinPars = "-30, 0.125, 30" 
     singleGaussFitToHProfile = False     # When False, use Hermite expansion
-    globalFitFlag = False
+    globalFitFlag = True
     forceManualMinos = False
-    
+    nGlobalFitGroups = 1   
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
@@ -187,16 +186,17 @@ yfitIC = YSpaceFitInitialConditions
 start_time = time.time()
 # Start of interactive section 
 
-runOnlyYSpaceFit = False
-if runOnlyYSpaceFit:
-    wsFinal = mtd["DHMT_300K_RD_forward_1"]
-    allNCP = extractNCPFromWorkspaces(wsFinal)
+wsName = "DHMT_300K_RD_forward_0"
+if wsName in mtd:
+    wsFinal = mtd["DHMT_300K_RD_forward_0"]
+    allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
 else:
 #     wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
     allNCP = lastIterationNCP
 
+assert ~np.all(allNCP==0), "NCP extraction not working!"
 
 print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
 fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)

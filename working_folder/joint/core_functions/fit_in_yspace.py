@@ -21,7 +21,8 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
     if ic.symmetrisationFlag:
-        wsYSpaceAvg = symmetrizeWs(ic.symmetriseHProfileUsingAveragesFlag, wsYSpaceAvg)
+        #TODO: Need to symmetrize resolution as well
+        wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
 
     fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
     fitProfileMantidFit(ic, wsYSpaceAvg, wsResSum)
@@ -33,6 +34,7 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
 
     if ic.globalFitFlag:
         # fitGlobalFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
+
         fitMinuitGlobalFit(wsYSpace, wsRes, ic)
 
 
@@ -76,6 +78,7 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
         if wsSubMass.spectrumInfo().isMasked(j):
             continue
 
+        # Due to different sizes, last value of original ws remains untouched
         binWidths = wsSubMass.dataX(j)[1:] - wsSubMass.dataX(j)[:-1]
         wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] * binWidths
 
@@ -128,8 +131,7 @@ def weightedAvg(wsYSpace):
     dataY[dataY==0] = np.nan
     dataE[dataE==0] = np.nan
 
-    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
-    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+    meanY, meanE = weightedAvgArr(dataY, dataE)
 
     tempWs = SumSpectra(wsYSpace)
     newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_Weighted_Avg")
@@ -139,33 +141,54 @@ def weightedAvg(wsYSpace):
     return newWs
 
 
-def symmetrizeWs(avgSymFlag, avgYSpace):
-    """Symmetrizes workspace,
+def weightedAvgArr(dataY, dataE):
+    """Weighted average over 2D arrays."""
+
+    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
+    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+    return meanY, meanE
+
+
+def symmetrizeWs(avgYSpace):
+    """Symmetrizes workspace after weighted average,
        Needs to have symmetric binning"""
 
     dataX = avgYSpace.extractX()
     dataY = avgYSpace.extractY()
     dataE = avgYSpace.extractE()
 
-    yFlip = np.flip(dataY, axis=1)
-    eFlip = np.flip(dataE, axis=1)
-
-    if avgSymFlag:
-        # Inverse variance weighting
-        dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
-        dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
-
-    # TODO: Maybe take out possibility of symmetrisation by mirror
-    else:
-        # Mirroring positive values from negative ones
-        dataYSym = np.where(dataX>0, yFlip, dataY)
-        dataESym = np.where(dataX>0, eFlip, dataE)
+    dataYSym, dataESym = symmetrizeArr(dataY, dataE)
 
     Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_Symmetrised")
     for i in range(Sym.getNumberHistograms()):
         Sym.dataY(i)[:] = dataYSym[i]
-        Sym.dataE(i)[:] = dataESym[i]
+        Sym.dataE(i)[:] = dataESym[i] 
     return Sym
+
+
+def symmetrizeArr(dataY, dataE):
+    """Performs Inverse variance weighting between two oposite points."""
+
+    #TODO: Deal with cut-offs by mirroring opposite data
+    cutOffMask = dataE==0
+    dataY[cutOffMask] = np.flip(dataY, axis=1)[cutOffMask]
+    dataE[cutOffMask] = np.flip(dataE, axis=1)[cutOffMask]
+    # End of treatment
+
+    yFlip = np.flip(dataY, axis=1)
+    eFlip = np.flip(dataE, axis=1)
+
+    # Inverse variance weighting
+    dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
+    dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
+
+    #TODO: assert for the cut-offs
+    # THIS DOES NOT MAKE SENSE
+    # SYMMETRIC ARRAYS SHOULD PASS BUT THIS FAILS ANYWAY
+    assert dataYSym[cutOffMask] == np.flip(dataYSym, axis=1)[cutOffMask]
+    assert dataESym[cutOffMask] == np.flip(dataESym, axis=1)[cutOffMask]
+
+    return dataYSym, dataESym
 
 
 def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
@@ -283,7 +306,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     for p, v, e in zip(m.parameters, m.values, m.errors):
         bestFitVals[p] = v
         bestFitErrs[p] = e
-    fValsMin = m.fval
+    # fValsMin = m.fval
 
     try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
         if ic.forceManualMinos:
@@ -370,7 +393,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs):
     figsize = (12, 7)
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
-    fig.canvas.set_window_title("Manual Implementation of Minos algorithm")
+    fig.canvas.set_window_title("Plot of Manual Implementation MINOS")
 
     merrors = {}
     for p, ax in zip(minuitObj.parameters, axs.flat):
@@ -470,7 +493,7 @@ def plotAutoMinos(minuitObj):
     figsize = (12, 7)
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
-    fig.canvas.set_window_title("Plot of automatic Minos algorithm")
+    fig.canvas.set_window_title("Plot of Automatic MINOS")
 
     for p, ax in zip(minuitObj.parameters, axs.flat):
         loc, fvals, status = minuitObj.mnprofile(p, bound=2)
@@ -525,9 +548,9 @@ def printYSpaceFitResults(wsJoYName):
         # print("    ".join(tableWS.keys()))
         for key in tableWS.keys():
             if key=="Name":
-                print(f"{key:12s}:  "+"  ".join([f"{elem:7.8s}" for elem in tableWS.column(key)]))
+                print(f"{key:>20s}:  "+"  ".join([f"{elem:7.8s}" for elem in tableWS.column(key)]))
             else:
-                print(f"{key:12s}: "+"  ".join([f"{elem:7.4f}" for elem in tableWS.column(key)]))
+                print(f"{key:>20s}: "+"  ".join([f"{elem:7.4f}" for elem in tableWS.column(key)]))
     print("\n")
 
 
@@ -715,13 +738,26 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
     idxList = groupDetectors(instrPars, ic.nGlobalFitGroups)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
+    if ic.symmetrisationFlag:  
+        dataY, dataE = symmetrizeArr(dataY, dataE)
+
+        print(f"Data cut-offs: {np.argwhere(dataE==0)}")
+        print(f"DataY at cut-offs: {dataY[np.nonzero(dataE==0)]}")
+        # assert np.all(dataY!=np.inf), f"Nans are present after symmetrization: {np.argwhere(dataY==np.nan)}"
+        # assert np.all(dataE!=0), f"Cut-offs are present after symmetrization: {np.argwhere(dataE==0)}"
+
     model, defaultPars, sharedPars = selectModelAndPars(ic.singleGaussFitToHProfile)   
- 
+    
+    print("\nShared Parameters: ", [key for key in sharedPars])
+    print("\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars])
+    
     totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
         totCost += calcCostFun(model, i, x, y, yerr, res, sharedPars)
     
-    print("\nGlobal Fit Parameters:\n", describe(totCost))
+    assert len(describe(totCost)) == len(sharedPars) + len(dataY)*(len(defaultPars)-len(sharedPars)), f"Wrong parameters for Global Fit:\n{describe(totCost)}"
+    
+    # print("\nGlobal Fit Parameters:\n", describe(totCost))
     print("\nRunning Global Fit ...\n")
 
     initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
@@ -733,10 +769,6 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
 
     t0 = time.time()
     if ic.singleGaussFitToHProfile:
-
-        #TODO Ask about the limits on y0
-        for i in range(len(dataY)):
-            m.limits["y0"+str(i)] = (0, np.inf)
 
         m.simplex()
         m.migrad() 
@@ -767,11 +799,14 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
     m.hesse()
     t1 = time.time()
     print(f"\nTime of fitting: {t1-t0:.2f} seconds")
-    print(f"Value of minimum: {m.fval:.2f}")
+    chi2 = m.fval / (len(dataY)*len(dataY[0])-m.nfit)
+    print(f"Value of Chi2/ndof: {chi2:.2f}")
+    print(f"Migrad Minimum valid: {m.valid}")
+
 
     print("\nResults of Global Fit:\n")
     for p, v, e in zip(m.parameters, m.values, m.errors):
-        print(f"{p:7s} = {v:7.3f} +/- {e:7.3f}")
+        print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
     print("\n")
 
     plotGlobalFit(dataX, dataY, dataE, m, totCost)
@@ -872,7 +907,7 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     # print(describe(convolvedModel))
 
     # Data without cut-offs
-    nonZeros = y != 0
+    nonZeros = yerr!=0  #(y != 0) & (y != np.nan)
     xNZ = x[nonZeros]
     yNZ = y[nonZeros]
     yerrNZ = yerr[nonZeros]
@@ -902,6 +937,11 @@ def chooseXDense(x, res, flag):
 
 
 def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
+
+    if len(dataY) > 12:    
+        print("\nToo many axes to show in figure, skipping the plot ...\n")
+        return
+
     rows = 2
 
     fig, axs = plt.subplots(
@@ -911,10 +951,11 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
         tight_layout=True,
         subplot_kw={'projection':'mantid'}
     )
+    fig.canvas.set_window_title("Plot of Global Fit")
 
     # Data used in Global Fit
-    for x, y, yerr, ax in zip(dataX, dataY, dataE, axs.flat):
-        ax.errorbar(x, y, yerr, fmt="k.", label="Data") 
+    for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
+        ax.errorbar(x, y, yerr, fmt="k.", label=f"Data Group {i}") 
 
     # Global Fit 
     for x, costFun, ax in zip(dataX, totCost, axs.flat):
@@ -932,7 +973,8 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
 
         ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
         ax.legend()
-
+    fig.show()
+    return
 
 # ------- Groupings 
 
@@ -943,7 +985,7 @@ def groupDetectors(ipData, nGroups):
     Output: list of group lists containing the idx of spectra.
     """
     assert nGroups > 0, "Number of groups must be bigger than zero."
-    assert nGroups < len(ipData), "Number of groups cannot exceed no of detectors"
+    assert nGroups <= len(ipData), "Number of groups cannot exceed no of detectors"
     print(f"\nNumber of gropus: {nGroups}")
 
     L1 = ipData[:, -1]    
@@ -960,7 +1002,7 @@ def groupDetectors(ipData, nGroups):
     assert points.shape == (len(L1), 2), "Wrong shape."
     centers = points[np.linspace(0, len(points)-1, nGroups).astype(int), :]
 
-    if True:
+    if False:    # Set to True to investigate problems with groupings
         plotDetsAndInitialCenters(L1, theta, centers)
 
     clusters, n = kMeansClustering(points, centers)
@@ -973,20 +1015,29 @@ def groupDetectors(ipData, nGroups):
 
 def plotDetsAndInitialCenters(L1, theta, centers):
     fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})  
+    fig.canvas.set_window_title("Starting centroids for groupings")
     ax.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
     ax.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
+    ax.axes.xaxis.set_ticks([])  # Numbers plotted do not correspond to real numbers, so hide them
+    ax.axes.yaxis.set_ticks([]) 
     ax.set_xlabel("L1")
-    ax.set_ylabel("theta")
+    ax.set_ylabel("Theta")
     ax.legend()
+    fig.show()
+
 
 def plotFinalGroups(points, clusters, nGroups):
     fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})  
+    fig.canvas.set_window_title("Calculated groups of detectors")
     for i in range(nGroups):
         clus = points[clusters==i]
         ax.scatter(clus[:, 0], clus[:, 1], label=f"group {i}")
+    ax.axes.xaxis.set_ticks([])  # Numbers plotted do not correspond to real numbers, so hide them
+    ax.axes.yaxis.set_ticks([]) 
     ax.set_xlabel("L1")
-    ax.set_ylabel("theta")
+    ax.set_ylabel("Theta")
     ax.legend()
+    fig.show()
 
 
 def kMeansClustering(points, centers):
@@ -1042,7 +1093,12 @@ def formIdxList(clusters, n, lenPoints):
     for i in range(n):
         idxs = np.argwhere(clusters==i).flatten()
         idxList.append(list(idxs))
-    print("\nList of idexes that will be used for idexing: \n", idxList)
+
+    print("\nGroups formed successfully:\n")
+    groupLen = np.array([len(group) for group in idxList])
+    unique, counts = np.unique(groupLen, return_counts=True)
+    for length, no in zip(unique, counts):
+        print(f"{no} groups with {length} detectors.")
 
     # Check that idexes are not repeated and not missing
     flatList = []
@@ -1097,7 +1153,7 @@ def extractArrByIdx(dataX, dataY, dataE, dataRes, idxs):
     return groupX, groupY, groupE, groupRes
 
 
-def weightedAvgArr(dataY, dataE):
-    meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
-    meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
-    return meanY, meanE
+# def weightedAvgArr(dataY, dataE):
+#     meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
+#     meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+#     return meanY, meanE

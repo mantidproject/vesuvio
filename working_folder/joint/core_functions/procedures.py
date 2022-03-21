@@ -85,11 +85,11 @@ def setInitFwdParsFromBackResultsAndHRatio(backScatteringResults, HToMass0Ratio,
 
 
 def extractNCPFromWorkspaces(wsFinal):
-    allNCP = mtd[wsFinal.name()+"_tof_fitted_profile_1"].extractY()[np.newaxis, :, :]
-    i = 2
+    allNCP = mtd[wsFinal.name()+"_TOF_Fitted_Profile_0"].extractY()[np.newaxis, :, :]
+    i = 1
     while True:   # By default, looks for all ncp ws until it breaks
         try:
-            ncpToAppend = mtd[wsFinal.name()+"_tof_fitted_profile_" + str(i)].extractY()[np.newaxis, :, :]
+            ncpToAppend = mtd[wsFinal.name()+"_TOF_Fitted_Profile_" + str(i)].extractY()[np.newaxis, :, :]
             allNCP = np.append(allNCP, ncpToAppend, axis=0)
             i += 1
         except KeyError:
