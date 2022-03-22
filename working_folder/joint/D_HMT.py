@@ -171,12 +171,11 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-#     resolutionRebinPars = "-30, 0.125, 30" 
-    singleGaussFitToHProfile = False     # When False, use Hermite expansion
+    rebinParametersForYSpaceFit = "-40, 0.5, 40"    # Needs to be symetric
+    singleGaussFitToHProfile = True    # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
-    nGlobalFitGroups = 1   
+    nGlobalFitGroups = 16   
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions

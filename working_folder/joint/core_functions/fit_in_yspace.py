@@ -21,7 +21,7 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
     if ic.symmetrisationFlag:
-        #TODO: Need to symmetrize resolution as well
+        # TODO: Need to symmetrize resolution?
         wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
 
     fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
@@ -33,8 +33,7 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     yfitResults.save()
 
     if ic.globalFitFlag:
-        # fitGlobalFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
-
+        # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
         fitMinuitGlobalFit(wsYSpace, wsRes, ic)
 
 
@@ -124,13 +123,6 @@ def weightedAvg(wsYSpace):
     dataY = wsYSpace.extractY()
     dataE = wsYSpace.extractE()
 
-    # TODO: Revise this, some zeros might not be cut offs
-    # TODO: If one column is all zeros ir puts dataY=nan and dataE=inf, will throw an error when fitting
-    # Replace dataE at cut-offs by np.inf?
-
-    dataY[dataY==0] = np.nan
-    dataE[dataE==0] = np.nan
-
     meanY, meanE = weightedAvgArr(dataY, dataE)
 
     tempWs = SumSpectra(wsYSpace)
@@ -138,14 +130,33 @@ def weightedAvg(wsYSpace):
     newWs.dataY(0)[:] = meanY
     newWs.dataE(0)[:] = meanE
     DeleteWorkspace(tempWs)
+
     return newWs
 
 
-def weightedAvgArr(dataY, dataE):
+def weightedAvgArr(dataYOri, dataEOri):
     """Weighted average over 2D arrays."""
+
+    dataY = dataYOri.copy()  # Copy arrays not to change original data
+    dataE = dataEOri.copy()
+
+    # Ignore invalid data by changing zeros to nans
+    zerosMask = dataE==0
+    dataY[zerosMask] = np.nan  
+    dataE[zerosMask] = np.nan
 
     meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
     meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
+
+    # Change invalid data back to original format with zeros
+    nanInfMask = meanE==np.inf
+    meanY[nanInfMask] = 0
+    meanE[nanInfMask] = 0
+
+    # Test that columns of zeros are left unchanged
+    np.testing.assert_allclose((np.sum(dataYOri, axis=0)==0), (meanY==0)), "Collumns of zeros are not being ignored."
+    np.testing.assert_allclose((np.sum(dataEOri, axis=0)==0), (meanE==0)), "Collumns of zeros are not being ignored."
+    
     return meanY, meanE
 
 
@@ -166,17 +177,20 @@ def symmetrizeWs(avgYSpace):
     return Sym
 
 
-def symmetrizeArr(dataY, dataE):
-    """Performs Inverse variance weighting between two oposite points."""
-
-    #TODO: Deal with cut-offs by mirroring opposite data
-    dataY = dataY.copy()  # Copy arrays not to risk changing original data
-    dataE = dataE.copy()
+def symmetrizeArr(dataYOri, dataEOri):
+    """
+    Performs Inverse variance weighting between two oposite points.
+    When one of the points is a cut-off and the other is a valid point, 
+    the final value will be the valid point.
+    """
+    assert len(dataYOri.shape) == 2, "Symmetrization is written for 2D arrays."
+    dataY = dataYOri.copy()  # Copy arrays not to risk changing original data
+    dataE = dataEOri.copy()
 
     cutOffMask = dataE==0
-    dataY[cutOffMask] = np.flip(dataY, axis=1)[cutOffMask]
-    dataE[cutOffMask] = np.flip(dataE, axis=1)[cutOffMask]
-    # End of treatment
+    # Change values of yerr to leave cut-offs unchanged during symmetrisation
+    dataE[cutOffMask] = np.full(np.sum(cutOffMask), np.inf)
+
 
     yFlip = np.flip(dataY, axis=1)
     eFlip = np.flip(dataE, axis=1)
@@ -185,19 +199,25 @@ def symmetrizeArr(dataY, dataE):
     dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
     dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
 
-    #TODO: assert for the cut-offs
-    # THIS DOES NOT MAKE SENSE
-    # SYMMETRIC ARRAYS SHOULD PASS BUT THIS FAILS ANYWAY
-    assert np.all(dataYSym == np.flip(dataYSym, axis=1))
-    assert np.all(dataESym == np.flip(dataESym, axis=1))
 
-    assert np.all(dataYSym[cutOffMask] == dataY[cutOffMask])
-    assert np.all(dataESym[cutOffMask] == dataE[cutOffMask])
+    # Deal with effects from previously changing dataE=np.inf
+    nanInfMask = dataESym==np.inf
+    dataYSym[nanInfMask] = 0
+    dataESym[nanInfMask] = 0
+
+    # Test that arrays are symmetrised
+    np.testing.assert_array_equal(dataYSym, np.flip(dataYSym, axis=1)), f"Symmetrisation failed in {np.argwhere(dataYSym!=np.flip(dataYSym))}"
+    np.testing.assert_array_equal(dataESym, np.flip(dataESym, axis=1)), f"Symmetrisation failed in {np.argwhere(dataESym!=np.flip(dataESym))}"
+
+    # Test that cut-offs were not included in the symmetrisation
+    np.testing.assert_allclose(dataYSym[cutOffMask], np.flip(dataYOri, axis=1)[cutOffMask])
+    np.testing.assert_allclose(dataESym[cutOffMask], np.flip(dataEOri, axis=1)[cutOffMask])
 
     return dataYSym, dataESym
 
 
 def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
+    #TODO: Try out with point data
     dataY = wsYSpaceSym.extractY()[0]
     dataX = wsYSpaceSym.extractX()[0]
     dataE = wsYSpaceSym.extractE()[0]
@@ -223,16 +243,15 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
         funcSig = ["x", "A", "x0", "sigma1", "c4", "c6"]
         initPars = {"A":1, "x0":0, "sigma1":4, "c4":0, "c6":0}
 
-    xDense, xDelta, resDense = chooseXDense(resX, resY, True)
-
+    xDense, xDelta, resDense = chooseXDense(resX, resY)
     def convolvedModel(x, *pars):
         convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
         return np.interp(x, xDense, convDense)
 
     convolvedModel.func_code = make_func_code(funcSig)
 
-    # Ignore cut-off values 
-    nonZeros = dataE != 0
+    # Fit only valid values, ignore cut-offs 
+    nonZeros = (dataE!=0) & (dataE!=np.nan) & (dataE!=np.inf)  # Invalid values should have errors=0, but cover other invalid cases as well
     dataXNZ = dataX[nonZeros]
     dataYNZ = dataY[nonZeros]
     dataENZ = dataE[nonZeros]
@@ -339,25 +358,30 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     return 
 
 
-def chooseXDense(x, res, flag):
+def chooseXDense(x, res, flag=True):
     # TODO: Need to sort out the best density for the convolution
 
-    """Make high density symmetric grid for convolution"""
+    """
+    Make either odd grid or high density symmetric grid for convolution.
+    The default mode makes a odd grid and ensures a resolution with a single peak at the center.
+    The deault mode is significantly faster than using the dense grid.
+    """
 
     assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
     assert x.size == res.size, "x and res need to be the same size!"
 
-    if flag:
-        if x.size % 2 == 0:
-            dens = x.size+1  # If even change to odd
+    if flag:  
+        if res.size % 2 == 0:
+            dens = res.size+1  # If even change to odd
         else:
-            dens = x.size    # If odd, keep being odd)
+            dens = res.size    # If odd, keep being odd)
     else:
         dens = 1000
 
     xDense = np.linspace(np.min(x), np.max(x), dens)
     xDelta = xDense[1] - xDense[0]
     resDense = np.interp(xDense, x, res)
+
     return xDense, xDelta, resDense
 
 
@@ -439,8 +463,7 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
     limit = (bound*varErr)**(1/2)
     varSpace = np.linspace(-limit, limit, 30)
     varSpace = varSpace**2 * np.sign(varSpace) + varVal
-    # varSpace = np.linspace(varVal-bound*varErr, varVal+bound*varErr, 30)
-
+  
     fValsScipy = np.zeros(varSpace.shape)
     fValsMigrad = np.zeros(varSpace.shape)
 
@@ -611,11 +634,10 @@ class ResultsYFitObject:
 
 # Functions for Global Fit Mantid
 
-def fitGlobalFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
     replaceNansWithZeros(wsJoY)
     wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
     wsQInv = createOneOverQWs(wsQ)
-
     avgWidths = globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
 
 
@@ -649,6 +671,8 @@ def createOneOverQWs(wsQ):
 
 
 def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+    """Original Implementation of Global Fit using Mantid"""
+
     if gaussFitFlag:
         convolution_template = """
         (composite=Convolution,$domains=({0});
@@ -708,7 +732,6 @@ def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirst
 
             if counter > 0:
                 ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
-                #TODO: Ask if conditional statement goes here
                 #ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
                 #ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
 
@@ -747,11 +770,6 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
     if ic.symmetrisationFlag:  
         dataY, dataE = symmetrizeArr(dataY, dataE)
 
-        print(f"Data cut-offs: {np.argwhere(dataE==0)}")
-        print(f"DataY at cut-offs: {dataY[np.nonzero(dataE==0)]}")
-        # assert np.all(dataY!=np.inf), f"Nans are present after symmetrization: {np.argwhere(dataY==np.nan)}"
-        # assert np.all(dataE!=0), f"Cut-offs are present after symmetrization: {np.argwhere(dataE==0)}"
-
     model, defaultPars, sharedPars = selectModelAndPars(ic.singleGaussFitToHProfile)   
     
     print("\nShared Parameters: ", [key for key in sharedPars])
@@ -763,11 +781,11 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
     
     assert len(describe(totCost)) == len(sharedPars) + len(dataY)*(len(defaultPars)-len(sharedPars)), f"Wrong parameters for Global Fit:\n{describe(totCost)}"
     
-    # print("\nGlobal Fit Parameters:\n", describe(totCost))
     print("\nRunning Global Fit ...\n")
 
     initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
 
+    # Minuit Fit with global cost function and local+global parameters
     m = Minuit(totCost, **initPars)
 
     for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier
@@ -783,11 +801,13 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
 
         x = dataX[0]
         def constr(*pars):
-            """Constraint for positivity of Gram Carlier.
-            Input: All parameters defined in original function.
-            Format *pars to work with Minuit.
-            x is defined outside function.
-            Builds array with all constraints from individual functions."""
+            """
+            Constraint for positivity of Global Gram Carlier.
+            Input: All parameters defined in global cost function.
+            Format *pars as argument, to work with Minuit.
+            x is the range for each individual cost fun, defined outside.
+            Builds array with all constraints from individual functions.
+            """
 
             sharedPars = pars[:3]    # sigma1, c4, c6
             joinedGC = np.zeros(int((len(pars)-3)/2) * x.size)
@@ -805,6 +825,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
     m.hesse()
     t1 = time.time()
     print(f"\nTime of fitting: {t1-t0:.2f} seconds")
+
     chi2 = m.fval / (len(dataY)*len(dataY[0])-m.nfit)
     print(f"Value of Chi2/ndof: {chi2:.2f}")
     print(f"Migrad Minimum valid: {m.valid}")
@@ -849,6 +870,8 @@ def takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars):
 
 
 def selectModelAndPars(gaussFlag):
+    """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
+    
     if gaussFlag:
         def model(x, sigma, y0, A, x0):
             gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
@@ -860,7 +883,6 @@ def selectModelAndPars(gaussFlag):
             "A" : 1,
             "x0" : 0,         
         }
-
         sharedPars = ["sigma"]
 
     else:
@@ -878,7 +900,6 @@ def selectModelAndPars(gaussFlag):
             "A" : 1,
             "x0" : 0          
         }
-
         sharedPars = ["sigma1", "c4", "c6"]  
 
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
@@ -887,6 +908,8 @@ def selectModelAndPars(gaussFlag):
 
 
 def minuitInitialParameters(defaultPars, sharedPars, nSpec):
+    """Buids dictionary to initialize Minuit with starting global+local parameters"""
+    
     initPars = {}
     # Populate with initial shared parameters
     for sp in sharedPars:
@@ -902,7 +925,7 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
 def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
    
-    xDense, xDelta, resDense = chooseXDense(x, res, True)
+    xDense, xDelta, resDense = chooseXDense(x, res)
     def convolvedModel(xrange, *pars):
         """Performs convolution first on high density grid and interpolates to desired x range"""
         convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
@@ -910,10 +933,9 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
 
     costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
     convolvedModel.func_code = make_func_code(costSig)
-    # print(describe(convolvedModel))
 
-    # Data without cut-offs
-    nonZeros = yerr!=0  #(y != 0) & (y != np.nan)
+    # Select only valid data, i.e. when error is not 0 or nan or inf
+    nonZeros= (yerr!=0) & (yerr!=np.nan) & (yerr!=np.inf)  
     xNZ = x[nonZeros]
     yNZ = y[nonZeros]
     yerrNZ = yerr[nonZeros]
@@ -922,34 +944,13 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     return costFun
 
 
-def chooseXDense(x, res, flag):
-    """Make high density symmetric grid for convolution"""
-
-    assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
-    assert x.size == res.size, "x and res need to be the same size!"
-
-    if flag:
-        if x.size % 2 == 0:
-            dens = x.size+1  # If even change to odd
-        else:
-            dens = x.size    # If odd, keep being odd)
-    else:
-        dens = 1000
-
-    xDense = np.linspace(np.min(x), np.max(x), dens)
-    xDelta = xDense[1] - xDense[0]
-    resDense = np.interp(xDense, x, res)
-    return xDense, xDelta, resDense
-
-
 def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
 
-    if len(dataY) > 12:    
+    if len(dataY) > 10:    
         print("\nToo many axes to show in figure, skipping the plot ...\n")
         return
 
     rows = 2
-
     fig, axs = plt.subplots(
         rows, 
         int(np.ceil(len(dataY)/rows)),
@@ -991,7 +992,7 @@ def groupDetectors(ipData, nGroups):
     Output: list of group lists containing the idx of spectra.
     """
     assert nGroups > 0, "Number of groups must be bigger than zero."
-    assert nGroups <= len(ipData), "Number of groups cannot exceed no of detectors"
+    assert nGroups <= len(ipData), "Number of groups cannot exceed no of unmasked detectors"
     print(f"\nNumber of gropus: {nGroups}")
 
     L1 = ipData[:, -1]    
@@ -1047,17 +1048,21 @@ def plotFinalGroups(points, clusters, nGroups):
 
 
 def kMeansClustering(points, centers):
-    # Fails in some rare situations
+    """
+    Algorithm used to form groups of detectors.
+    Works best for spherical groups with similar scaling on x and y axis.
+    Fails in some rare cases, solution is to try a different number of groups.
+    """
+
     prevCenters = centers
     while  True:
         clusters, nGroups = closestCenter(points, prevCenters)
         centers = calculateCenters(points, clusters, nGroups)
-        # print(centers)
 
         if np.all(centers == prevCenters):
             break
 
-        assert np.isfinite(centers).all(), f"Invalid centers found:\n{centers}\nMaybe try a different number for the groupings."
+        assert np.isfinite(centers).all(), f"Invalid centers found:\n{centers}\nTry a different number for the groupings."
 
         prevCenters = centers
     clusters, n = closestCenter(points, centers)
@@ -1065,6 +1070,8 @@ def kMeansClustering(points, centers):
 
 
 def closestCenter(points, centers):
+    """Checks eahc point and assigns it to closest center."""
+
     clusters = np.zeros(len(points))
     for p in range(len(points)):
 
@@ -1082,21 +1089,24 @@ def closestCenter(points, centers):
 
 
 def pairDistance(p1, p2):
-    "pairs have shape (1, 2)"
+    "Calculates the distance between two points."
     return np.sqrt(np.sum(np.square(p1-p2)))
 
 
-def calculateCenters(points, clusters, n):
-    centers = np.zeros((n, 2))
-    for i in range(n):
+def calculateCenters(points, clusters, nGroups):
+    """Calculates centers for the given clusters"""
+
+    centers = np.zeros((nGroups, 2))
+    for i in range(nGroups):
         centers[i] = np.mean(points[clusters==i, :], axis=0)  # If cluster i is not present, returns nan
     return centers
 
 
-def formIdxList(clusters, n, lenPoints):
-    # Form list with groups of idxs
+def formIdxList(clusters, nGroups, lenPoints):
+    """Converts information of clusters into a list of indexes."""
+
     idxList = []
-    for i in range(n):
+    for i in range(nGroups):
         idxs = np.argwhere(clusters==i).flatten()
         idxList.append(list(idxs))
 
@@ -1118,6 +1128,12 @@ def formIdxList(clusters, n, lenPoints):
 # ---------- Weighted Avgs of Groups
 
 def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
+    """
+    Performs weighted average on each detector group given by the index list.
+    The imput arrays do not include masked spectra.
+    """
+    assert ~np.any(np.all(dataY==0, axis=1)), f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY==0, axis=1))}"
+    
     wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(dataY[0])))
 
     for i, idxs in enumerate(idxList):
@@ -1129,7 +1145,7 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
 
         else:
             meanY, meanE = weightedAvgArr(groupY, groupE)
-            meanRes = np.nanmean(groupRes, axis=0)
+            meanRes = np.nanmean(groupRes, axis=0)   # Nans are not present but safeguard
 
         assert np.all(groupX[0] == np.mean(groupX, axis=0)), "X values should not change with groups"
         
@@ -1158,8 +1174,3 @@ def extractArrByIdx(dataX, dataY, dataE, dataRes, idxs):
     groupRes = dataRes[idxs, :]
     return groupX, groupY, groupE, groupRes
 
-
-# def weightedAvgArr(dataY, dataE):
-#     meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
-#     meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
-#     return meanY, meanE
