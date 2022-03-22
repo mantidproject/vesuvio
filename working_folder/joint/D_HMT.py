@@ -182,25 +182,26 @@ fwdIC = ForwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
 
 
-start_time = time.time()
-# Start of interactive section 
+if False:
+    start_time = time.time()
+    # Start of interactive section 
 
-wsName = "DHMT_300K_RD_forward_0"
-if wsName in mtd:
-    wsFinal = mtd["DHMT_300K_RD_forward_0"]
-    allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
-else:
-#     wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
-    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-    allNCP = lastIterationNCP
+    wsName = "DHMT_300K_RD_forward_0"
+    if wsName in mtd:
+        wsFinal = mtd["DHMT_300K_RD_forward_0"]
+        allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
+    else:
+    #     wsFinal, forwardScatteringResults = runJointBackAndForward(bckwdIC, fwdIC)
+        wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+        lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+        allNCP = lastIterationNCP
 
-assert ~np.all(allNCP==0), "NCP extraction not working!"
+    assert ~np.all(allNCP==0), "NCP extraction not working!"
 
-print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+    print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+    fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
 
-# End of iteractive section
-end_time = time.time()
-print("\nRunning time: ", end_time-start_time, " seconds")
+    # End of iteractive section
+    end_time = time.time()
+    print("\nRunning time: ", end_time-start_time, " seconds")

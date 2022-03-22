@@ -1,5 +1,6 @@
 from core_functions.fit_in_yspace import fitInYSpaceProcedure
 from core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
+from experiments.directories_helpers import IODirectoriesForSample
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
@@ -8,39 +9,61 @@ from pathlib import Path
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
 
-# Set output path
-testingCleaning = True
-if testingCleaning:     
-    cleaningPath = experimentPath / "output" / "testing" / "cleaning"
+class LoadVesuvioBackParameters:
+    name = "starch_80_RD_backward_"
+    tof_binning='275.,1.,420'                    # Binning of ToF spectra
+    mode='DoubleDifference'
+    runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
+    empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
+    spectra='3-134'                            # Spectra to be analysed
+    # ipfile='./ip2019.par'
+   
+class LoadVesuvioFrontParameters:
+    name = "starch_80_RD_forward_"
+    runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
+    empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+    spectra='144-182'                        # Spectra to be analysed
+    tof_binning="110,1.,430"                 # Binning of ToF spectra
+    mode='SingleDifference'
+    # ipfile='./ip2018_3.par'
 
-    forwardScatteringSavePath = cleaningPath / "current_forward.npz" 
-    backScatteringSavePath = cleaningPath / "current_backward.npz" 
-    ySpaceFitSavePath = cleaningPath / "current_yspacefit.npz"
-else:
-    outputPath = experimentPath / "output" / "testing" / "original" / "current_data"
+wsp = LoadVesuvioBackParameters
 
-    forwardScatteringSavePath = outputPath / "4iter_forward_GM_MS.npz"
-    backScatteringSavePath = outputPath / "4iter_backward_MS.npz"
-    ySpaceFitSavePath = outputPath / "4iter_yspacefit.npz"
+inputDirs, ouputDirs = IODirectoriesForSample(scriptName, wsp)
+
+# # Set output path
+# testingCleaning = True
+# if testingCleaning:     
+#     cleaningPath = experimentPath / "output" / "testing" / "cleaning"
+
+#     forwardScatteringSavePath = cleaningPath / "current_forward.npz" 
+#     backScatteringSavePath = cleaningPath / "current_backward.npz" 
+#     ySpaceFitSavePath = cleaningPath / "current_yspacefit.npz"
+# else:
+#     outputPath = experimentPath / "output" / "testing" / "original" / "current_data"
+
+#     forwardScatteringSavePath = outputPath / "4iter_forward_GM_MS.npz"
+#     backScatteringSavePath = outputPath / "4iter_backward_MS.npz"
+#     ySpaceFitSavePath = outputPath / "4iter_yspacefit.npz"
 
 
-ipFilePath =  experimentPath / "ip2018_3.par"  
-inputWsPath = experimentPath / "input_ws"
+# ipFilePath =  experimentPath / "ip2018_3.par"  
+# inputWsPath = experimentPath / "input_ws"
 
-# Default in case of no DoubleDifference
-# TODO: Sort out Double difference in a more elegant manner
-frontWsEmptyPath = None
-backWsEmptyPath = None
-for wsPath in inputWsPath.iterdir():
-    keywords = wsPath.name.split(".")[0].split("_")
-    if "raw" in keywords and "backward" in keywords:
-        backWsRawPath = wsPath 
-    if "empty" in keywords and "backward" in keywords:
-        backWsEmptyPath = wsPath 
-    if "raw" in keywords and "forward" in keywords:
-        frontWsRawPath = wsPath
-    if "empty" in keywords and "forward" in keywords:
-        frontWsEmptyPath = wsPath 
+# # Default in case of no DoubleDifference
+# # TODO: Sort out Double difference in a more elegant manner
+# frontWsEmptyPath = None
+# backWsEmptyPath = None
+# for wsPath in inputWsPath.iterdir():
+#     keywords = wsPath.name.split(".")[0].split("_")
+#     if "raw" in keywords and "backward" in keywords:
+#         backWsRawPath = wsPath 
+#     if "empty" in keywords and "backward" in keywords:
+#         backWsEmptyPath = wsPath 
+#     if "raw" in keywords and "forward" in keywords:
+#         frontWsRawPath = wsPath
+#     if "empty" in keywords and "forward" in keywords:
+#         frontWsEmptyPath = wsPath 
 
 
 class GeneralInitialConditions:
