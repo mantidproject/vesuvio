@@ -169,13 +169,12 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
-    symmetriseHProfileUsingAveragesFlag = True      # When False, use mirror sym
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-    resolutionRebinPars = "-20, 0.5, 20" 
+    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
-    globalFitFlag = False
+    globalFitFlag = True
     forceManualMinos = False
-
+    nGlobalFitGroups = 8
+   
     
 
 bckwdIC = BackwardInitialConditions
@@ -186,18 +185,18 @@ if __name__ == "main":
     start_time = time.time()
     # Interactive section 
 
-    runOnlyYSpaceFit = False
-    if runOnlyYSpaceFit:
-        wsFinal = mtd["starch_80_RD_forward_1"]
+    wsName = "starch_80_RD_forward_0"
+    if wsName in mtd:
+        wsFinal = mtd["starch_80_RD_forward_0"]
         allNCP = extractNCPFromWorkspaces(wsFinal)
     else:
         wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-    #     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-    #     allNCP = lastIterationNCP
+        lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+        allNCP = lastIterationNCP
 
 
-    # print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-    # fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+    print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+    fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
 
     # End of iteractive section
