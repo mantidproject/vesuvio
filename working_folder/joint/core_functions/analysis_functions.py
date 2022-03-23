@@ -82,7 +82,7 @@ def loadVesuvioDataWorkspaces(ic):
 
 def loadRawAndEmptyWsFromUserPath(ic):
 
-    print('\n', 'Loading the sample runs: ', ic.runs, '\n')
+    print('\nLoading local workspaces ...\n')
     Load(Filename=ic.userWsRawPath, OutputWorkspace=ic.name+"raw")
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
           OutputWorkspace=ic.name+'raw')

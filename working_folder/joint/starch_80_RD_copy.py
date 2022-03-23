@@ -8,6 +8,8 @@ from pathlib import Path
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
+ipFilesPath = Path(__file__).absolute().parent / "ip_files"
+
 
 class LoadVesuvioBackParameters:
     # name = "starch_80_RD_backward_"
@@ -16,8 +18,9 @@ class LoadVesuvioBackParameters:
     runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
     empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
     spectra='3-134'                            # Spectra to be analysed
-    # ipfile='./ip2019.par'
-   
+    ipfile=str(ipFilesPath / "ip2019.par")  #'./ip2019.par'
+
+
 class LoadVesuvioFrontParameters:
     # name = "starch_80_RD_forward_"
     runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
@@ -25,10 +28,12 @@ class LoadVesuvioFrontParameters:
     spectra='144-182'                        # Spectra to be analysed
     # tof_binning="110,1.,430"                 # Binning of ToF spectra
     mode='SingleDifference'
-    # ipfile='./ip2018_3.par'
+    ipfile=str(ipFilesPath / "ip2018_3.par")  #'./ip2018_3.par'
+
 
 wspBack = LoadVesuvioBackParameters
 wspFront = LoadVesuvioFrontParameters
+
 
 # Check if directories of input ws exist
 inputWSPath, inputPaths, outputPaths = IODirectoriesForSample(scriptName)
@@ -38,12 +43,12 @@ if all(path==None for path in inputPaths):
     loadWsFromLoadVesuvio(wspBack, inputWSPath, scriptName)
     loadWsFromLoadVesuvio(wspFront, inputWSPath, scriptName)
     inputWSPath, inputPaths, outputPaths = IODirectoriesForSample(scriptName)
-    assert any(path!=None for path in inputPaths), "Automatic loading of workspaces failed."
+    assert any(path!=None for path in inputPaths), "Automatic loading of workspaces failed, usage: scriptName_raw_backward.nxs"
 
 # Extract all required input and output paths
 backWsRawPath, frontWsRawPath, backWsEmptyPath, frontWsEmptyPath = inputPaths
 forwardSavePath, backSavePath, ySpaceFitSavePath = outputPaths
-ipFilePath = experimentPath / "ip2018_3.par"  
+ipFilePath = ipFilesPath / "ip2018_3.par"  
 
 
 # # Set output path

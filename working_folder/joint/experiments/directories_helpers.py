@@ -3,19 +3,27 @@ from pathlib import Path
 experimentsPath = Path(__file__).absolute().parent
 
 
-def IODirectoriesForSample(sampleName, wsp):
+def IODirectoriesForSample(sampleName):
     samplePath = experimentsPath / sampleName
     inputWSPath  = samplePath / "input_ws"
     outputPath = samplePath / "output_npz_for_testing"
 
-    if ~inputWSPath.exists():   # TODO: introduce check on whether it contains files
-
+    if not inputWSPath.exists():  
         inputWSPath.mkdir(parents=True)
+    if not outputPath.exists():
         outputPath.mkdir(parents=True)
 
-        loadRawAndEmptyWsFromLoadVesuvio(wsp, inputWSPath)
+    inputPaths = checkInputPaths(inputWSPath)
 
-    # Input paths
+    # Output paths
+    forwardSavePath = outputPath / "current_forward.npz" 
+    backSavePath = outputPath / "current_backward.npz" 
+    ySpaceFitSavePath = outputPath / "current_yspacefit.npz"
+
+    return inputWSPath, inputPaths, [forwardSavePath, backSavePath, ySpaceFitSavePath]
+
+
+def checkInputPaths(inputWSPath):
     backWsRawPath = None
     frontWsRawPath = None
     frontWsEmptyPath = None
@@ -32,20 +40,13 @@ def IODirectoriesForSample(sampleName, wsp):
         if "empty" in keywords and "forward" in keywords:
             frontWsEmptyPath = wsPath 
         if "empty" in keywords and "backward" in keywords:
-            backWsEmptyPath = wsPath 
- 
-    assert (backWsRawPath!=None) | (frontWsRawPath!=None), "No raw ws detected, usage: wsName_raw_backward.nxs"
-
-    # Output paths
-    forwardSavePath = outputPath / "current_forward.npz" 
-    backSavePath = outputPath / "current_backward.npz" 
-    ySpaceFitSavePath = outputPath / "current_yspacefit.npz"
-
-    return [backWsRawPath, frontWsRawPath, backWsEmptyPath, frontWsEmptyPath], [forwardSavePath, backSavePath, ySpaceFitSavePath]
+            backWsEmptyPath = wsPath  
 
 
+    return [backWsRawPath, frontWsRawPath, backWsEmptyPath, frontWsEmptyPath]
 
-def loadRawAndEmptyWsFromLoadVesuvio(ic, inputWSPath):
+
+def loadWsFromLoadVesuvio(ic, inputWSPath, sampleName):
     
     print(f"\nLoading and storing workspace sample runs: {ic.runs}\n")
 
@@ -61,7 +62,7 @@ def loadRawAndEmptyWsFromLoadVesuvio(ic, inputWSPath):
         SpectrumList=ic.spectra, 
         Mode=ic.mode,
         InstrumentParFile=ic.ipfile, 
-        OutputWorkspace=ic.name+'raw_'+runningType
+        OutputWorkspace=sampleName+'_raw_'+runningType
         )
 
     rawName = rawVesuvio.name() + ".nxs"
@@ -74,7 +75,7 @@ def loadRawAndEmptyWsFromLoadVesuvio(ic, inputWSPath):
         SpectrumList=ic.spectra, 
         Mode=ic.mode,
         InstrumentParFile=ic.ipfile, 
-        OutputWorkspace=ic.name+'empty_'+runningType
+        OutputWorkspace=sampleName+'_empty_'+runningType
         )
 
     emptyName = emptyVesuvio.name() + ".nxs"
