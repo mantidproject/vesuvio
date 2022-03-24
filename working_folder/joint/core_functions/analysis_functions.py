@@ -90,7 +90,6 @@ def loadRawAndEmptyWsFromUserPath(ic):
     wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
     if ic.mode=="DoubleDifference":
-        print('\n', 'Loading the empty runs: ', ic.empty_runs, '\n')
         Load(Filename=ic.userWsEmptyPath, OutputWorkspace=ic.name+"empty")
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
@@ -238,12 +237,12 @@ def createMeansAndStdTableWS(wsName, ic):
     return meanWidths, meanIntensityRatios
 
 
-def calculateMeansAndStds(widths, intensities, ic):
-    assert len(widths) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+def calculateMeansAndStds(widthsIn, intensitiesIn, ic):
+    assert len(widthsIn) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
     noOfMasses = ic.noOfMasses
 
-    widths = widths.copy()      # Copy to avoid accidental changes in arrays
-    intensities = intensities.copy()
+    widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
+    intensities = intensitiesIn.copy()
     # Replace zeros from masked spectra with nans
     widths[:, ic.maskedDetectorIdx] = np.nan
     intensities[:, ic.maskedDetectorIdx] = np.nan

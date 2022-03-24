@@ -1,18 +1,20 @@
-from core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
-from mantid.api import AnalysisDataService, mtd
+from joint.core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
 import time
 import numpy as np
 from pathlib import Path
 
 
 currentPath = Path(__file__).absolute().parent 
-ipFilesPath = Path(__file__).absolute().parent.parent / "ip_files"
-inputWSPath = currentPath / "input_ws"
-outputPath = currentPath / "original_and_current_data" / "current_data"
+ipFilesPath = currentPath / "joint" / "ip_files"
+
+comparisonPath = currentPath / "comparison_with_old_script"
+
+inputWSPath = comparisonPath / "input_ws"
+outputPath = comparisonPath / "original_and_current_data" / "current_data"
 
 backWsRawPath = inputWSPath / "starch_80_RD_raw_backward.nxs"
-frontWsRawPath = inputWSPath / "starch_80_RD_raw_forward.nxs"
 backWsEmptyPath = inputWSPath / "starch_80_RD_empty_backward.nxs"
+frontWsRawPath = inputWSPath / "starch_80_RD_raw_forward.nxs"
 frontWsEmptyPath = None
 
 forwardSavePath = outputPath / "4iter_forward_GM_MS.npz"
@@ -43,7 +45,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
-    masses = np.array([12, 16, 27])
+    masses = np.array([12, 16, 27]).astype(float)
     noOfMasses = len(masses)
 
     initPars = np.array([ 
@@ -154,8 +156,7 @@ start_time = time.time()
 
 # Run forward and backward independently, results are being stored in current_data folder
 runIndependentIterativeProcedure(fwdIC)
-AnalysisDataService.clear()
-runIndependentIterativeProcedure(bckwdIC)
+# runIndependentIterativeProcedure(bckwdIC)
 
 
 end_time = time.time()
