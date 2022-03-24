@@ -15,8 +15,8 @@ class LoadVesuvioBackParameters:
     # name = "starch_80_RD_backward_"
     # tof_binning='275.,1.,420'                    # Binning of ToF spectra
     mode='DoubleDifference'
-    runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
-    empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
+    runs="43066-43076"  # 77K             # The numbers of the runs to be analysed
+    empty_runs="41876-41923"   # 77K             # The numbers of the empty runs to be subtracted
     spectra='3-134'                            # Spectra to be analysed
     ipfile=str(ipFilesPath / "ip2019.par")  #'./ip2019.par'
 

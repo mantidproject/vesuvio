@@ -35,7 +35,8 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     if ic.globalFitFlag:
         # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
         fitMinuitGlobalFit(wsYSpace, wsRes, ic)
-
+    
+    return yfitResults
 
 def calculateMantidResolution(ic, ws, mass):
     resName = ws.name()+"_Resolution"
