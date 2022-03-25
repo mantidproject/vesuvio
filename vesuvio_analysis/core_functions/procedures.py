@@ -12,6 +12,7 @@ def runIndependentIterativeProcedure(IC):
     return wsFinal, ncpFitResultsObject
 
 
+# TODO: Review these procedures, and make sure they can also run with one mass
 def runJointBackAndForward(bckwdIC, fwdIC):
     """Used when H is not present, assumes more than one mass.
     Runs backward scattering and uses the resulting widhts and intensity ratios

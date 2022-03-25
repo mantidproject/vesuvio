@@ -21,7 +21,6 @@ def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
     if ic.symmetrisationFlag:
-        # TODO: Need to symmetrize resolution?
         wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
 
     fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
@@ -284,7 +283,6 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     dataYSigma = np.sqrt(np.diag(dataYCov))
 
     # Weight the confidence band
-    # TODO: Shoud it be weighted?
     dataYSigma *= chi2
 
     Residuals = dataY - dataYFit
