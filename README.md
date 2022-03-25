@@ -4,19 +4,18 @@ Repository for the optimized forward and backward scattering analysis procedures
 
 Currently in development, daily updates and corrections.
 
-Two samples are provided, D_HMT and starch_80_D, each with its own main script and directories for input and output data.
+Two example scripts are provided, D_HMT and starch_80_D, each detailing the initial conditions
 
 How to use for a new sample: 
 
-    1. Copy one of the main scripts D_HMT.py or starch_80_RD.py and create a new .py file with the initial conditions of the new sample
+    1. Copy one of the main scripts D_HMT.py or starch_80_RD.py and create a new .py file with the name of the desired sample, in the sample directory as D_HMT.py or starch_80_RD.py. 
 
-    2. Need to create a directory under "experiments" for the new sample, replicating the example directory of DHMT. 
-    (This step will be made automatic in the future)
+    2. Fill in the new script with the desired initial conditions.
 
-    3. Put forwad and backward workspaces in input_ws under the new sample data directories, they are detected if their names contain "raw", "empty", "backward" and "forward" seperated by "_" and are sorted out accordingly.
+    3. Run the script. The script will create a new directory for the sample under experiments/, and will try to use LoadVesuvio to store the workspaces locally for future runs. If LoadVesuvio fails, the user needs to copy the worksapces as .nxs files onto experiments/sample/input_ws/, using the same format as the two example samples provided.
 
-    4. After the data directories are sorted out, the main script is ready to be run. The procedures for data reduction can be found on core_functions/procedures.py, so import the preferred functions onto the main script.
+    4. After the workspaces are stored locally, any further data reduction will run using the local workspaces. 
 
-    5. God's willing, the main script will run without issues.
+  
 
     
