@@ -21,7 +21,8 @@ forwardSavePath = outputPath / "4iter_forward_GM_MS.npz"
 backSavePath = outputPath / "4iter_backward_MS.npz"
 
 ipFileFrontPath = ipFilesPath / "ip2018_3.par"  
-ipFileBackPath = ipFilesPath / "ip2019.par"  
+ipFileBackPath = ipFilesPath / "ip2018_3.par"  
+# ipFileBackPath = ipFilesPath / "ip2019.par"  
 
 
 class GeneralInitialConditions:
@@ -155,8 +156,8 @@ fwdIC = ForwardInitialConditions
 start_time = time.time()
 
 # Run forward and backward independently, results are being stored in current_data folder
-runIndependentIterativeProcedure(fwdIC)
-# runIndependentIterativeProcedure(bckwdIC)
+# runIndependentIterativeProcedure(fwdIC)
+runIndependentIterativeProcedure(bckwdIC)
 
 
 end_time = time.time()

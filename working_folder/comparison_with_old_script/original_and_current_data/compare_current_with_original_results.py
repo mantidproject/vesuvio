@@ -15,7 +15,7 @@ np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 currentPath = Path(__file__).absolute().parent  # Path to the repository
 
-testForward = False
+testForward = True
 if testForward:
     pathToOriginal = currentPath / "original_data" / "4iter_forward_GB_MS.npz" 
     pathToOptimized = currentPath / "current_data" / "4iter_forward_GM_MS.npz" 
@@ -215,131 +215,131 @@ class TestFitWorkspaces(unittest.TestCase):
         displayMaskAllIter(totalDiffMask, self.rtol, "workspaces to be fitted")
 
 
-class TestResolution(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.orires = originalResults["resolution"]
+# class TestResolution(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.orires = originalResults["resolution"]
 
-        optimizedResults = np.load(pathToOptimized)
-        self.optres = optimizedResults["resolution"]
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optres = optimizedResults["resolution"]
 
-        self.rtol = 0.0001
-        self.equal_nan = True
-        self.decimal = 8
+#         self.rtol = 0.0001
+#         self.equal_nan = True
+#         self.decimal = 8
 
-    def test_resolution(self):
-        totalMask = np.isclose(
-            self.orires, self.optres, rtol=self.rtol, equal_nan=self.equal_nan
-            )
-        totalDiffMask = ~ totalMask
-        displayMask(totalDiffMask, self.rtol, "values resolution YSpace")
+#     def test_resolution(self):
+#         totalMask = np.isclose(
+#             self.orires, self.optres, rtol=self.rtol, equal_nan=self.equal_nan
+#             )
+#         totalDiffMask = ~ totalMask
+#         displayMask(totalDiffMask, self.rtol, "values resolution YSpace")
 
-        plotResolution = False
-        if plotResolution:
-            plt.figure()
-            x = range(len(self.orires[0]))
-            plt.plot(x, self.orires[0], label="oriRes")
-            plt.plot(x, self.optres[0], label="optRes")
-            plt.legend()
-            plt.show()
-        # nptest.assert_almost_equal(self.orires, self.optres, decimal=self.decimal)
-        # print(f"\nResolution in YSpace is equal up to decimal={self.decimal}")
-
-
-class TestHdataY(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.oriHdataY = originalResults["HdataY"]
-
-        optimizedResults = np.load(pathToOptimized)
-        self.optHdataY = optimizedResults["HdataY"]
-
-        self.rtol = 0.0001
-        self.equal_nan = True
-        self.decimal = 4
-
-    def test_HdataY(self):
-        totalMask = np.isclose(
-            self.oriHdataY, self.optHdataY, rtol=self.rtol, equal_nan=self.equal_nan
-            )
-        totalDiffMask = ~ totalMask
-        displayMask(totalDiffMask, self.rtol, "values isolated H TOF")
-
-        plotHdataY = False
-        if plotHdataY:            
-            plt.figure()
-            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-                        interpolation="nearest", norm=None)
-            plt.title("H peak TOF dataY")
-            plt.ylabel("Spectra")
-            plt.show()    
-
-        nptest.assert_almost_equal(self.oriHdataY, self.optHdataY, decimal=self.decimal)
-        print(f"\nIsolated H peak in TOF is equal up to decimal={self.decimal}")
+#         plotResolution = False
+#         if plotResolution:
+#             plt.figure()
+#             x = range(len(self.orires[0]))
+#             plt.plot(x, self.orires[0], label="oriRes")
+#             plt.plot(x, self.optres[0], label="optRes")
+#             plt.legend()
+#             plt.show()
+#         # nptest.assert_almost_equal(self.orires, self.optres, decimal=self.decimal)
+#         # print(f"\nResolution in YSpace is equal up to decimal={self.decimal}")
 
 
-class TestFinalRawDataY(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.oriFinalDataY = originalResults["finalRawDataY"]
+# class TestHdataY(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.oriHdataY = originalResults["HdataY"]
 
-        optimizedResults = np.load(pathToOptimized)
-        self.optFinalDataY = optimizedResults["finalRawDataY"]
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optHdataY = optimizedResults["HdataY"]
 
-        self.rtol = 1e-6
-        self.equal_nan = True
-        self.decimal = 7
+#         self.rtol = 0.0001
+#         self.equal_nan = True
+#         self.decimal = 4
 
-    def test_finalDataY(self):
-        totalMask = np.isclose(
-            self.oriFinalDataY, self.optFinalDataY, rtol=self.rtol, equal_nan=self.equal_nan
-            )
-        totalDiffMask = ~ totalMask
-        displayMask(totalDiffMask, self.rtol, "values final raw dataY")
+#     def test_HdataY(self):
+#         totalMask = np.isclose(
+#             self.oriHdataY, self.optHdataY, rtol=self.rtol, equal_nan=self.equal_nan
+#             )
+#         totalDiffMask = ~ totalMask
+#         displayMask(totalDiffMask, self.rtol, "values isolated H TOF")
 
-        plotFinalRawDataY = False
-        if plotFinalRawDataY:            
-            plt.figure()
-            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-                        interpolation="nearest", norm=None)
-            plt.title("Final raw dataY TOF")
-            plt.ylabel("Spectra")
-            plt.show()    
+#         plotHdataY = False
+#         if plotHdataY:            
+#             plt.figure()
+#             plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+#                         interpolation="nearest", norm=None)
+#             plt.title("H peak TOF dataY")
+#             plt.ylabel("Spectra")
+#             plt.show()    
 
-        nptest.assert_almost_equal(self.oriFinalDataY, self.optFinalDataY, decimal=self.decimal)
-        print(f"\nFinal DataY in TOF is equal up to decimal={self.decimal}")
+#         nptest.assert_almost_equal(self.oriHdataY, self.optHdataY, decimal=self.decimal)
+#         print(f"\nIsolated H peak in TOF is equal up to decimal={self.decimal}")
 
 
-class TestFinalRawDataE(unittest.TestCase):
-    def setUp(self):
-        originalResults = np.load(pathToOriginal)
-        self.oriFinalDataE = originalResults["finalRawDataE"]
+# class TestFinalRawDataY(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.oriFinalDataY = originalResults["finalRawDataY"]
 
-        optimizedResults = np.load(pathToOptimized)
-        self.optFinalDataE = optimizedResults["finalRawDataE"]
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optFinalDataY = optimizedResults["finalRawDataY"]
 
-        self.rtol = 1e-6
-        self.equal_nan = True
-        self.decimal = 7
+#         self.rtol = 1e-6
+#         self.equal_nan = True
+#         self.decimal = 7
 
-    def test_finalDataE(self):
-        totalMask = np.isclose(
-            self.oriFinalDataE, self.optFinalDataE, rtol=self.rtol, equal_nan=self.equal_nan
-            )
-        totalDiffMask = ~ totalMask
-        displayMask(totalDiffMask, self.rtol, "values final raw dataE")
+#     def test_finalDataY(self):
+#         totalMask = np.isclose(
+#             self.oriFinalDataY, self.optFinalDataY, rtol=self.rtol, equal_nan=self.equal_nan
+#             )
+#         totalDiffMask = ~ totalMask
+#         displayMask(totalDiffMask, self.rtol, "values final raw dataY")
 
-        plotFinalRawDataY = False
-        if plotFinalRawDataY:            
-            plt.figure()
-            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
-                        interpolation="nearest", norm=None)
-            plt.title("Final raw dataE TOF")
-            plt.ylabel("Spectra")
-            plt.show()    
+#         plotFinalRawDataY = False
+#         if plotFinalRawDataY:            
+#             plt.figure()
+#             plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+#                         interpolation="nearest", norm=None)
+#             plt.title("Final raw dataY TOF")
+#             plt.ylabel("Spectra")
+#             plt.show()    
 
-        nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE, decimal=self.decimal)
-        print(f"\nFinal DataE in TOF is equal up to decimal={self.decimal}")
+#         nptest.assert_almost_equal(self.oriFinalDataY, self.optFinalDataY, decimal=self.decimal)
+#         print(f"\nFinal DataY in TOF is equal up to decimal={self.decimal}")
+
+
+# class TestFinalRawDataE(unittest.TestCase):
+#     def setUp(self):
+#         originalResults = np.load(pathToOriginal)
+#         self.oriFinalDataE = originalResults["finalRawDataE"]
+
+#         optimizedResults = np.load(pathToOptimized)
+#         self.optFinalDataE = optimizedResults["finalRawDataE"]
+
+#         self.rtol = 1e-6
+#         self.equal_nan = True
+#         self.decimal = 7
+
+#     def test_finalDataE(self):
+#         totalMask = np.isclose(
+#             self.oriFinalDataE, self.optFinalDataE, rtol=self.rtol, equal_nan=self.equal_nan
+#             )
+#         totalDiffMask = ~ totalMask
+#         displayMask(totalDiffMask, self.rtol, "values final raw dataE")
+
+#         plotFinalRawDataY = False
+#         if plotFinalRawDataY:            
+#             plt.figure()
+#             plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+#                         interpolation="nearest", norm=None)
+#             plt.title("Final raw dataE TOF")
+#             plt.ylabel("Spectra")
+#             plt.show()    
+
+#         nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE, decimal=self.decimal)
+#         print(f"\nFinal DataE in TOF is equal up to decimal={self.decimal}")
 
 # Don't do the tests below anymore because changed the averaging and symetrizing in yspace
 
