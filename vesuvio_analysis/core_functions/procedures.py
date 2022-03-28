@@ -16,7 +16,7 @@ def runIndependentIterativeProcedure(IC):
 
 def runJointBackAndForwardProcedure(bckwdIC, fwdIC):
     assert bckwdIC.modeRunning == "BACKWARD", "Missing backward IC, args usage: (bckwdIC, fwdIC)"
-    assert bckwdIC.modeRunning == "FORWARD", "Missing forward IC, args usage: (bckwdIC, fwdIC)"
+    assert fwdIC.modeRunning == "FORWARD", "Missing forward IC, args usage: (bckwdIC, fwdIC)"
     
     Hmask = np.abs(fwdIC.masses-1)/1 < 0.1
     if np.any(Hmask):  # Check if H present
@@ -24,13 +24,13 @@ def runJointBackAndForwardProcedure(bckwdIC, fwdIC):
         assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
 
         if (bckwdIC.HToMass0Ratio==None) or (bckwdIC.HToMass0Ratio==0):
-            runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
+            wsFinal, forwardScatteringResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
         else:
-            runHPresentAndKnownHRatio(bckwdIC, fwdIC)
+            wsFinal, forwardScatteringResults = runHPresentAndKnownHRatio(bckwdIC, fwdIC)
     else:
-        runHNotPresent(bckwdIC, fwdIC)
+        wsFinal, forwardScatteringResults = runHNotPresent(bckwdIC, fwdIC)
 
-    return 
+    return wsFinal, forwardScatteringResults
 
 
 def runHNotPresent(bckwdIC, fwdIC):

@@ -88,9 +88,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 1     #4
-    firstSpec = 3    #3
-    lastSpec = 134    #134
+    noOfMSIterations = 2     #4
+    firstSpec = 30    #3
+    lastSpec = 50    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -141,7 +141,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 1 #2   #4
+    noOfMSIterations = 2 #2   #4
     firstSpec = 135   #135
     lastSpec = 145   #182
 
@@ -183,20 +183,21 @@ yfitIC = YSpaceFitInitialConditions
 start_time = time.time()
 # Start of interactive section 
 
-wsName = "DHMT_300K_RD_forward_0"
-if wsName in mtd:
-    wsFinal = mtd["DHMT_300K_RD_forward_0"]
-    allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
-else:
-    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-    allNCP = lastIterationNCP
+# wsName = "DHMT_300K_RD_forward_0"
+# if wsName in mtd:
+#     wsFinal = mtd["DHMT_300K_RD_forward_0"]
+#     allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
+# else:
+#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+#     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+#     allNCP = lastIterationNCP
+# 
+# assert ~np.all(allNCP==0), "NCP extraction not working!"
+# 
+# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+# fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
-assert ~np.all(allNCP==0), "NCP extraction not working!"
-
-print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
-
+wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
 
 # End of iteractive section
 end_time = time.time()

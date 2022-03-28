@@ -1,5 +1,5 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
+from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, extractNCPFromWorkspaces
 from experiments.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -85,9 +85,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
-    firstSpec = 3    #3
-    lastSpec = 134    #134
+    noOfMSIterations = 2     #4
+    firstSpec = 80    #3
+    lastSpec = 90    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -117,8 +117,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     userWsRawPath = str(frontWsRawPath)
     userWsEmptyPath = str(frontWsEmptyPath)
     InstrParsPath = ipFileFrontPath
-
-    # HToMass0Ratio = None
 
     masses = np.array([1.0079, 12, 16, 27]) 
     noOfMasses = len(masses)
@@ -166,11 +164,11 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    singleGaussFitToHProfile = True      # When False, use Hermite expansion
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    singleGaussFitToHProfile = False      # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
-    nGlobalFitGroups = 8
+    nGlobalFitGroups = 4
    
 
 bckwdIC = BackwardInitialConditions
@@ -181,18 +179,22 @@ yfitIC = YSpaceFitInitialConditions
 start_time = time.time()
 # Interactive section 
 
-wsName = "starch_80_RD_forward_0"
-if wsName in mtd:
-    wsFinal = mtd["starch_80_RD_forward_0"]
-    allNCP = extractNCPFromWorkspaces(wsFinal)
-else:
-    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-    allNCP = lastIterationNCP
+# wsName = "starch_80_RD_FORWARD_1"
+# if wsName in mtd:
+#     wsFinal = mtd[wsName]
+#     allNCP = extractNCPFromWorkspaces(wsFinal)
+# else:
+#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+#     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+#     allNCP = lastIterationNCP
+
+# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+# fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
 
-print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+allNCP = lastIterationNCP
 
 
 # End of iteractive section

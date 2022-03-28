@@ -63,7 +63,7 @@ def createTableInitialParameters(ic):
     meansTableWS.addColumn(type='str', name="Bounds Centers")
 
     print("\nCreated Table with Initial Parameters:")
-    for m, iw, bw, ii, bi, inc, bc in zip(ic.masses, ic.initPars[1::3], ic.bounds[1::3], ic.initPars[0::3], ic.bounds[0::3], ic.initPars[2::3], ic.bounds[2::3]):
+    for m, iw, bw, ii, bi, inc, bc in zip(ic.masses.astype(float), ic.initPars[1::3], ic.bounds[1::3], ic.initPars[0::3], ic.bounds[0::3], ic.initPars[2::3], ic.bounds[2::3]):
         meansTableWS.addRow([m, iw, str(bw), ii, str(bi), inc, str(bc)])
         print("Mass: ", m)
         print(f"Initial Intensity: {ii:6}, Bounds: {bi}")
@@ -230,7 +230,7 @@ def createMeansAndStdTableWS(wsName, ic):
 
     print("\nCreated Table with means and std:")
     print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
-    for m, mw, stdw, mi, stdi in zip(ic.masses, meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
+    for m, mw, stdw, mi, stdi in zip(ic.masses.astype(float), meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
         meansTableWS.addRow([m, mw, stdw, mi, stdi])
         print(f"{m:5.2f}  {mw:10.5f} \u00B1 {stdw:7.5f}  {mi:10.5f} \u00B1 {stdi:7.5f}")
     print("\n")
