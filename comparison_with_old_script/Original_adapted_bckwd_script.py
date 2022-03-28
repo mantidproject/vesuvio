@@ -27,8 +27,12 @@ from scipy.ndimage import convolve1d
 import time
 from pathlib import Path
 
+# ------------ sort out paths
+currentPath = Path(__file__).absolute().parent 
+ipFilesPath = currentPath / ".." / "vesuvio_analysis" / "ip_files"
+inputWSPath = currentPath / "input_ws"
+
 start_time = time.time()
-repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 # command for the formatting of the printed output
 np.set_printoptions(suppress=True, precision=4, linewidth= 150 )
@@ -74,7 +78,7 @@ def fun_derivative4(x,fun): # not used at present. Can be used for the H4 polyno
 
 def load_ip_file(spectrum):
     #print "Loading parameters from file: ", namedtuple
-    ipfile = repoPath / 'ip2018_3.par'
+    ipfile = ipFilesPath / 'ip2018_3.par'
     f = open(ipfile, 'r')
     data = f.read()
     lines = data.split('\n')
@@ -574,7 +578,7 @@ plot_iterations = True                      # If True, plots all the time-of-fli
 number_of_iterations = 4 #4               # This is the number of iterations for the reduction analysis in time-of-flight.
 
 
-name='starch_80_DD_backward'  
+name='starch_80_RD_backward_'  
 runs='43066-43076'  # 77K             # The numbers of the runs to be analysed
 empty_runs='41876-41923'   # 77K             # The numbers of the empty runs to be subtracted
 spectra='3-134'                                             # Spectra to be analysed
@@ -589,13 +593,13 @@ detectors_masked=[18, 34, 42, 43, 59, 60, 62, 118, 119, 133]
 if (name+'raw' not in mtd):
     print('\n', 'Loading the sample runs: ', runs, '\n')
     #LoadVesuvio(Filename=runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile,OutputWorkspace=name+'raw')
-    Load(Filename= r"./input_ws/starch_80_RD_raw_backward.nxs", OutputWorkspace=name+'raw')
+    Load(Filename= str(inputWSPath/"starch_80_RD_raw_backward.nxs"), OutputWorkspace=name+'raw')
     Rebin(InputWorkspace=name+'raw',Params=tof_binning,OutputWorkspace=name+'raw') 
     SumSpectra(InputWorkspace=name+'raw', OutputWorkspace=name+'raw'+'_sum')
 if (name+'empty' not in mtd):
     print('\n', 'Loading the empty runs: ', empty_runs, '\n')
     #LoadVesuvio(Filename=empty_runs, SpectrumList=spectra, Mode=mode, InstrumentParFile=ipfile,OutputWorkspace=name+'empty')
-    Load(Filename= r"./input_ws/starch_80_RD_empty_backward.nxs", OutputWorkspace=name+'empty')
+    Load(Filename= str(inputWSPath/"starch_80_RD_empty_backward.nxs"), OutputWorkspace=name+'empty')
     Rebin(InputWorkspace=name+'empty',Params=tof_binning,OutputWorkspace=name+'empty') 
     
 Minus(LHSWorkspace=name+'raw', RHSWorkspace=name+'empty', OutputWorkspace=name)
@@ -677,6 +681,7 @@ for iteration in range(number_of_iterations):
     
     # Calculate mean widths and intensities
     mean_widths, mean_intensity_ratios = calculate_mean_widths_and_intensities(masses, widths, intensities, spectra, verbose) # at present is not multiplying for 0,9
+    
     ##----------
     all_mean_widths[iteration] = np.array(mean_widths)
     all_mean_intensities[iteration] = np.array(mean_intensity_ratios)
@@ -691,14 +696,7 @@ for iteration in range(number_of_iterations):
         Minus(LHSWorkspace= name, RHSWorkspace = str(name)+"_MulScattering", OutputWorkspace = name+str(iteration+1))
 
 
-##------------------test for general quantities--------------
-#intensities=np.array(intensities)
-#widths = np.array(widths)
-#positions = np.array(positions)
-#mean_widths = np.array(mean_widths)
-#mean_intensity_ratios = np.array(mean_intensity_ratios)
-
-##-------------------test for ncp workspaces-----------------
+##-------------------exctract ncp from workspaces-----------------
 
 all_tot_ncp = np.zeros((number_of_iterations, mtd[name].getNumberHistograms(), mtd[name].blocksize()))
 all_indiv_ncp = np.zeros((number_of_iterations, len(masses), mtd[name].getNumberHistograms(), mtd[name].blocksize()))
@@ -715,8 +713,7 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-
-savepath = repoPath / "tests" / "fixatures" / "original" / "4iter_backward_MS.npz"
+savepath = currentPath / "original_and_current_data" / "original_data" / "4iter_backward_MS.npz"
 
 np.savez(savepath, all_fit_workspaces = all_fit_workspaces, \
                    all_spec_best_par_chi_nit = all_spec_best_par_chi_nit, \
