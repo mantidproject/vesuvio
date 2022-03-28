@@ -297,11 +297,6 @@ def prepareFitArgs(ic, dataX):
 def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
     """Loads instrument parameters into array, from the file in the specified path"""
 
-    # For some odd reason, np.loadtxt() is only working with Path object
-    # So transform string path into Path object
-    # IPFileName = IPFileString.split("/")[-1]
-    # InstrParsPath = repoPath / IPFileName
-
     data = np.loadtxt(InstrParsPath, dtype=str)[1:].astype(float)
 
     spectra = data[:, 0]
@@ -315,8 +310,8 @@ def loadResolutionPars(instrPars):
        Output: matrix with each parameter in each column"""
     spectrums = instrPars[:, 0] 
     L = len(spectrums)
-    #for spec no below 135, back scattering detectors, mode is double difference
-    #for spec no 135 or above, front scattering detectors, mode is single difference
+    # For spec no below 135, back scattering detectors, mode is double difference
+    # For spec no 135 or above, front scattering detectors, mode is single difference
     dE1 = np.where(spectrums < 135, 88.7, 73)       #meV, STD
     dE1_lorz = np.where(spectrums < 135, 40.3, 24)  #meV, HFHM
     dTOF = np.repeat(0.37, L)      #us
@@ -395,9 +390,10 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
-        # This condition is not usually satisfied but in the exceptional case that it is,
-        # we can use a statistical weight to make sure the chi2 used is not too small for the 
-        # optimization algorithm. This is not used in the original script
+        # This condition is currently never satisfied, 
+        # but I am keeping it for the unlikely case of fitting NCP data without errors.
+        # In this case, we can use a statistical weight to make sure 
+        # chi2 is not too small for minimize.optimize().
         chi2 = (ncpTotal - dataY)**2 / dataY**2
     else:
         chi2 =  (ncpTotal - dataY)**2 / dataE**2    
@@ -543,8 +539,7 @@ def pseudoVoigt(x, sigma, gamma):
     f = 0.5346 * fl + np.sqrt(0.2166*fl**2 + fg**2)
     eta = 1.36603 * fl/f - 0.47719 * (fl/f)**2 + 0.11116 * (fl/f)**3
     sigma_v, gamma_v = f/(2.*np.sqrt(2.*np.log(2.))), f / 2.
-    pseudo_voigt = eta * \
-        lorentizian(x, gamma_v) + (1.-eta) * gaussian(x, sigma_v)
+    pseudo_voigt = eta * lorentizian(x, gamma_v) + (1.-eta) * gaussian(x, sigma_v)
     # TODO: Ask about this comment
     # norm = np.sum(pseudo_voigt)*(x[1]-x[0])
     return pseudo_voigt  # /np.abs(norm)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 currentPath = Path(__file__).absolute().parent 
-ipFilesPath = currentPath / "joint" / "ip_files"
+ipFilesPath = currentPath / "vesuvio_analysis" / "ip_files"
 
 comparisonPath = currentPath / "comparison_with_old_script"
 

@@ -26,8 +26,13 @@ from scipy import optimize
 from scipy.ndimage import convolve1d
 import time
 from pathlib import Path
-repoPath = Path(__file__).absolute().parent  # Path to the repository
 start_time = time.time()
+
+# ------------ sort out paths
+currentPath = Path(__file__).absolute().parent 
+ipFilesPath = currentPath / ".." / "vesuvio_analysis" / "ip_files"
+inputWSPath = currentPath / "input_ws"
+
 
 # command for the formatting of the printed output
 np.set_printoptions(suppress=True, precision=4, linewidth= 150 )
@@ -73,7 +78,7 @@ def fun_derivative4(x,fun): # not used at present. Can be used for the H4 polyno
 
 def load_ip_file(spectrum):
     #print "Loading parameters from file: ", namedtuple
-    ipfile =  repoPath / 'ip2018_3.par'
+    ipfile =  ipFilesPath / 'ip2018_3.par'
     f = open(ipfile, 'r')
     data = f.read()
     lines = data.split('\n')
@@ -532,7 +537,7 @@ is not needed as a result of the symmetrisation.
 load_data=True                             # If data have already been loaded, it can be put to Fasle to save time;
 verbose=True                                 # If True, prints the value of the fitting parameters for each time-of-flight spectrum
 plot_iterations = True                      # If True, plots all the time-of-flight spectra and fits in a single window for each iteration
-number_of_iterations = 4              # This is the number of iterations for the reduction analysis in time-of-flight.
+number_of_iterations = 4 #4              # This is the number of iterations for the reduction analysis in time-of-flight.
 fit_in_Y_space = True      # If True, corrected time-of-flight spectra containing H only are transformed to Y-space and fitted.
 
 ws_name="starch_80_RD_"
@@ -550,7 +555,7 @@ if load_data:
     runs='43066-43076'
     ipfile = r'./ip2018_3.par'
     # LoadVesuvio(Filename=runs,SpectrumList=spectrum_list,Mode="SingleDifference",SumSpectra=False,InstrumentParFile=ipfile, OutputWorkspace=ws_name_raw)
-    Load(Filename= r"./input_ws/starch_80_RD_raw_forward.nxs", OutputWorkspace=ws_name_raw)
+    Load(Filename= str(inputWSPath/"starch_80_RD_raw_forward.nxs"), OutputWorkspace=ws_name_raw)
     Rebin(InputWorkspace=ws_name_raw,Params="110,1.,430",OutputWorkspace=ws_name_raw)
     SumSpectra(InputWorkspace=ws_name_raw, OutputWorkspace=ws_name_raw+'_sum')
     CloneWorkspace(InputWorkspace = ws_name_raw, OutputWorkspace = ws_name)
@@ -775,7 +780,8 @@ for i in range(number_of_iterations):
         all_indiv_ncp[i, m] = ncp_m_dataY
 
 ##-------------------save results-------------------
-savepath = repoPath / "tests" / "fixatures" / "original" / "4iter_forward_GB_MS.npz"
+savepath = currentPath / "original_and_current_data" / "original_data" / "4iter_forward_GB_MS.npz"
+
 
 wsJoY = mtd[ws_name+'joy_sum']
 resolution = mtd["resolution_sum"].extractY()
