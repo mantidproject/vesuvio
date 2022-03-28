@@ -1,5 +1,5 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runJointBackAndForward, extractNCPFromWorkspaces, runIndependentIterativeProcedure
+from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, extractNCPFromWorkspaces, runIndependentIterativeProcedure
 from experiments.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
 from mantid.api import AnalysisDataService, mtd
 import time

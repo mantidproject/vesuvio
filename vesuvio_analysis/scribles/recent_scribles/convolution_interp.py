@@ -82,7 +82,7 @@ def chooseXDense(x, res, flag):
         resDense = np.interp(xDense, x, res)
     return xDense, xDelta, resDense
 
-xDense, xDelta, resDense = chooseXDense(x, res, False)
+xDense, xDelta, resDense = chooseXDense(x, res, True)
 convDense = signal.convolve(gauss(xDense, *pars), resDense, mode="same") * xDelta
 convBetter = np.interp(x, xDense, convDense)
 
@@ -93,6 +93,7 @@ plt.plot(x, res, label="Resolution")
 plt.plot(x, convInterp, label="Conv Interp")
 plt.plot(x, convOdd, label="Conv Odd")
 plt.plot(xDense, convDense, label="Better convolution")
+plt.plot(x, convBetter, label="Conv Better Interp")
 plt.vlines(0, 0, 0.3, color="k", ls="--")
 plt.legend()
 plt.show()

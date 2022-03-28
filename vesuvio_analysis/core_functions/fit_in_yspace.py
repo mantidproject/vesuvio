@@ -358,12 +358,11 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
 
 
 def chooseXDense(x, res, flag=True):
-    # TODO: Need to sort out the best density for the convolution
-
     """
     Make either odd grid or high density symmetric grid for convolution.
     The default mode makes a odd grid and ensures a resolution with a single peak at the center.
     The deault mode is significantly faster than using the dense grid.
+    Default odd grid also makes resolution more symetric, which is also desirable.
     """
 
     assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
