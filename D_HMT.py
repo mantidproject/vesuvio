@@ -197,7 +197,8 @@ start_time = time.time()
 # print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
 # fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
-wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+# wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
 
 # End of iteractive section
 end_time = time.time()

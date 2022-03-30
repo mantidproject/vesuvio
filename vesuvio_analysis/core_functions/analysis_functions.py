@@ -65,10 +65,10 @@ def createTableInitialParameters(ic):
     print("\nCreated Table with Initial Parameters:")
     for m, iw, bw, ii, bi, inc, bc in zip(ic.masses.astype(float), ic.initPars[1::3], ic.bounds[1::3], ic.initPars[0::3], ic.bounds[0::3], ic.initPars[2::3], ic.bounds[2::3]):
         meansTableWS.addRow([m, iw, str(bw), ii, str(bi), inc, str(bc)])
-        print("Mass: ", m)
-        print(f"Initial Intensity: {ii:6}, Bounds: {bi}")
-        print(f"Initial Width:     {iw:6}, Bounds: {bw}")
-        print(f"Initial Center:    {inc:6}, Bounds: {bc}")
+        print("\nMass: ", m)
+        print(f"{'Initial Intensity:':>20s} {ii:<8.3f} Bounds: {bi}")
+        print(f"{'Initial Width:':>20s} {iw:<8.3f} Bounds: {bw}")
+        print(f"{'Initial Center:':>20s} {inc:<8.3f} Bounds: {bc}")
     print("\n")    
 
 def loadVesuvioDataWorkspaces(ic):
