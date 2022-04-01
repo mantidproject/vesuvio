@@ -45,6 +45,28 @@ def iterativeFitForDataReduction(ic):
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
     fittingResults = resultsObject(ic)
     fittingResults.save()
+
+    # Implement Bootsrap of residuals on already corrected data
+    if ic.bootstrapResiduals:
+        dataY = wsFinal.extractY()
+        totNcp = fittingResults.all_tot_ncp[-1]
+        residuals  = dataY[:, :-1] - totNcp    # y = g(x) + res
+
+        bootSamples = np.zeros((ic.nSamples, len(dataY), 3*ic.noOfMasses))
+        for i in range(ic.nSamples):
+            
+            # Form the bootstrap residuals
+            bootRes = np.zeros(residuals.shape)
+            for i in range(len(residuals)):
+                rowIdxs = np.random.randint(0, len(residuals[0]), len(residuals[0]))
+                bootRes[i] = residuals[i, rowIdxs]
+
+            bootDataY = totNcp + bootRes
+            print("Bootstrap Procedure under development...")
+
+
+
+
     return wsFinal, fittingResults
 
 
