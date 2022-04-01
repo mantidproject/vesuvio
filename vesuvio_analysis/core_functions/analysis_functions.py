@@ -275,9 +275,11 @@ def loadWorkspaceIntoArrays(ws):
     dataX = ws.extractX()
 
     histWidths = dataX[:, 1:] - dataX[:, :-1]
-    dataY = dataY[:, :-1] / histWidths
-    dataE = dataE[:, :-1] / histWidths
-    dataX = (dataX[:, 1:] + dataX[:, :-1]) / 2
+    assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
+    
+    dataY = dataY #/ histWidths[0, 0]
+    dataE = dataE #/ histWidths[0, 0]
+    dataX = dataX + histWidths[0, 0]/2 
     return dataY, dataX, dataE
 
 
@@ -596,21 +598,22 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
 
     # Original script does not have this step to multiply by histogram widths
     histWidths = dataX[:, 1:] - dataX[:, :-1]
-    dataX = dataX[:, :-1]       # Cut last column to match ncpTotal length
-    dataY = ncpTotal * histWidths
+    assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
+    
+    dataTotNcp = ncpTotal #* histWidths[0, 0]
     # Also for the individual ncp
-    ncpForEachMass *= histWidths
+    dataNcpForEachMass = ncpForEachMass #* histWidths[0, 0]
 
     # Total ncp workspace
     ncpTotWs = CreateWorkspace(
         DataX=dataX.flatten(), 
-        DataY=dataY.flatten(),
+        DataY=dataTotNcp.flatten(),
         Nspec=len(dataX), 
         OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
     SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
 
     # Individual ncp workspaces
-    for i, ncp_m in enumerate(ncpForEachMass):
+    for i, ncp_m in enumerate(dataNcpForEachMass):
         ncpMWs = CreateWorkspace(
             DataX=dataX.flatten(), 
             DataY=ncp_m.flatten(), 
