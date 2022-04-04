@@ -136,7 +136,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1   #4
     firstSpec = 164   #144
     lastSpec = 175    #182
 
@@ -146,7 +146,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,1.,430"                 # Binning of ToF spectra
+    tof_binning="110,10,430"                 # Binning of ToF spectra
  
     # Parameters below are not to be changed
     name = scriptName+"_"+modeRunning+"_"
@@ -191,11 +191,11 @@ start_time = time.time()
 # print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
 # fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
-
-wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-allNCP = lastIterationNCP
-
+wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+# wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+# lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+# allNCP = lastIterationNCP
+# 
 
 # End of iteractive section
 end_time = time.time()
