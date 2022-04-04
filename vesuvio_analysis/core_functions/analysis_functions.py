@@ -277,9 +277,9 @@ def loadWorkspaceIntoArrays(ws):
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
     
-    dataY = dataY #/ histWidths[0, 0]
-    dataE = dataE #/ histWidths[0, 0]
-    dataX = dataX + histWidths[0, 0]/2 
+    dataY = dataY[:, :-1] #/ histWidths[0, 0]
+    dataE = dataE[:, :-1] #/ histWidths[0, 0]
+    dataX = dataX[:, :-1] + histWidths[0, 0]/2 
     return dataY, dataX, dataE
 
 

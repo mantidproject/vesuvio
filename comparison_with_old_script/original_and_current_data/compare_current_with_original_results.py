@@ -112,7 +112,7 @@ class TestFitParameters(unittest.TestCase):
 class TestNcp(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
-        self.orincp = originalResults["all_tot_ncp"]
+        self.orincp = originalResults["all_tot_ncp"][:,:,:-1]
         
         optimizedResults = np.load(pathToOptimized)
         self.optncp = optimizedResults["all_tot_ncp"]
