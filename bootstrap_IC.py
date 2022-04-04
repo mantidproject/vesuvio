@@ -48,6 +48,9 @@ forwardSavePath, backSavePath, ySpaceFitSavePath = outputPaths
 ipFileBackPath = ipFilesPath / "ip2018_3.par"  
 ipFileFrontPath = ipFilesPath / "ip2018_3.par"  
 
+backBootPath = experimentPath / "back_bootstrap.npz"
+frontBootPath = experimentPath / "front_bootstrap.npz"
+
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -58,7 +61,7 @@ class GeneralInitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
     bootstrapResiduals = True
-    nSamples = 2
+    nSamples = 100
 
 class BackwardInitialConditions(GeneralInitialConditions):
 
@@ -68,6 +71,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     userWsRawPath = str(backWsRawPath)
     userWsEmptyPath = str(backWsEmptyPath)
     InstrParsPath = ipFileBackPath
+    bootPath = backBootPath
 
     HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
 
@@ -88,9 +92,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
-    firstSpec = 80    #3
-    lastSpec = 90    #134
+    noOfMSIterations = 4     #4
+    firstSpec = 3    #3
+    lastSpec = 134    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -120,6 +124,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     userWsRawPath = str(frontWsRawPath)
     userWsEmptyPath = str(frontWsEmptyPath)
     InstrParsPath = ipFileFrontPath
+    bootPath = frontBootPath
 
     masses = np.array([1.0079, 12, 16, 27]) 
     noOfMasses = len(masses)
@@ -139,9 +144,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
-    firstSpec = 164   #144
-    lastSpec = 175    #182
+    noOfMSIterations = 4   #4
+    firstSpec = 144   #144
+    lastSpec = 182    #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -149,7 +154,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,10.,430"                 # Binning of ToF spectra
+    tof_binning="110,1.,430"                 # Binning of ToF spectra
  
     # Parameters below are not to be changed
     name = scriptName+"_"+modeRunning+"_"
@@ -182,6 +187,7 @@ start_time = time.time()
 # Interactive section 
 
 wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+wsFinal, backwardScatteringResults = runIndependentIterativeProcedure(bckwdIC)
 
 # End of iteractive section
 end_time = time.time()

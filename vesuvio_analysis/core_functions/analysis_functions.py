@@ -47,13 +47,16 @@ def iterativeFitForDataReduction(ic):
     fittingResults.save()
 
     # Implement Bootsrap of residuals on already corrected data
+    np.random.seed(1)
     if ic.bootstrapResiduals:
-        dataY = wsFinal.extractY()
+        dataY, dataX, dataE = arraysFromWS(wsFinal) 
+        dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)  
         totNcp = fittingResults.all_tot_ncp[-1]
-        residuals  = dataY[:, :-1] - totNcp    # y = g(x) + res
 
-        bootSamples = np.zeros((ic.nSamples, len(dataY), 3*ic.noOfMasses))
-        for i in range(ic.nSamples):
+        residuals  = dataY - totNcp    # y = g(x) + res
+
+        bootSamples = np.zeros((ic.nSamples, len(dataY), len(ic.initPars)+3))
+        for j in range(ic.nSamples):
             
             # Form the bootstrap residuals
             bootRes = np.zeros(residuals.shape)
@@ -64,8 +67,14 @@ def iterativeFitForDataReduction(ic):
             bootDataY = totNcp + bootRes
             print("Bootstrap Procedure under development...")
 
+            resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
+            
+            # Fit Bootstrap sample
+            arrFitPars = fitNcpToArray(ic, bootDataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
 
+            bootSamples[j] = arrFitPars
 
+    np.savez(ic.bootPath, boot_samples=bootSamples)
 
     return wsFinal, fittingResults
 
@@ -178,13 +187,59 @@ def fitNcpToWorkspace(ic, ws):
     Firtly the arrays required for the fit are prepared and then the fit is performed iteratively
     on a spectrum by spectrum basis.
     """
-    dataY, dataX, dataE = loadWorkspaceIntoArrays(ws)                     
+    dataY, dataX, dataE = arraysFromWS(ws)   
+    dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)                  
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
     # Fit individual spectra
-    allNcpForEachMass = []
-    fitParsTable = createTableWSForFitPars(ws.name(), ic.noOfMasses)
+    # allNcpForEachMass = []
+    # fitParsTable = createTableWSForFitPars(ws.name(), ic.noOfMasses)
     print("\nFitting NCP:\n")
+
+    arrFitPars = fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
+    createTableWSForFitPars(ws.name(), ic.noOfMasses, arrFitPars)
+    arrBestFitPars = arrFitPars[:, 1:-2]
+    allNcpForEachMass, allNcpTotal = calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
+    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
+
+    # for i in range(len(dataY)):
+    #     specFitPars = fitNcpToSingleSpec(
+    #         dataY[i],
+    #         dataE[i],
+    #         ySpacesForEachMass[i],
+    #         resolutionPars[i],
+    #         instrPars[i],
+    #         kinematicArrays[i],
+    #         ic
+    #         )
+        # fitParsTable.addRow(specFitPars)
+
+        # fitPars = specFitPars[1:-2]
+        # ncpForEachMass = calculateNcpSpec(
+        #     fitPars,
+        #     ySpacesForEachMass[i], 
+        #     resolutionPars[i], 
+        #     instrPars[i], 
+        #     kinematicArrays[i],
+        #     ic
+        #     )
+        # allNcpForEachMass.append(ncpForEachMass)
+        
+        # if np.all(specFitPars==0):
+        #     print("Skipped spectra.")
+        # else:
+        #     print(f"Fitted spectra {int(specFitPars[0]):3}")
+    # print("\n")
+    # allNcpForEachMass = np.array(allNcpForEachMass)
+    # allNcpTotal = np.sum(allNcpForEachMass, axis=1)
+    # createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
+    return
+
+
+def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
+    """Takes dataY as a 2D array and returns the 2D array best fit parameters."""
+
+    arrFitPars = np.zeros((len(dataY), len(ic.initPars)+3))
     for i in range(len(dataY)):
         specFitPars = fitNcpToSingleSpec(
             dataY[i],
@@ -194,32 +249,19 @@ def fitNcpToWorkspace(ic, ws):
             instrPars[i],
             kinematicArrays[i],
             ic
-            )
-        fitParsTable.addRow(specFitPars)
+            )   
+        arrFitPars[i] = specFitPars
 
-        fitPars = specFitPars[1:-2]
-        ncpForEachMass = buildNcpFromSpec(
-            fitPars,
-            ySpacesForEachMass[i], 
-            resolutionPars[i], 
-            instrPars[i], 
-            kinematicArrays[i],
-            ic
-            )
-        allNcpForEachMass.append(ncpForEachMass)
-        
         if np.all(specFitPars==0):
             print("Skipped spectra.")
         else:
             print(f"Fitted spectra {int(specFitPars[0]):3}")
-    print("\n")
-    allNcpForEachMass = np.array(allNcpForEachMass)
-    allNcpTotal = np.sum(allNcpForEachMass, axis=1)
-    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
-    return
+    
+    assert ~np.all(arrFitPars==0), "Either Fits are all zero or assignment of fitting not working"
+    return arrFitPars
 
 
-def createTableWSForFitPars(wsName, noOfMasses):
+def createTableWSForFitPars(wsName, noOfMasses, arrFitPars):
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Best_Fit_NCP_Parameters")
     tableWS.setTitle("SCIPY Fit")
     tableWS.addColumn(type='float', name="Spec Idx")
@@ -229,7 +271,30 @@ def createTableWSForFitPars(wsName, noOfMasses):
         tableWS.addColumn(type='float', name=f"Center {i}")
     tableWS.addColumn(type='float', name="Norm Chi2")
     tableWS.addColumn(type='float', name="No Iter")
-    return tableWS
+
+    for row in arrFitPars:    # Pass array onto table ws
+        tableWS.addRow(row)
+    return 
+
+
+def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
+    """Calculates the matrix of NCP from matrix of best fit parameters"""
+
+    allNcpForEachMass = []
+    for i in range(len(arrBestFitPars)):
+        ncpForEachMass = calculateNcpRow(
+            arrBestFitPars[i],
+            ySpacesForEachMass[i], 
+            resolutionPars[i], 
+            instrPars[i], 
+            kinematicArrays[i],
+            ic
+            )
+        allNcpForEachMass.append(ncpForEachMass)
+
+    allNcpForEachMass = np.array(allNcpForEachMass)
+    allNcpTotal = np.sum(allNcpForEachMass, axis=1)        
+    return allNcpForEachMass, allNcpTotal
 
 
 def createMeansAndStdTableWS(wsName, ic):
@@ -290,19 +355,24 @@ def calculateMeansAndStds(widthsIn, intensitiesIn, ic):
     return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
     
 
-def loadWorkspaceIntoArrays(ws):
-    """Output: dataY, dataX and dataE as arrays and converted to point data"""
+def arraysFromWS(ws):
+    """Output: dataY, dataX and dataE as arrays"""
     dataY = ws.extractY()
     dataE = ws.extractE()
     dataX = ws.extractX()
+    return dataY, dataX, dataE
+
+
+def histToPointData(dataY, dataX, dataE):
+    """Output: middle points of dataX hists"""
 
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
     
-    dataY = dataY[:, :-1] #/ histWidths[0, 0]
-    dataE = dataE[:, :-1] #/ histWidths[0, 0]
-    dataX = dataX[:, :-1] + histWidths[0, 0]/2 
-    return dataY, dataX, dataE
+    dataYp = dataY[:, :-1] #/ histWidths[0, 0]
+    dataEp = dataE[:, :-1] #/ histWidths[0, 0]
+    dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
+    return dataYp, dataXp, dataEp
 
 
 def prepareFitArgs(ic, dataX):
@@ -600,7 +670,7 @@ def numericalThirdDerivative(x, fun):
     return derivative
 
 
-def buildNcpFromSpec(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
+def calculateNcpRow(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
 
@@ -619,8 +689,8 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
     dataX = ws.extractX()
 
     # Original script does not have this step to multiply by histogram widths
-    histWidths = dataX[:, 1:] - dataX[:, :-1]
-    assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
+    # histWidths = dataX[:, 1:] - dataX[:, :-1]
+    # assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
     
     dataTotNcp = ncpTotal #* histWidths[0, 0]
     # Also for the individual ncp
