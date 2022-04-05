@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
+from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds
 
 currentPath = Path(__file__).parent.absolute() 
 
-bootPath = currentPath / "back_bootstrap.npz"
+bootPath = currentPath / "experiments" / "bootstrap_IC" / "back_bootstrap.npz"
 bootData = np.load(bootPath)
 
 bestPars = bootData["boot_samples"][:, :, 1:-2]
@@ -13,18 +14,47 @@ print(bestPars.shape)
 
 def histSampleMeans(meanWidths, meanIntensities):
     print(meanWidths.shape)
+
     fig, axs = plt.subplots(1, 2)
     for mode, ax, means in zip(["Widhts", "Intensities"], axs, [meanWidths, meanIntensities]):
+
         ax.set_title(f"Histogram of Mean {mode}")
+        print(f"\nBootstrap distribution of {mode}: \n")
         for i, bootHist in enumerate(means):
+
             leg = f"{mode} {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
+            print(leg)
             ax.hist(bootHist, 20, histtype="step", label=leg)
+
         ax.legend()
     plt.show()
 
 
+def calcBootMeans(bestPars):
+    """Performs the means and std on each bootstrap sample"""
+    bootWidths = bestPars[:, :, 1::3]
+    bootIntensities = bestPars[:, :, 0::3]
+
+    bootMeanW = np.zeros((len(bootWidths[0,0,:]), len(bootWidths)))
+    bootStdW = np.zeros(bootMeanW.shape)
+    bootMeanI = np.zeros(bootMeanW.shape)
+    bootStdI = np.zeros(bootMeanW.shape)
+
+    for j, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
+
+        meanW, stdW, meanI, stdI = calculateMeansAndStds(widths.T, intensities.T)
+
+        bootMeanW[:, j] = meanW
+        bootStdW[:, j] = stdW
+        bootMeanI[:, j] = meanI
+        bootStdI[:, j] = stdI
+
+    return bootMeanW, bootMeanI, bootStdW, bootStdI
+
+
 def calculateMeanWidhtsAndIntensities(bestPars):
-    #TODO: Check that this is doing what is intended with simple example
+    """Replicates means and intensities of original code but with numpy arrays"""
+
     widths = bestPars[:, :, 1::3]
     intensities = bestPars[:, :, 0::3]
 
@@ -50,16 +80,14 @@ def calculateMeanWidhtsAndIntensities(bestPars):
 
     return meanWidths.T, meanIntensities.T, stdWidths.T, stdIntensities.T
 
+meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bestPars)
+meanW1, meanI1, stdW1, stdI1 = calculateMeanWidhtsAndIntensities(bestPars)
 
-meanWidths, meanIntensities, stdWidths, stdIntensities = calculateMeanWidhtsAndIntensities(bestPars)
-histSampleMeans(meanWidths, meanIntensities)
-# histSampleMeans(stdWidths, stdIntensities)
+np.testing.assert_array_almost_equal(meanW0, meanW1)
+np.testing.assert_array_almost_equal(meanI0, meanI1)
+np.testing.assert_array_almost_equal(stdW0, stdW1)
+np.testing.assert_array_almost_equal(stdI0, stdI1)
+print("Tests passed! Array operations same as original.")
 
-
-def printResults(meanWidths, meanIntensities):
-    for mode, means in zip(["Widths", "Intensities"], [meanWidths, meanIntensities]):
-        print(f"\nBootstrap distribution of {mode}: \n")
-        for i, sample in enumerate(means):
-            print(f"{mode} {i}: {np.mean(sample):>8.3f} +/- {np.std(sample):<8.3f}")
-
-printResults(meanWidths, meanIntensities)
+histSampleMeans(meanW0, meanI0)
+# histSampleMeans(stdW, stdI)

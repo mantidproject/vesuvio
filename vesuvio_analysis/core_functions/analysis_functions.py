@@ -365,12 +365,12 @@ def createMeansAndStdTableWS(wsName, ic):
     # Extract widths and intensities from tableWorkspace
     fitParsTable = mtd[wsName+"_Best_Fit_NCP_Parameters"]
     widths = np.zeros((ic.noOfMasses, fitParsTable.rowCount()))
-    intensities = widths.copy()
+    intensities = np.zeros(widths.shape)
     for i in range(ic.noOfMasses):
         widths[i] = fitParsTable.column(f"Width {i}")
         intensities[i] = fitParsTable.column(f"Intensity {i}")
 
-    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
+    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities)
 
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
     meansTableWS.addColumn(type='float', name="Mass")
@@ -388,34 +388,50 @@ def createMeansAndStdTableWS(wsName, ic):
     return meanWidths, meanIntensityRatios
 
 
-def calculateMeansAndStds(widthsIn, intensitiesIn, ic):
-    assert len(widthsIn) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
-    noOfMasses = ic.noOfMasses
+def calculateMeansAndStds(widthsIn, intensitiesIn):
+    # assert len(widthsIn) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+    # noOfMasses = ic.noOfMasses
+
+    # assert widthsIn.shape[1] == 1, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+    # noOfMasses = len(widthsIn)
 
     widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
     intensities = intensitiesIn.copy()
-    # Replace zeros from masked spectra with nans
-    widths[:, ic.maskedDetectorIdx] = np.nan
-    intensities[:, ic.maskedDetectorIdx] = np.nan
 
-    meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-    stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
+    # # Replace zeros from masked spectra with nans
+    # widths[:, ic.maskedDetectorIdx] = np.nan
+    # intensities[:, ic.maskedDetectorIdx] = np.nan
+
+    zeroSpecs = np.all(widths==0, axis=0)   # Catches all failed fits, not just masked spectra
+    widths[:, zeroSpecs] = np.nan
+    intensities[:, zeroSpecs] = np.nan
+
+    meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]  
+    # stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
+
+    # meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
+    # stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
 
     # Subtraction row by row
     widthDeviation = np.abs(widths - meanWidths)
+    stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
+
     # Where True, replace by nan
     betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+    
     betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
+    betterIntensities = betterIntensities / np.sum(betterIntensities, axis=0)   # Not nansum()
 
     meanWidths = np.nanmean(betterWidths, axis=1)  
     stdWidths = np.nanstd(betterWidths, axis=1)
 
-    # Not nansum(), to propagate nan
-    normalization = np.sum(betterIntensities, axis=0)
-    intensityRatios = betterIntensities / normalization
+    # # Not nansum(), to propagate nan
+    # norm = np.sum(betterIntensities, axis=0)
+    # intensityRatios = betterIntensities / norm
 
-    meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
-    stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
+    meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
+    stdIntensityRatios = np.nanstd(betterIntensities, axis=1)
+
     return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
 
 
