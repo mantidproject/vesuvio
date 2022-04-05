@@ -45,37 +45,6 @@ def iterativeFitForDataReduction(ic):
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
     fittingResults = resultsObject(ic)
     fittingResults.save()
-
-    # Implement Bootsrap of residuals on already corrected data
-    np.random.seed(1)
-    if ic.bootstrapResiduals:
-        dataY, dataX, dataE = arraysFromWS(wsFinal) 
-        dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)  
-        totNcp = fittingResults.all_tot_ncp[-1]
-
-        residuals  = dataY - totNcp    # y = g(x) + res
-
-        bootSamples = np.zeros((ic.nSamples, len(dataY), len(ic.initPars)+3))
-        for j in range(ic.nSamples):
-            
-            # Form the bootstrap residuals
-            bootRes = np.zeros(residuals.shape)
-            for i in range(len(residuals)):
-                rowIdxs = np.random.randint(0, len(residuals[0]), len(residuals[0]))
-                bootRes[i] = residuals[i, rowIdxs]
-
-            bootDataY = totNcp + bootRes
-            print("Bootstrap Procedure under development...")
-
-            resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
-            
-            # Fit Bootstrap sample
-            arrFitPars = fitNcpToArray(ic, bootDataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
-
-            bootSamples[j] = arrFitPars
-
-    np.savez(ic.bootPath, boot_samples=bootSamples)
-
     return wsFinal, fittingResults
 
 
@@ -191,9 +160,6 @@ def fitNcpToWorkspace(ic, ws):
     dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)                  
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
-    # Fit individual spectra
-    # allNcpForEachMass = []
-    # fitParsTable = createTableWSForFitPars(ws.name(), ic.noOfMasses)
     print("\nFitting NCP:\n")
 
     arrFitPars = fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
@@ -201,38 +167,6 @@ def fitNcpToWorkspace(ic, ws):
     arrBestFitPars = arrFitPars[:, 1:-2]
     allNcpForEachMass, allNcpTotal = calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
     createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
-
-    # for i in range(len(dataY)):
-    #     specFitPars = fitNcpToSingleSpec(
-    #         dataY[i],
-    #         dataE[i],
-    #         ySpacesForEachMass[i],
-    #         resolutionPars[i],
-    #         instrPars[i],
-    #         kinematicArrays[i],
-    #         ic
-    #         )
-        # fitParsTable.addRow(specFitPars)
-
-        # fitPars = specFitPars[1:-2]
-        # ncpForEachMass = calculateNcpSpec(
-        #     fitPars,
-        #     ySpacesForEachMass[i], 
-        #     resolutionPars[i], 
-        #     instrPars[i], 
-        #     kinematicArrays[i],
-        #     ic
-        #     )
-        # allNcpForEachMass.append(ncpForEachMass)
-        
-        # if np.all(specFitPars==0):
-        #     print("Skipped spectra.")
-        # else:
-        #     print(f"Fitted spectra {int(specFitPars[0]):3}")
-    # print("\n")
-    # allNcpForEachMass = np.array(allNcpForEachMass)
-    # allNcpTotal = np.sum(allNcpForEachMass, axis=1)
-    # createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
     return
 
 
@@ -241,6 +175,7 @@ def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, 
 
     arrFitPars = np.zeros((len(dataY), len(ic.initPars)+3))
     for i in range(len(dataY)):
+
         specFitPars = fitNcpToSingleSpec(
             dataY[i],
             dataE[i],
@@ -249,7 +184,8 @@ def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, 
             instrPars[i],
             kinematicArrays[i],
             ic
-            )   
+            ) 
+
         arrFitPars[i] = specFitPars
 
         if np.all(specFitPars==0):
@@ -282,6 +218,7 @@ def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArra
 
     allNcpForEachMass = []
     for i in range(len(arrBestFitPars)):
+
         ncpForEachMass = calculateNcpRow(
             arrBestFitPars[i],
             ySpacesForEachMass[i], 
@@ -290,6 +227,7 @@ def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArra
             kinematicArrays[i],
             ic
             )
+            
         allNcpForEachMass.append(ncpForEachMass)
 
     allNcpForEachMass = np.array(allNcpForEachMass)

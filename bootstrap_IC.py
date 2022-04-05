@@ -1,7 +1,7 @@
-from ensurepip import bootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, extractNCPFromWorkspaces
 from experiments.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
+from vesuvio_analysis.core_functions.bootstrap import bootstrapAfterProcedure
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
@@ -48,8 +48,8 @@ forwardSavePath, backSavePath, ySpaceFitSavePath = outputPaths
 ipFileBackPath = ipFilesPath / "ip2018_3.par"  
 ipFileFrontPath = ipFilesPath / "ip2018_3.par"  
 
-backBootPath = experimentPath / "back_bootstrap.npz"
-frontBootPath = experimentPath / "front_bootstrap.npz"
+backBootPath = experimentPath / "back_bootstrap_test.npz"
+frontBootPath = experimentPath / "front_bootstrap_test.npz"
 
 
 class GeneralInitialConditions:
@@ -60,8 +60,6 @@ class GeneralInitialConditions:
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
-    bootstrapResiduals = True
-    nSamples = 100
 
 class BackwardInitialConditions(GeneralInitialConditions):
 
@@ -71,7 +69,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
     userWsRawPath = str(backWsRawPath)
     userWsEmptyPath = str(backWsEmptyPath)
     InstrParsPath = ipFileBackPath
-    bootPath = backBootPath
 
     HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
 
@@ -124,7 +121,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     userWsRawPath = str(frontWsRawPath)
     userWsEmptyPath = str(frontWsEmptyPath)
     InstrParsPath = ipFileFrontPath
-    bootPath = frontBootPath
 
     masses = np.array([1.0079, 12, 16, 27]) 
     noOfMasses = len(masses)
@@ -144,9 +140,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
-    lastSpec = 182    #182
+    lastSpec = 154    #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -154,7 +150,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,1.,430"                 # Binning of ToF spectra
+    tof_binning="110,10.,430"                 # Binning of ToF spectra
  
     # Parameters below are not to be changed
     name = scriptName+"_"+modeRunning+"_"
@@ -187,7 +183,10 @@ start_time = time.time()
 # Interactive section 
 
 wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-wsFinal, backwardScatteringResults = runIndependentIterativeProcedure(bckwdIC)
+bootstrapAfterProcedure(fwdIC, wsFinal, forwardScatteringResults, 5, frontBootPath)
+
+# wsFinal, backwardScatteringResults = runIndependentIterativeProcedure(bckwdIC)
+# bootstrapAfterProcedure(bckwdIC, wsFinal, forwardScatteringResults, 5, backBootPath)
 
 # End of iteractive section
 end_time = time.time()
