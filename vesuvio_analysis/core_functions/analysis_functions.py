@@ -156,8 +156,8 @@ def fitNcpToWorkspace(ic, ws):
     Firtly the arrays required for the fit are prepared and then the fit is performed iteratively
     on a spectrum by spectrum basis.
     """
-    dataY, dataX, dataE = arraysFromWS(ws)   
-    dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)                  
+    dataYws, dataXws, dataEws = arraysFromWS(ws)   
+    dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)                  
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
     print("\nFitting NCP:\n")
@@ -624,7 +624,10 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
 
     # Need to rearrage array of yspaces into seperate arrays for each mass
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    dataX = ws.extractX()
+    dataX = ws.extractX()[:, :-1]
+    assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+
+
 
     # Original script does not have this step to multiply by histogram widths
     # histWidths = dataX[:, 1:] - dataX[:, :-1]

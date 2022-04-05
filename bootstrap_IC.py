@@ -183,7 +183,7 @@ start_time = time.time()
 # Interactive section 
 
 wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-bootstrapAfterProcedure(fwdIC, wsFinal, forwardScatteringResults, 5, frontBootPath)
+# bootstrapAfterProcedure(fwdIC, wsFinal, forwardScatteringResults, 5, frontBootPath)
 
 # wsFinal, backwardScatteringResults = runIndependentIterativeProcedure(bckwdIC)
 # bootstrapAfterProcedure(bckwdIC, wsFinal, forwardScatteringResults, 5, backBootPath)
