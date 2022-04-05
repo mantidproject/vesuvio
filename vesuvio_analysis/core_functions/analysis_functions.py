@@ -98,27 +98,6 @@ def loadRawAndEmptyWsFromUserPath(ic):
     return wsToBeFitted
 
 
-# def loadRawAndEmptyWsFromLoadVesuvio(ic):
-    
-#     print('\n', 'Loading the sample runs: ', ic.runs, '\n')
-#     LoadVesuvio(Filename=ic.runs, SpectrumList=ic.spectra, Mode=ic.mode,
-#                 InstrumentParFile=ic.ipfile, OutputWorkspace=ic.name+'raw')
-#     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
-#           OutputWorkspace=ic.name+'raw')
-#     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
-#     wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
-
-#     if ic.mode=="DoubleDifference":
-#         print('\n', 'Loading the empty runs: ', ic.empty_runs, '\n')
-#         LoadVesuvio(Filename=ic.empty_runs, SpectrumList=ic.spectra, Mode=ic.mode,
-#                     InstrumentParFile=ic.ipfile, OutputWorkspace=ic.name+'empty')
-#         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
-#             OutputWorkspace=ic.name+'empty')
-#         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty', 
-#                             OutputWorkspace=ic.name+"uncroped_unmasked")
-#     return wsToBeFitted
-
-
 def cropAndMaskWorkspace(ic, ws):
     """Returns cloned and cropped workspace with modified name"""
     # Read initial Spectrum number
@@ -170,129 +149,6 @@ def fitNcpToWorkspace(ic, ws):
     return
 
 
-def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
-    """Takes dataY as a 2D array and returns the 2D array best fit parameters."""
-
-    arrFitPars = np.zeros((len(dataY), len(ic.initPars)+3))
-    for i in range(len(dataY)):
-
-        specFitPars = fitNcpToSingleSpec(
-            dataY[i],
-            dataE[i],
-            ySpacesForEachMass[i],
-            resolutionPars[i],
-            instrPars[i],
-            kinematicArrays[i],
-            ic
-            ) 
-
-        arrFitPars[i] = specFitPars
-
-        if np.all(specFitPars==0):
-            print("Skipped spectra.")
-        else:
-            print(f"Fitted spectra {int(specFitPars[0]):3}")
-    
-    assert ~np.all(arrFitPars==0), "Either Fits are all zero or assignment of fitting not working"
-    return arrFitPars
-
-
-def createTableWSForFitPars(wsName, noOfMasses, arrFitPars):
-    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Best_Fit_NCP_Parameters")
-    tableWS.setTitle("SCIPY Fit")
-    tableWS.addColumn(type='float', name="Spec Idx")
-    for i in range(int(noOfMasses)):
-        tableWS.addColumn(type='float', name=f"Intensity {i}")
-        tableWS.addColumn(type='float', name=f"Width {i}")
-        tableWS.addColumn(type='float', name=f"Center {i}")
-    tableWS.addColumn(type='float', name="Norm Chi2")
-    tableWS.addColumn(type='float', name="No Iter")
-
-    for row in arrFitPars:    # Pass array onto table ws
-        tableWS.addRow(row)
-    return 
-
-
-def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
-    """Calculates the matrix of NCP from matrix of best fit parameters"""
-
-    allNcpForEachMass = []
-    for i in range(len(arrBestFitPars)):
-
-        ncpForEachMass = calculateNcpRow(
-            arrBestFitPars[i],
-            ySpacesForEachMass[i], 
-            resolutionPars[i], 
-            instrPars[i], 
-            kinematicArrays[i],
-            ic
-            )
-            
-        allNcpForEachMass.append(ncpForEachMass)
-
-    allNcpForEachMass = np.array(allNcpForEachMass)
-    allNcpTotal = np.sum(allNcpForEachMass, axis=1)        
-    return allNcpForEachMass, allNcpTotal
-
-
-def createMeansAndStdTableWS(wsName, ic):
-    # Extract widths and intensities from tableWorkspace
-    fitParsTable = mtd[wsName+"_Best_Fit_NCP_Parameters"]
-    widths = np.zeros((ic.noOfMasses, fitParsTable.rowCount()))
-    intensities = widths.copy()
-    for i in range(ic.noOfMasses):
-        widths[i] = fitParsTable.column(f"Width {i}")
-        intensities[i] = fitParsTable.column(f"Intensity {i}")
-
-    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
-
-    meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
-    meansTableWS.addColumn(type='float', name="Mass")
-    meansTableWS.addColumn(type='float', name="Mean Widths")
-    meansTableWS.addColumn(type='float', name="Std Widths")
-    meansTableWS.addColumn(type='float', name="Mean Intensities")
-    meansTableWS.addColumn(type='float', name="Std Intensities")
-
-    print("\nCreated Table with means and std:")
-    print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
-    for m, mw, stdw, mi, stdi in zip(ic.masses.astype(float), meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
-        meansTableWS.addRow([m, mw, stdw, mi, stdi])
-        print(f"{m:5.2f}  {mw:10.5f} \u00B1 {stdw:7.5f}  {mi:10.5f} \u00B1 {stdi:7.5f}")
-    print("\n")
-    return meanWidths, meanIntensityRatios
-
-
-def calculateMeansAndStds(widthsIn, intensitiesIn, ic):
-    assert len(widthsIn) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
-    noOfMasses = ic.noOfMasses
-
-    widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
-    intensities = intensitiesIn.copy()
-    # Replace zeros from masked spectra with nans
-    widths[:, ic.maskedDetectorIdx] = np.nan
-    intensities[:, ic.maskedDetectorIdx] = np.nan
-
-    meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-    stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
-
-    # Subtraction row by row
-    widthDeviation = np.abs(widths - meanWidths)
-    # Where True, replace by nan
-    betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
-    betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
-
-    meanWidths = np.nanmean(betterWidths, axis=1)  
-    stdWidths = np.nanstd(betterWidths, axis=1)
-
-    # Not nansum(), to propagate nan
-    normalization = np.sum(betterIntensities, axis=0)
-    intensityRatios = betterIntensities / normalization
-
-    meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
-    stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
-    return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
-    
-
 def arraysFromWS(ws):
     """Output: dataY, dataX and dataE as arrays"""
     dataY = ws.extractY()
@@ -307,8 +163,8 @@ def histToPointData(dataY, dataX, dataE):
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
     
-    dataYp = dataY[:, :-1] #/ histWidths[0, 0]
-    dataEp = dataE[:, :-1] #/ histWidths[0, 0]
+    dataYp = dataY[:, :-1]
+    dataEp = dataE[:, :-1] 
     dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
     return dataYp, dataXp, dataEp
 
@@ -392,6 +248,175 @@ def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
     energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
     ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
     return ySpacesForEachMass
+
+
+def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
+    """Takes dataY as a 2D array and returns the 2D array best fit parameters."""
+
+    arrFitPars = np.zeros((len(dataY), len(ic.initPars)+3))
+    for i in range(len(dataY)):
+
+        specFitPars = fitNcpToSingleSpec(
+            dataY[i],
+            dataE[i],
+            ySpacesForEachMass[i],
+            resolutionPars[i],
+            instrPars[i],
+            kinematicArrays[i],
+            ic
+            ) 
+
+        arrFitPars[i] = specFitPars
+
+        if np.all(specFitPars==0):
+            print("Skipped spectra.")
+        else:
+            print(f"Fitted spectra {int(specFitPars[0]):3}")
+    
+    assert ~np.all(arrFitPars==0), "Either Fits are all zero or assignment of fitting not working"
+    return arrFitPars
+
+
+def createTableWSForFitPars(wsName, noOfMasses, arrFitPars):
+    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Best_Fit_NCP_Parameters")
+    tableWS.setTitle("SCIPY Fit")
+    tableWS.addColumn(type='float', name="Spec Idx")
+    for i in range(int(noOfMasses)):
+        tableWS.addColumn(type='float', name=f"Intensity {i}")
+        tableWS.addColumn(type='float', name=f"Width {i}")
+        tableWS.addColumn(type='float', name=f"Center {i}")
+    tableWS.addColumn(type='float', name="Norm Chi2")
+    tableWS.addColumn(type='float', name="No Iter")
+
+    for row in arrFitPars:    # Pass array onto table ws
+        tableWS.addRow(row)
+    return 
+
+
+def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
+    """Calculates the matrix of NCP from matrix of best fit parameters"""
+
+    allNcpForEachMass = []
+    for i in range(len(arrBestFitPars)):
+
+        ncpForEachMass = calculateNcpRow(
+            arrBestFitPars[i],
+            ySpacesForEachMass[i], 
+            resolutionPars[i], 
+            instrPars[i], 
+            kinematicArrays[i],
+            ic
+            )
+            
+        allNcpForEachMass.append(ncpForEachMass)
+
+    allNcpForEachMass = np.array(allNcpForEachMass)
+    allNcpTotal = np.sum(allNcpForEachMass, axis=1)        
+    return allNcpForEachMass, allNcpTotal
+
+
+def calculateNcpRow(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
+    """input: all row shape
+       output: row shape with the ncpTotal for each mass"""
+
+    if np.all(initPars==0):  
+        return np.zeros(ySpacesForEachMass.shape) 
+    
+    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    return ncpForEachMass
+
+
+def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
+    """Creates workspaces from ncp array data"""
+
+    # Need to rearrage array of yspaces into seperate arrays for each mass
+    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
+
+    # Use ws dataX to match with histogram data
+    dataX = ws.extractX()[:, :-1]
+    assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+
+    # Total ncp workspace
+    ncpTotWs = CreateWorkspace(
+        DataX=dataX.flatten(), 
+        DataY=ncpTotal.flatten(),
+        Nspec=len(dataX), 
+        OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
+    SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
+
+    # Individual ncp workspaces
+    for i, ncp_m in enumerate(ncpForEachMass):
+        ncpMWs = CreateWorkspace(
+            DataX=dataX.flatten(), 
+            DataY=ncp_m.flatten(), 
+            Nspec=len(dataX),
+            OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
+        SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
+
+
+def switchFirstTwoAxis(A):
+    """Exchanges the first two indices of an array A,
+    rearranges matrices per spectrum for iteration of main fitting procedure
+    """
+    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
+
+
+def createMeansAndStdTableWS(wsName, ic):
+    # Extract widths and intensities from tableWorkspace
+    fitParsTable = mtd[wsName+"_Best_Fit_NCP_Parameters"]
+    widths = np.zeros((ic.noOfMasses, fitParsTable.rowCount()))
+    intensities = widths.copy()
+    for i in range(ic.noOfMasses):
+        widths[i] = fitParsTable.column(f"Width {i}")
+        intensities[i] = fitParsTable.column(f"Intensity {i}")
+
+    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
+
+    meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
+    meansTableWS.addColumn(type='float', name="Mass")
+    meansTableWS.addColumn(type='float', name="Mean Widths")
+    meansTableWS.addColumn(type='float', name="Std Widths")
+    meansTableWS.addColumn(type='float', name="Mean Intensities")
+    meansTableWS.addColumn(type='float', name="Std Intensities")
+
+    print("\nCreated Table with means and std:")
+    print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
+    for m, mw, stdw, mi, stdi in zip(ic.masses.astype(float), meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
+        meansTableWS.addRow([m, mw, stdw, mi, stdi])
+        print(f"{m:5.2f}  {mw:10.5f} \u00B1 {stdw:7.5f}  {mi:10.5f} \u00B1 {stdi:7.5f}")
+    print("\n")
+    return meanWidths, meanIntensityRatios
+
+
+def calculateMeansAndStds(widthsIn, intensitiesIn, ic):
+    assert len(widthsIn) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+    noOfMasses = ic.noOfMasses
+
+    widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
+    intensities = intensitiesIn.copy()
+    # Replace zeros from masked spectra with nans
+    widths[:, ic.maskedDetectorIdx] = np.nan
+    intensities[:, ic.maskedDetectorIdx] = np.nan
+
+    meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
+    stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
+
+    # Subtraction row by row
+    widthDeviation = np.abs(widths - meanWidths)
+    # Where True, replace by nan
+    betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+    betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
+
+    meanWidths = np.nanmean(betterWidths, axis=1)  
+    stdWidths = np.nanstd(betterWidths, axis=1)
+
+    # Not nansum(), to propagate nan
+    normalization = np.sum(betterIntensities, axis=0)
+    intensityRatios = betterIntensities / normalization
+
+    meanIntensityRatios = np.nanmean(intensityRatios, axis=1)
+    stdIntensityRatios = np.nanstd(intensityRatios, axis=1)
+    return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
 
 
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
@@ -606,60 +631,6 @@ def numericalThirdDerivative(x, fun):
     derivative[:, 6:-6] = dev
     # Padded with zeros left and right to return array with same shape
     return derivative
-
-
-def calculateNcpRow(initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
-    """input: all row shape
-       output: row shape with the ncpTotal for each mass"""
-
-    if np.all(initPars==0):  
-        return np.zeros(ySpacesForEachMass.shape) 
-    
-    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
-    return ncpForEachMass
-
-
-def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
-    """Creates workspaces from ncp array data"""
-
-    # Need to rearrage array of yspaces into seperate arrays for each mass
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    dataX = ws.extractX()[:, :-1]
-    assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
-
-
-
-    # Original script does not have this step to multiply by histogram widths
-    # histWidths = dataX[:, 1:] - dataX[:, :-1]
-    # assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
-    
-    dataTotNcp = ncpTotal #* histWidths[0, 0]
-    # Also for the individual ncp
-    dataNcpForEachMass = ncpForEachMass #* histWidths[0, 0]
-
-    # Total ncp workspace
-    ncpTotWs = CreateWorkspace(
-        DataX=dataX.flatten(), 
-        DataY=dataTotNcp.flatten(),
-        Nspec=len(dataX), 
-        OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
-    SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
-
-    # Individual ncp workspaces
-    for i, ncp_m in enumerate(dataNcpForEachMass):
-        ncpMWs = CreateWorkspace(
-            DataX=dataX.flatten(), 
-            DataY=ncp_m.flatten(), 
-            Nspec=len(dataX),
-            OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
-        SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
 def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
