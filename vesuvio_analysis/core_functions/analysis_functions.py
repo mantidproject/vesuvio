@@ -391,6 +391,21 @@ def createMeansAndStdTableWS(wsName, ic):
 
 
 def calculateMeansAndStds(widthsIn, intensitiesIn):
+
+    betterWidths, betterIntensities = filterWidthsAndIntensities(widthsIn, intensitiesIn)
+    
+    meanWidths = np.nanmean(betterWidths, axis=1)  
+    stdWidths = np.nanstd(betterWidths, axis=1)
+
+    meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
+    stdIntensityRatios = np.nanstd(betterIntensities, axis=1)
+
+    return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
+
+
+def filterWidthsAndIntensities(widthsIn, intensitiesIn):
+    """Puts nans in places to be ignored"""
+
     widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
     intensities = intensitiesIn.copy()
 
@@ -400,23 +415,16 @@ def calculateMeansAndStds(widthsIn, intensitiesIn):
 
     meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]  
 
-    # Subtraction row by row
     widthDeviation = np.abs(widths - meanWidths)
     stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
 
-    # Where True, replace by nan
+    # Put nan in places where width deviation is bigger than std
     betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
     
     betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
     betterIntensities = betterIntensities / np.sum(betterIntensities, axis=0)   # Not nansum()
 
-    meanWidths = np.nanmean(betterWidths, axis=1)  
-    stdWidths = np.nanstd(betterWidths, axis=1)
-
-    meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
-    stdIntensityRatios = np.nanstd(betterIntensities, axis=1)
-
-    return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
+    return betterWidths, betterIntensities
 
 
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):

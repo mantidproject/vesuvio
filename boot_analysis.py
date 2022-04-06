@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
-from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds
+from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
+
 
 currentPath = Path(__file__).parent.absolute() 
 
@@ -10,24 +11,6 @@ bootData = np.load(bootPath)
 
 bestPars = bootData["boot_samples"][:, :, 1:-2]
 print(bestPars.shape)
-
-
-def histSampleMeans(meanWidths, meanIntensities):
-    print(meanWidths.shape)
-
-    fig, axs = plt.subplots(1, 2)
-    for mode, ax, means in zip(["Widhts", "Intensities"], axs, [meanWidths, meanIntensities]):
-
-        ax.set_title(f"Histogram of Mean {mode}")
-        print(f"\nBootstrap distribution of {mode}: \n")
-        for i, bootHist in enumerate(means):
-
-            leg = f"{mode} {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
-            print(leg)
-            ax.hist(bootHist, 20, histtype="step", label=leg)
-
-        ax.legend()
-    plt.show()
 
 
 def calcBootMeans(bestPars):
@@ -51,6 +34,61 @@ def calcBootMeans(bestPars):
 
     return bootMeanW, bootMeanI, bootStdW, bootStdI
 
+
+def histSampleMeans(meanWidths, meanIntensities):
+    print(meanWidths.shape)
+
+    fig, axs = plt.subplots(1, 2)
+    for mode, ax, means in zip(["Widhts", "Intensities"], axs, [meanWidths, meanIntensities]):
+
+        ax.set_title(f"Histogram of Mean {mode}")
+        print(f"\nBootstrap distribution of {mode}: \n")
+        for i, bootHist in enumerate(means):
+
+            leg = f"{mode} {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
+            print(leg)
+            ax.hist(bootHist, 20, histtype="step", label=leg)
+
+        ax.legend()
+    plt.show()
+
+
+def calcBootWeightAvgMeans(bestPars):
+    """Calculates bootstrap means and std of pars for each spectra and weighted avgs over all spectra."""
+
+    bootMeans = np.mean(bestPars, axis=0)    # Mean of each fit parameter
+    bootStd = np.std(bestPars, axis=0)     # Error on each fit parameter
+
+    widthsM = bootMeans[:, 1::3].T
+    intensitiesM = bootMeans[:, 0::3].T
+
+    print(widthsM.shape)
+    betterWidhtsM, betterIntensitiesM = filterWidthsAndIntensities(widthsM, intensitiesM)
+
+    widthsE = bootStd[:, 1::3].T
+    intensitiesE = bootStd[:, 0::3].T
+
+    print(np.sum(np.isnan(betterWidhtsM)))
+
+    # Ignore results with zero error
+    widthsE[np.isnan(betterWidhtsM) | (widthsE==0)] = np.inf
+    intensitiesE[np.isnan(intensitiesM) | (intensitiesE==0)] = np.inf
+
+    avgMeansW, avgErrorsW = weightedAvg(betterWidhtsM, widthsE)
+    avgMeansI, avgErrorsI = weightedAvg(betterIntensitiesM, intensitiesE)
+    return avgMeansW, avgErrorsW, avgMeansI, avgErrorsI
+
+
+def weightedAvg(means, errors):
+    avgMeans = np.nansum(means/np.square(errors), axis=1) / np.nansum(1/np.square(errors), axis=1)
+    avgErrors = np.sqrt(1 / np.nansum(1/np.square(errors), axis=1))
+    return avgMeans, avgErrors
+
+
+def printResults(arrM, arrE, mode):
+    print(f"\nWeighted avg results for {mode}:\n")
+    for i, (m, e) in enumerate(zip(arrM, arrE)):
+        print(f"{mode} {i}: : {m:>6.3f} \u00B1 {e:<6.3f}")
 
 # def calculateMeanWidhtsAndIntensities(bestPars):
 #     """Replicates means and intensities of original code but with numpy arrays"""
@@ -82,6 +120,7 @@ def calcBootMeans(bestPars):
 
 
 meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bestPars)
+
 # meanW1, meanI1, stdW1, stdI1 = calculateMeanWidhtsAndIntensities(bestPars)
 
 # np.testing.assert_array_almost_equal(meanW0, meanW1)
@@ -91,4 +130,12 @@ meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bestPars)
 # print("Tests passed! Array operations same as original.")
 
 histSampleMeans(meanW0, meanI0)
+
 # histSampleMeans(stdW, stdI)
+
+
+# Results of bootstrap error on each parameter and performing weighted avg
+avgMW, avgEW, avgMI, avgEI = calcBootWeightAvgMeans(bestPars)
+
+printResults(avgMW, avgEW, "Widths")
+printResults(avgMI, avgEI, "Intensities")
