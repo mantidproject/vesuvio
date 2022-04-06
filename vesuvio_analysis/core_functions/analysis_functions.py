@@ -370,6 +370,8 @@ def createMeansAndStdTableWS(wsName, ic):
         widths[i] = fitParsTable.column(f"Width {i}")
         intensities[i] = fitParsTable.column(f"Intensity {i}")
 
+    assert len(widths) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+
     meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities)
 
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
@@ -389,28 +391,14 @@ def createMeansAndStdTableWS(wsName, ic):
 
 
 def calculateMeansAndStds(widthsIn, intensitiesIn):
-    # assert len(widthsIn) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
-    # noOfMasses = ic.noOfMasses
-
-    # assert widthsIn.shape[1] == 1, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
-    # noOfMasses = len(widthsIn)
-
     widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
     intensities = intensitiesIn.copy()
-
-    # # Replace zeros from masked spectra with nans
-    # widths[:, ic.maskedDetectorIdx] = np.nan
-    # intensities[:, ic.maskedDetectorIdx] = np.nan
 
     zeroSpecs = np.all(widths==0, axis=0)   # Catches all failed fits, not just masked spectra
     widths[:, zeroSpecs] = np.nan
     intensities[:, zeroSpecs] = np.nan
 
     meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]  
-    # stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
-
-    # meanWidths = np.nanmean(widths, axis=1).reshape(noOfMasses, 1)  
-    # stdWidths = np.nanstd(widths, axis=1).reshape(noOfMasses, 1)
 
     # Subtraction row by row
     widthDeviation = np.abs(widths - meanWidths)
@@ -424,10 +412,6 @@ def calculateMeansAndStds(widthsIn, intensitiesIn):
 
     meanWidths = np.nanmean(betterWidths, axis=1)  
     stdWidths = np.nanstd(betterWidths, axis=1)
-
-    # # Not nansum(), to propagate nan
-    # norm = np.sum(betterIntensities, axis=0)
-    # intensityRatios = betterIntensities / norm
 
     meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
     stdIntensityRatios = np.nanstd(betterIntensities, axis=1)
