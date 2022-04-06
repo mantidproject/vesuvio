@@ -8,7 +8,8 @@ currentPath = Path(__file__).parent.absolute()
 
 def quickBootstrap(ic, nSamples, savePath):
 
-    wsFinal, fittingResults = runIndependentIterativeProcedure(ic)
+    AnalysisDataService.clear()
+    wsFinal, fittingResults = iterativeFitForDataReduction(ic)
 
     np.random.seed(1)  # Comment this line later on
 

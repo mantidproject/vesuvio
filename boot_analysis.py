@@ -39,7 +39,7 @@ def histSampleMeans(meanWidths, meanIntensities):
 
             leg = f"{mode} {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
             print(leg)
-            ax.hist(bootHist, 20, histtype="step", label=leg)
+            ax.hist(bootHist, 10, histtype="step", label=leg)
 
         ax.legend()
     plt.show()
@@ -112,8 +112,8 @@ def printResults(arrM, arrE, mode):
 
 
 backFlag= True
-quickFlag = False
-nSamples = 5
+quickFlag = True
+nSamples = 20
 
 if backFlag:
     mode = "back"
