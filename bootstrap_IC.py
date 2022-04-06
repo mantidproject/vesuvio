@@ -1,7 +1,7 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, extractNCPFromWorkspaces
 from experiments.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
-from vesuvio_analysis.core_functions.bootstrap import bootstrapAfterProcedure
+from vesuvio_analysis.core_functions.bootstrap import quickBootstrap, slowBootstrap
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
@@ -48,9 +48,6 @@ forwardSavePath, backSavePath, ySpaceFitSavePath = outputPaths
 ipFileBackPath = ipFilesPath / "ip2018_3.par"  
 ipFileFrontPath = ipFilesPath / "ip2018_3.par"  
 
-backBootPath = experimentPath / "back_bootstrap_test.npz"
-frontBootPath = experimentPath / "front_bootstrap_test.npz"
-
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -60,6 +57,9 @@ class GeneralInitialConditions:
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
+    # DO NOT ALTER THESE
+    bootSample = False
+    bootWS = None
 
 class BackwardInitialConditions(GeneralInitialConditions):
 
@@ -89,7 +89,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -179,14 +179,40 @@ bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
 
+
 start_time = time.time()
 # Interactive section 
 
-wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-bootstrapAfterProcedure(fwdIC, wsFinal, forwardScatteringResults, 5, frontBootPath)
+def sortSavePahtsAndIC(backFlag, quickFlag, nSamples):
+    if backFlag:
+        mode = "back"
+        IC = bckwdIC
+    else:
+        mode = "front"
+        IC = fwdIC
 
-# wsFinal, backwardScatteringResults = runIndependentIterativeProcedure(bckwdIC)
-# bootstrapAfterProcedure(bckwdIC, wsFinal, forwardScatteringResults, 5, backBootPath)
+    if quickFlag:
+        speed = "quick"
+    else:
+        speed = "slow"
+
+    filename = "bootstrap_"+speed+"_"+mode+"_"+str(nSamples)+".npz"
+    savePath = experimentPath / filename
+    return savePath, IC
+
+
+backFlag= True
+quickFlag = True
+nSamples = 20
+
+savePath, IC = sortSavePahtsAndIC(backFlag, quickFlag, nSamples)
+quickBootstrap(IC, nSamples, savePath)
+
+quickFlag = False
+
+savePath, IC = sortSavePahtsAndIC(backFlag, quickFlag, nSamples)
+slowBootstrap(IC, nSamples, savePath)
+
 
 # End of iteractive section
 end_time = time.time()

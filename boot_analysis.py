@@ -2,15 +2,7 @@ import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
 from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
-
-
 currentPath = Path(__file__).parent.absolute() 
-
-bootPath = currentPath / "experiments" / "bootstrap_IC" / "back_bootstrap.npz"
-bootData = np.load(bootPath)
-
-bestPars = bootData["boot_samples"][:, :, 1:-2]
-print(bestPars.shape)
 
 
 def calcBootMeans(bestPars):
@@ -119,23 +111,60 @@ def printResults(arrM, arrE, mode):
 #     return meanWidths.T, meanIntensities.T, stdWidths.T, stdIntensities.T
 
 
+backFlag= True
+quickFlag = False
+nSamples = 5
+
+if backFlag:
+    mode = "back"
+else:
+    mode = "front"
+if quickFlag:
+    speed = "quick"
+else:
+    speed = "slow"
+
+filename = "bootstrap_"+speed+"_"+mode+"_"+str(nSamples)+".npz"
+bootPath = currentPath / "experiments" / "bootstrap_IC" / filename
+bootData = np.load(bootPath)
+bestPars = bootData["boot_samples"][:, :, 1:-2]
+print(bestPars.shape)
+
+
 meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bestPars)
-
-# meanW1, meanI1, stdW1, stdI1 = calculateMeanWidhtsAndIntensities(bestPars)
-
-# np.testing.assert_array_almost_equal(meanW0, meanW1)
-# np.testing.assert_array_almost_equal(meanI0, meanI1)
-# np.testing.assert_array_almost_equal(stdW0, stdW1)
-# np.testing.assert_array_almost_equal(stdI0, stdI1)
-# print("Tests passed! Array operations same as original.")
-
 histSampleMeans(meanW0, meanI0)
-
-# histSampleMeans(stdW, stdI)
-
 
 # Results of bootstrap error on each parameter and performing weighted avg
 avgMW, avgEW, avgMI, avgEI = calcBootWeightAvgMeans(bestPars)
-
 printResults(avgMW, avgEW, "Widths")
 printResults(avgMI, avgEI, "Intensities")
+
+
+
+# def calculateMeanWidhtsAndIntensities(bestPars):
+#     """Replicates means and intensities of original code but with numpy arrays"""
+
+#     widths = bestPars[:, :, 1::3]
+#     intensities = bestPars[:, :, 0::3]
+
+#     maskSpec = np.all(widths==0, axis=2)
+#     widths[maskSpec] = np.nan     # (100, 132, 3)
+#     intensities[maskSpec] = np.nan
+
+#     meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis, :]      # (100, 1, 3)
+#     stdWidths = np.std(widths, axis=1)[:, np.newaxis, :]
+
+#     widthDev = np.abs(widths - meanWidths)
+#     betterWidths = np.where(widthDev > stdWidths, np.nan, widths)
+#     betterIntensities = np.where(widthDev > stdWidths, np.nan, intensities)
+
+#     meanWidths = np.nanmean(betterWidths, axis=1)
+
+#     normIntensities = np.sum(betterIntensities, axis=2)[:, :, np.newaxis]  # (100, 132, 1)
+#     betterIntensities = betterIntensities / normIntensities
+#     meanIntensities = np.nanmean(betterIntensities, axis=1)
+
+#     stdWidths = np.nanstd(betterWidths, axis=1)
+#     stdIntensities = np.nanstd(betterIntensities, axis=1)
+
+#     return meanWidths.T, meanIntensities.T, stdWidths.T, stdIntensities.T
