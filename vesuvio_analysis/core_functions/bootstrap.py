@@ -103,7 +103,7 @@ def slowBootstrap(ic, nSamples, savePath):
 
         # Save result at each iteration in case of failure for long runs
         np.savez(savePath, boot_samples=bootSamples, parent_result=parentResult)
-        AnalysisDataService.clear()
+        AnalysisDataService.clear()    # Clear all ws
 
 
 

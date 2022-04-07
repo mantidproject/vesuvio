@@ -1,3 +1,5 @@
+from turtle import speed
+from matplotlib import projections
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
@@ -28,7 +30,6 @@ def calcBootMeans(bestPars):
 
 
 def histSampleMeans(meanWidths, meanIntensities):
-    print(meanWidths.shape)
 
     fig, axs = plt.subplots(1, 2)
     for mode, ax, means in zip(["Widhts", "Intensities"], axs, [meanWidths, meanIntensities]):
@@ -43,6 +44,17 @@ def histSampleMeans(meanWidths, meanIntensities):
 
         ax.legend()
     plt.show()
+
+
+def plot3DRows(rows):
+    fig= plt.figure()
+    ax = fig.add_subplot(projection="3d")
+    ax.scatter(rows[0], rows[1], rows[2])
+    ax.set_xlabel("0")
+    ax.set_ylabel("1")
+    ax.set_zlabel("2")
+    plt.show()
+
 
 
 def calcBootWeightAvgMeans(bestPars):
@@ -78,9 +90,9 @@ def weightedAvg(means, errors):
 
 
 def printResults(arrM, arrE, mode):
-    print(f"\nWeighted avg results for {mode}:\n")
+    print(f"\n{mode}:\n")
     for i, (m, e) in enumerate(zip(arrM, arrE)):
-        print(f"{mode} {i}: : {m:>6.3f} \u00B1 {e:<6.3f}")
+        print(f"{mode} {i}: {m:>6.3f} \u00B1 {e:<6.3f}")
 
 # def calculateMeanWidhtsAndIntensities(bestPars):
 #     """Replicates means and intensities of original code but with numpy arrays"""
@@ -111,33 +123,52 @@ def printResults(arrM, arrE, mode):
 #     return meanWidths.T, meanIntensities.T, stdWidths.T, stdIntensities.T
 
 
+def extractData(backFlag, quickFlag, nSamples):
+    if backFlag:
+        mode = "back"
+    else:
+        mode = "front"
+    if quickFlag:
+        speed = "quick"
+    else:
+        speed = "slow"
+
+    filename = "bootstrap_"+speed+"_"+mode+"_"+str(nSamples)+".npz"
+    bootPath = currentPath / "experiments" / "bootstrap_IC" / filename
+    bootData = np.load(bootPath)
+    bestPars = bootData["boot_samples"][:, :, 1:-2]
+    parentPars = bootData["parent_result"][:, 1:-2]
+    return bestPars, parentPars
+
+
 backFlag= True
-quickFlag = True
 nSamples = 20
 
-if backFlag:
-    mode = "back"
-else:
-    mode = "front"
-if quickFlag:
-    speed = "quick"
-else:
-    speed = "slow"
+bestParsQuick, parentParsQuick = extractData(backFlag, True, nSamples)
+bestParsSlow, parentParsSlow = extractData(backFlag, False, nSamples)
 
-filename = "bootstrap_"+speed+"_"+mode+"_"+str(nSamples)+".npz"
-bootPath = currentPath / "experiments" / "bootstrap_IC" / filename
-bootData = np.load(bootPath)
-bestPars = bootData["boot_samples"][:, :, 1:-2]
-print(bestPars.shape)
+np.testing.assert_array_almost_equal(parentParsQuick, parentParsSlow)
 
 
-meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bestPars)
-histSampleMeans(meanW0, meanI0)
+meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentParsSlow[np.newaxis, :, :])
+print(f"\nExperimental Sample results:\n")
+printResults(meanWp.flatten(), stdWp.flatten(), "Widths Parent")
+printResults(meanIp.flatten(), stdIp.flatten(), "Intensities Parent")
+
+for bestPars, runSpeed in zip([bestParsQuick, bestParsSlow], ["QUICK", "SLOW"]):
+    print(f"\n{runSpeed}\n")
+    meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bestPars)
+    histSampleMeans(meanW0, meanI0)
+    plot3DRows(meanW0)
+
 
 # Results of bootstrap error on each parameter and performing weighted avg
-avgMW, avgEW, avgMI, avgEI = calcBootWeightAvgMeans(bestPars)
-printResults(avgMW, avgEW, "Widths")
-printResults(avgMI, avgEI, "Intensities")
+weightedAvgFlag = False
+if weightedAvgFlag:
+    avgMW, avgEW, avgMI, avgEI = calcBootWeightAvgMeans(bestPars)
+    print(f"\nWeighted avg results:\n")
+    printResults(avgMW, avgEW, "Widths")
+    printResults(avgMI, avgEI, "Intensities")
 
 
 
