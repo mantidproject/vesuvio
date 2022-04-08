@@ -6,7 +6,15 @@ from mantid.simpleapi import CloneWorkspace, SaveNexus, Load
 from pathlib import Path
 currentPath = Path(__file__).parent.absolute()
 
-def quickBootstrap(ic, nSamples, savePath):
+
+def runBootstrap(ic, bootIC):
+    if bootIC.speedQuick:
+        quickBootstrap(ic, bootIC.nSamples)
+    else:
+        slowBootstrap(ic, bootIC.nSamples)
+
+
+def quickBootstrap(ic, nSamples):
 
     AnalysisDataService.clear()
     wsFinal, fittingResults = iterativeFitForDataReduction(ic)
@@ -35,7 +43,7 @@ def quickBootstrap(ic, nSamples, savePath):
 
         bootSamples[j] = arrFitPars
 
-    np.savez(savePath, boot_samples=bootSamples, parent_result=parentResult)
+    np.savez(ic.bootSavePath, boot_samples=bootSamples, parent_result=parentResult)
 
 
 def bootstrapResiduals(residuals):
@@ -49,7 +57,7 @@ def bootstrapResiduals(residuals):
     return bootRes
 
 
-def slowBootstrap(ic, nSamples, savePath):
+def slowBootstrap(ic, nSamples):
     """Runs bootstrap of full procedure (with MS corrections)"""
 
     ic.bootSample = False
@@ -102,7 +110,7 @@ def slowBootstrap(ic, nSamples, savePath):
         bootSamples[j] = scatResultsBoot.all_spec_best_par_chi_nit[-1]
 
         # Save result at each iteration in case of failure for long runs
-        np.savez(savePath, boot_samples=bootSamples, parent_result=parentResult)
+        np.savez(ic.bootSavePath, boot_samples=bootSamples, parent_result=parentResult)
         AnalysisDataService.clear()    # Clear all ws
 
 

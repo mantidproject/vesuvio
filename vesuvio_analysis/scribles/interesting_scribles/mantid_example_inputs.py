@@ -17,7 +17,7 @@ from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
 
 # These imports deal with input-output data directories and with the loading of workspaces
-from experiments.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
+from vesuvio_analysis.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
 from pathlib import Path
 
 # Other useful imports

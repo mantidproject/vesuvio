@@ -1,11 +1,13 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, extractNCPFromWorkspaces
-from experiments.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
-from vesuvio_analysis.core_functions.bootstrap import quickBootstrap, slowBootstrap
+# from vesuvio_analysis.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
+from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
 from pathlib import Path
+
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
@@ -28,27 +30,6 @@ class LoadVesuvioFrontParameters:
     ipfile=str(ipFilesPath / "ip2018_3.par") 
 
 
-wspBack = LoadVesuvioBackParameters
-wspFront = LoadVesuvioFrontParameters
-
-
-# Check if directories of input ws exist
-inputWSPath, inputPaths, outputPaths = IODirectoriesForSample(scriptName)
-
-# If input ws are not detected, load locally with Mantid
-if all(path==None for path in inputPaths):
-    loadWsFromLoadVesuvio(wspBack, inputWSPath, scriptName)
-    loadWsFromLoadVesuvio(wspFront, inputWSPath, scriptName)
-    inputWSPath, inputPaths, outputPaths = IODirectoriesForSample(scriptName)
-    assert any(path!=None for path in inputPaths), "Automatic loading of workspaces failed, usage: scriptName_raw_backward.nxs"
-
-# Extract all required input and output paths
-backWsRawPath, frontWsRawPath, backWsEmptyPath, frontWsEmptyPath = inputPaths
-forwardSavePath, backSavePath, ySpaceFitSavePath = outputPaths
-ipFileBackPath = ipFilesPath / "ip2018_3.par"  
-ipFileFrontPath = ipFilesPath / "ip2018_3.par"  
-
-
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
     
@@ -57,24 +38,15 @@ class GeneralInitialConditions:
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
-    # DO NOT ALTER THESE
-    bootSample = False
-    bootWS = None
 
 class BackwardInitialConditions(GeneralInitialConditions):
-
-    modeRunning = "BACKWARD"
-
-    resultsSavePath = backSavePath
-    userWsRawPath = str(backWsRawPath)
-    userWsEmptyPath = str(backWsEmptyPath)
-    InstrParsPath = ipFileBackPath
+    InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
-    noOfMasses = len(masses)
+    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers   
@@ -89,7 +61,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -102,28 +74,13 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # # Parameters of workspaces in input_ws
     tof_binning='275.,1.,420'                    # Binning of ToF spectra
 
-    # Parameters below are not to be changed
-    name = scriptName+"_"+modeRunning+"_"
-    mode = wspBack.mode
-
-    # Masked spectra between first and last spectrum
-    maskedSpecNo = maskedSpecAllNo[
-        (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
-    ]
-    maskedDetectorIdx = maskedSpecNo - firstSpec
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-
-    modeRunning = "FORWARD"  # Used to control MS correction
-
-    resultsSavePath = forwardSavePath
-    userWsRawPath = str(frontWsRawPath)
-    userWsEmptyPath = str(frontWsEmptyPath)
-    InstrParsPath = ipFileFrontPath
+    InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 12, 16, 27]) 
-    noOfMasses = len(masses)
+    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
@@ -140,7 +97,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 2   #4
     firstSpec = 144   #144
     lastSpec = 154    #182
 
@@ -150,22 +107,12 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,10.,430"                 # Binning of ToF spectra
+    tof_binning="110,1,430"                 # Binning of ToF spectra
  
-    # Parameters below are not to be changed
-    name = scriptName+"_"+modeRunning+"_"
-    mode = wspFront.mode
-
-    # Consider only the masked spectra between first and last spectrum
-    maskedSpecNo = maskedSpecAllNo[
-        (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
-    ]
-    maskedDetectorIdx = maskedSpecNo - firstSpec
-
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions(ForwardInitialConditions):
-    ySpaceFitSavePath = ySpaceFitSavePath
+    # ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
@@ -173,45 +120,34 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4
-   
+
+
+class bootstrapInitialConditions:
+    speedQuick = False
+    nSamples = 3
+
+
+icWSBack = LoadVesuvioBackParameters
+icWSFront = LoadVesuvioFrontParameters  
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
 
+bootIC = bootstrapInitialConditions
+
+completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
+completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
+
 
 start_time = time.time()
 # Interactive section 
 
-def sortSavePahtsAndIC(backFlag, quickFlag, nSamples):
-    if backFlag:
-        mode = "back"
-        IC = bckwdIC
-    else:
-        mode = "front"
-        IC = fwdIC
+runIndependentIterativeProcedure(bckwdIC)
 
-    if quickFlag:
-        speed = "quick"
-    else:
-        speed = "slow"
-
-    filename = "bootstrap_"+speed+"_"+mode+"_"+str(nSamples)+".npz"
-    savePath = experimentPath / filename
-    return savePath, IC
-
-
-backFlag= True
-quickFlag = True
-nSamples = 20
-
-savePath, IC = sortSavePahtsAndIC(backFlag, quickFlag, nSamples)
-quickBootstrap(IC, nSamples, savePath)
-
-quickFlag = False
-
-savePath, IC = sortSavePahtsAndIC(backFlag, quickFlag, nSamples)
-slowBootstrap(IC, nSamples, savePath)
+# runBootstrap(bckwdIC, bootIC)
+# bootIC.speedQuick = False
+# runBootstrap(bckwdIC, bootIC)
 
 
 # End of iteractive section

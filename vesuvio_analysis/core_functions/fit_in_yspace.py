@@ -812,7 +812,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
             for i, (A, x0) in enumerate(zip(pars[3::2], pars[4::2])):
                 joinedGC[i*x.size : (i+1)*x.size] = model(x, *sharedPars, A, x0)
             
-            assert np.all(joinedGC!=0), f"Args where zero: {np.argwhere(joinedGC==0)}"
+            # assert np.all(joinedGC!=0), f"Args where zero: {np.argwhere(joinedGC==0)}"
      
             return joinedGC
 
