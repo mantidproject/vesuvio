@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, extractNCPFromWorkspaces, runIndependentIterativeProcedure
-from vesuvio_analysis.directories_helpers import IODirectoriesForSample, loadWsFromLoadVesuvio
+from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
@@ -27,28 +27,6 @@ class LoadVesuvioFrontParameters:
     ipfile=str(ipFilesPath / "ip2018_3.par") 
 
 
-wspBack = LoadVesuvioBackParameters
-wspFront = LoadVesuvioFrontParameters
-
-
-# Check if directories of input ws exist
-inputWSPath, inputPaths, outputPaths = IODirectoriesForSample(scriptName)
-
-# If input ws are not detected, load locally with Mantid
-if all(path==None for path in inputPaths):
-    loadWsFromLoadVesuvio(wspBack, inputWSPath, scriptName)
-    loadWsFromLoadVesuvio(wspFront, inputWSPath, scriptName)
-    inputWSPath, inputPaths, outputPaths = IODirectoriesForSample(scriptName)
-    assert any(path!=None for path in inputPaths), "Automatic loading of workspaces failed, usage: scriptName_raw_backward.nxs"
-
-
-# Extract all required input and output paths
-backWsRawPath, frontWsRawPath, backWsEmptyPath, frontWsEmptyPath = inputPaths
-forwardSavePath, backSavePath, ySpaceFitSavePath = outputPaths
-ipFileBackPath = ipFilesPath / "ip2018_3.par"  
-ipFileFrontPath = ipFilesPath / "ip2018_3.par"  
-
-
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
     
@@ -59,19 +37,13 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-
-    modeRunning = "BACKWARD"
-
-    resultsSavePath = backSavePath
-    userWsRawPath = str(backWsRawPath)
-    userWsEmptyPath = str(backWsEmptyPath)
-    InstrParsPath = ipFileBackPath
+    InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = None   # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015, 12, 14, 27])
-    noOfMasses = len(masses)
+    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers   
@@ -101,30 +73,14 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # # Parameters of workspaces in input_ws
     tof_binning='275.,1.,420'                    # Binning of ToF spectra
 
-    # Parameters below are not to be changed
-    name = scriptName+"_"+modeRunning+"_"
-    mode = wspBack.mode
-
-    # Masked spectra between first and last spectrum
-    maskedSpecNo = maskedSpecAllNo[
-        (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
-    ]
-    maskedDetectorIdx = maskedSpecNo - firstSpec
-
 
 class ForwardInitialConditions(GeneralInitialConditions):
-
-    modeRunning = "FORWARD"  # Used to control MS correction
-
-    resultsSavePath = forwardSavePath
-    userWsRawPath = str(frontWsRawPath)
-    userWsEmptyPath = str(frontWsEmptyPath)
-    InstrParsPath = ipFileFrontPath
+    InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     # HToMass0Ratio = None
 
     masses = np.array([2.015, 12, 14, 27]) 
-    noOfMasses = len(masses)
+    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
@@ -153,20 +109,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     tof_binning="110,1.,430"                 # Binning of ToF spectra
  
-    # Parameters below are not to be changed
-    name = scriptName+"_"+modeRunning+"_"
-    mode = wspFront.mode
-
-    # Consider only the masked spectra between first and last spectrum
-    maskedSpecNo = maskedSpecAllNo[
-        (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
-    ]
-    maskedDetectorIdx = maskedSpecNo - firstSpec
-
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions(ForwardInitialConditions):
-    ySpaceFitSavePath = ySpaceFitSavePath
+    # ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-40, 0.5, 40"    # Needs to be symetric
@@ -175,30 +121,42 @@ class YSpaceFitInitialConditions(ForwardInitialConditions):
     forceManualMinos = False
     nGlobalFitGroups = 4   
 
+
+class bootstrapInitialConditions:
+    speedQuick = False
+    nSamples = 3
+
+
+icWSBack = LoadVesuvioBackParameters
+icWSFront = LoadVesuvioFrontParameters  
+
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
+
+bootIC = bootstrapInitialConditions
+
+completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
+completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
 
 
 start_time = time.time()
 # Start of interactive section 
 
-# wsName = "DHMT_300K_RD_forward_0"
-# if wsName in mtd:
-#     wsFinal = mtd["DHMT_300K_RD_forward_0"]
-#     allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
-# else:
-#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-#     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-#     allNCP = lastIterationNCP
-# 
-# assert ~np.all(allNCP==0), "NCP extraction not working!"
-# 
-# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-# fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+wsName = f"{fwdIC.name}{fwdIC.noOfMSIterations-1}"   #"DHMT_300K_RD_forward_"+str(fwdIC.noOfMSIterations-1)
+if wsName in mtd:
+    wsFinal = mtd[wsName]
+    allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
+else:
+    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
+    allNCP = lastIterationNCP
 
-wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-# wsFinal, forwardScatteringResults = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+assert ~np.all(allNCP==0), "NCP extraction not working!"
+
+print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+
 
 # End of iteractive section
 end_time = time.time()
