@@ -76,14 +76,6 @@ def createTableInitialParameters(ic):
         print(f"{'Initial Center:':>20s} {inc:<8.3f} Bounds: {bc}")
     print("\n")    
 
-# def loadVesuvioDataWorkspaces(ic):
-#     """Loads raw and empty workspaces from either LoadVesuvio or user specified path"""
-#     # if ic.loadWsFromUserPathFlag:
-#     wsToBeFitted =  loadRawAndEmptyWsFromUserPath(ic)
-#     # else:
-#     #     wsToBeFitted = loadRawAndEmptyWsFromLoadVesuvio(ic)
-#     return wsToBeFitted
-
 
 def loadRawAndEmptyWsFromUserPath(ic):
 

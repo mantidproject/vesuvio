@@ -100,15 +100,22 @@ def setOutputDirsForSample(ic, sampleName, bootIC):
     else:
         speed = "slow"
 
-    bootOutPath = experimentsPath / sampleName / "bootstrap_data" / speed
+    bootOutPath = experimentsPath / sampleName / "bootstrap_data"
 
     if not bootOutPath.exists():
         bootOutPath.mkdir(parents=True)
+        quickPath = bootOutPath / "quick"
+        slowPath = bootOutPath / "slow"
+
+        quickPath.mkdir(parents=True)
+        slowPath.mkdir(parents=True)
+    
 
     bootName = fileName + f"_nsampl_{bootIC.nSamples}"
     bootNameZ = bootName + ".npz"
 
-    ic.bootSavePath = bootOutPath / bootNameZ
+    ic.bootQuickSavePath = bootOutPath / "quick" / bootNameZ
+    ic.bootSlowSavePath = bootOutPath / "slow" / bootNameZ
     return
 
 

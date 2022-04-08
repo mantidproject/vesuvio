@@ -43,7 +43,7 @@ def quickBootstrap(ic, nSamples):
 
         bootSamples[j] = arrFitPars
 
-    np.savez(ic.bootSavePath, boot_samples=bootSamples, parent_result=parentResult)
+    np.savez(ic.bootQuickSavePath, boot_samples=bootSamples, parent_result=parentResult)
 
 
 def bootstrapResiduals(residuals):
@@ -110,7 +110,7 @@ def slowBootstrap(ic, nSamples):
         bootSamples[j] = scatResultsBoot.all_spec_best_par_chi_nit[-1]
 
         # Save result at each iteration in case of failure for long runs
-        np.savez(ic.bootSavePath, boot_samples=bootSamples, parent_result=parentResult)
+        np.savez(ic.bootSlowSavePath, boot_samples=bootSamples, parent_result=parentResult)
         AnalysisDataService.clear()    # Clear all ws
 
 
