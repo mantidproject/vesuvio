@@ -1,5 +1,6 @@
 
 from ..core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
+from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np
 import numpy.testing as nptest
@@ -11,10 +12,15 @@ ipFilesPath = Path(__file__).absolute().parent.parent / "ip_files"
 ipFilePath = ipFilesPath / "ip2018_3.par"  
 
 testPath = Path(__file__).absolute().parent 
-forwardSavePath = testPath / "output_from_tests" / "output_analysis.npz"
 
-frontWsEmptyPath = None
-frontWsRawPath = testPath / "starch_80_RD_raw_forward.nxs"
+
+class LoadVesuvioFrontParameters:
+    runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
+    empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+    spectra='144-182'                        # Spectra to be analysed
+    mode='SingleDifference'
+    ipfile=str(ipFilesPath / "ip2018_3.par") 
+
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -27,15 +33,10 @@ class GeneralInitialConditions:
 
 class ForwardInitialConditions(GeneralInitialConditions):
 
-    modeRunning = "FORWARD"  # Used to control MS correction
-
-    resultsSavePath = forwardSavePath
-    userWsRawPath = str(frontWsRawPath)
-    userWsEmptyPath = str(frontWsEmptyPath)
     InstrParsPath = ipFilePath
 
     masses = np.array([1.0079, 12, 16, 27]) 
-    noOfMasses = len(masses)
+    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
@@ -62,31 +63,27 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    name = "starch_80_RD_forward"
-    # runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
-    # empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-    # spectra='144-182'                        # Spectra to be analysed
     tof_binning="110,1.,430"                 # Binning of ToF spectra
-    mode='SingleDifference'
-    # # ipfile='./ip2018_3.par'
-
-    # Parameters below are not to be changed
-
-    # Consider only the masked spectra between first and last spectrum
-    maskedSpecNo = maskedSpecAllNo[
-        (maskedSpecAllNo >= firstSpec) & (maskedSpecAllNo <= lastSpec)
-    ]
-    maskedDetectorIdx = maskedSpecNo - firstSpec
 
 
+class bootstrapInitialConditions:
+    speedQuick = None
+    nSamples = None
+
+
+icWSFront = LoadVesuvioFrontParameters
 fwdIC = ForwardInitialConditions
+wsBootIC = bootstrapInitialConditions
+
+completeICFromInputs(fwdIC, "tests", icWSFront, wsBootIC)
+
 
 wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
 
 # Test the results
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
-oriPath = testPath / "stored_analysis.npz"
+oriPath = testPath / "stored_analysis.npz"   # Original data
 storedResults = np.load(oriPath)
 currentResults = forwardScatteringResults
 
