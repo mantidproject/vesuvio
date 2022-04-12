@@ -1,5 +1,4 @@
-from turtle import speed
-from matplotlib import projections
+
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
