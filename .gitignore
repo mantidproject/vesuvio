@@ -1,4 +1,4 @@
 # Ignore cache files
 __pycache__/
 *.py[cod]
-output_npz_for_testing/
+# output_npz_for_testing/

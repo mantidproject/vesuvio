@@ -45,10 +45,14 @@ def inputDirsForSample(ic, sampleName, icWS):
     wsPresent = False
     for wsPath in inputWSPath.iterdir():
         keywords = wsPath.name.split(".")[0].split("_")
-        keywordsSearch = ["raw", "empty", "backward", "forward"]
+
+        if ic.modeRunning == "BACKWARD":
+            modeName = "backward"
+        else:
+            modeName = "forward"
 
         for key in keywords:
-            if key in keywordsSearch:
+            if key == modeName:
                 wsPresent = True
 
     if not wsPresent:
