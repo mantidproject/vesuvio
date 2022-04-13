@@ -143,17 +143,17 @@ def setInitFwdParsFromBackResultsAndHRatio(backScatteringResults, HToMass0Ratio,
     return    # Changes were implemented of fwdIC object
 
  
-def extractNCPFromWorkspaces(wsFinal):
-    """Extra function to extract ncps from loaded ws in mantid."""
+# def extractNCPFromWorkspaces(wsFinal):
+#     """Extra function to extract ncps from loaded ws in mantid."""
 
-    allNCP = mtd[wsFinal.name()+"_TOF_Fitted_Profile_0"].extractY()[np.newaxis, :, :]
-    i = 1
-    while True:   # By default, looks for all ncp ws until it breaks
-        try:
-            ncpToAppend = mtd[wsFinal.name()+"_TOF_Fitted_Profile_" + str(i)].extractY()[np.newaxis, :, :]
-            allNCP = np.append(allNCP, ncpToAppend, axis=0)
-            i += 1
-        except KeyError:
-            break
-    allNCP = switchFirstTwoAxis(allNCP)
-    return allNCP
+#     allNCP = mtd[wsFinal.name()+"_TOF_Fitted_Profile_0"].extractY()[np.newaxis, :, :]
+#     i = 1
+#     while True:   # By default, looks for all ncp ws until it breaks
+#         try:
+#             ncpToAppend = mtd[wsFinal.name()+"_TOF_Fitted_Profile_" + str(i)].extractY()[np.newaxis, :, :]
+#             allNCP = np.append(allNCP, ncpToAppend, axis=0)
+#             i += 1
+#         except KeyError:
+#             break
+#     allNCP = switchFirstTwoAxis(allNCP)
+#     return allNCP

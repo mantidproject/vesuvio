@@ -11,37 +11,55 @@ import time
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
+def fitInYSpaceProcedure(yFitIC, ic, wsFinal):
 
-def fitInYSpaceProcedure(ic, wsFinal, ncpForEachMass):
+    ncpForEachMass = extractNCPFromWorkspaces(wsFinal, ic)
+
     firstMass = ic.masses[0]
-    wsResSum, wsRes = calculateMantidResolution(ic, wsFinal, firstMass)
+    wsResSum, wsRes = calculateMantidResolution(ic, yFitIC, wsFinal, firstMass)
     
     wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
-    wsYSpace, wsQ = convertToYSpace(ic.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
+    wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
-    if ic.symmetrisationFlag:
+    if yFitIC.symmetrisationFlag:
         wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
 
-    fitProfileMinuit(ic, wsYSpaceAvg, wsResSum)
-    fitProfileMantidFit(ic, wsYSpaceAvg, wsResSum)
+    fitProfileMinuit(yFitIC, wsYSpaceAvg, wsResSum)
+    fitProfileMantidFit(yFitIC, wsYSpaceAvg, wsResSum)
     
     printYSpaceFitResults(wsYSpaceAvg.name())
 
-    yfitResults = ResultsYFitObject(ic, wsFinal.name())
+    yfitResults = ResultsYFitObject(ic, yFitIC, wsFinal.name())
     yfitResults.save()
 
-    if ic.globalFitFlag:
+    if yFitIC.globalFitFlag:
         # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
-        fitMinuitGlobalFit(wsYSpace, wsRes, ic)
+        fitMinuitGlobalFit(wsYSpace, wsRes, ic, yFitIC)
     
     return yfitResults
 
-def calculateMantidResolution(ic, ws, mass):
+
+def extractNCPFromWorkspaces(wsFinal, ic):
+    """Extra function to extract ncps from loaded ws in mantid."""
+
+    ncpForEachMass = mtd[wsFinal.name()+"_TOF_Fitted_Profile_0"].extractY()[np.newaxis, :, :]
+    for i in range(1, ic.noOfMasses):
+        ncpToAppend = mtd[wsFinal.name()+"_TOF_Fitted_Profile_" + str(i)].extractY()[np.newaxis, :, :]
+        ncpForEachMass = np.append(ncpForEachMass, ncpToAppend, axis=0)    
+
+    assert ncpForEachMass.shape == (ic.noOfMasses, wsFinal.getNumberHistograms(), wsFinal.blocksize()-1), "Extracted NCP not in correct shape."
+    
+    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)  # Organizes ncp by spectra
+    print(f"\nExtracted NCP profiles from workspaces.\n")
+    return ncpForEachMass
+
+
+def calculateMantidResolution(ic, yFitIC, ws, mass):
     resName = ws.name()+"_Resolution"
     for index in range(ws.getNumberHistograms()):
         VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
-        Rebin(InputWorkspace="tmp", Params=ic.rebinParametersForYSpaceFit, OutputWorkspace="tmp")
+        Rebin(InputWorkspace="tmp", Params=yFitIC.rebinParametersForYSpaceFit, OutputWorkspace="tmp")
 
         if index == 0:   # Ensures that workspace has desired units
             RenameWorkspace("tmp",  resName)
@@ -83,6 +101,8 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
 
      # Mask spectra again, to be seen as masked from Mantid's perspective
     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
+
+    SumSpectra(InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name()+"_Sum")
 
     if np.any(np.isnan(wsSubMass.extractY())):
         raise ValueError("The workspace for the isolated first mass countains NaNs in non-masked spectra, might cause problems!")
@@ -216,7 +236,7 @@ def symmetrizeArr(dataYOri, dataEOri):
     return dataYSym, dataESym
 
 
-def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
+def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     #TODO: Try out with point data
     dataY = wsYSpaceSym.extractY()[0]
     dataX = wsYSpaceSym.extractX()[0]
@@ -225,7 +245,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     resY = wsRes.extractY()[0]
     resX = wsRes. extractX()[0]
 
-    if ic.singleGaussFitToHProfile:
+    if yFitIC.singleGaussFitToHProfile:
         def model(x, y0, A, x0, sigma):
             return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
@@ -262,7 +282,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     m.limits["A"] = (0, None)
 
     m.simplex()
-    if ic.singleGaussFitToHProfile:
+    if yFitIC.singleGaussFitToHProfile:
         m.migrad()
     else:
         def constrFunc(*pars):
@@ -333,7 +353,7 @@ def fitProfileMinuit(ic, wsYSpaceSym, wsRes):
     # fValsMin = m.fval
 
     try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
-        if ic.forceManualMinos:
+        if yFitIC.forceManualMinos:
             try:
                 constrFunc(*m.values)      # Check if constraint is present
                 raise(RuntimeError)        # If so, jump to Manual MINOS
@@ -384,13 +404,13 @@ def chooseXDense(x, res, flag=True):
 
 
 
-def fitProfileMantidFit(ic, wsYSpaceSym, wsRes):
+def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     print('\nFitting on the sum of spectra in the West domain ...\n')     
     for minimizer in ['Levenberg-Marquardt','Simplex']:
         outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
-        if ic.singleGaussFitToHProfile:
+        if yFitIC.singleGaussFitToHProfile:
             function=f"""composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
@@ -583,11 +603,11 @@ def printYSpaceFitResults(wsJoYName):
 
 class ResultsYFitObject:
 
-    def __init__(self, ic, wsFinalName):
+    def __init__(self, ic, yFitIC, wsFinalName):
         # Extract most relevant information from ws
         wsFinal = mtd[wsFinalName]
         wsMass0 = mtd[wsFinalName + "_Mass0"]
-        if ic.symmetrisationFlag:
+        if yFitIC.symmetrisationFlag:
             wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg_Symmetrised"]
         else:
             wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg"]
@@ -615,7 +635,7 @@ class ResultsYFitObject:
         self.perr = perr
 
         self.savePath = ic.ySpaceFitSavePath
-        self.singleGaussFitToHProfile = ic.singleGaussFitToHProfile
+        self.singleGaussFitToHProfile = yFitIC.singleGaussFitToHProfile
 
 
     def save(self):
@@ -757,18 +777,18 @@ def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirst
 
 # ------ Global Fit Minuit Procedure
 
-def fitMinuitGlobalFit(ws, wsRes, ic):
+def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, ic)   
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
-    idxList = groupDetectors(instrPars, ic.nGlobalFitGroups)
+    idxList = groupDetectors(instrPars, yFitIC.nGlobalFitGroups)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
-    if ic.symmetrisationFlag:  
+    if yFitIC.symmetrisationFlag:  
         dataY, dataE = symmetrizeArr(dataY, dataE)
 
-    model, defaultPars, sharedPars = selectModelAndPars(ic.singleGaussFitToHProfile)   
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)   
     
     print("\nShared Parameters: ", [key for key in sharedPars])
     print("\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars])
@@ -790,7 +810,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic):
         m.limits["A"+str(i)] = (0, np.inf)
 
     t0 = time.time()
-    if ic.singleGaussFitToHProfile:
+    if yFitIC.singleGaussFitToHProfile:
 
         m.simplex()
         m.migrad() 

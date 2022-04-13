@@ -91,13 +91,14 @@ completeICFromInputs(fwdIC, "tests", icWSFront, wsBootIC)
 
 AnalysisDataService.clear()
 
-wsPath = testPath / "ws_test_yspace_fit.nxs"
-wsFinal = Load(str(wsPath))
+wsFinal = Load(str(testPath / "wsFinal.nxs"))
+for i in range(fwdIC.noOfMasses):
+    fileName = "wsFinal_ncp_"+str(i)+".nxs"
+    Load(str(testPath / fileName), 
+        OutputWorkspace=wsFinal.name()+"_TOF_Fitted_Profile_"+str(i))
 
-oriPath = testPath / "stored_analysis.npz"
-AllNCP = np.load(oriPath)["all_ncp_for_each_mass"][-1]
 
-ySpaceFitResults = fitInYSpaceProcedure(yfitIC, wsFinal, AllNCP)
+ySpaceFitResults = fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
 # Test yspace
 np.set_printoptions(suppress=True, precision=8, linewidth=150)

@@ -1,5 +1,5 @@
 
-from ..core_functions.procedures import runIndependentIterativeProcedure, extractNCPFromWorkspaces
+from ..core_functions.procedures import runIndependentIterativeProcedure
 from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np

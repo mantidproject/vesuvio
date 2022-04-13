@@ -1,6 +1,10 @@
 import numpy as np
 np.random.seed(1)
 
+for i in range(1, 1):
+    print("Loop activates.")
+
+
 A = np.arange(25).reshape((5,5))
 idxs = np.random.randint(0, len(A[0]), A.shape)
 

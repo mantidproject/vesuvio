@@ -1,5 +1,5 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, extractNCPFromWorkspaces
+from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -59,8 +59,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
     constraints = ()
 
     noOfMSIterations = 2     #4
-    firstSpec = 80    #3
-    lastSpec = 90    #134
+    firstSpec = 3    #3
+    lastSpec = 134    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -144,14 +144,11 @@ start_time = time.time()
 wsName = "starch_80_RD_FORWARD_1"
 if wsName in mtd:
     wsFinal = mtd[wsName]
-    allNCP = extractNCPFromWorkspaces(wsFinal)
 else:
     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-    lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-    allNCP = lastIterationNCP
 
 print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
+fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
 
 # End of iteractive section

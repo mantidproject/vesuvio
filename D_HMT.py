@@ -1,5 +1,5 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, extractNCPFromWorkspaces, runIndependentIterativeProcedure
+from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
@@ -62,7 +62,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -101,7 +101,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     
     noOfMSIterations = 2 #2   #4
     firstSpec = 135   #135
-    lastSpec = 145   #182
+    lastSpec = 182  #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -113,11 +113,11 @@ class ForwardInitialConditions(GeneralInitialConditions):
  
 
 # This class inherits all of the atributes in ForwardInitialConditions
-class YSpaceFitInitialConditions(ForwardInitialConditions):
+class YSpaceFitInitialConditions:
     # ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-40, 0.5, 40"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     singleGaussFitToHProfile = True    # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
@@ -159,11 +159,14 @@ start_time = time.time()
 # print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
 # fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
-# runIndependentIterativeProcedure(bckwdIC)
+wsFinal, scatteringResults = runIndependentIterativeProcedure(fwdIC)
+fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
-runBootstrap(bckwdIC, bootIC)
-bootIC.speedQuick = False
-runBootstrap(bckwdIC, bootIC)
+
+# # Run Bootstrap procedures
+# runBootstrap(bckwdIC, bootIC)
+# bootIC.speedQuick = False
+# runBootstrap(bckwdIC, bootIC)
 
 
 
