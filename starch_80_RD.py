@@ -1,5 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -58,7 +59,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -93,9 +94,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 2   #4
-    firstSpec = 164   #144
-    lastSpec = 175    #182
+    noOfMSIterations = 1   #4
+    firstSpec = 144   #144
+    lastSpec = 182   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -111,7 +112,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = False      # When False, use Hermite expansion
+    singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4
@@ -119,7 +120,9 @@ class YSpaceFitInitialConditions:
 
 class bootstrapInitialConditions:
     speedQuick = False
-    nSamples = 3
+    nSamples = 40
+    ySpaceFit = True
+
 
 
 icWSBack = LoadVesuvioBackParameters
@@ -127,7 +130,7 @@ icWSFront = LoadVesuvioFrontParameters
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
-yfitIC = YSpaceFitInitialConditions
+yFitIC = YSpaceFitInitialConditions
 
 bootIC = bootstrapInitialConditions
 
@@ -140,15 +143,16 @@ completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
 start_time = time.time()
 # Interactive section 
 
-wsName = "starch_80_RD_FORWARD_1"
-if wsName in mtd:
-    wsFinal = mtd[wsName]
-else:
-    wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+# wsName = "starch_80_RD_FORWARD_1"
+# if wsName in mtd:
+#     wsFinal = mtd[wsName]
+# else:
+#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
 
-print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
+# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
+# fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
+runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 # End of iteractive section
 end_time = time.time()

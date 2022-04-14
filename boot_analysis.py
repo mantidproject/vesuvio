@@ -89,14 +89,14 @@ def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed
     bootData = np.load(loadPath)
 
     loadYFitPath = bootOutPath / speed / bootNameYFitZ
-    bootYFitData = np.load(loadYFitPath)
+    # bootYFitData = np.load(loadYFitPath)
 
     bootPars = bootData["boot_samples"][:, :, 1:-2]
     parentPars = bootData["parent_result"][:, 1:-2]
 
-    bootYFitVals = bootYFitData["boot_vals"]
+    # bootYFitVals = bootYFitData["boot_vals"]
         
-    return bootPars, parentPars, bootYFitVals
+    return bootPars, parentPars#, bootYFitVals
 
 
 # sampleName = "D_HMT"
@@ -108,25 +108,23 @@ def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed
 # nSamples = 1000
 # nBins = 30
 
-sampleName = "D_HMT"
-firstSpec = 135
-lastSpec = 155
+sampleName = "starch_80_RD"
+firstSpec = 3
+lastSpec = 134
 msIter = 1
 MS = False
 GC = False
-nSamples = 10
-nBins = 5
+nSamples = 40
+nBins = 10
 speed = "slow"
 
 
 # bootQuickPars, parentQuickPars = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
-bootPars, parentPars, bootYFitVals = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
+bootPars, parentPars = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 # np.testing.assert_array_almost_equal(parentQuickPars, parentSlowPars)
 
-mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi2
-
-
-histSampleMeans(mFitVals, mFitVals, nBins)
+# mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
+# histSampleMeans(mFitVals, mFitVals, nBins)
 
 
 

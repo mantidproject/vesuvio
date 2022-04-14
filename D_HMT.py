@@ -62,7 +62,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -101,7 +101,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     
     noOfMSIterations = 1 #2   #4
     firstSpec = 135   #135
-    lastSpec = 155  #182
+    lastSpec = 182  #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -125,7 +125,7 @@ class YSpaceFitInitialConditions:
 
 class bootstrapInitialConditions:
     speedQuick = False
-    nSamples = 10
+    nSamples = 100
     ySpaceFit = True
 
 
@@ -134,7 +134,7 @@ icWSFront = LoadVesuvioFrontParameters
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
-yfitIC = YSpaceFitInitialConditions
+yFitIC = YSpaceFitInitialConditions
 
 bootIC = bootstrapInitialConditions
 
@@ -164,10 +164,7 @@ start_time = time.time()
 
 
 # Run Bootstrap procedures
-runBootstrap(fwdIC, bootIC, yfitIC)
-# bootIC.speedQuick = False
-# runBootstrap(fwdIC, bootIC, yfitIC)
-
+runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 
 # End of iteractive section
