@@ -5,6 +5,7 @@ from .fit_in_yspace import fitInYSpaceProcedure
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load
 from pathlib import Path
+import time
 currentPath = Path(__file__).parent.absolute()
 
 
@@ -43,7 +44,7 @@ def runBootstrap(ic, bootIC, yFitIC):
 #     for j in range(bootIC.nSamples):
         
 #         # Form the bootstrap residuals
-#         bootRes = bootstrapResiduals(residuals)
+#         bootRes = bootstrapResidualsSample(residuals)
 
 #         bootDataY = totNcp + bootRes
         
@@ -55,7 +56,7 @@ def runBootstrap(ic, bootIC, yFitIC):
 #     np.savez(ic.bootQuickSavePath, boot_samples=bootSamples, parent_result=parentResult)
 
 
-def bootstrapResiduals(residuals):
+def bootstrapResidualsSample(residuals):
     """Randomly choose points from residuals of each spectra (same statistical weigth)"""
 
     bootRes = np.zeros(residuals.shape)
@@ -66,6 +67,13 @@ def bootstrapResiduals(residuals):
     return bootRes
 
 
+def checkUserInput(t, nSamples):
+    print(f"\nRan original procedure, time: {t:.2f} s.")
+    print(f"Estimated time for {nSamples} samples: {nSamples*t/60/60:.1f} hours.")
+    userIn = input("Continue with Bootstrap? y/n: ")
+    return userIn
+
+
 def slowBootstrap(ic, bootIC, yFitIC):
     """Runs bootstrap of full procedure (with MS corrections)"""
 
@@ -73,45 +81,37 @@ def slowBootstrap(ic, bootIC, yFitIC):
 
     # Run procedure without modifications to get parent results
     AnalysisDataService.clear()
+    t0 = time.time()
     wsParent, scatResultsParent = iterativeFitForDataReduction(ic)
     yFitResultsParent = fitInYSpaceProcedure(yFitIC, ic, wsParent)
-    parentResult = scatResultsParent.all_spec_best_par_chi_nit[-1]
+    t1 = time.time()
+    userIn = checkUserInput(t1-t0, bootIC.nSamples)
+    if (userIn != "y") and (userIn != "Y"): return
 
-    oriNoMS = ic.noOfMSIterations   # Store value in seperate variable
-
-    # Run ncp fit without MS corrections
-    ic.noOfMSIterations = 1
-    AnalysisDataService.clear()
-    wsFinal, scatteringResults = iterativeFitForDataReduction(ic)
-
-    # Save workspace to create copy at each iteration
-    saveWSPath = currentPath/"bootstrap_ws"/"wsFinal.nxs"
-    SaveNexus(wsFinal, str(saveWSPath))
-
-    totNcp = scatteringResults.all_tot_ncp[-1]
-    dataY = wsFinal.extractY()[:, :-1]  # Last column cut off
-    # Calculate residuals to be basis of bootstrap sampling
+    # Extract dataY and ncp from starting workspace
+    initialWS = mtd[ic.name+"0"]
+    dataY = initialWS.extractY()[:, :-1]
+    totNcp = scatResultsParent.all_tot_ncp[0]     # Select fitted ncp corresponding to initialWS
     residuals = dataY - totNcp
-
-    # Change no of MS corrections back to original value
-    ic.noOfMSIterations = oriNoMS
+    # Save initialWS to preserve dataX and dataE
+    saveBootWSPath = currentPath / "bootstrap_ws" / "wsFinal.nxs"
+    SaveNexus(initialWS, str(saveBootWSPath))
 
     # Initialize arrays
     bootSamples = np.zeros((bootIC.nSamples, len(dataY), len(ic.initPars)+3))
     yFitNPars = 5 if yFitIC.singleGaussFitToHProfile else 6
     bootYFitVals = np.zeros((bootIC.nSamples, 3, yFitNPars))
-    bootYFitErrs = np.zeros(bootYFitVals.shape)
 
     AnalysisDataService.clear()
     # Form each bootstrap workspace and run ncp fit with MS corrections
     for j in range(bootIC.nSamples):
 
-        bootRes = bootstrapResiduals(residuals)
+        bootRes = bootstrapResidualsSample(residuals)
 
         bootDataY = totNcp + bootRes
 
         # From workspace with bootstrap dataY
-        wsBoot = Load(str(saveWSPath), OutputWorkspace="wsBoot")
+        wsBoot = Load(str(saveBootWSPath), OutputWorkspace="wsBoot")
   
         for i, row in enumerate(bootDataY):
             wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit
@@ -126,11 +126,11 @@ def slowBootstrap(ic, bootIC, yFitIC):
 
         bootSamples[j] = scatResultsBoot.all_spec_best_par_chi_nit[-1]
         bootYFitVals[j] = yFitResults.popt
-        bootYFitErrs[j] = yFitResults.perr
 
         # Save result at each iteration in case of failure for long runs
-        np.savez(ic.bootSlowSavePath, boot_samples=bootSamples, parent_result=parentResult)
-        np.savez(ic.bootSlowYFitSavePath, boot_vals=bootYFitVals, boot_errs=bootYFitErrs,
+        np.savez(ic.bootSlowSavePath, boot_samples=bootSamples,
+             parent_result=scatResultsParent.all_spec_best_par_chi_nit[-1])
+        np.savez(ic.bootSlowYFitSavePath, boot_vals=bootYFitVals,
                 parent_popt=yFitResultsParent.popt, parent_perr=yFitResultsParent.perr)
         AnalysisDataService.clear()    # Clear all ws
 

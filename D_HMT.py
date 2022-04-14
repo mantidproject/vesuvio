@@ -165,8 +165,8 @@ start_time = time.time()
 
 # Run Bootstrap procedures
 runBootstrap(fwdIC, bootIC, yfitIC)
-bootIC.speedQuick = False
-runBootstrap(fwdIC, bootIC, yfitIC)
+# bootIC.speedQuick = False
+# runBootstrap(fwdIC, bootIC, yfitIC)
 
 
 

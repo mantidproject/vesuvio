@@ -95,9 +95,8 @@ def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed
     parentPars = bootData["parent_result"][:, 1:-2]
 
     bootYFitVals = bootYFitData["boot_vals"]
-    bootYFitErrs = bootYFitData["boot_errs"]
         
-    return bootPars, parentPars, bootYFitVals, bootYFitErrs
+    return bootPars, parentPars, bootYFitVals
 
 
 # sampleName = "D_HMT"
@@ -121,14 +120,13 @@ speed = "slow"
 
 
 # bootQuickPars, parentQuickPars = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
-bootPars, parentPars, bootYFitVals, bootYFitErrs = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
+bootPars, parentPars, bootYFitVals = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 # np.testing.assert_array_almost_equal(parentQuickPars, parentSlowPars)
 
-mFitVals = bootYFitVals[:, 0, :].T
-mFitErrs = bootYFitErrs[:, 0, :].T
+mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi2
 
 
-histSampleMeans(mFitVals, mFitErrs, nBins)
+histSampleMeans(mFitVals, mFitVals, nBins)
 
 
 
