@@ -74,7 +74,7 @@ def slowBootstrap(ic, nSamples):
     AnalysisDataService.clear()
     wsFinal, scatteringResults = iterativeFitForDataReduction(ic)
 
-    # Save workspace to be used at each iteration
+    # Save workspace to create copy at each iteration
     saveWSPath = currentPath / "bootstrap_ws" / "wsFinal.nxs"
     SaveNexus(wsFinal, str(saveWSPath))
 
@@ -97,9 +97,9 @@ def slowBootstrap(ic, nSamples):
 
         # From workspace with bootstrap dataY
         wsBoot = Load(str(saveWSPath), OutputWorkspace="wsBoot")
-        # wsBoot = CloneWorkspace(wsFinal)
+  
         for i, row in enumerate(bootDataY):
-            wsBoot.dataY(i)[:-1] = row
+            wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit
 
         ic.bootSample = True    # Tells script to use input bootstrap ws
         ic.bootWS = wsBoot      # bootstrap ws to input

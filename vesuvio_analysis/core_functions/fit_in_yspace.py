@@ -366,10 +366,12 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
         me = m.merrors
         for p, v, e in zip(parameters, values, errors):
             tableWS.addRow([p, v, e, me[p].lower, me[p].upper, 0, 0])   
-        plotAutoMinos(m)
+        
+        if yFitIC.showPlots:
+            plotAutoMinos(m)
 
     except RuntimeError:
-        merrors = runAndPlotManualMinos(m, constrFunc, bestFitVals, bestFitErrs)     # Changes values of minuit obj m, do not use m below this point
+        merrors = runAndPlotManualMinos(m, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
         for p, v, e in zip(parameters, values, errors):
             tableWS.addRow([p, v, e, 0, 0, merrors[p][0], merrors[p][1]])
 
@@ -434,7 +436,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     return 
 
 
-def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs):
+def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showPlots):
     # Set format of subplots
     height = 2
     width = int(np.ceil(len(minuitObj.parameters)/2))
@@ -445,22 +447,23 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs):
 
     merrors = {}
     for p, ax in zip(minuitObj.parameters, axs.flat):
-        lerr, uerr = runMinosForPar(minuitObj, constrFunc, p, 2, ax, bestFitVals, bestFitErrs)
+        lerr, uerr = runMinosForPar(minuitObj, constrFunc, p, 2, ax, bestFitVals, bestFitErrs, showPlots)
         merrors[p] = np.array([lerr, uerr])
 
-    # Hide plots not in use:
-    for ax in axs.flat:
-        if not ax.lines:   # If empty list
-            ax.set_visible(False)
+    if showPlots:
+        # Hide plots not in use:
+        for ax in axs.flat:
+            if not ax.lines:   # If empty list
+                ax.set_visible(False)
 
-    # ALl axes share same legend, so set figure legend to first axis
-    handle, label = axs[0, 0].get_legend_handles_labels()
-    fig.legend(handle, label, loc='lower right')
-    fig.show()
+        # ALl axes share same legend, so set figure legend to first axis
+        handle, label = axs[0, 0].get_legend_handles_labels()
+        fig.legend(handle, label, loc='lower right')
+        fig.show()
     return merrors
 
 
-def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, bestFitErrs):
+def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, bestFitErrs, showPlots):
 
     # Set parameters to previously found minimum to restart procedure
     for p in bestFitVals:
@@ -527,8 +530,9 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
     else:
         lerr, uerr = varSpaceDense[idxErr].flatten() - varVal
 
-    ax.plot(varSpaceDense, fValsScipyDense, label="fVals Constr Scipy")
-    plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr)
+    if showPlots:
+        ax.plot(varSpaceDense, fValsScipyDense, label="fVals Constr Scipy")
+        plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr)
   
     return lerr, uerr
 
@@ -782,7 +786,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, ic)   
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
-    idxList = groupDetectors(instrPars, yFitIC.nGlobalFitGroups)
+    idxList = groupDetectors(instrPars, yFitIC.nGlobalFitGroups, yFitIC.showPlots)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
     if yFitIC.symmetrisationFlag:  
@@ -854,7 +858,8 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
         print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
     print("\n")
 
-    plotGlobalFit(dataX, dataY, dataE, m, totCost)
+    if yFitIC.showPlots:
+        plotGlobalFit(dataX, dataY, dataE, m, totCost)
     
     return np.array(m.values), np.array(m.errors)     # Pass into array to store values in variable
 
@@ -1003,7 +1008,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
 
 # ------- Groupings 
 
-def groupDetectors(ipData, nGroups):
+def groupDetectors(ipData, nGroups, showPlots):
     """
     Uses the method of k-means to find clusters in theta-L1 space.
     Input: instrument parameters to extract L1 and theta of detectors.
@@ -1033,7 +1038,8 @@ def groupDetectors(ipData, nGroups):
     clusters, n = kMeansClustering(points, centers)
     idxList = formIdxList(clusters, n, len(L1))
 
-    plotFinalGroups(points, clusters, n)
+    if showPlots:
+        plotFinalGroups(points, clusters, n)
 
     return idxList
 

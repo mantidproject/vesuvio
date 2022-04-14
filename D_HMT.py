@@ -99,7 +99,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 2 #2   #4
+    noOfMSIterations = 1 #2   #4
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -114,13 +114,12 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    # ySpaceFitSavePath = ySpaceFitSavePath
-
+    showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    singleGaussFitToHProfile = True    # When False, use Hermite expansion
+    singleGaussFitToHProfile = False    # When False, use Hermite expansion
     globalFitFlag = True
-    forceManualMinos = False
+    forceManualMinos = True
     nGlobalFitGroups = 4   
 
 
