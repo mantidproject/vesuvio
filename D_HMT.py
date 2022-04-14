@@ -101,7 +101,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     
     noOfMSIterations = 1 #2   #4
     firstSpec = 135   #135
-    lastSpec = 182  #182
+    lastSpec = 155  #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -117,15 +117,16 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    singleGaussFitToHProfile = False    # When False, use Hermite expansion
+    singleGaussFitToHProfile = True    # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = True
     nGlobalFitGroups = 4   
 
 
 class bootstrapInitialConditions:
-    speedQuick = True
-    nSamples = 1000
+    speedQuick = False
+    nSamples = 10
+    ySpaceFit = True
 
 
 icWSBack = LoadVesuvioBackParameters
@@ -158,14 +159,14 @@ start_time = time.time()
 # print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
 # fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
 
-wsFinal, scatteringResults = runIndependentIterativeProcedure(fwdIC)
-fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
+# wsFinal, scatteringResults = runIndependentIterativeProcedure(fwdIC)
+# fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
 
-# # Run Bootstrap procedures
-# runBootstrap(bckwdIC, bootIC)
-# bootIC.speedQuick = False
-# runBootstrap(bckwdIC, bootIC)
+# Run Bootstrap procedures
+runBootstrap(fwdIC, bootIC, yfitIC)
+bootIC.speedQuick = False
+runBootstrap(fwdIC, bootIC, yfitIC)
 
 
 

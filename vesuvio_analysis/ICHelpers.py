@@ -98,12 +98,7 @@ def setOutputDirsForSample(ic, sampleName, bootIC):
     ic.resultsSavePath = outputPath / fileNameZ
     ic.ySpaceFitSavePath = outputPath / fileNameYSpaceZ
 
-    # Bootstrap output path
-    if bootIC.speedQuick:
-        speed = "quick"
-    else:
-        speed = "slow"
-
+    # Bootstrap output paths
     bootOutPath = experimentsPath / sampleName / "bootstrap_data"
 
     if not bootOutPath.exists():
@@ -116,10 +111,16 @@ def setOutputDirsForSample(ic, sampleName, bootIC):
     
 
     bootName = fileName + f"_nsampl_{bootIC.nSamples}"
+    bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{bootIC.nSamples}"
+    
     bootNameZ = bootName + ".npz"
+    bootNameYFitZ = bootNameYFit + ".npz"
 
     ic.bootQuickSavePath = bootOutPath / "quick" / bootNameZ
     ic.bootSlowSavePath = bootOutPath / "slow" / bootNameZ
+
+    ic.bootQuickYFitSavePath = bootOutPath / "quick" / bootNameYFitZ
+    ic.bootSlowYFitSavePath = bootOutPath / "slow" / bootNameYFitZ
     return
 
 
