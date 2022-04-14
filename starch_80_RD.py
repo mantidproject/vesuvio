@@ -107,7 +107,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
  
 
 # This class inherits all of the atributes in ForwardInitialConditions
-class YSpaceFitInitialConditions(ForwardInitialConditions):
+class YSpaceFitInitialConditions:
     # ySpaceFitSavePath = ySpaceFitSavePath
 
     symmetrisationFlag = True

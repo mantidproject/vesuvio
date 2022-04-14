@@ -76,7 +76,7 @@ icWSFront = LoadVesuvioFrontParameters
 fwdIC = ForwardInitialConditions
 wsBootIC = bootstrapInitialConditions
 
-class YSpaceFitInitialConditions(ForwardInitialConditions):
+class YSpaceFitInitialConditions:
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
