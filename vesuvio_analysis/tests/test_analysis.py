@@ -5,7 +5,7 @@ import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 import matplotlib.pyplot as plt
-from .tests_IC import icWSFront, fwdIC, wsBootIC
+from .tests_IC import icWSFront, fwdIC, bootIC
 testPath = Path(__file__).absolute().parent 
 
 

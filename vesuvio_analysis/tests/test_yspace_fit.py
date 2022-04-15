@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from .tests_IC import icWSFront, fwdIC, wsBootIC, yfitIC
+from .tests_IC import icWSFront, fwdIC, bootIC, yfitIC
 testPath = Path(__file__).absolute().parent 
 
 AnalysisDataService.clear()

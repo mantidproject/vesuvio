@@ -5,6 +5,15 @@ from pathlib import Path
 ipFilesPath = Path(__file__).absolute().parent.parent / "ip_files"
 ipFilePath = ipFilesPath / "ip2018_3.par"  
 
+
+class LoadVesuvioBackParameters:
+    runs="43066-43076"         # 77K         # The numbers of the runs to be analysed
+    empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
+    spectra='3-134'                          # Spectra to be analysed
+    mode='DoubleDifference'
+    ipfile=str(ipFilesPath / "ip2019.par")   
+
+
 class LoadVesuvioFrontParameters:
     runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
@@ -20,6 +29,42 @@ class GeneralInitialConditions:
     multiple_scattering_order, number_of_events = 2, 1.e5
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+
+
+class BackwardInitialConditions(GeneralInitialConditions):
+    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+
+    HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
+
+    # Masses, instrument parameters and initial fitting parameters
+    masses = np.array([12, 16, 27])
+    # noOfMasses = len(masses)
+
+    initPars = np.array([ 
+    # Intensities, NCP widths, NCP centers   
+            1, 12, 0.,    
+            1, 12, 0.,   
+            1, 12.5, 0.    
+        ])
+    bounds = np.array([
+            [0, np.nan], [8, 16], [-3, 1],
+            [0, np.nan], [8, 16], [-3, 1],
+            [0, np.nan], [11, 14], [-3, 1]
+        ])
+    constraints = ()
+
+    noOfMSIterations = 1     #4
+    firstSpec = 3    #3
+    lastSpec = 13    #134
+
+    maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
+
+    # Boolean Flags to control script
+    MSCorrectionFlag = True
+    GammaCorrectionFlag = False
+
+    # # Parameters of workspaces in input_ws
+    tof_binning='275.,1.,420'                    # Binning of ToF spectra
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -73,10 +118,15 @@ class YSpaceFitInitialConditions:
     nGlobalFitGroups = 4
 
 
-yfitIC = YSpaceFitInitialConditions
 icWSFront = LoadVesuvioFrontParameters
-fwdIC = ForwardInitialConditions
-wsBootIC = bootstrapInitialConditions
+icWSBack = LoadVesuvioFrontParameters  
 
-completeICFromInputs(fwdIC, "tests", icWSFront, wsBootIC)
+fwdIC = ForwardInitialConditions
+bckwdIC = BackwardInitialConditions
+yfitIC = YSpaceFitInitialConditions
+
+bootIC = bootstrapInitialConditions
+
+completeICFromInputs(fwdIC, "tests", icWSFront, bootIC)
+completeICFromInputs(bckwdIC, "tests", icWSBack, bootIC)
 

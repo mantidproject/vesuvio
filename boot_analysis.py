@@ -29,22 +29,21 @@ def calcBootMeans(bestPars):
     return bootMeanW, bootMeanI, bootStdW, bootStdI
 
 
-def histSampleMeans(meanWidths, meanIntensities, nBins):
+def plotHists(ax, samples, nBins, title):
+    ax.set_title(f"Histogram of {title}")
+    for i, bootHist in enumerate(samples):
+        leg = f"Row {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
+        ax.hist(bootHist, nBins, histtype="step", label=leg)
 
-    fig, axs = plt.subplots(1, 2, figsize=(15, 8))
-    for mode, ax, means in zip(["Widhts", "Intensities"], axs, [meanWidths, meanIntensities]):
+        ax.axvline(np.mean(bootHist), 0, 0.97, color="k", ls="--")
 
-        ax.set_title(f"Histogram of Mean {mode}")
-        print(f"\nBootstrap distribution of {mode}: \n")
-        for i, bootHist in enumerate(means):
+    ax.legend()
 
-            leg = f"{mode} {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
-            print(leg)
-            ax.hist(bootHist, nBins, histtype="step", label=leg)
 
-        ax.legend()
-    plt.show()
-
+def addParentMeans(ax, means):
+    for mean in means:
+        ax.axvline(mean, 0, 0.97, color="k", ls=":")
+        
 
 def plot3DRows(rows):
     fig= plt.figure()
@@ -62,7 +61,7 @@ def printResults(arrM, arrE, mode):
         print(f"{mode} {i}: {m:>6.3f} \u00B1 {e:<6.3f}")
 
 
-def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
+def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
     # Build Filename based on ic
     corr = ""
     if MS & (msIter>1):
@@ -71,14 +70,10 @@ def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed
         corr+="_GC"
 
     fileName = f"spec_{firstSpec}-{lastSpec}_iter_{msIter}{corr}"
-    # fileNameYSpace = fileName + "_ySpaceFit"
-
     fileNameZ = fileName + ".npz"
-    # fileNameYSpaceZ = fileNameYSpace + ".npz"
 
     bootOutPath = experimentsPath / sampleName / "bootstrap_data"
     
-
     bootName = fileName + f"_nsampl_{nSamples}"
     bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"
 
@@ -89,14 +84,8 @@ def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed
     bootData = np.load(loadPath)
 
     loadYFitPath = bootOutPath / speed / bootNameYFitZ
-    # bootYFitData = np.load(loadYFitPath)
 
-    bootPars = bootData["boot_samples"][:, :, 1:-2]
-    parentPars = bootData["parent_result"][:, 1:-2]
-
-    # bootYFitVals = bootYFitData["boot_vals"]
-        
-    return bootPars, parentPars#, bootYFitVals
+    return loadPath, loadYFitPath
 
 
 # sampleName = "D_HMT"
@@ -107,36 +96,51 @@ def extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed
 # GC = False
 # nSamples = 1000
 # nBins = 30
+# speed = "slow"
+# ySpaceFit = False
 
 sampleName = "starch_80_RD"
-firstSpec = 3
-lastSpec = 134
+firstSpec = 144
+lastSpec = 154
 msIter = 1
 MS = False
 GC = False
-nSamples = 40
+nSamples = 5
 nBins = 10
 speed = "slow"
+ySpaceFit = True
 
 
-# bootQuickPars, parentQuickPars = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
-bootPars, parentPars = extractData(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
-# np.testing.assert_array_almost_equal(parentQuickPars, parentSlowPars)
+dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
-# mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
-# histSampleMeans(mFitVals, mFitVals, nBins)
+bootData = np.load(dataPath)
+bootPars = bootData["boot_samples"][:, :, 1:-2]
+parentPars = bootData["parent_result"][:, 1:-2]
 
+if ySpaceFit:
+    bootYFitData = np.load(dataYFitPath)
+    bootYFitVals = bootYFitData["boot_vals"]
+    mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
+
+    fig, ax = plt.subplots()
+    plotHists(ax, mFitVals, nBins, "Y-Space Fit Parameters")
+    plt.show()
 
 
 meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
-print(f"\nExperimental Sample results:\n")
-printResults(meanWp.flatten(), stdWp.flatten(), "Widths Parent")
-printResults(meanIp.flatten(), stdIp.flatten(), "Intensities Parent")
+meanWp = meanWp.flatten()
+meanIp = meanIp.flatten()
 
-print(f"\n{speed}\n")
-meanW0, meanI0, stdW0, stdI0 = calcBootMeans(bootPars)
-histSampleMeans(meanW0, meanI0, nBins)
-plot3DRows(meanW0)
+meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
+
+fig, axs = plt.subplots(1, 2, figsize=(15, 8))
+for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
+    plotHists(ax, means, nBins, title)
+    addParentMeans(ax, meanp)
+
+plt.show()
+
+# plot3DRows(meanW0)
 
 
 
