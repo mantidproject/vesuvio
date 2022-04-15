@@ -242,6 +242,7 @@ def BootstrapJoint(bckwdIC, fwdIC, bootIC, yFitIC):
         
         np.savez(fwdIC.bootSlowYFitSavePath, boot_vals=bootYFitVals,
                 parent_popt=yFitResultsParent.popt, parent_perr=yFitResultsParent.perr)
+        
         AnalysisDataService.clear()    # Clear all ws
     return bootBackSamples, bootFrontSamples, bootYFitVals
     # return bootResults.bootBackSamples, bootResults.bootFrontSamples, bootResults.bootYFitVals
