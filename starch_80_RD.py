@@ -59,7 +59,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -94,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 4   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -120,7 +120,7 @@ class YSpaceFitInitialConditions:
 
 class bootstrapInitialConditions:
     speedQuick = False
-    nSamples = 40
+    nSamples = 1250
     ySpaceFit = True
 
 
