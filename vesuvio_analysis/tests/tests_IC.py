@@ -1,15 +1,9 @@
-from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
-from vesuvio_analysis.ICHelpers import completeICFromInputs
-from mantid.api import AnalysisDataService, mtd
-import time
+from ..ICHelpers import completeICFromInputs
 import numpy as np
 from pathlib import Path
 
-scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
-experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
-ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
+ipFilesPath = Path(__file__).absolute().parent.parent / "ip_files"
+ipFilePath = ipFilesPath / "ip2018_3.par"  
 
 
 class LoadVesuvioBackParameters:
@@ -59,7 +53,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 13    #134
 
@@ -74,7 +68,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+
+    InstrParsPath = ipFilePath
 
     masses = np.array([1.0079, 12, 16, 27]) 
     # noOfMasses = len(masses)
@@ -94,9 +89,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
-    firstSpec = 144   #144
-    lastSpec = 154   #182
+    noOfMSIterations = 2   #4
+    firstSpec = 164   #144
+    lastSpec = 175    #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -104,76 +99,34 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,1,430"                 # Binning of ToF spectra
- 
+    tof_binning="110,1.,430"                 # Binning of ToF spectra
 
-# This class inherits all of the atributes in ForwardInitialConditions
+
+class bootstrapInitialConditions:
+    speedQuick = False
+    nSamples = 3
+    ySpaceFit = True
+
+
 class YSpaceFitInitialConditions:
-    showPlots = True
+    showPlots = False
     symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4
-   
-
-class bootstrapInitialConditions:
-    speedQuick = False
-    nSamples = 5
-    ySpaceFit = True
 
 
+icWSFront = LoadVesuvioFrontParameters
+icWSBack = LoadVesuvioFrontParameters  
 
-icWSBack = LoadVesuvioBackParameters
-icWSFront = LoadVesuvioFrontParameters  
-
-bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
-yFitIC = YSpaceFitInitialConditions
+bckwdIC = BackwardInitialConditions
+yfitIC = YSpaceFitInitialConditions
 
 bootIC = bootstrapInitialConditions
 
-# Need to run this function, otherwise will not work
-completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
-completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
+completeICFromInputs(fwdIC, "tests", icWSFront, bootIC)
+completeICFromInputs(bckwdIC, "tests", icWSBack, bootIC)
 
-
-start_time = time.time()
-# ----- Interactive section 
-
-
-# # Runing some procedure and y-space fit at the final workspace;
-# # If final workspace is loaded in Mantid, run only y-space fit:
-
-# # Name of final workspace produced by procedure
-# wsName = "starch_80_RD_FORWARD_"+str(fwdIC.noOfMSIterations-1)
-
-# if wsName in mtd:
-#     wsFinal = mtd[wsName]
-
-# else:
-#     # Uncomment either independent OR joint procedure;
-
-#     # Independent procedure
-#     runIndependentIterativeProcedure(fwdIC)
-    
-#     # Joint procedure
-#     # runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-
-#     # Select final ws created by the procedure
-#     wsFinal = mtd[wsName]
-
-
-# # Run Y-Space fit on selected ws
-# fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
-
-
-# Currently Bootstrap only supports running joint version
-runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-
-
-
-# ----- End of iteractive section
-end_time = time.time()
-print("\nRunning time: ", end_time-start_time, " seconds")
