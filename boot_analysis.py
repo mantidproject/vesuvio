@@ -101,12 +101,12 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 
 sampleName = "starch_80_RD"
 firstSpec = 144
-lastSpec = 154
-msIter = 1
-MS = False
-GC = False
-nSamples = 5
-nBins = 10
+lastSpec = 182
+msIter = 4
+MS = True
+GC = True
+nSamples = 1250
+nBins = 50
 speed = "slow"
 ySpaceFit = True
 
@@ -116,15 +116,6 @@ dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, 
 bootData = np.load(dataPath)
 bootPars = bootData["boot_samples"][:, :, 1:-2]
 parentPars = bootData["parent_result"][:, 1:-2]
-
-if ySpaceFit:
-    bootYFitData = np.load(dataYFitPath)
-    bootYFitVals = bootYFitData["boot_vals"]
-    mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
-
-    fig, ax = plt.subplots()
-    plotHists(ax, mFitVals, nBins, "Y-Space Fit Parameters")
-    plt.show()
 
 
 meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
@@ -137,8 +128,17 @@ fig, axs = plt.subplots(1, 2, figsize=(15, 8))
 for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
     plotHists(ax, means, nBins, title)
     addParentMeans(ax, meanp)
-
 plt.show()
+
+
+if ySpaceFit:
+    bootYFitData = np.load(dataYFitPath)
+    bootYFitVals = bootYFitData["boot_vals"]
+    mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
+
+    fig, ax = plt.subplots()
+    plotHists(ax, mFitVals, nBins, "Y-Space Fit Parameters")
+    plt.show()
 
 # plot3DRows(meanW0)
 

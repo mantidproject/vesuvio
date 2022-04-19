@@ -61,7 +61,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
     noOfMSIterations = 4     #4
     firstSpec = 3    #3
-    lastSpec = 13    #134
+    lastSpec = 134    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     noOfMSIterations = 4   #4
     firstSpec = 144   #144
-    lastSpec = 154   #182
+    lastSpec = 182   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -120,7 +120,7 @@ class YSpaceFitInitialConditions:
 
 class bootstrapInitialConditions:
     speedQuick = False
-    nSamples = 5
+    nSamples = 650
     ySpaceFit = True
 
 
