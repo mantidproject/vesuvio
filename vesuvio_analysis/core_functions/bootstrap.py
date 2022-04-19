@@ -23,6 +23,7 @@ def runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
     #     quickBootstrap(ic, bootIC, yFitIC)
     # else:
     # slowBootstrap(ic, bootIC, yFitIC)
+
     bootBackSamples, bootFrontSamples, bootYFitVals = BootstrapJoint(bckwdIC, fwdIC, bootIC, yFitIC)
     return bootBackSamples, bootFrontSamples, bootYFitVals
 
@@ -58,15 +59,52 @@ def runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 #     np.savez(ic.bootQuickSavePath, boot_samples=bootSamples, parent_result=parentResult)
 
 
-def bootstrapResidualsSample(residuals):
-    """Randomly choose points from residuals of each spectra (same statistical weigth)"""
+def BootstrapJoint(bckwdIC, fwdIC, bootIC, yFitIC):
 
-    bootRes = np.zeros(residuals.shape)
-    for i, res in enumerate(residuals):
-        rowIdxs = np.random.randint(0, len(res), len(res))    # [low, high)
-        bootRes[i] = res[rowIdxs]
+    bckwdIC.bootSample = False
+    fwdIC.bootSample = False
 
-    return bootRes
+    t0 = time.time()
+    wsParent, bckwdScatResP, fwdScatResP = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+    yFitResultsParent = fitInYSpaceProcedure(yFitIC, fwdIC, wsParent)
+    t1 = time.time()
+    userIn = checkUserInput(t1-t0, bootIC.nSamples)
+    if (userIn != "y") and (userIn != "Y"): return
+
+    initialBackWS, dataYB, totNcpB = extractDataFromInitialWS(bckwdIC, bckwdScatResP)
+    initialFrontWS, dataYF, totNcpF = extractDataFromInitialWS(fwdIC, fwdScatResP)
+
+    SaveNexus(initialBackWS, str(savePathInitialWS(bckwdIC)))
+    SaveNexus(initialFrontWS, str(savePathInitialWS(fwdIC)))
+
+    resiB = dataYB - totNcpB
+    resiF = dataYF - totNcpF
+
+    bootResults = BootstrapResults(fwdIC, bckwdIC, bootIC, yFitIC, dataYB, dataYF)
+    bootResults.storeParentResults(bckwdScatResP, fwdScatResP, yFitResultsParent)
+
+    AnalysisDataService.clear()
+    # Form each bootstrap workspace and run ncp fit with MS corrections
+    for j in range(bootIC.nSamples):
+
+        wsBootB = createBootstrapWS(resiB, totNcpB, bckwdIC)
+        wsBootF = createBootstrapWS(resiF, totNcpF, fwdIC)
+
+        bckwdIC.bootSample = True    # Tells script to use input bootstrap ws
+        fwdIC.bootSample = True    
+
+        bckwdIC.bootWS = wsBootB      # bootstrap ws to input
+        fwdIC.bootWS = wsBootF     
+
+        # Run procedure for bootstrap ws
+        wsFinalBoot, bckwdScatResBoot, fwdScatResBoot = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
+        yFitResultsBoot = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinalBoot)
+
+        bootResults.storeBootIterResults(j, bckwdScatResBoot, fwdScatResBoot, yFitResultsBoot)
+        bootResults.saveResults(bckwdIC, fwdIC)
+              
+        AnalysisDataService.clear()    # Clear all ws
+    return bootResults.bootBackSamples, bootResults.bootFrontSamples, bootResults.bootYFitVals
 
 
 def checkUserInput(t, nSamples):
@@ -82,8 +120,8 @@ def extractDataFromInitialWS(ic, scatRes):
     initialWS = mtd[ic.name+"0"]
     dataY = initialWS.extractY()[:, :-1]
     totNcp = scatRes.all_tot_ncp[0]   # Select fitted ncp corresponding to initialWS
-
     return initialWS, dataY, totNcp
+
 
 def savePathInitialWS(ic):
     if ic.modeRunning == "BACKWARD":
@@ -96,14 +134,31 @@ def savePathInitialWS(ic):
     return savePath
 
 
-def initializeZeroArrs(fwdIC, bckwdIC, bootIC, yFitIC, dataYB, dataYF):
-    """Initializes arrays required to store Bootstrap results"""
+def createBootstrapWS(residuals, totNcp, ic):
 
-    bootBackSamples = np.zeros((bootIC.nSamples, len(dataYB), len(bckwdIC.initPars)+3))
-    bootFrontSamples = np.zeros((bootIC.nSamples, len(dataYF), len(fwdIC.initPars)+3))
-    
-    yFitNPars = 5 if yFitIC.singleGaussFitToHProfile else 6
-    bootYFitVals = np.zeros((bootIC.nSamples, 3, yFitNPars))
+    bootRes = bootstrapResidualsSample(residuals)
+    bootDataY = totNcp + bootRes
+
+    # Form workspace with bootstrap dataY
+    savePath = savePathInitialWS(ic)
+    wsBootName = savePath.name.split(".")[0]
+
+    wsBoot = Load(str(savePath), OutputWorkspace=wsBootName)
+    for i, row in enumerate(bootDataY):
+        wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit anyway
+
+    return wsBoot
+
+
+def bootstrapResidualsSample(residuals):
+    """Randomly choose points from residuals of each spectra (same statistical weigth)"""
+
+    bootRes = np.zeros(residuals.shape)
+    for i, res in enumerate(residuals):
+        rowIdxs = np.random.randint(0, len(res), len(res))    # [low, high)
+        bootRes[i] = res[rowIdxs]
+
+    return bootRes
 
 
 class BootstrapResults:
@@ -138,115 +193,6 @@ class BootstrapResults:
         
         np.savez(fwdIC.bootSlowYFitSavePath, boot_vals=self.bootYFitVals,
                 parent_popt=self.poptParent)     
-
-
-def createBootstrapWS(residuals, totNcp, ic):
-
-    bootRes = bootstrapResidualsSample(residuals)
-    bootDataY = totNcp + bootRes
-
-    # From workspace with bootstrap dataY
-    savePath = savePathInitialWS(ic)
-    wsBootName = savePath.name.split(".")[0]
-
-    wsBoot = Load(str(savePath), OutputWorkspace=wsBootName)
-    for i, row in enumerate(bootDataY):
-        wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit anyway
-
-    return wsBoot
-
-
-
-def BootstrapJoint(bckwdIC, fwdIC, bootIC, yFitIC):
-
-    bckwdIC.bootSample = False
-    fwdIC.bootSample = False
-
-    t0 = time.time()
-    wsParent, bckwdScatResP, fwdScatResP = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-    yFitResultsParent = fitInYSpaceProcedure(yFitIC, fwdIC, wsParent)
-    t1 = time.time()
-    userIn = checkUserInput(t1-t0, bootIC.nSamples)
-    if (userIn != "y") and (userIn != "Y"): return
-
-    initialBackWS = mtd[bckwdIC.name+"0"]
-    initialFrontWS = mtd[fwdIC.name+"0"]
-
-    # initialBackWS, dataYB, totNcpB = extractDataFromInitialWS(bckwdIC, bckwdScatResP)
-    # initialFrontWS, dataYF, totNcpF = extractDataFromInitialWS(fwdIC, fwdScatResP)
-
-    SaveNexus(initialBackWS, str(savePathInitialWS(bckwdIC)))
-    SaveNexus(initialFrontWS, str(savePathInitialWS(fwdIC)))
-
-    dataYB = initialBackWS.extractY()[:, :-1]
-    dataYF = initialFrontWS.extractY()[:, :-1]
-
-    totNcpB = bckwdScatResP.all_tot_ncp[0]     # Select fitted ncp corresponding to initialWS
-    totNcpF = fwdScatResP.all_tot_ncp[0]     # Select fitted ncp corresponding to initialWS
-
-    resiB = dataYB - totNcpB
-    resiF = dataYF - totNcpF
-
-    # Initialize arrays
-    bootBackSamples = np.zeros((bootIC.nSamples, len(dataYB), len(bckwdIC.initPars)+3))
-    bootFrontSamples = np.zeros((bootIC.nSamples, len(dataYF), len(fwdIC.initPars)+3))
-    yFitNPars = 5 if yFitIC.singleGaussFitToHProfile else 6
-    bootYFitVals = np.zeros((bootIC.nSamples, 3, yFitNPars))
-
-    # bootResults = BootstrapResults(fwdIC, bckwdIC, bootIC, yFitIC, dataYB, dataYF)
-    # bootResults.storeParentResults(bckwdScatResP, fwdScatResP, yFitResultsParent)
-
-    AnalysisDataService.clear()
-    # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(bootIC.nSamples):
-
-        # wsBootB = createBootstrapWS(resiB, totNcpB, bckwdIC)
-        # wsBootF = createBootstrapWS(resiF, totNcpF, fwdIC)
-
-        bootResB = bootstrapResidualsSample(resiB)
-        bootDataYB = totNcpB + bootResB
-
-        bootResF = bootstrapResidualsSample(resiF)
-        bootDataYF = totNcpF + bootResF
-
-        # From workspace with bootstrap dataY
-        wsBootB = Load(str(savePathInitialWS(bckwdIC)), OutputWorkspace="wsBootB")
-        wsBootF = Load(str(savePathInitialWS(fwdIC)), OutputWorkspace="wsBootF")
-        for i, (rowB, rowF) in enumerate(zip(bootDataYB, bootDataYF)):
-            wsBootB.dataY(i)[:-1] = rowB     # Last column will be ignored in ncp fit
-            wsBootF.dataY(i)[:-1] = rowF     # Last column will be ignored in ncp fit
-
-        bckwdIC.bootSample = True    # Tells script to use input bootstrap ws
-        fwdIC.bootSample = True    
-
-        bckwdIC.bootWS = wsBootB      # bootstrap ws to input
-        fwdIC.bootWS = wsBootF     
-
-        # Run procedure for bootstrap ws
-        wsFinalBoot, bckwdScatResBoot, fwdScatResBoot = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
-        yFitResultsBoot = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinalBoot)
-
-        # bootResults.storeBootIterResults(j, bckwdScatResBoot, fwdScatResBoot, yFitResultsBoot)
-        # bootResults.saveResults(bckwdIC, fwdIC)
-        
-        bootBackSamples[j] = bckwdScatResBoot.all_spec_best_par_chi_nit[-1]
-        bootFrontSamples[j] = fwdScatResBoot.all_spec_best_par_chi_nit[-1]
-        bootYFitVals[j] = yFitResultsBoot.popt
-
-        # Save result at each iteration in case of failure for long runs
-        np.savez(bckwdIC.bootSlowSavePath, boot_samples=bootBackSamples,
-             parent_result=bckwdScatResP.all_spec_best_par_chi_nit[-1])
-        
-        np.savez(fwdIC.bootSlowSavePath, boot_samples=bootFrontSamples,
-             parent_result=fwdScatResP.all_spec_best_par_chi_nit[-1])
-        
-        np.savez(fwdIC.bootSlowYFitSavePath, boot_vals=bootYFitVals,
-                parent_popt=yFitResultsParent.popt, parent_perr=yFitResultsParent.perr)
-        
-        AnalysisDataService.clear()    # Clear all ws
-    return bootBackSamples, bootFrontSamples, bootYFitVals
-    # return bootResults.bootBackSamples, bootResults.bootFrontSamples, bootResults.bootYFitVals
-
 
 
 # TODO: Figure out a way of switching between single independent and joint procedures

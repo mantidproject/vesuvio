@@ -139,21 +139,41 @@ completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
 completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
 
 
-# if __name__ == "main":
 start_time = time.time()
-# Interactive section 
+# ----- Interactive section 
 
-# wsName = "starch_80_RD_FORWARD_1"
+
+# # Runing some procedure and y-space fit at the final workspace;
+# # If final workspace is loaded in Mantid, run only y-space fit:
+
+# # Name of final workspace produced by procedure
+# wsName = "starch_80_RD_FORWARD_"+str(fwdIC.noOfMSIterations-1)
+
 # if wsName in mtd:
 #     wsFinal = mtd[wsName]
+
 # else:
-#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+#     # Uncomment either independent OR joint procedure;
 
-# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-# fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
+#     # Independent procedure
+#     runIndependentIterativeProcedure(fwdIC)
+    
+#     # Joint procedure
+#     # runJointBackAndForwardProcedure(bckwdIC, fwdIC)
 
+#     # Select final ws created by the procedure
+#     wsFinal = mtd[wsName]
+
+
+# # Run Y-Space fit on selected ws
+# fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
+
+
+# Currently Bootstrap only supports running joint version
 runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
-# End of iteractive section
+
+
+# ----- End of iteractive section
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
