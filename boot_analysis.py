@@ -40,6 +40,48 @@ def plotHists(ax, samples, nBins, title):
     ax.legend()
 
 
+def checkBootSamplesVSParent(bestPars, parentPars):
+    """
+    For an unbiased estimator, the mean of the bootstrap samples will converge to 
+    the mean of the experimental sample (here called parent).
+    """
+
+    bootWidths = bestPars[:, :, 1::3]
+    bootIntensities = bestPars[:, :, 0::3]
+
+    meanBootWidths = np.mean(bootWidths, axis=0)
+    meanBootIntensities = np.mean(bootIntensities, axis=0)
+
+    avgWidths, stdWidths, avgInt, stdInt = calculateMeansAndStds(meanBootWidths.T, meanBootIntensities.T)
+
+    parentWidths = parentPars[:, 1::3]
+    parentIntensities = parentPars[:, 0::3]
+
+    avgWidthsP, stdWidthsP, avgIntP, stdIntP = calculateMeansAndStds(parentWidths.T, parentIntensities.T)
+  
+    print("\nComparing Bootstrap means with parent means:\n")
+    printResults(avgWidths, stdWidths, "Boot Widths")
+    printResults(avgWidthsP, stdWidthsP, "Parent Widths")
+    printResults(avgInt, stdInt, "Boot Intensities")
+    printResults(avgIntP, stdIntP, "Parent Intensities")
+    
+
+def plot2DHists(bootSamples, nBins):
+    """bootSamples has histogram rows for each parameter"""
+
+    plotSize = len(bootSamples)
+    fig, axs = plt.subplots(plotSize, plotSize)
+
+    for i in range(plotSize):
+        for j in range(plotSize):
+            
+            if i==j:
+                axs[i, j].hist(bootSamples[i], nBins)
+            else:
+                axs[i, j].hist2d(bootSamples[i], bootSamples[j], nBins)
+    plt.show()
+
+
 def addParentMeans(ax, means):
     for mean in means:
         ax.axvline(mean, 0, 0.97, color="k", ls=":")
@@ -100,15 +142,15 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # ySpaceFit = False
 
 sampleName = "starch_80_RD"
-firstSpec = 144
-lastSpec = 182
+firstSpec = 3
+lastSpec = 134
 msIter = 4
 MS = True
-GC = True
+GC = False
 nSamples = 1250
 nBins = 50
 speed = "slow"
-ySpaceFit = True
+ySpaceFit = False
 
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
@@ -141,6 +183,7 @@ if ySpaceFit:
     plt.show()
 
 # plot3DRows(meanW0)
-
+checkBootSamplesVSParent(bootPars, parentPars)
+plot2DHists(means, nBins)    # I can't believe this actually works lol
 
 
