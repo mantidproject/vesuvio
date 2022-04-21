@@ -49,8 +49,9 @@ def checkBootSamplesVSParent(bestPars, parentPars):
     bootWidths = bestPars[:, :, 1::3]
     bootIntensities = bestPars[:, :, 0::3]
 
-    meanBootWidths = np.mean(bootWidths, axis=0)
-    meanBootIntensities = np.mean(bootIntensities, axis=0)
+    # TODO: Need to decide on wether to use mean, median or mode
+    meanBootWidths = np.median(bootWidths, axis=0)
+    meanBootIntensities = np.median(bootIntensities, axis=0)
 
     avgWidths, stdWidths, avgInt, stdInt = calculateMeansAndStds(meanBootWidths.T, meanBootIntensities.T)
 
@@ -66,19 +67,34 @@ def checkBootSamplesVSParent(bestPars, parentPars):
     printResults(avgIntP, stdIntP, "Parent Intensities")
     
 
-def plot2DHists(bootSamples, nBins):
+def plot2DHists(bootSamples, nBins, mode):
     """bootSamples has histogram rows for each parameter"""
 
     plotSize = len(bootSamples)
-    fig, axs = plt.subplots(plotSize, plotSize)
+    fig, axs = plt.subplots(plotSize, plotSize, figsize=(8, 8))
 
     for i in range(plotSize):
         for j in range(plotSize):
-            
-            if i==j:
-                axs[i, j].hist(bootSamples[i], nBins)
+            if j>i:
+                axs[i, j].set_visible(False)
+
+            elif i==j:
+                if i>0:
+                    orientation="horizontal"
+                else:
+                    orientation="vertical"
+
+                axs[i, j].hist(bootSamples[i], nBins, orientation=orientation)
+
             else:
-                axs[i, j].hist2d(bootSamples[i], bootSamples[j], nBins)
+                axs[i, j].hist2d(bootSamples[j], bootSamples[i], nBins)
+                
+            if j==0:
+                axs[i, j].set_ylabel(f"idx {i}")   
+            if i==plotSize-1:
+                axs[i, j].set_xlabel(f"idx{j}")
+    
+    fig.suptitle(f"1D and 2D Histograms of {mode}")
     plt.show()
 
 
@@ -86,16 +102,6 @@ def addParentMeans(ax, means):
     for mean in means:
         ax.axvline(mean, 0, 0.97, color="k", ls=":")
         
-
-def plot3DRows(rows):
-    fig= plt.figure()
-    ax = fig.add_subplot(projection="3d")
-    ax.scatter(rows[0], rows[1], rows[2])
-    ax.set_xlabel("0")
-    ax.set_ylabel("1")
-    ax.set_zlabel("2")
-    plt.show()
-
 
 def printResults(arrM, arrE, mode):
     print(f"\n{mode}:\n")
@@ -130,27 +136,27 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
     return loadPath, loadYFitPath
 
 
-# sampleName = "D_HMT"
-# firstSpec = 3
-# lastSpec = 134
-# msIter = 4
-# MS = True
-# GC = False
-# nSamples = 1000
-# nBins = 30
-# speed = "slow"
-# ySpaceFit = False
-
-sampleName = "starch_80_RD"
+sampleName = "D_HMT"
 firstSpec = 3
 lastSpec = 134
 msIter = 4
 MS = True
 GC = False
-nSamples = 1250
-nBins = 50
+nSamples = 1000
+nBins = 30
 speed = "slow"
 ySpaceFit = False
+
+# sampleName = "starch_80_RD"
+# firstSpec = 3
+# lastSpec = 134
+# msIter = 1
+# MS = True
+# GC = False
+# nSamples = 40
+# nBins = 6
+# speed = "slow"
+# ySpaceFit = False
 
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
@@ -159,6 +165,8 @@ bootData = np.load(dataPath)
 bootPars = bootData["boot_samples"][:, :, 1:-2]
 parentPars = bootData["parent_result"][:, 1:-2]
 
+checkBootSamplesVSParent(bootPars, parentPars)
+
 
 meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
 meanWp = meanWp.flatten()
@@ -166,7 +174,7 @@ meanIp = meanIp.flatten()
 
 meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 
-fig, axs = plt.subplots(1, 2, figsize=(15, 8))
+fig, axs = plt.subplots(1, 2, figsize=(15, 3))
 for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
     plotHists(ax, means, nBins, title)
     addParentMeans(ax, meanp)
@@ -183,7 +191,6 @@ if ySpaceFit:
     plt.show()
 
 # plot3DRows(meanW0)
-checkBootSamplesVSParent(bootPars, parentPars)
-plot2DHists(means, nBins)    # I can't believe this actually works lol
-
+plot2DHists(meanW, nBins, "Widths")    
+plot2DHists(meanI, nBins, "Intensities")   
 
