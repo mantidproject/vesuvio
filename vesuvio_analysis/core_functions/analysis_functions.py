@@ -9,7 +9,7 @@ np.set_printoptions(suppress=True, precision=4, linewidth=100, threshold=sys.max
 def iterativeFitForDataReduction(ic):
     createTableInitialParameters(ic)
 
-    initialWs = loadRawAndEmptyWsFromUserPath(ic)   
+    initialWs = loadRawAndEmptyWsFromUserPath(ic)  # Do this before alternative bootstrap to extract name()   
 
     if ic.bootSample:
         initialWs = RenameWorkspace(InputWorkspace=ic.bootWS, OutputWorkspace=initialWs.name())

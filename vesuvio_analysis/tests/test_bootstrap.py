@@ -8,7 +8,7 @@ from .tests_IC import fwdIC, bckwdIC, bootIC, yfitIC
 testPath = Path(__file__).absolute().parent 
 
 np.random.seed(1)   # Set seed so that tests match everytime
-bootBackSamples, bootFrontSamples, bootYFitSamples = runBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
+bootBackSamples, bootFrontSamples, bootYFitSamples = runBootstrap(bckwdIC, fwdIC, bootIC, yfitIC, checkUserIn=False)
 
 oriBootBack = testPath / "stored_boot_back.npz"
 oriBootFront = testPath / "stored_boot_front.npz"

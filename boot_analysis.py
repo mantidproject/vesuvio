@@ -50,8 +50,8 @@ def checkBootSamplesVSParent(bestPars, parentPars):
     bootIntensities = bestPars[:, :, 0::3]
 
     # TODO: Need to decide on wether to use mean, median or mode
-    meanBootWidths = np.median(bootWidths, axis=0)
-    meanBootIntensities = np.median(bootIntensities, axis=0)
+    meanBootWidths = np.mean(bootWidths, axis=0)
+    meanBootIntensities = np.mean(bootIntensities, axis=0)
 
     avgWidths, stdWidths, avgInt, stdInt = calculateMeansAndStds(meanBootWidths.T, meanBootIntensities.T)
 
@@ -136,27 +136,27 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
     return loadPath, loadYFitPath
 
 
-sampleName = "D_HMT"
-firstSpec = 3
-lastSpec = 134
-msIter = 4
-MS = True
-GC = False
-nSamples = 1000
-nBins = 30
-speed = "slow"
-ySpaceFit = False
-
-# sampleName = "starch_80_RD"
+# sampleName = "D_HMT"
 # firstSpec = 3
 # lastSpec = 134
-# msIter = 1
+# msIter = 4
 # MS = True
 # GC = False
-# nSamples = 40
-# nBins = 6
+# nSamples = 1000
+# nBins = 30
 # speed = "slow"
 # ySpaceFit = False
+
+sampleName = "starch_80_RD"
+firstSpec = 144
+lastSpec = 182
+msIter = 4
+MS = True
+GC = True
+nSamples = 650
+nBins = int(nSamples/25)
+speed = "slow"
+ySpaceFit = True
 
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
@@ -186,11 +186,13 @@ if ySpaceFit:
     bootYFitVals = bootYFitData["boot_vals"]
     mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
 
-    fig, ax = plt.subplots()
-    plotHists(ax, mFitVals, nBins, "Y-Space Fit Parameters")
+    # Plot each parameter in an individual histogram
+    fig, axs = plt.subplots(len(mFitVals), 1, figsize=(8, 15))
+    for i, (ax, hist) in enumerate(zip(axs.flatten(), mFitVals)):
+        plotHists(ax, hist[np.newaxis, :], nBins, f"idx {i}")
     plt.show()
 
-# plot3DRows(meanW0)
+
 plot2DHists(meanW, nBins, "Widths")    
 plot2DHists(meanI, nBins, "Intensities")   
 
