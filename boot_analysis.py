@@ -177,7 +177,7 @@ meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 fig, axs = plt.subplots(1, 2, figsize=(15, 3))
 for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
     plotHists(ax, means, nBins, title)
-    addParentMeans(ax, meanp)
+    # addParentMeans(ax, meanp)
 plt.show()
 
 
@@ -187,12 +187,12 @@ if ySpaceFit:
     mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
 
     # Plot each parameter in an individual histogram
-    fig, axs = plt.subplots(len(mFitVals), 1, figsize=(8, 15))
+    fig, axs = plt.subplots(len(mFitVals), 1, figsize=(8, 10))
     for i, (ax, hist) in enumerate(zip(axs.flatten(), mFitVals)):
         plotHists(ax, hist[np.newaxis, :], nBins, f"idx {i}")
     plt.show()
 
 
-plot2DHists(meanW, nBins, "Widths")    
-plot2DHists(meanI, nBins, "Intensities")   
+# plot2DHists(meanW, nBins, "Widths")    
+# plot2DHists(meanI, nBins, "Intensities")   
 

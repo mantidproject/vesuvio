@@ -80,9 +80,9 @@ def BootstrapJoint(bckwdIC, fwdIC, bootIC, yFitIC, checkUserIn=True):
     bootResults = BootstrapResults(fwdIC, bckwdIC, bootIC, yFitIC, parentBackWS.getNumberHistograms(), parentFrontWS.getNumberHistograms())
     bootResults.storeParentResults(bckwdScatResP, fwdScatResP, yFitResultsParent)
 
-    AnalysisDataService.clear()
     # Form each bootstrap workspace and run ncp fit with MS corrections
     for j in range(bootIC.nSamples):
+        AnalysisDataService.clear()
 
         wsBootB = createBootstrapWS(savePathBackWS, savePathBackNCP)
         wsBootF = createBootstrapWS(savePathFrontWS, savePathFrontNCP)
@@ -94,13 +94,15 @@ def BootstrapJoint(bckwdIC, fwdIC, bootIC, yFitIC, checkUserIn=True):
         fwdIC.bootWS = wsBootF     
 
         # Run procedure for bootstrap ws
-        wsFinalBoot, bckwdScatResBoot, fwdScatResBoot = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
-        yFitResultsBoot = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinalBoot)
+        try:
+            wsFinalBoot, bckwdScatResBoot, fwdScatResBoot = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
+            yFitResultsBoot = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinalBoot)
+        except:
+            continue
 
         bootResults.storeBootIterResults(j, bckwdScatResBoot, fwdScatResBoot, yFitResultsBoot)
         bootResults.saveResults(bckwdIC, fwdIC)
-              
-        AnalysisDataService.clear()    # Clear all ws
+            
     return bootResults.bootBackSamples, bootResults.bootFrontSamples, bootResults.bootYFitVals
 
 

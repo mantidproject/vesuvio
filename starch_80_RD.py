@@ -110,7 +110,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = True
+    symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = True
@@ -120,7 +120,7 @@ class YSpaceFitInitialConditions:
 
 class bootstrapInitialConditions:
     speedQuick = False
-    nSamples = 650
+    nSamples = 2500
     ySpaceFit = True
 
 
