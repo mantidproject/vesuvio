@@ -2,14 +2,17 @@ from .analysis_functions import iterativeFitForDataReduction, switchFirstTwoAxis
 from mantid.api import AnalysisDataService, mtd
 import numpy as np
 
-def runIndependentIterativeProcedure(IC):
+def runIndependentIterativeProcedure(IC, clearWS=True):
     """
     Runs the iterative fitting of NCP, cleaning any previously stored workspaces.
     input: Backward or Forward scattering initial conditions object
     output: Final workspace that was fitted, object with results arrays
     """
 
-    AnalysisDataService.clear()
+    # Clear worksapces before running one of the procedures below
+    if clearWS:
+        AnalysisDataService.clear()
+        
     wsFinal, ncpFitResultsObject = iterativeFitForDataReduction(IC)
     return wsFinal, ncpFitResultsObject
 

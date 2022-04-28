@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap, runJointBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -59,9 +59,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
-    lastSpec = 134    #134
+    lastSpec = 23    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -94,9 +94,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
-    lastSpec = 182   #182
+    lastSpec = 164   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -120,7 +120,7 @@ class YSpaceFitInitialConditions:
 
 class bootstrapInitialConditions:
     speedQuick = False
-    nSamples = 2500
+    nSamples = 5
     ySpaceFit = True
 
 
@@ -170,8 +170,9 @@ start_time = time.time()
 
 
 # Currently Bootstrap only supports running joint version
-runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+# runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
+runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 
 # ----- End of iteractive section
