@@ -148,15 +148,15 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # ySpaceFit = False
 
 sampleName = "starch_80_RD"
-firstSpec = 144
-lastSpec = 182
+firstSpec = 3
+lastSpec = 134
 msIter = 4
 MS = True
-GC = True
+GC = False
 nSamples = 650
 nBins = int(nSamples/25)
 speed = "slow"
-ySpaceFit = True
+ySpaceFit = False
 
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
@@ -193,6 +193,6 @@ if ySpaceFit:
     plt.show()
 
 
-# plot2DHists(meanW, nBins, "Widths")    
-# plot2DHists(meanI, nBins, "Intensities")   
+plot2DHists(meanW, nBins, "Widths")    
+plot2DHists(meanI, nBins, "Intensities")   
 
