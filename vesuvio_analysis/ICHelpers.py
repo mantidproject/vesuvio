@@ -1,6 +1,7 @@
 
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
+import numpy as np
 currentPath = Path(__file__).absolute().parent
 experimentsPath = currentPath / ".." / "experiments"
 
@@ -20,6 +21,7 @@ def completeICFromInputs(ic, scriptName, icWS, bootIC):
 
     ic.name = scriptName+"_"+ic.modeRunning+"_"
 
+    ic.masses = ic.masses.astype(float)
     ic.noOfMasses = len(ic.masses)
 
     ic.maskedSpecNo = ic.maskedSpecAllNo[(ic.maskedSpecAllNo>=ic.firstSpec) & (ic.maskedSpecAllNo<=ic.lastSpec)]
@@ -103,11 +105,12 @@ def setOutputDirsForSample(ic, sampleName, bootIC):
 
     if not bootOutPath.exists():
         bootOutPath.mkdir(parents=True)
-        quickPath = bootOutPath / "quick"
-        slowPath = bootOutPath / "slow"
 
-        quickPath.mkdir(parents=True)
-        slowPath.mkdir(parents=True)
+    quickPath = bootOutPath / "quick"
+    slowPath = bootOutPath / "slow"
+    if not quickPath.exists() or not slowPath.exists():
+        quickPath.mkdir(parents=True, exist_ok=True)
+        slowPath.mkdir(parents=True, exist_ok=True)
     
 
     bootName = fileName + f"_nsampl_{bootIC.nSamples}"
@@ -116,11 +119,11 @@ def setOutputDirsForSample(ic, sampleName, bootIC):
     bootNameZ = bootName + ".npz"
     bootNameYFitZ = bootNameYFit + ".npz"
 
-    ic.bootQuickSavePath = bootOutPath / "quick" / bootNameZ
-    ic.bootSlowSavePath = bootOutPath / "slow" / bootNameZ
+    ic.bootQuickSavePath = quickPath / bootNameZ
+    ic.bootSlowSavePath = slowPath / bootNameZ
 
-    ic.bootQuickYFitSavePath = bootOutPath / "quick" / bootNameYFitZ
-    ic.bootSlowYFitSavePath = bootOutPath / "slow" / bootNameYFitZ
+    ic.bootQuickYFitSavePath = quickPath / bootNameYFitZ
+    ic.bootSlowYFitSavePath = slowPath / bootNameYFitZ
     return
 
 

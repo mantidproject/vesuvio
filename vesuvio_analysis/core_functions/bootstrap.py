@@ -10,14 +10,14 @@ import time
 currentPath = Path(__file__).parent.absolute()
 
 
-def runIndependentBootstrap(singleIC, bootIC, yFitIC):
+def runIndependentBootstrap(singleIC, bootIC, yFitIC, checkUserIn=True, fastBootstrap=False):
     inputIC = [singleIC]
-    return runBootstrap(inputIC, bootIC, yFitIC)
+    return runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap)
 
 
-def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
+def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC, checkUserIn=True, fastBootstrap=False):
     inputIC = [bckwdIC, fwdIC]
-    return runBootstrap(inputIC, bootIC, yFitIC)
+    return runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap)
 
 
 def setICsToDefault(inputIC, yFitIC):
@@ -32,12 +32,12 @@ def setICsToDefault(inputIC, yFitIC):
         IC.bootSample = False
 
 
-def chooseAndRunProcedure(inputIC, yFitIC):
+def runMainProcedure(inputIC, yFitIC):
 
     if len(inputIC) == 2:
         bckwdIC, fwdIC = inputIC
 
-        wsParent, bckwdScatResP, fwdScatResP = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+        wsParent, bckwdScatResP, fwdScatResP = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
         yFitResultsParent = fitInYSpaceProcedure(yFitIC, fwdIC, wsParent)
 
         parentResults = [bckwdScatResP, fwdScatResP, yFitResultsParent]
@@ -45,7 +45,7 @@ def chooseAndRunProcedure(inputIC, yFitIC):
     elif len(inputIC) == 1:
         singleIC = inputIC[0]
 
-        wsParent, singleScatResP = runIndependentIterativeProcedure(singleIC)
+        wsParent, singleScatResP = runIndependentIterativeProcedure(singleIC, clearWS=False)
         yFitResultsParent = fitInYSpaceProcedure(yFitIC, singleIC, wsParent)
 
         parentResults = [singleScatResP, yFitResultsParent]  
@@ -85,19 +85,63 @@ def convertWSToSavePaths(parentWSnNCPs):
 def initializeResults(parentResults, nSamples):
     bootResultObjs = []
     for pResults in parentResults:
-        resultsObj = BootstrapResults(pResults, nSamples)
+        try:
+            resultsObj = BootScattResults(pResults, nSamples)
+        except AttributeError:
+            resultsObj = BootYFitResults(pResults, nSamples)
+
         bootResultObjs.append(resultsObj)
     return bootResultObjs
+
+
+class BootScattResults:
+
+    def __init__(self, parentResults, nSamples):
+        self.parentResult = parentResults.all_spec_best_par_chi_nit[-1]
+        self.bootSamples = np.zeros((nSamples, *self.parentResult.shape))
+
+    def storeBootIterResults(self, j, bootResult):
+        self.bootSamples[j] = bootResult.all_spec_best_par_chi_nit[-1]
+    
+    def saveResults(self, IC, fastBootstrap):
+        if fastBootstrap:
+            savePath = IC.bootQuickSavePath
+        else:
+            savePath = IC.bootSlowSavePath
+
+        np.savez(savePath, boot_samples=self.bootSamples,
+             parent_result=self.parentResult)
+
+
+class BootYFitResults:
+
+    def __init__(self, parentResults, nSamples):
+        self.parentPopt = parentResults.popt
+        self.parentPerr = parentResults.perr
+        self.bootSamples = np.zeros((nSamples, *self.parentPopt.shape))
+
+    def storeBootIterResults(self, j, bootResult):
+        self.bootSamples[j] = bootResult.popt
+    
+    def saveResults(self, IC, fastBootstrap):
+        if fastBootstrap:
+            savePath = IC.bootQuickYFitSavePath
+        else:
+            savePath = IC.bootSlowYFitSavePath
+
+        np.savez(savePath, boot_samples=self.bootSamples,
+             parent_popt=self.parentPopt, parent_perr=self.parentPerr)    
+
 
 def storeBootIter(bootResultObjs, j, bootIterResults):
     for bootObj, iterRes in zip(bootResultObjs, bootIterResults):
         bootObj.storeBootIterResults(j, iterRes)
 
-def saveBootstrapResults(bootResultObjs, inputIC):
 
+def saveBootstrapResults(bootResultObjs, inputIC, fastBootstrap):
     for bootObj, IC in zip(bootResultObjs, inputIC):
-        bootObj.saveResults(IC)
-    bootResultObjs[-1].saveResults(inputIC[-1])
+        bootObj.saveResults(IC, fastBootstrap)
+    bootResultObjs[-1].saveResults(inputIC[-1], fastBootstrap)
 
 
 def createBootstrapWS(parentWSNCPSavePaths):
@@ -127,26 +171,37 @@ def createBootstrapWS(parentWSNCPSavePaths):
     return bootInputWS
 
 
-def plugBootWSIntoIC(inputIC, bootInputWS):
+def plugBootWSIntoIC(inputIC, bootInputWS, fastBootstrap):
+    """
+    Changes initial conditions to take in the bootstrap workspace.
+    If bootstrap is on fast mode, change MS iterations to 1.
+    """
     for IC, wsBoot in zip(inputIC, bootInputWS):
         IC.bootSample = True
         IC.bootWS = wsBoot
 
+        if fastBootstrap:
+            IC.noOfMSIterations = 1
 
-def runBootstrap(inputIC, bootIC, yFitIC, checkUserIn=True):
+    
+
+    
+
+
+def runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap):
     """inutIC can have one or two (back, forward) IC inputs."""
 
     setICsToDefault(inputIC, yFitIC)
 
     t0 = time.time()
-    parentResults = chooseAndRunProcedure(inputIC, yFitIC)
+    parentResults = runMainProcedure(inputIC, yFitIC)
     t1 = time.time()
 
     if checkUserIn:
         userIn = checkUserInput(t1-t0, bootIC.nSamples)
         if (userIn != "y") and (userIn != "Y"): return
 
-    parentWSnNCPs = selectParentWorkspaces(inputIC, False)
+    parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
     bootResults = initializeResults(parentResults, bootIC.nSamples)
@@ -157,13 +212,13 @@ def runBootstrap(inputIC, bootIC, yFitIC, checkUserIn=True):
 
         bootInputWS = createBootstrapWS(parentWSNCPSavePaths)
 
-        plugBootWSIntoIC(inputIC, bootInputWS)   
+        plugBootWSIntoIC(inputIC, bootInputWS, fastBootstrap)   
 
         # Run procedure for bootstrap ws
-        iterResults = chooseAndRunProcedure(inputIC, yFitIC)
+        iterResults = runMainProcedure(inputIC, yFitIC)
 
         storeBootIter(bootResults, j, iterResults)
-        saveBootstrapResults(bootResults, inputIC)
+        saveBootstrapResults(bootResults, inputIC, fastBootstrap)
             
     return bootResults
 
@@ -299,79 +354,66 @@ def bootstrapResidualsSample(residuals):
     return bootRes
 
 
-class BootstrapResults:
 
-    def __init__(self, parentResults, nSamples):
-        self.parentResult = parentResults.all_spec_best_par_chi_nit[-1]
-        self.bootSamples = np.zeros((nSamples, *self.parentResult.shape))
+# # TODO: Figure out a way of switching between single independent and joint procedures
 
-    def storeBootIterResults(self, j, bootResult):
-        self.bootSamples[j] = bootResult.all_spec_best_par_chi_nit[-1]
-    
-    def saveResults(self, IC):
+# # Legacy function for single individual back or forward procedure
+# def slowBootstrap(ic, bootIC, yFitIC):
+#     """Runs bootstrap of full procedure (with MS corrections)"""
 
-        np.savez(IC.bootSlowSavePath, boot_samples=self.bootSamples,
-             parent_result=self.parentResult)
+#     ic.bootSample = False
 
-# TODO: Figure out a way of switching between single independent and joint procedures
+#     # Run procedure without modifications to get parent results
+#     AnalysisDataService.clear()
+#     t0 = time.time()
+#     wsParent, scatResultsParent = iterativeFitForDataReduction(ic)
+#     yFitResultsParent = fitInYSpaceProcedure(yFitIC, ic, wsParent)
+#     t1 = time.time()
+#     userIn = checkUserInput(t1-t0, bootIC.nSamples)
+#     if (userIn != "y") and (userIn != "Y"): return
 
-# Legacy function for single individual back or forward procedure
-def slowBootstrap(ic, bootIC, yFitIC):
-    """Runs bootstrap of full procedure (with MS corrections)"""
+#     # Extract dataY and ncp from starting workspace
+#     initialWS = mtd[ic.name+"0"]
+#     dataY = initialWS.extractY()[:, :-1]
+#     totNcp = scatResultsParent.all_tot_ncp[0]     # Select fitted ncp corresponding to initialWS
+#     residuals = dataY - totNcp
+#     # Save initialWS to preserve dataX and dataE
+#     saveBootWSPath = currentPath / "bootstrap_ws" / "wsFinal.nxs"
+#     SaveNexus(initialWS, str(saveBootWSPath))
 
-    ic.bootSample = False
+#     # Initialize arrays
+#     bootSamples = np.zeros((bootIC.nSamples, len(dataY), len(ic.initPars)+3))
+#     yFitNPars = 5 if yFitIC.singleGaussFitToHProfile else 6
+#     bootYFitVals = np.zeros((bootIC.nSamples, 3, yFitNPars))
 
-    # Run procedure without modifications to get parent results
-    AnalysisDataService.clear()
-    t0 = time.time()
-    wsParent, scatResultsParent = iterativeFitForDataReduction(ic)
-    yFitResultsParent = fitInYSpaceProcedure(yFitIC, ic, wsParent)
-    t1 = time.time()
-    userIn = checkUserInput(t1-t0, bootIC.nSamples)
-    if (userIn != "y") and (userIn != "Y"): return
+#     AnalysisDataService.clear()
+#     # Form each bootstrap workspace and run ncp fit with MS corrections
+#     for j in range(bootIC.nSamples):
 
-    # Extract dataY and ncp from starting workspace
-    initialWS = mtd[ic.name+"0"]
-    dataY = initialWS.extractY()[:, :-1]
-    totNcp = scatResultsParent.all_tot_ncp[0]     # Select fitted ncp corresponding to initialWS
-    residuals = dataY - totNcp
-    # Save initialWS to preserve dataX and dataE
-    saveBootWSPath = currentPath / "bootstrap_ws" / "wsFinal.nxs"
-    SaveNexus(initialWS, str(saveBootWSPath))
+#         bootRes = bootstrapResidualsSample(residuals)
+#         bootDataY = totNcp + bootRes
 
-    # Initialize arrays
-    bootSamples = np.zeros((bootIC.nSamples, len(dataY), len(ic.initPars)+3))
-    yFitNPars = 5 if yFitIC.singleGaussFitToHProfile else 6
-    bootYFitVals = np.zeros((bootIC.nSamples, 3, yFitNPars))
+#         # From workspace with bootstrap dataY
+#         wsBoot = Load(str(saveBootWSPath), OutputWorkspace="wsBoot")
+#         for i, row in enumerate(bootDataY):
+#             wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit
 
-    AnalysisDataService.clear()
-    # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(bootIC.nSamples):
+#         ic.bootSample = True    # Tells script to use input bootstrap ws
+#         ic.bootWS = wsBoot      # bootstrap ws to input
 
-        bootRes = bootstrapResidualsSample(residuals)
-        bootDataY = totNcp + bootRes
+#         # Run procedure for bootstrap ws
+#         wsFinalBoot, scatResultsBoot = iterativeFitForDataReduction(ic)
+#         yFitResults = fitInYSpaceProcedure(yFitIC, ic, wsFinalBoot)
 
-        # From workspace with bootstrap dataY
-        wsBoot = Load(str(saveBootWSPath), OutputWorkspace="wsBoot")
-        for i, row in enumerate(bootDataY):
-            wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit
+#         bootSamples[j] = scatResultsBoot.all_spec_best_par_chi_nit[-1]
+#         bootYFitVals[j] = yFitResults.popt
 
-        ic.bootSample = True    # Tells script to use input bootstrap ws
-        ic.bootWS = wsBoot      # bootstrap ws to input
-
-        # Run procedure for bootstrap ws
-        wsFinalBoot, scatResultsBoot = iterativeFitForDataReduction(ic)
-        yFitResults = fitInYSpaceProcedure(yFitIC, ic, wsFinalBoot)
-
-        bootSamples[j] = scatResultsBoot.all_spec_best_par_chi_nit[-1]
-        bootYFitVals[j] = yFitResults.popt
-
-        # Save result at each iteration in case of failure for long runs
-        np.savez(ic.bootSlowSavePath, boot_samples=bootSamples,
-             parent_result=scatResultsParent.all_spec_best_par_chi_nit[-1])
-        np.savez(ic.bootSlowYFitSavePath, boot_vals=bootYFitVals,
-                parent_popt=yFitResultsParent.popt, parent_perr=yFitResultsParent.perr)
-        AnalysisDataService.clear()    # Clear all ws
+#         # Save result at each iteration in case of failure for long runs
+#         np.savez(ic.bootSlowSavePath, boot_samples=bootSamples,
+#              parent_result=scatResultsParent.all_spec_best_par_chi_nit[-1])
+#         np.savez(ic.bootSlowYFitSavePath, boot_vals=bootYFitVals,
+#                 parent_popt=yFitResultsParent.popt, parent_perr=yFitResultsParent.perr)
+#         AnalysisDataService.clear()    # Clear all ws
 
 
 

@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap, runJointBootstrap
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap, runIndependentBootstrap, runJointBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -59,9 +59,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
-    lastSpec = 23    #134
+    lastSpec = 33    #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -172,7 +172,8 @@ start_time = time.time()
 # Currently Bootstrap only supports running joint version
 # runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
-runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+# runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+runIndependentBootstrap(bckwdIC, bootIC, yFitIC, checkUserIn=False, fastBootstrap=True)
 
 
 # ----- End of iteractive section

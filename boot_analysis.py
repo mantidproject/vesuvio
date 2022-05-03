@@ -147,17 +147,27 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # speed = "slow"
 # ySpaceFit = False
 
+# sampleName = "starch_80_RD"
+# firstSpec = 3
+# lastSpec = 134
+# msIter = 4
+# MS = True
+# GC = False
+# nSamples = 650
+# nBins = int(nSamples/25)
+# speed = "slow"
+# ySpaceFit = False
+
 sampleName = "starch_80_RD"
 firstSpec = 3
-lastSpec = 134
-msIter = 4
+lastSpec = 33
+msIter = 1
 MS = True
 GC = False
-nSamples = 650
-nBins = int(nSamples/25)
+nSamples = 5
+nBins = 5
 speed = "slow"
-ySpaceFit = False
-
+ySpaceFit = True
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
@@ -183,7 +193,7 @@ plt.show()
 
 if ySpaceFit:
     bootYFitData = np.load(dataYFitPath)
-    bootYFitVals = bootYFitData["boot_vals"]
+    bootYFitVals = bootYFitData["boot_samples"]    # Previously boot_vals
     mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
 
     # Plot each parameter in an individual histogram
