@@ -160,13 +160,13 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 
 sampleName = "starch_80_RD"
 firstSpec = 3
-lastSpec = 33
-msIter = 1
+lastSpec = 134
+msIter = 4
 MS = True
 GC = False
-nSamples = 5
-nBins = 5
-speed = "slow"
+nSamples = 50
+nBins = 10
+speed = "quick"
 ySpaceFit = True
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
