@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
+from scipy import stats
 from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
 currentPath = Path(__file__).parent.absolute() 
 experimentsPath = currentPath / "experiments"
@@ -75,6 +76,9 @@ def plot2DHists(bootSamples, nBins, mode):
 
     for i in range(plotSize):
         for j in range(plotSize):
+            
+            # axs[i, j].axis("off")
+
             if j>i:
                 axs[i, j].set_visible(False)
 
@@ -90,11 +94,20 @@ def plot2DHists(bootSamples, nBins, mode):
                 axs[i, j].hist2d(bootSamples[j], bootSamples[i], nBins)
                 
             if j==0:
-                axs[i, j].set_ylabel(f"idx {i}")   
+                axs[i, j].set_ylabel(f"idx {i}")  
+            else:
+                axs[i, j].get_yaxis().set_ticks([])
+
             if i==plotSize-1:
                 axs[i, j].set_xlabel(f"idx{j}")
+            else:
+                axs[i, j].get_xaxis().set_ticks([])
+            
+            axs[i, j].set_title(f"r = {stats.pearsonr(bootSamples[i], bootSamples[j])[0]:.3f}")
+
     
     fig.suptitle(f"1D and 2D Histograms of {mode}")
+
     plt.show()
 
 
@@ -147,27 +160,16 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # speed = "slow"
 # ySpaceFit = False
 
-# sampleName = "starch_80_RD"
-# firstSpec = 3
-# lastSpec = 134
-# msIter = 4
-# MS = True
-# GC = False
-# nSamples = 650
-# nBins = int(nSamples/25)
-# speed = "slow"
-# ySpaceFit = False
-
 sampleName = "starch_80_RD"
-firstSpec = 3
-lastSpec = 134
+firstSpec = 144
+lastSpec = 182
 msIter = 4
 MS = True
-GC = False
-nSamples = 50
-nBins = 10
-speed = "quick"
-ySpaceFit = True
+GC = True
+nSamples = 650
+nBins = int(nSamples/25)
+speed = "slow"
+ySpaceFit = False
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
