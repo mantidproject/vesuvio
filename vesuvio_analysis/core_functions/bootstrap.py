@@ -1,3 +1,4 @@
+from scipy import stats
 import numpy as np
 from .analysis_functions import arraysFromWS, histToPointData, prepareFitArgs, fitNcpToArray
 from .analysis_functions import iterativeFitForDataReduction
@@ -7,6 +8,8 @@ from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load
 from pathlib import Path
 import time
+import matplotlib.pyplot as plt
+plt.style.use("ggplot")
 currentPath = Path(__file__).parent.absolute()
 
 
@@ -34,6 +37,7 @@ def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
         if (userIn != "y") and (userIn != "Y"): return
 
     parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
+    checkResiduals(parentWSnNCPs)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
     bootResults = initializeResults(parentResults, nSamples)
@@ -271,6 +275,27 @@ def createBootstrapWS(parentWSNCPSavePaths):
 
         bootInputWS.append(wsBoot)
     return bootInputWS
+
+#TODO: Figure out how to include this check in the code
+def checkResiduals(parentWSnNCP):
+    """
+    Calculates the self-correlation of residuals for each spectrum.
+    When correlation is detected, plots the spectrum.
+    """
+    for (parentWS, parentNCP) in parentWSnNCP:
+        dataY = parentWS.extractY()[:, :-1]
+        totNcp = parentNCP.extractY()[:, :]     
+        residuals = dataY - totNcp 
+
+        lag = 1     # For lag-plot of self-correlation
+        print(f"Correlation Coefficients for lag={lag}:\n")
+        for rowRes in residuals:
+            corrCoef = stats.pearsonr(rowRes[:-lag], rowRes[lag:])  
+            print(corrCoef[0])
+            if np.abs(corrCoef[0]) >= 0.5:
+                plt.scatter(rowRes[:-lag], rowRes[lag:], label=f"r={corrCoef}")
+                plt.legend()
+                plt.show()
 
 
 def loadWorkspacesFromPath(*args):
