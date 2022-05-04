@@ -16,54 +16,54 @@ yfitICDefault = yfitIC
 
 #TODO: Figure out why doing the two tests simultaneously fails the testing
 
-# Test Joint procedure
-bootJointResults = runJointBootstrap(bckwdICDefault, fwdICDefault, bootICDefault, yfitICDefault, checkUserIn=False)
+# # Test Joint procedure
+# bootJointResults = runJointBootstrap(bckwdICDefault, fwdICDefault, bootICDefault, yfitICDefault, checkUserIn=False)
 
-bootSamples = []
-for bootRes in bootJointResults:
-    bootSamples.append(bootRes.bootSamples)
+# bootSamples = []
+# for bootRes in bootJointResults:
+#     bootSamples.append(bootRes.bootSamples)
 
-bootBackSamples, bootFrontSamples, bootYFitSamples = bootSamples
+# bootBackSamples, bootFrontSamples, bootYFitSamples = bootSamples
 
-oriBootBack = testPath / "stored_boot_back.npz"
-oriBootFront = testPath / "stored_boot_front.npz"
-oriBootYFit = testPath / "stored_boot_yfit.npz"
+# oriBootBack = testPath / "stored_boot_back.npz"
+# oriBootFront = testPath / "stored_boot_front.npz"
+# oriBootYFit = testPath / "stored_boot_yfit.npz"
 
-class TestJointBootstrap(unittest.TestCase):
+# class TestJointBootstrap(unittest.TestCase):
 
-    def setUp(self):
-        self.oriJointBack = np.load(oriBootBack)["boot_samples"]
-        self.oriJointFront = np.load(oriBootFront)["boot_samples"]
-        self.oriJointYFit = np.load(oriBootYFit)["boot_vals"]
-
-    def testBack(self):
-        nptest.assert_array_almost_equal(bootBackSamples, self.oriJointBack)
-
-    def testFront(self):
-        nptest.assert_array_almost_equal(bootFrontSamples, self.oriJointFront)
-
-    def testYFit(self):
-        nptest.assert_array_almost_equal(bootYFitSamples, self.oriJointYFit)
-
-
-# # Test Single procedure
-# bootSingleResults = runIndependentBootstrap(bckwdIC, bootIC, yfitIC, checkUserIn=False)
-
-# bootSingleBackSamples = bootSingleResults[0].bootSamples
-# bootSingleYFitSamples = bootSingleResults[1].bootSamples
-
-# oriSingleBootBack = testPath / "stored_single_boot_back.npz"
-# oriSingleBootYFit = testPath / "stored_single_boot_back_yfit.npz"
-
-# class TestIndependentBootstrap(unittest.TestCase):
 #     def setUp(self):
-#         self.oriBack = np.load(oriSingleBootBack)["boot_samples"]
-#         self.oriYFit = np.load(oriSingleBootYFit)["boot_vals"]
+#         self.oriJointBack = np.load(oriBootBack)["boot_samples"]
+#         self.oriJointFront = np.load(oriBootFront)["boot_samples"]
+#         self.oriJointYFit = np.load(oriBootYFit)["boot_vals"]
 
 #     def testBack(self):
-#         nptest.assert_array_almost_equal(bootSingleBackSamples, self.oriBack)
+#         nptest.assert_array_almost_equal(bootBackSamples, self.oriJointBack)
+
+#     def testFront(self):
+#         nptest.assert_array_almost_equal(bootFrontSamples, self.oriJointFront)
 
 #     def testYFit(self):
-#         nptest.assert_array_almost_equal(bootSingleYFitSamples, self.oriYFit)
+#         nptest.assert_array_almost_equal(bootYFitSamples, self.oriJointYFit)
+
+
+# Test Single procedure
+bootSingleResults = runIndependentBootstrap(bckwdIC, bootIC, yfitIC, checkUserIn=False)
+
+bootSingleBackSamples = bootSingleResults[0].bootSamples
+bootSingleYFitSamples = bootSingleResults[1].bootSamples
+
+oriSingleBootBack = testPath / "stored_single_boot_back.npz"
+oriSingleBootYFit = testPath / "stored_single_boot_back_yfit.npz"
+
+class TestIndependentBootstrap(unittest.TestCase):
+    def setUp(self):
+        self.oriBack = np.load(oriSingleBootBack)["boot_samples"]
+        self.oriYFit = np.load(oriSingleBootYFit)["boot_vals"]
+
+    def testBack(self):
+        nptest.assert_array_almost_equal(bootSingleBackSamples, self.oriBack)
+
+    def testYFit(self):
+        nptest.assert_array_almost_equal(bootSingleYFitSamples, self.oriYFit)
 
 
