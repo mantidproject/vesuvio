@@ -118,10 +118,10 @@ class YSpaceFitInitialConditions:
     nGlobalFitGroups = 4
    
 
-class bootstrapInitialConditions:
-    speedQuick = False
-    nSamples = 5
-    ySpaceFit = True
+# class bootstrapInitialConditions:
+#     speedQuick = False
+#     nSamples = 5
+#     ySpaceFit = True
 
 
 
@@ -132,11 +132,11 @@ bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 
-bootIC = bootstrapInitialConditions
+# bootIC = bootstrapInitialConditions
 
 # Need to run this function, otherwise will not work
-completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
-completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
+completeICFromInputs(fwdIC, scriptName, icWSFront)
+completeICFromInputs(bckwdIC, scriptName, icWSBack)
 
 
 start_time = time.time()
@@ -169,11 +169,11 @@ start_time = time.time()
 # fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
 
 
-# Currently Bootstrap only supports running joint version
-# runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-
-# runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-runIndependentBootstrap(bckwdIC, bootIC, yFitIC, checkUserIn=False, fastBootstrap=True)
+# Run either joint or independent bootstrap
+# YSpace fit is performed automatically by default
+nSamples = 5
+# runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
+runIndependentBootstrap(bckwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
 
 
 # ----- End of iteractive section

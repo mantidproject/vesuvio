@@ -6,7 +6,7 @@ currentPath = Path(__file__).absolute().parent
 experimentsPath = currentPath / ".." / "experiments"
 
 
-def completeICFromInputs(ic, scriptName, icWS, bootIC):
+def completeICFromInputs(ic, scriptName, icWS):
     """Assigns new methods to the initial conditions class from the inputs of that class"""
 
     assert ic.lastSpec > ic.firstSpec, "Last spectrum needs to be bigger than first spectrum"
@@ -30,19 +30,20 @@ def completeICFromInputs(ic, scriptName, icWS, bootIC):
     ic.mode = icWS.mode
     # Sort out input and output paths
     inputDirsForSample(ic, scriptName, icWS)
-    setOutputDirsForSample(ic, scriptName, bootIC)
+    setOutputDirsForSample(ic, scriptName)
     
     # Do not run bootstrap sample, by default
     ic.bootSample = False
     ic.bootWS = None
+
+    # Store script name
+    ic.scriptName = scriptName
     return 
 
 
 def inputDirsForSample(ic, sampleName, icWS):
     inputWSPath = experimentsPath / sampleName / "input_ws"
-
-    if not inputWSPath.exists():  
-        inputWSPath.mkdir(parents=True)
+    inputWSPath.mkdir(parents=True, exist_ok=True)
 
     wsPresent = False
     for wsPath in inputWSPath.iterdir():
@@ -78,11 +79,9 @@ def inputDirsForSample(ic, sampleName, icWS):
     return
 
 
-def setOutputDirsForSample(ic, sampleName, bootIC):
+def setOutputDirsForSample(ic, sampleName):
     outputPath = experimentsPath / sampleName / "output_npz_for_testing"
-
-    if not outputPath.exists():
-        outputPath.mkdir(parents=True)
+    outputPath.mkdir(parents=True, exist_ok=True)
 
     # Build Filename based on ic
     corr = ""
@@ -91,39 +90,11 @@ def setOutputDirsForSample(ic, sampleName, bootIC):
     if ic.GammaCorrectionFlag & (ic.noOfMSIterations>1):
         corr+="_GC"
 
-    fileName = f"spec_{ic.firstSpec}-{ic.lastSpec}_iter_{ic.noOfMSIterations}{corr}"
-    fileNameYSpace = fileName + "_ySpaceFit"
+    fileName = f"spec_{ic.firstSpec}-{ic.lastSpec}_iter_{ic.noOfMSIterations}{corr}"+".npz"
+    fileNameYSpace = fileName + "_ySpaceFit"+".npz"
 
-    fileNameZ = fileName + ".npz"
-    fileNameYSpaceZ = fileNameYSpace + ".npz"
-
-    ic.resultsSavePath = outputPath / fileNameZ
-    ic.ySpaceFitSavePath = outputPath / fileNameYSpaceZ
-
-    # Bootstrap output paths
-    bootOutPath = experimentsPath / sampleName / "bootstrap_data"
-
-    if not bootOutPath.exists():
-        bootOutPath.mkdir(parents=True)
-
-    quickPath = bootOutPath / "quick"
-    slowPath = bootOutPath / "slow"
-    if not quickPath.exists() or not slowPath.exists():
-        quickPath.mkdir(parents=True, exist_ok=True)
-        slowPath.mkdir(parents=True, exist_ok=True)
-    
-
-    bootName = fileName + f"_nsampl_{bootIC.nSamples}"
-    bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{bootIC.nSamples}"
-    
-    bootNameZ = bootName + ".npz"
-    bootNameYFitZ = bootNameYFit + ".npz"
-
-    ic.bootQuickSavePath = quickPath / bootNameZ
-    ic.bootSlowSavePath = slowPath / bootNameZ
-
-    ic.bootQuickYFitSavePath = quickPath / bootNameYFitZ
-    ic.bootSlowYFitSavePath = slowPath / bootNameYFitZ
+    ic.resultsSavePath = outputPath / fileName
+    ic.ySpaceFitSavePath = outputPath / fileNameYSpace
     return
 
 

@@ -102,11 +102,11 @@ class ForwardInitialConditions(GeneralInitialConditions):
     tof_binning="110,1.,430"                 # Binning of ToF spectra
 
 
-class bootstrapInitialConditions:
-    speedQuick = False
-    nSamples = 3
-    ySpaceFit = True
-
+# class bootstrapInitialConditions:
+#     speedQuick = False
+#     nSamples = 3
+#     ySpaceFit = True
+nSamples = 3
 
 class YSpaceFitInitialConditions:
     showPlots = False
@@ -125,8 +125,8 @@ fwdIC = ForwardInitialConditions
 bckwdIC = BackwardInitialConditions
 yfitIC = YSpaceFitInitialConditions
 
-bootIC = bootstrapInitialConditions
+# bootIC = bootstrapInitialConditions
 
-completeICFromInputs(fwdIC, "tests", icWSFront, bootIC)
-completeICFromInputs(bckwdIC, "tests", icWSBack, bootIC)
+completeICFromInputs(fwdIC, "tests", icWSFront)
+completeICFromInputs(bckwdIC, "tests", icWSBack)
 

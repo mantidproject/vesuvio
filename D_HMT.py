@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
+from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -62,7 +62,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -99,7 +99,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 1 #2   #4
+    noOfMSIterations = 2 #2   #4
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -115,18 +115,12 @@ class ForwardInitialConditions(GeneralInitialConditions):
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    singleGaussFitToHProfile = True    # When False, use Hermite expansion
+    symmetrisationFlag = False
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    singleGaussFitToHProfile = False    # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = True
     nGlobalFitGroups = 4   
-
-
-class bootstrapInitialConditions:
-    speedQuick = False
-    nSamples = 100
-    ySpaceFit = True
 
 
 icWSBack = LoadVesuvioBackParameters
@@ -136,10 +130,9 @@ bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 
-bootIC = bootstrapInitialConditions
 
-completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
-completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
+completeICFromInputs(fwdIC, scriptName, icWSFront)
+completeICFromInputs(bckwdIC, scriptName, icWSBack)
 
 
 start_time = time.time()
@@ -164,7 +157,8 @@ start_time = time.time()
 
 
 # Run Bootstrap procedures
-runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+nSamples = 5
+runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
 
 
 # End of iteractive section

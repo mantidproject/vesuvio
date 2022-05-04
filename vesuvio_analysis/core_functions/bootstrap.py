@@ -10,36 +10,36 @@ import time
 currentPath = Path(__file__).parent.absolute()
 
 
-def runIndependentBootstrap(singleIC, bootIC, yFitIC, checkUserIn=True, fastBootstrap=False):
+def runIndependentBootstrap(singleIC, nSamples, yFitIC, checkUserIn=True, fastBootstrap=False):
     inputIC = [singleIC]
-    return runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap)
+    return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
 
 
-def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC, checkUserIn=True, fastBootstrap=False):
+def runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=True, fastBootstrap=False):
     inputIC = [bckwdIC, fwdIC]
-    return runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap)
+    return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
 
 
-def runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap):
+def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     """inutIC can have one or two (back, forward) IC inputs."""
 
-    setICsToDefault(inputIC, yFitIC)
+    setICsToDefault(inputIC, yFitIC, nSamples)
 
     t0 = time.time()
     parentResults = runMainProcedure(inputIC, yFitIC)
     t1 = time.time()
 
     if checkUserIn:
-        userIn = checkUserInput(t1-t0, bootIC.nSamples)
+        userIn = checkUserInput(t1-t0, nSamples)
         if (userIn != "y") and (userIn != "Y"): return
 
     parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
-    bootResults = initializeResults(parentResults, bootIC.nSamples)
+    bootResults = initializeResults(parentResults, nSamples)
 
     # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(bootIC.nSamples):
+    for j in range(nSamples):
         AnalysisDataService.clear()
 
         bootInputWS = createBootstrapWS(parentWSNCPSavePaths)
@@ -55,7 +55,8 @@ def runBootstrap(inputIC, bootIC, yFitIC, checkUserIn, fastBootstrap):
     return bootResults
 
 
-def setICsToDefault(inputIC, yFitIC):
+def setICsToDefault(inputIC, yFitIC, nSamples):
+    """Disables some features of yspace fit, makes sure the default """
     # Disable global fit 
     yFitIC.globalFitFlag = False
     # Run automatic minos by default
@@ -65,6 +66,38 @@ def setICsToDefault(inputIC, yFitIC):
 
     for IC in inputIC:    # Default is not to run with bootstrap ws
         IC.bootSample = False
+
+    # Form bootstrap output paths
+
+    # Select script name and experiments path
+    sampleName = inputIC[0].scriptName   # Name of sample currently running
+    experimentsPath = currentPath/".."/".."/"experiments"
+
+    bootOutPath = experimentsPath / sampleName / "bootstrap_data"
+    bootOutPath.mkdir(exist_ok=True)
+
+    quickPath = bootOutPath / "quick"
+    slowPath = bootOutPath / "slow"
+    quickPath.mkdir(exist_ok=True)
+    slowPath.mkdir(exist_ok=True)
+
+    for IC in inputIC:    # Make save paths for .npz files
+        # Build Filename based on ic
+        corr = ""
+        if IC.MSCorrectionFlag & (IC.noOfMSIterations>1):
+            corr+="_MS"
+        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>1):
+            corr+="_GC"
+
+        fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
+        bootName = fileName + f"_nsampl_{nSamples}"+".npz"
+        bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
+
+        IC.bootQuickSavePath = quickPath / bootName
+        IC.bootQuickYFitSavePath = quickPath / bootNameYFit
+        IC.bootSlowSavePath = slowPath / bootName
+        IC.bootSlowYFitSavePath = slowPath / bootNameYFit
+    
 
 
 def runMainProcedure(inputIC, yFitIC):
