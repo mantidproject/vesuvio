@@ -33,10 +33,16 @@ def calcBootMeans(bestPars):
 def plotHists(ax, samples, nBins, title):
     ax.set_title(f"Histogram of {title}")
     for i, bootHist in enumerate(samples):
-        leg = f"Row {i}: {np.mean(bootHist):>6.3f} \u00B1 {np.std(bootHist):<6.3f}"
+        
+        mean = np.mean(bootHist)
+        bounds = np.percentile(bootHist, [5, 95])
+        errors = bounds - mean
+
+        leg = f"Row {i}: {mean:>6.3f} +{errors[1]:.3f} {errors[0]:.3f}"
         ax.hist(bootHist, nBins, histtype="step", label=leg)
 
-        ax.axvline(np.mean(bootHist), 0, 0.97, color="k", ls="--")
+        ax.axvline(np.mean(bootHist), 0, 0.97, color="k", ls="--", alpha=0.4)
+        ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
 
     ax.legend()
 
@@ -169,7 +175,7 @@ GC = True
 nSamples = 2500
 nBins = int(nSamples/25)
 speed = "slow"
-ySpaceFit = True
+ySpaceFit = False
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
@@ -189,7 +195,7 @@ meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 fig, axs = plt.subplots(1, 2, figsize=(15, 3))
 for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
     plotHists(ax, means, nBins, title)
-    addParentMeans(ax, meanp)
+    # addParentMeans(ax, meanp)
 plt.show()
 
 
