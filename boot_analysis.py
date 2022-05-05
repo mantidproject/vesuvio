@@ -166,10 +166,10 @@ lastSpec = 182
 msIter = 4
 MS = True
 GC = True
-nSamples = 650
+nSamples = 2500
 nBins = int(nSamples/25)
 speed = "slow"
-ySpaceFit = False
+ySpaceFit = True
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
@@ -189,13 +189,13 @@ meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 fig, axs = plt.subplots(1, 2, figsize=(15, 3))
 for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
     plotHists(ax, means, nBins, title)
-    # addParentMeans(ax, meanp)
+    addParentMeans(ax, meanp)
 plt.show()
 
 
 if ySpaceFit:
     bootYFitData = np.load(dataYFitPath)
-    bootYFitVals = bootYFitData["boot_samples"]    # Previously boot_vals
+    bootYFitVals = bootYFitData["boot_vals"]    # Previously boot_samples
     mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
 
     # Plot each parameter in an individual histogram
