@@ -30,9 +30,12 @@ def calcBootMeans(bestPars):
     return bootMeanW, bootMeanI, bootStdW, bootStdI
 
 
-def plotHists(ax, samples, nBins, title):
+def plotHists(ax, samples, nBins, title, disableCI=False):
     ax.set_title(f"Histogram of {title}")
     for i, bootHist in enumerate(samples):
+
+        if np.all(bootHist==0) or np.all(np.isnan(bootHist)):
+            continue
         
         mean = np.mean(bootHist)
         bounds = np.percentile(bootHist, [5, 95])
@@ -42,9 +45,51 @@ def plotHists(ax, samples, nBins, title):
         ax.hist(bootHist, nBins, histtype="step", label=leg)
 
         ax.axvline(np.mean(bootHist), 0, 0.97, color="k", ls="--", alpha=0.4)
-        ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
+        
+        if disableCI:
+            pass
+        else:
+            ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
 
-    ax.legend()
+    ax.legend(loc="upper center")
+
+
+def plotMeansOverNoSamples(sampleNos, samples, title):
+
+    sampleMeans = np.zeros((len(samples), len(sampleNos)))
+    sampleErrors = np.zeros((len(samples), 2, len(sampleNos)))
+    for i, N in enumerate(sampleNos):
+        subSample = samples[:, :N]
+
+        mean = np.mean(subSample, axis=1)
+
+        bounds = np.percentile(subSample, [5, 95], axis=1).T
+        assert bounds.shape == (len(subSample), 2), f"Wrong shape: {bounds.shape}"
+        errors = bounds - mean[:, np.newaxis]
+
+        sampleMeans[:, i] = mean
+        sampleErrors[:, :, i] = errors
+
+    sampleMeans = sampleMeans - sampleMeans[:, 0][:, np.newaxis]
+    for i, (means, errors) in enumerate(zip(sampleMeans, sampleErrors)):
+        plt.plot(sampleNos, means, label=f"idx {i}")
+        plt.fill_between(sampleNos, errors[0, :], errors[1, :], alpha=0.2)
+    
+    plt.title(f"Evolution of {title} over the sample size.")
+    plt.legend()
+    plt.show()
+
+
+def plotRawHists(bootSamples, idx, specRange):
+
+    samples = bootSamples[:, specRange[0]:specRange[1], idx].T
+    print(f"\nShape: {samples.shape}\n")
+    # assert samples.shape == (len(samples[0, 0, :]), len(samples)), f"Wrong shape: {samples.shape}"
+    
+    print(f"\nNaNs positions: {np.argwhere(samples==np.nan)}\n")
+    fig, ax = plt.subplots()
+    plotHists(ax, samples, 100, f"idx {idx}", disableCI=True)
+    plt.show()
 
 
 def checkBootSamplesVSParent(bestPars, parentPars):
@@ -167,11 +212,11 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # ySpaceFit = False
 
 sampleName = "starch_80_RD"
-firstSpec = 144
-lastSpec = 182
+firstSpec = 3
+lastSpec = 134
 msIter = 4
 MS = True
-GC = True
+GC = False
 nSamples = 2500
 nBins = int(nSamples/25)
 speed = "slow"
@@ -183,34 +228,40 @@ bootData = np.load(dataPath)
 bootPars = bootData["boot_samples"][:, :, 1:-2]
 parentPars = bootData["parent_result"][:, 1:-2]
 
+
+
 checkBootSamplesVSParent(bootPars, parentPars)
+plotRawHists(bootPars, 1, [0, 20])
 
 
-meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
-meanWp = meanWp.flatten()
-meanIp = meanIp.flatten()
+# meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
+# meanWp = meanWp.flatten()
+# meanIp = meanIp.flatten()
 
-meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
+# meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 
-fig, axs = plt.subplots(1, 2, figsize=(15, 3))
-for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
-    plotHists(ax, means, nBins, title)
-    # addParentMeans(ax, meanp)
-plt.show()
+# plotMeansOverNoSamples(np.linspace(50, 2500, 20).astype(int), meanW, "Widths")
 
 
-if ySpaceFit:
-    bootYFitData = np.load(dataYFitPath)
-    bootYFitVals = bootYFitData["boot_vals"]    # Previously boot_samples
-    mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
-
-    # Plot each parameter in an individual histogram
-    fig, axs = plt.subplots(len(mFitVals), 1, figsize=(8, 10))
-    for i, (ax, hist) in enumerate(zip(axs.flatten(), mFitVals)):
-        plotHists(ax, hist[np.newaxis, :], nBins, f"idx {i}")
-    plt.show()
+# fig, axs = plt.subplots(1, 2, figsize=(15, 3))
+# for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
+#     plotHists(ax, means, nBins, title)
+#     # addParentMeans(ax, meanp)
+# plt.show()
 
 
-plot2DHists(meanW, nBins, "Widths")    
-plot2DHists(meanI, nBins, "Intensities")   
+# if ySpaceFit:
+#     bootYFitData = np.load(dataYFitPath)
+#     bootYFitVals = bootYFitData["boot_vals"]    # Previously boot_samples
+#     mFitVals = bootYFitVals[:, 0, :-1].T  # Last value is chi
+
+#     # Plot each parameter in an individual histogram
+#     fig, axs = plt.subplots(len(mFitVals), 1, figsize=(8, 10))
+#     for i, (ax, hist) in enumerate(zip(axs.flatten(), mFitVals)):
+#         plotHists(ax, hist[np.newaxis, :], nBins, f"idx {i}")
+#     plt.show()
+
+
+# plot2DHists(meanW, nBins, "Widths")    
+# plot2DHists(meanI, nBins, "Intensities")   
 
