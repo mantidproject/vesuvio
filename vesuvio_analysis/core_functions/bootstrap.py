@@ -26,22 +26,17 @@ def runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=True, fastBo
 def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     """inutIC can have one or two (back, forward) IC inputs."""
 
-    setICsToDefault(inputIC, yFitIC, nSamples)
-
     t0 = time.time()
-    parentResults = runMainProcedure(inputIC, yFitIC)
+    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap)
     t1 = time.time()
 
     if checkUserIn:
         userIn = checkUserInput(t1-t0, nSamples)
         if (userIn != "y") and (userIn != "Y"): return
 
-    parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
-    checkResiduals(parentWSnNCPs)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
-
+    setOutputDirs(inputIC, nSamples)
     bootResults = initializeResults(parentResults, nSamples)
-
     # Form each bootstrap workspace and run ncp fit with MS corrections
     for j in range(nSamples):
         AnalysisDataService.clear()
@@ -59,7 +54,17 @@ def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     return bootResults
 
 
-def setICsToDefault(inputIC, yFitIC, nSamples):
+def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap):
+    """Runs unaltered procedure to store parent results and select parent ws"""
+
+    setICsToDefault(inputIC, yFitIC)
+    parentResults = runMainProcedure(inputIC, yFitIC)
+    parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
+    checkResiduals(parentWSnNCPs)
+    return parentResults, parentWSnNCPs
+
+
+def setICsToDefault(inputIC, yFitIC):
     """Disables some features of yspace fit, makes sure the default """
     # Disable global fit 
     yFitIC.globalFitFlag = False
@@ -71,7 +76,9 @@ def setICsToDefault(inputIC, yFitIC, nSamples):
     for IC in inputIC:    # Default is not to run with bootstrap ws
         IC.bootSample = False
 
-    # Form bootstrap output paths
+
+def setOutputDirs(inputIC, nSamples):
+    """Form bootstrap output paths"""
 
     # Select script name and experiments path
     sampleName = inputIC[0].scriptName   # Name of sample currently running
