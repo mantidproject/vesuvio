@@ -59,7 +59,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -94,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 4   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -116,13 +116,6 @@ class YSpaceFitInitialConditions:
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4
-   
-
-# class bootstrapInitialConditions:
-#     speedQuick = False
-#     nSamples = 5
-#     ySpaceFit = True
-
 
 
 icWSBack = LoadVesuvioBackParameters
@@ -171,9 +164,9 @@ start_time = time.time()
 
 # Run either joint or independent bootstrap
 # YSpace fit is performed automatically by default
-nSamples = 2
-# runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
-runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
+nSamples = 2500
+runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, fastBootstrap=True)
+# runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
 
 
 # ----- End of iteractive section
