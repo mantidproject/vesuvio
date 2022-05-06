@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap, runIndependentBootstrap, runJointBootstrap
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap, runIndependentBootstrap, runJointBootstrap, runJointJackknife
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -59,9 +59,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
-    lastSpec = 134    #134
+    lastSpec = 134   #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -94,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 4   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -173,8 +173,8 @@ start_time = time.time()
 # YSpace fit is performed automatically by default
 nSamples = 2
 # runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
-runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
-
+# runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
+runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=True)
 
 # ----- End of iteractive section
 end_time = time.time()

@@ -22,6 +22,11 @@ def runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=True, fastBo
     inputIC = [bckwdIC, fwdIC]
     return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
 
+def runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False):
+    inputIC = [bckwdIC, fwdIC]
+    return runJackknife(inputIC, yFitIC, fastBootstrap)
+    
+
 
 def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     """inutIC can have one or two (back, forward) IC inputs."""
@@ -54,6 +59,39 @@ def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     return bootResults
 
 
+def runJackknife(inputIC, yFitIC, fastBootstrap):
+
+    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap)
+    nSamples = parentWSnNCPs[0][0].dataY(0).size - 1  # Because last column is ignored
+    parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
+
+    setOutputDirs(inputIC, nSamples, runningJackknife=True)
+    bootResults = initializeResults(parentResults, nSamples)
+    # Form each bootstrap workspace and run ncp fit with MS corrections
+    for j in range(nSamples):
+        AnalysisDataService.clear()
+ 
+        setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths) 
+
+        # Run procedure for bootstrap ws
+        iterResults = runMainProcedure(inputIC, yFitIC, runYFit=False)
+
+        storeBootIter(bootResults, j, iterResults)
+        saveBootstrapResults(bootResults, inputIC, fastBootstrap)
+            
+
+def setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths):
+    for IC, (parentWSPath, totNcpWSPath)  in zip(inputIC, parentWSNCPSavePaths):
+        IC.runningJackknife = True
+        IC.jackIter = j
+
+        if fastBootstrap:
+            parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
+            IC.bootSample = True
+            IC.bootWS = parentWS
+            IC.noOfMSIterations = 1
+
+
 def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap):
     """Runs unaltered procedure to store parent results and select parent ws"""
 
@@ -75,16 +113,20 @@ def setICsToDefault(inputIC, yFitIC):
 
     for IC in inputIC:    # Default is not to run with bootstrap ws
         IC.bootSample = False
+        IC.runningJackknife = False
 
 
-def setOutputDirs(inputIC, nSamples):
+def setOutputDirs(inputIC, nSamples, runningJackknife=False):
     """Form bootstrap output paths"""
 
     # Select script name and experiments path
     sampleName = inputIC[0].scriptName   # Name of sample currently running
     experimentsPath = currentPath/".."/".."/"experiments"
 
-    bootOutPath = experimentsPath / sampleName / "bootstrap_data"
+    if runningJackknife:
+        bootOutPath = experimentsPath / sampleName / "jackknife_data"
+    else:
+        bootOutPath = experimentsPath / sampleName / "bootstrap_data"
     bootOutPath.mkdir(exist_ok=True)
 
     quickPath = bootOutPath / "quick"
@@ -111,23 +153,25 @@ def setOutputDirs(inputIC, nSamples):
     
 
 
-def runMainProcedure(inputIC, yFitIC):
+def runMainProcedure(inputIC, yFitIC, runYFit=True):
 
     if len(inputIC) == 2:
         bckwdIC, fwdIC = inputIC
 
         wsParent, bckwdScatResP, fwdScatResP = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
-        yFitResultsParent = fitInYSpaceProcedure(yFitIC, fwdIC, wsParent)
-
-        parentResults = [bckwdScatResP, fwdScatResP, yFitResultsParent]
+        parentResults = [bckwdScatResP, fwdScatResP]
+        if runYFit:
+            yFitResultsParent = fitInYSpaceProcedure(yFitIC, fwdIC, wsParent)
+            parentResults = [bckwdScatResP, fwdScatResP, yFitResultsParent]
     
     elif len(inputIC) == 1:
         singleIC = inputIC[0]
 
         wsParent, singleScatResP = runIndependentIterativeProcedure(singleIC, clearWS=False)
-        yFitResultsParent = fitInYSpaceProcedure(yFitIC, singleIC, wsParent)
-
-        parentResults = [singleScatResP, yFitResultsParent]  
+        parentResults = [singleScatResP]
+        if runYFit:
+            yFitResultsParent = fitInYSpaceProcedure(yFitIC, singleIC, wsParent)
+            parentResults = [singleScatResP, yFitResultsParent]  
 
     else:
         raise ValueError("len(inputIC) needs to be one or two.")

@@ -133,7 +133,11 @@ def fitNcpToWorkspace(ic, ws):
     on a spectrum by spectrum basis.
     """
     dataYws, dataXws, dataEws = arraysFromWS(ws)   
-    dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)                  
+    dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)      
+
+    if ic.runningJackknife:   # Creates a jackknife sample data
+        dataY, dataX, dataE = jackSampleFromPointData(dataY, dataX, dataE, ic.jackIter)
+
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
     print("\nFitting NCP:\n")
@@ -142,7 +146,7 @@ def fitNcpToWorkspace(ic, ws):
     createTableWSForFitPars(ws.name(), ic.noOfMasses, arrFitPars)
     arrBestFitPars = arrFitPars[:, 1:-2]
     allNcpForEachMass, allNcpTotal = calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
-    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
+    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws, ic)
     return
 
 
@@ -164,6 +168,13 @@ def histToPointData(dataY, dataX, dataE):
     dataEp = dataE[:, :-1] 
     dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
     return dataYp, dataXp, dataEp
+
+
+def jackSampleFromPointData(dataY, dataX, dataE, j):
+    jackDataY = np.delete(dataY, j, axis=1)
+    jackDataX = np.delete(dataX, j, axis=1)
+    jackDataE = np.delete(dataE, j, axis=1)
+    return jackDataY, jackDataX, jackDataE
 
 
 def prepareFitArgs(ic, dataX):
@@ -323,7 +334,7 @@ def calculateNcpRow(initPars, ySpacesForEachMass, resolutionPars, instrPars, kin
     return ncpForEachMass
 
 
-def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
+def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     """Creates workspaces from ncp array data"""
 
     # Need to rearrage array of yspaces into seperate arrays for each mass
@@ -331,6 +342,9 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
 
     # Use ws dataX to match with histogram data
     dataX = ws.extractX()[:, :-1]
+    if ic.runningJackknife:
+        dataX = np.delete(dataX, ic.jackIter, axis=1)
+
     assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
 
     # Total ncp workspace

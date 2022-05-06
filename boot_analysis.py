@@ -42,7 +42,7 @@ def plotHists(ax, samples, nBins, title):
         ax.hist(bootHist, nBins, histtype="step", label=leg)
 
         ax.axvline(np.mean(bootHist), 0, 0.97, color="k", ls="--", alpha=0.4)
-        ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
+        # ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
 
     ax.legend()
 
@@ -139,7 +139,7 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
     fileName = f"spec_{firstSpec}-{lastSpec}_iter_{msIter}{corr}"
     fileNameZ = fileName + ".npz"
 
-    bootOutPath = experimentsPath / sampleName / "bootstrap_data"
+    bootOutPath = experimentsPath / sampleName / "jackknife_data"
     
     bootName = fileName + f"_nsampl_{nSamples}"
     bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"
@@ -172,9 +172,9 @@ lastSpec = 182
 msIter = 4
 MS = True
 GC = True
-nSamples = 2500
-nBins = int(nSamples/25)
-speed = "slow"
+nSamples = 144
+nBins = 20 #int(nSamples/25)
+speed = "quick"
 ySpaceFit = False
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
@@ -182,6 +182,11 @@ dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, 
 bootData = np.load(dataPath)
 bootPars = bootData["boot_samples"][:, :, 1:-2]
 parentPars = bootData["parent_result"][:, 1:-2]
+
+# bootPars[bootPars==0] = np.nan
+print(f"\nNo of boot samples: {len(bootPars)}\n")
+
+assert ~np.all(bootPars[-2] == bootPars[-1]), "Last two boot samples are the same, jackknife not working properly!"
 
 checkBootSamplesVSParent(bootPars, parentPars)
 
@@ -211,6 +216,6 @@ if ySpaceFit:
     plt.show()
 
 
-plot2DHists(meanW, nBins, "Widths")    
-plot2DHists(meanI, nBins, "Intensities")   
+# plot2DHists(meanW, nBins, "Widths")    
+# plot2DHists(meanI, nBins, "Intensities")   
 
