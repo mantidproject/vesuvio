@@ -135,8 +135,8 @@ def fitNcpToWorkspace(ic, ws):
     dataYws, dataXws, dataEws = arraysFromWS(ws)   
     dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)      
 
-    if ic.runningJackknife:   # Creates a jackknife sample data
-        dataY, dataX, dataE = jackSampleFromPointData(dataY, dataX, dataE, ic.jackIter)
+    # if ic.runningJackknife:   # Creates a jackknife sample data
+    #     dataY, dataX, dataE = jackSampleFromPointData(dataY, dataX, dataE, ic.jackIter)
 
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
@@ -167,14 +167,25 @@ def histToPointData(dataY, dataX, dataE):
     dataYp = dataY[:, :-1]
     dataEp = dataE[:, :-1] 
     dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
+
+    dataYp, dataXp, dataEp = filterNanColumns(dataYp, dataXp, dataEp)
+
     return dataYp, dataXp, dataEp
 
 
-def jackSampleFromPointData(dataY, dataX, dataE, j):
-    jackDataY = np.delete(dataY, j, axis=1)
-    jackDataX = np.delete(dataX, j, axis=1)
-    jackDataE = np.delete(dataE, j, axis=1)
-    return jackDataY, jackDataX, jackDataE
+def filterNanColumns(dataY, dataX, dataE):
+    zeroCol = np.all(dataY == 0, axis=0)   # When whole column is zero, take it out of point data
+
+    dataYf = dataY[:, ~zeroCol]
+    dataXf = dataX[:, ~zeroCol]
+    dataEf = dataE[:, ~zeroCol]
+    return dataYf, dataXf, dataEf
+
+# def jackSampleFromPointData(dataY, dataX, dataE, j):
+#     jackDataY = np.delete(dataY, j, axis=1)
+#     jackDataX = np.delete(dataX, j, axis=1)
+#     jackDataE = np.delete(dataE, j, axis=1)
+#     return jackDataY, jackDataX, jackDataE
 
 
 def prepareFitArgs(ic, dataX):
@@ -342,28 +353,45 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
 
     # Use ws dataX to match with histogram data
     dataX = ws.extractX()[:, :-1]
-    if ic.runningJackknife:
-        dataX = np.delete(dataX, ic.jackIter, axis=1)
 
-    assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+    # if ic.runningJackknife:
+    #     dataX = np.delete(dataX, ic.jackIter, axis=1)
+
+    # assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
 
     # Total ncp workspace
+
+    # Add zeros column
+    ncpTotalf = addZeroCol(ncpTotal, ws)
+    assert ncpTotalf.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+
+
     ncpTotWs = CreateWorkspace(
         DataX=dataX.flatten(), 
-        DataY=ncpTotal.flatten(),
+        DataY=ncpTotalf.flatten(),
         Nspec=len(dataX), 
         OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
     SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
 
     # Individual ncp workspaces
     for i, ncp_m in enumerate(ncpForEachMass):
+
+        ncp_mf = addZeroCol(ncp_m, ws)
+
         ncpMWs = CreateWorkspace(
             DataX=dataX.flatten(), 
-            DataY=ncp_m.flatten(), 
+            DataY=ncp_mf.flatten(), 
             Nspec=len(dataX),
             OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
         SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
 
+
+def addZeroCol(ncp, ws):
+    ncpf = ws.extractY()[:, :-1]
+    zeroCol = np.all(ncpf==0, axis=0)
+    ncpf[:, ~zeroCol] = ncp
+    return ncpf
+  
 
 def switchFirstTwoAxis(A):
     """Exchanges the first two indices of an array A,

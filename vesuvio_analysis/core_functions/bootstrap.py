@@ -67,29 +67,34 @@ def runJackknife(inputIC, yFitIC, fastBootstrap):
 
     setOutputDirs(inputIC, nSamples, runningJackknife=True)
     bootResults = initializeResults(parentResults, nSamples)
+
     # Form each bootstrap workspace and run ncp fit with MS corrections
     for j in range(nSamples):
         AnalysisDataService.clear()
- 
-        setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths) 
+
+        jackInputWS = createJackknifeWS(parentWSNCPSavePaths, j)
+
+        plugBootWSIntoIC(inputIC, jackInputWS, fastBootstrap) 
 
         # Run procedure for bootstrap ws
         iterResults = runMainProcedure(inputIC, yFitIC, runYFit=False)
 
         storeBootIter(bootResults, j, iterResults)
         saveBootstrapResults(bootResults, inputIC, fastBootstrap)
+        if input("Press s to stop.") == "s": break
+
             
 
-def setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths):
-    for IC, (parentWSPath, totNcpWSPath)  in zip(inputIC, parentWSNCPSavePaths):
-        IC.runningJackknife = True
-        IC.jackIter = j
+# def setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths):
+#     for IC, (parentWSPath, totNcpWSPath)  in zip(inputIC, parentWSNCPSavePaths):
+#         IC.runningJackknife = True
+#         IC.jackIter = j
 
-        if fastBootstrap:
-            parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
-            IC.bootSample = True
-            IC.bootWS = parentWS
-            IC.noOfMSIterations = 1
+#         if fastBootstrap:
+#             parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
+#             IC.bootSample = True
+#             IC.bootWS = parentWS
+#             IC.noOfMSIterations = 1
 
 
 def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=True):
@@ -326,6 +331,31 @@ def createBootstrapWS(parentWSNCPSavePaths):
 
         bootInputWS.append(wsBoot)
     return bootInputWS
+
+
+def createJackknifeWS(parentWSNCPSavePaths, j):
+    """
+    Creates bootstrap ws replica.
+    Inputs: Experimental (parent) workspace and corresponding NCP total fit
+    """
+
+    jackInputWS = []
+    for (parentWSPath, totNcpWSPath) in parentWSNCPSavePaths:
+        parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
+
+        dataY = parentWS.extractY()[:, :-1]
+        jackDataY = dataY.copy()
+        jackDataY[:, j] = 0   # Masks j collumn with zeros
+
+        wsJack = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Jackknife")
+        for i, row in enumerate(jackDataY):
+            wsJack.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit anyway
+
+        assert np.all(wsJack.extractY()[:, :-1] == jackDataY), "Bootstrap data not being correctly passed onto ws."
+
+        jackInputWS.append(wsJack)
+    return jackInputWS
+
 
 #TODO: Figure out how to include this check in the code
 def checkResiduals(parentWSnNCP):
