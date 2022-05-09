@@ -61,7 +61,7 @@ def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
 
 def runJackknife(inputIC, yFitIC, fastBootstrap):
 
-    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap)
+    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=False)
     nSamples = parentWSnNCPs[0][0].dataY(0).size - 1  # Because last column is ignored
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
@@ -92,11 +92,11 @@ def setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths):
             IC.noOfMSIterations = 1
 
 
-def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap):
+def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=True):
     """Runs unaltered procedure to store parent results and select parent ws"""
 
     setICsToDefault(inputIC, yFitIC)
-    parentResults = runMainProcedure(inputIC, yFitIC)
+    parentResults = runMainProcedure(inputIC, yFitIC, runYFit)
     parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
     checkResiduals(parentWSnNCPs)
     return parentResults, parentWSnNCPs
