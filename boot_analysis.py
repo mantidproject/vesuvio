@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
 from scipy import stats
-from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
+from vesuvio_analysis.core_functions.analysis_functions import filterWidthsAndIntensities, calculateMeansAndStds, filterWidthsAndIntensities
 currentPath = Path(__file__).parent.absolute() 
 experimentsPath = currentPath / "experiments"
 
@@ -30,28 +30,47 @@ def calcBootMeans(bestPars):
     return bootMeanW, bootMeanI, bootStdW, bootStdI
 
 
-def plotHists(ax, samples, nBins, title, disableCI=False):
+def filteredBootMeans(bestPars):
+    bootWidths = bestPars[:, :, 1::3]
+    bootIntensities = bestPars[:, :, 0::3]
+
+    for i, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
+        filteredWidths, filteredIntensities = filterWidthsAndIntensities(widths.T, intensities.T)
+
+        bootWidths[i] = filteredWidths.T
+        bootIntensities[i] = filteredIntensities.T
+    
+    filteredBestPars = bestPars.copy()
+    filteredBestPars[:, :, 1::3] = bootWidths
+    filteredBestPars[:, :, 0::3] = bootIntensities
+    return filteredBestPars
+
+
+def plotHists(ax, samples, nBins, title, disableCI=False, disableLeg=False):
     ax.set_title(f"Histogram of {title}")
     for i, bootHist in enumerate(samples):
 
         if np.all(bootHist==0) or np.all(np.isnan(bootHist)):
             continue
         
-        mean = np.mean(bootHist)
+        mean = np.nanmean(bootHist)
         bounds = np.percentile(bootHist, [5, 95])
         errors = bounds - mean
 
         leg = f"Row {i}: {mean:>6.3f} +{errors[1]:.3f} {errors[0]:.3f}"
         ax.hist(bootHist, nBins, histtype="step", label=leg)
 
-        ax.axvline(np.mean(bootHist), 0, 0.97, color="k", ls="--", alpha=0.4)
+        ax.axvline(mean, 0.9, 0.97, color="k", ls="--", alpha=0.4)
         
         if disableCI:
             pass
         else:
             ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
-
-    ax.legend(loc="upper center")
+    
+    if disableLeg:
+        pass
+    else:
+        ax.legend(loc="upper center")
 
 
 def plotMeansOverNoSamples(sampleNos, samples, title):
@@ -83,12 +102,19 @@ def plotMeansOverNoSamples(sampleNos, samples, title):
 def plotRawHists(bootSamples, idx, specRange):
 
     samples = bootSamples[:, specRange[0]:specRange[1], idx].T
+    nBins = 100
     print(f"\nShape: {samples.shape}\n")
     # assert samples.shape == (len(samples[0, 0, :]), len(samples)), f"Wrong shape: {samples.shape}"
     
     print(f"\nNaNs positions: {np.argwhere(samples==np.nan)}\n")
     fig, ax = plt.subplots()
-    plotHists(ax, samples, 100, f"idx {idx}", disableCI=True)
+    plotHists(ax, samples, nBins, f"idx {idx}", disableCI=True, disableLeg=True)
+
+    meanSamples = np.nanmean(samples, axis=0).flatten()
+    ax.hist(meanSamples, nBins, color="r", histtype="step", linewidth=2)
+    ax.axvline(np.nanmean(meanSamples), 0.9, 0.97, color="r", ls="--", linewidth=2)
+
+
     plt.show()
 
 
@@ -231,7 +257,9 @@ parentPars = bootData["parent_result"][:, 1:-2]
 
 
 checkBootSamplesVSParent(bootPars, parentPars)
-plotRawHists(bootPars, 1, [0, 20])
+
+filteredBootPars = filteredBootMeans(bootPars)
+plotRawHists(filteredBootPars, 1, [0, 20])
 
 
 # meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
