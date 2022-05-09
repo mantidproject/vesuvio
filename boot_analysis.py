@@ -175,7 +175,7 @@ GC = True
 nSamples = 144
 nBins = 20 #int(nSamples/25)
 speed = "quick"
-ySpaceFit = True
+ySpaceFit = False
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 

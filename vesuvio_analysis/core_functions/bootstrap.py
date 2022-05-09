@@ -54,14 +54,16 @@ def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
         iterResults = runMainProcedure(inputIC, yFitIC)
 
         storeBootIter(bootResults, j, iterResults)
-        saveBootstrapResults(bootResults, inputIC, fastBootstrap)
-            
+        saveBootstrapResults(bootResults, inputIC, fastBootstrap)      
     return bootResults
 
 
 def runJackknife(inputIC, yFitIC, fastBootstrap):
 
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=False)
+    
+    # TODO: This is wrong, because back and forward ws have different no of bins
+    # Also, need to ask how to do Jackknife: remove whole columns? First from back then from forward?
     nSamples = parentWSnNCPs[0][0].dataY(0).size - 1  # Because last column is ignored
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
@@ -69,7 +71,7 @@ def runJackknife(inputIC, yFitIC, fastBootstrap):
     bootResults = initializeResults(parentResults, nSamples)
 
     # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(nSamples):
+    for j in range(65, nSamples):
         AnalysisDataService.clear()
 
         jackInputWS = createJackknifeWS(parentWSNCPSavePaths, j)
@@ -344,14 +346,21 @@ def createJackknifeWS(parentWSNCPSavePaths, j):
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
         dataY = parentWS.extractY()[:, :-1]
+        dataE = parentWS.extractE()[:, :-1]
+
         jackDataY = dataY.copy()
+        jackDataE = dataE.copy()
+
         jackDataY[:, j] = 0   # Masks j collumn with zeros
+        jackDataE[:, j] = 0   # The fit fails if these errors are accidentally used
 
         wsJack = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Jackknife")
-        for i, row in enumerate(jackDataY):
-            wsJack.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit anyway
+        for i, (yRow, eRow) in enumerate(zip(jackDataY, jackDataE)):
+            wsJack.dataY(i)[:-1] = yRow     # Last column will be ignored in ncp fit anyway
+            wsJack.dataE(i)[:-1] = eRow
 
         assert np.all(wsJack.extractY()[:, :-1] == jackDataY), "Bootstrap data not being correctly passed onto ws."
+        assert np.all(wsJack.extractE()[:, :-1] == jackDataE), "Bootstrap data not being correctly passed onto ws."
 
         jackInputWS.append(wsJack)
     return jackInputWS

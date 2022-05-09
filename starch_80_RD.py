@@ -171,10 +171,10 @@ start_time = time.time()
 
 # Run either joint or independent bootstrap
 # YSpace fit is performed automatically by default
-nSamples = 3
-# runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
+nSamples = 10
+runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
 # runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
-runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=True)
+# runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=True)
 
 # ----- End of iteractive section
 end_time = time.time()

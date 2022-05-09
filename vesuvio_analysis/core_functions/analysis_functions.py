@@ -168,18 +168,18 @@ def histToPointData(dataY, dataX, dataE):
     dataEp = dataE[:, :-1] 
     dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
 
-    dataYp, dataXp, dataEp = filterNanColumns(dataYp, dataXp, dataEp)
+    # dataYp, dataXp, dataEp = filterNanColumns(dataYp, dataXp, dataEp)
 
     return dataYp, dataXp, dataEp
 
 
-def filterNanColumns(dataY, dataX, dataE):
-    zeroCol = np.all(dataY == 0, axis=0)   # When whole column is zero, take it out of point data
+# def filterNanColumns(dataY, dataX, dataE):
+#     zeroCol = np.all(dataY == 0, axis=0)   # When whole column is zero, take it out of point data
 
-    dataYf = dataY[:, ~zeroCol]
-    dataXf = dataX[:, ~zeroCol]
-    dataEf = dataE[:, ~zeroCol]
-    return dataYf, dataXf, dataEf
+#     dataYf = dataY[:, ~zeroCol]
+#     dataXf = dataX[:, ~zeroCol]
+#     dataEf = dataE[:, ~zeroCol]
+#     return dataYf, dataXf, dataEf
 
 # def jackSampleFromPointData(dataY, dataX, dataE, j):
 #     jackDataY = np.delete(dataY, j, axis=1)
@@ -357,14 +357,14 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     # if ic.runningJackknife:
     #     dataX = np.delete(dataX, ic.jackIter, axis=1)
 
-    # assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+    assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
 
     # Total ncp workspace
 
-    # Add zeros column
-    ncpTotalf = addZeroCol(ncpTotal, ws)
-    assert ncpTotalf.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
-
+    # # Add zeros column
+    # ncpTotalf = addZeroCol(ncpTotal, ws)
+    # assert ncpTotalf.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+    ncpTotalf = ncpTotal
 
     ncpTotWs = CreateWorkspace(
         DataX=dataX.flatten(), 
@@ -376,7 +376,8 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     # Individual ncp workspaces
     for i, ncp_m in enumerate(ncpForEachMass):
 
-        ncp_mf = addZeroCol(ncp_m, ws)
+        # ncp_mf = addZeroCol(ncp_m, ws)
+        ncp_mf = ncp_m
 
         ncpMWs = CreateWorkspace(
             DataX=dataX.flatten(), 
@@ -386,11 +387,11 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
         SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
 
 
-def addZeroCol(ncp, ws):
-    ncpf = ws.extractY()[:, :-1]
-    zeroCol = np.all(ncpf==0, axis=0)
-    ncpf[:, ~zeroCol] = ncp
-    return ncpf
+# def addZeroCol(ncp, ws):
+#     ncpf = ws.extractY()[:, :-1]
+#     zeroCol = np.all(ncpf==0, axis=0)
+#     ncpf[:, ~zeroCol] = ncp
+#     return ncpf
   
 
 def switchFirstTwoAxis(A):
@@ -493,14 +494,24 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
 
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
+    # Additional treatement for jackknife
+    zerosMask = dataY==0
+    ncpTotal = ncpTotal[~zerosMask]
+    dataYf = dataY[~zerosMask]   
+    dataEf = dataE[~zerosMask]   
+
+    # dataYf = dataY
+    # dataEf = dataE
+
+
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is currently never satisfied, 
         # but I am keeping it for the unlikely case of fitting NCP data without errors.
         # In this case, we can use a statistical weight to make sure 
         # chi2 is not too small for minimize.optimize().
-        chi2 = (ncpTotal - dataY)**2 / dataY**2
+        chi2 = (ncpTotal - dataYf)**2 / dataYf**2
     else:
-        chi2 =  (ncpTotal - dataY)**2 / dataE**2    
+        chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
     return np.sum(chi2)
 
 
