@@ -165,7 +165,7 @@ start_time = time.time()
 # Run either joint or independent bootstrap
 # YSpace fit is performed automatically by default
 nSamples = 2500
-runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, fastBootstrap=True)
+runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
 # runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
 
 
