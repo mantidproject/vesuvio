@@ -281,7 +281,7 @@ MS = True
 GC = False
 nSamples = 2500
 nBins = int(nSamples/25)
-speed = "slow"
+speed = "quick"
 ySpaceFit = False
 IPPath = currentPath / "vesuvio_analysis" / "ip_files" / "ip2018_3.par"
 
@@ -295,7 +295,7 @@ checkBootSamplesVSParent(bootPars, parentPars)
 
 filteredBootPars = bootPars.copy()
 # filteredBootPars = filteredBootMeans(bootPars)
-plotRawHists(filteredBootPars, 1, [0, 38], IPPath)
+# plotRawHists(filteredBootPars, 1, [0, 38], IPPath)
 
 
 meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
@@ -307,11 +307,11 @@ meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 # plotMeansOverNoSamples(np.linspace(50, 2500, 20).astype(int), meanW, "Widths")
 
 
-# fig, axs = plt.subplots(1, 2, figsize=(15, 3))
-# for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
-#     plotHists(ax, means, nBins, title, disableCI=True)
-#     # addParentMeans(ax, meanp)
-# plt.show()
+fig, axs = plt.subplots(1, 2, figsize=(15, 3))
+for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
+    plotHists(ax, means, nBins, title, disableCI=True)
+    # addParentMeans(ax, meanp)
+plt.show()
 
 
 # if ySpaceFit:
