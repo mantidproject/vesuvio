@@ -4,6 +4,7 @@ import matplotlib .pyplot as plt
 from pathlib import Path
 from scipy import stats
 from vesuvio_analysis.core_functions.analysis_functions import filterWidthsAndIntensities, calculateMeansAndStds, filterWidthsAndIntensities
+from vesuvio_analysis.core_functions.analysis_functions import loadInstrParsFileIntoArray
 currentPath = Path(__file__).parent.absolute() 
 experimentsPath = currentPath / "experiments"
 
@@ -99,9 +100,11 @@ def plotMeansOverNoSamples(sampleNos, samples, title):
     plt.show()
 
 
-def plotRawHists(bootSamples, idx, specRange):
+def plotRawHists(bootSamples, idx, specRange, IPPath):
 
-    samples = bootSamples[:, specRange[0]:specRange[1], idx].T
+    firstIdx = specRange[0]
+    lastIdx = specRange[1]
+    samples = bootSamples[:, firstIdx:lastIdx, idx].T
     nBins = 100
     print(f"\nShape: {samples.shape}\n")
     # assert samples.shape == (len(samples[0, 0, :]), len(samples)), f"Wrong shape: {samples.shape}"
@@ -113,6 +116,38 @@ def plotRawHists(bootSamples, idx, specRange):
     meanSamples = np.nanmean(samples, axis=0).flatten()
     ax.hist(meanSamples, nBins, color="r", histtype="step", linewidth=2)
     ax.axvline(np.nanmean(meanSamples), 0.9, 0.97, color="r", ls="--", linewidth=2)
+    # ax.axvline(np.percentile(meanSamples, 0.5), 0.9, 0.97, color="r", ls="--", linewidth=2)
+
+    # Calculate correlation with scattering angle
+    ipMatrix = np.loadtxt(IPPath, dtype=str)[1:].astype(float)
+
+    thetas = ipMatrix[firstIdx : lastIdx, 2]    # Scattering angle on third column
+    assert thetas.shape == (len(samples),), f"Wrong shape: {thetas.shape}"
+
+    histMeansCorr = True
+    if histMeansCorr:
+        deltaMeans = np.nanmean(samples, axis=1) #- np.nanmean(meanSamples)
+        # deltaMeans = np.percentile(samples, 0.5, axis=1) - np.percentile(meanSamples, 0.5)
+
+        # Remove masked spectra:
+        nanMask = np.isnan(deltaMeans)
+        deltaMeans = deltaMeans[~nanMask]
+        thetas = thetas[~nanMask]
+
+        print(thetas[:10])
+        corr = stats.pearsonr(thetas, deltaMeans)
+        ax.set_title(f"Correlation scatt angle: {corr[0]:.3f}")
+    else:
+        bounds = np.percentile(samples, [5, 95], axis=1).T
+        assert bounds.shape == (len(samples), 2), f"Wrong shape: {bounds.shape}"
+        histWidths = bounds[:, 1] - bounds[:, 0]
+
+        nanMask = np.isnan(histWidths)
+        histWidths = histWidths[~nanMask]
+        thetas = thetas[~nanMask]
+
+        corr = stats.pearsonr(thetas, histWidths)
+        ax.set_title(f"Correlation scatt angle: {corr[0]:.3f}")
 
 
     plt.show()
@@ -226,6 +261,7 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
     return loadPath, loadYFitPath
 
 
+
 # sampleName = "D_HMT"
 # firstSpec = 3
 # lastSpec = 134
@@ -247,33 +283,33 @@ nSamples = 2500
 nBins = int(nSamples/25)
 speed = "slow"
 ySpaceFit = False
+IPPath = currentPath / "vesuvio_analysis" / "ip_files" / "ip2018_3.par"
 
 dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
 bootData = np.load(dataPath)
 bootPars = bootData["boot_samples"][:, :, 1:-2]
 parentPars = bootData["parent_result"][:, 1:-2]
-
-
-
 checkBootSamplesVSParent(bootPars, parentPars)
 
-filteredBootPars = filteredBootMeans(bootPars)
-plotRawHists(filteredBootPars, 1, [0, 20])
+
+filteredBootPars = bootPars.copy()
+# filteredBootPars = filteredBootMeans(bootPars)
+plotRawHists(filteredBootPars, 1, [0, 38], IPPath)
 
 
-# meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
-# meanWp = meanWp.flatten()
-# meanIp = meanIp.flatten()
+meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
+meanWp = meanWp.flatten()
+meanIp = meanIp.flatten()
 
-# meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
+meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
 
 # plotMeansOverNoSamples(np.linspace(50, 2500, 20).astype(int), meanW, "Widths")
 
 
 # fig, axs = plt.subplots(1, 2, figsize=(15, 3))
 # for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
-#     plotHists(ax, means, nBins, title)
+#     plotHists(ax, means, nBins, title, disableCI=True)
 #     # addParentMeans(ax, meanp)
 # plt.show()
 
