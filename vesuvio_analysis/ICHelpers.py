@@ -34,7 +34,8 @@ def completeICFromInputs(ic, scriptName, icWS):
     
     # Do not run bootstrap sample, by default
     ic.bootSample = False
-    ic.bootWS = None
+    # ic.bootWS = None
+    ic.jackSample = False
 
     # Store script name
     ic.scriptName = scriptName

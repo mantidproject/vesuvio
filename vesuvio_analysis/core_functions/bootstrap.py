@@ -5,7 +5,7 @@ from .analysis_functions import iterativeFitForDataReduction
 from .fit_in_yspace import fitInYSpaceProcedure
 from .procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
 from mantid.api import AnalysisDataService, mtd
-from mantid.simpleapi import CloneWorkspace, SaveNexus, Load
+from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
 import time
 import matplotlib.pyplot as plt
@@ -22,14 +22,19 @@ def runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=True, fastBo
     inputIC = [bckwdIC, fwdIC]
     return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
 
-def runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False):
-    # Run entire joint procedure just to change fwdIC initial widths
-    runOriginalBeforeBootstrap([bckwdIC, fwdIC], yFitIC, fastBootstrap, runYFit=False)
-    runJackknife([bckwdIC], yFitIC, fastBootstrap)
-    runJackknife([fwdIC], yFitIC, fastBootstrap)
-    return #runJackknife(inputIC, yFitIC, fastBootstrap)
-    
+def runIndependentHackknife(singleIC, yFitIC, fastBootstrap=False, runningTest=False):
+    inputIC = [singleIC]
+    return runJackknife(inputIC, yFitIC, fastBootstrap, runningTest)
 
+
+def runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False, runningTest=False):
+    # Run entire joint procedure just to change fwdIC initial widths
+    # TODO: Write function for this?
+    runOriginalBeforeBootstrap([bckwdIC, fwdIC], yFitIC, fastBootstrap, runYFit=False)
+    bckwdJackResults = runJackknife([bckwdIC], yFitIC, fastBootstrap, runningTest)
+    fwdJackResults = runJackknife([fwdIC], yFitIC, fastBootstrap, runningTest)
+    return [bckwdJackResults[0], fwdJackResults[0]]    # For consistency
+    
 
 def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     """inutIC can have one or two (back, forward) IC inputs."""
@@ -61,7 +66,7 @@ def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
     return bootResults
 
 
-def runJackknife(inputIC, yFitIC, fastBootstrap):
+def runJackknife(inputIC, yFitIC, fastBootstrap, runningTest):
 
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=False)
     
@@ -71,68 +76,28 @@ def runJackknife(inputIC, yFitIC, fastBootstrap):
     setOutputDirs(inputIC, nSamples, runningJackknife=True)
     bootResults = initializeResults(parentResults, nSamples)
 
+    if runningTest:
+        start = int(nSamples/2)
+        end = start + 3
+    else:
+        start = 0
+        end = nSamples
+
     # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(nSamples):
+    for j in range(start, end):
         AnalysisDataService.clear()
 
-        jackInputWS = createJackknifeWS(parentWSNCPSavePaths, j)
+        jackInputWS, parentInputWS = createJackknifeWS(parentWSNCPSavePaths, j)
 
-        plugBootWSIntoIC(inputIC, jackInputWS, fastBootstrap) 
+        plugJackWSIntoIC(inputIC, jackInputWS, parentInputWS, fastBootstrap) 
 
         # Run procedure for bootstrap ws
         iterResults = runMainProcedure(inputIC, yFitIC, runYFit=False)
 
         storeBootIter(bootResults, j, iterResults)
         saveBootstrapResults(bootResults, inputIC, fastBootstrap)
-    
-    return
-        # if input("Press s to stop.") == "s": return
-
-            
-# def setJackknifeOn(inputIC, j, fastBootstrap, parentWSNCPSavePaths):
-#     for IC, (parentWSPath, totNcpWSPath)  in zip(inputIC, parentWSNCPSavePaths):
-#         IC.runningJackknife = True
-#         IC.jackIter = j
-
-#         if fastBootstrap:
-#             parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
-#             IC.bootSample = True
-#             IC.bootWS = parentWS
-#             IC.noOfMSIterations = 1
-
-# def runJackknife(inputIC, yFitIC, fastBootstrap):
-
-#     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=False)
-    
-#     parentNSamples = []         # Number of times to run jackknife for back and forward, respectively
-#     for WSnNCP in parentWSnNCPs:
-#         parentNSamples.append(WSnNCP[0].dataY(0).size - 1)
-
-#     # Run Jackknife procedure for backward and forward scattering independently
-#     for singleICp, singleScattResultsp, WSnNCPsp, nSamples in zip(inputIC, parentResults, parentWSnNCPs, parentNSamples):
-        
-#         WSnNCPs = [WSnNCPsp]
-#         singleIC = [singleICp]
-#         singleScattResults = [singleScattResultsp]   # To match current shape of inputs
-        
-#         parentWSNCPSavePaths = convertWSToSavePaths(WSnNCPs)
-#         setOutputDirs(singleIC, nSamples, runningJackknife=True)
-#         bootResults = initializeResults(singleScattResults, nSamples)
-
-#         # Form each bootstrap workspace and run ncp fit with MS corrections
-#         for j in range(65, nSamples):
-#             AnalysisDataService.clear()
-
-#             jackInputWS = createJackknifeWS(parentWSNCPSavePaths, j)
-
-#             plugBootWSIntoIC(singleIC, jackInputWS, fastBootstrap) 
-
-#             # Run procedure for bootstrap ws
-#             iterResults = runMainProcedure(singleIC, yFitIC, runYFit=False)
-
-#             storeBootIter(bootResults, j, iterResults)
-#             saveBootstrapResults(bootResults, singleIC, fastBootstrap)
-#             if input("Press s to stop.") == "s": break
+        # if input("Press s to stop.") == "s": return    
+    return bootResults
 
 
 def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=True):
@@ -156,7 +121,7 @@ def setICsToDefault(inputIC, yFitIC):
 
     for IC in inputIC:    # Default is not to run with bootstrap ws
         IC.bootSample = False
-        IC.runningJackknife = False
+        IC.jackSample = False
 
 
 def setOutputDirs(inputIC, nSamples, runningJackknife=False):
@@ -193,7 +158,6 @@ def setOutputDirs(inputIC, nSamples, runningJackknife=False):
         IC.bootQuickYFitSavePath = quickPath / bootNameYFit
         IC.bootSlowSavePath = slowPath / bootName
         IC.bootSlowYFitSavePath = slowPath / bootNameYFit
-    
 
 
 def runMainProcedure(inputIC, yFitIC, runYFit=True):
@@ -378,6 +342,7 @@ def createJackknifeWS(parentWSNCPSavePaths, j):
     """
 
     jackInputWS = []
+    parentInputWS = []
     for (parentWSPath, totNcpWSPath) in parentWSNCPSavePaths:
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
@@ -399,7 +364,8 @@ def createJackknifeWS(parentWSNCPSavePaths, j):
         assert np.all(wsJack.extractE()[:, :-1] == jackDataE), "Bootstrap data not being correctly passed onto ws."
 
         jackInputWS.append(wsJack)
-    return jackInputWS
+        parentInputWS.append([parentWS, totNcpWS])
+    return jackInputWS, parentInputWS
 
 
 #TODO: Figure out how to include this check in the code
@@ -429,6 +395,7 @@ def loadWorkspacesFromPath(*args):
     for path in args:
         saveName = path.name.split(".")[0]
         ws = Load(str(path), OutputWorkspace=saveName)
+        SumSpectra(ws, OutputWorkspace=ws.name()+"_Sum")
         wsList.append(ws)
 
     return wsList
@@ -457,4 +424,17 @@ def plugBootWSIntoIC(inputIC, bootInputWS, fastBootstrap):
         if fastBootstrap:
             IC.noOfMSIterations = 1
 
+
+def plugJackWSIntoIC(inputIC, jackInputWS, parentInputWS, fastJackknife):
+    """
+    Similar to the bootstrap case, except it takes parent ws used in GC and MS corrections.
+    """
+
+    for IC, wsJack, parentWSnNCP in zip(inputIC, jackInputWS, parentInputWS):
+        IC.jackSample = True
+        IC.jackWS = wsJack
+        IC.parentWS = parentWSnNCP[0]     # Select workspace with parent data
+
+        if fastJackknife:
+            IC.noOfMSIterations = 1
 

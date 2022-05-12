@@ -59,7 +59,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 23   #134
 
@@ -94,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 2   #4
     firstSpec = 144   #144
     lastSpec = 164   #182
 
@@ -174,7 +174,7 @@ start_time = time.time()
 # nSamples = 10
 # runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
 # runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
-runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=True)
+runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False)
 
 # ----- End of iteractive section
 end_time = time.time()
