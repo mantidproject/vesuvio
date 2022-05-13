@@ -22,6 +22,7 @@ def runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=True, fastBo
     inputIC = [bckwdIC, fwdIC]
     return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
 
+
 def runIndependentHackknife(singleIC, yFitIC, fastBootstrap=False, runningTest=False):
     inputIC = [singleIC]
     return runJackknife(inputIC, yFitIC, fastBootstrap, runningTest)
@@ -32,6 +33,10 @@ def runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False, runningTest=F
     # TODO: Write function for this?
     runOriginalBeforeBootstrap([bckwdIC, fwdIC], yFitIC, fastBootstrap, runYFit=False)
     bckwdJackResults = runJackknife([bckwdIC], yFitIC, fastBootstrap, runningTest)
+    
+    # Can insert change to the fwd inputs here
+    #  Write function that changes inputs
+    
     fwdJackResults = runJackknife([fwdIC], yFitIC, fastBootstrap, runningTest)
     return [bckwdJackResults[0], fwdJackResults[0]]    # For consistency
     
