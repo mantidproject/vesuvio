@@ -13,12 +13,15 @@ def iterativeFitForDataReduction(ic):
 
     if ic.bootSample:
         initialWs = RenameWorkspace(InputWorkspace=ic.bootWS, OutputWorkspace=initialWs.name())
-    
+    elif ic.jackSample:
+        initialWs = RenameWorkspace(InputWorkspace=ic.jackWS, OutputWorkspace=initialWs.name())
+
+
     cropedWs = cropAndMaskWorkspace(ic, initialWs)
 
     wsToBeFitted = CloneWorkspace(InputWorkspace=cropedWs, OutputWorkspace=cropedWs.name()+"0")
    
-    createSlabGeometry(ic)
+    createSlabGeometry(ic)  # TODO: Move this function inside the MS correction, not used otherwise
 
     for iteration in range(ic.noOfMSIterations):
         # Workspace from previous iteration
@@ -36,21 +39,42 @@ def iterativeFitForDataReduction(ic):
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
         if ic.MSCorrectionFlag:
-            createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios)
-            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_MulScattering",
-                    OutputWorkspace="tmpNameWs")
+            wsMS = createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios)
+            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs")
 
         if ic.GammaCorrectionFlag:  
-            createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios)
-            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=ic.name+"_gamma_background", 
-                    OutputWorkspace="tmpNameWs")
+            wsGC = createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios)
+            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
 
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
+
+        if ic.jackSample:
+            maskColumnWithZeros(ic.name, ic.name+str(iteration+1))
 
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
     fittingResults = resultsObject(ic)
     fittingResults.save()
     return wsFinal, fittingResults
+
+
+def maskColumnWithZeros(maskedWSName, wsToBeMaskedName):
+
+    maskedWS = mtd[maskedWSName]
+    wsToBeMasked = mtd[wsToBeMaskedName]
+
+    dataY = maskedWS.extractY()
+    dataE = maskedWS.extractE()
+
+    zeroCol = np.all(dataE==0, axis=0)
+    assert np.all(zeroCol == np.all(dataY==0, axis=0)), "Jackknife column needs to be masked in dataY and dataE"
+    # zeroIdx = np.argwhere(zeroCol)
+
+    for i in range(wsToBeMasked.getNumberHistograms()):
+        wsToBeMasked.dataY(i)[zeroCol] = 0
+        wsToBeMasked.dataE(i)[zeroCol] = 0
+    
+    # Check if this was successful
+
 
 
 def createTableInitialParameters(ic):
@@ -123,7 +147,11 @@ def createSlabGeometry(ic):
         + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
-    CreateSampleShape(ic.name, xml_str)
+
+    if ic.jackSample:
+        CreateSampleShape(ic.parentWS, xml_str)
+    else:
+        CreateSampleShape(ic.name, xml_str)
 
 
 def fitNcpToWorkspace(ic, ws):
@@ -133,7 +161,11 @@ def fitNcpToWorkspace(ic, ws):
     on a spectrum by spectrum basis.
     """
     dataYws, dataXws, dataEws = arraysFromWS(ws)   
-    dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)                  
+    dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)      
+
+    # if ic.runningJackknife:   # Creates a jackknife sample data
+    #     dataY, dataX, dataE = jackSampleFromPointData(dataY, dataX, dataE, ic.jackIter)
+
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
     print("\nFitting NCP:\n")
@@ -142,7 +174,7 @@ def fitNcpToWorkspace(ic, ws):
     createTableWSForFitPars(ws.name(), ic.noOfMasses, arrFitPars)
     arrBestFitPars = arrFitPars[:, 1:-2]
     allNcpForEachMass, allNcpTotal = calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
-    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws)
+    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws, ic)
     return
 
 
@@ -163,7 +195,25 @@ def histToPointData(dataY, dataX, dataE):
     dataYp = dataY[:, :-1]
     dataEp = dataE[:, :-1] 
     dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
+
+    # dataYp, dataXp, dataEp = filterNanColumns(dataYp, dataXp, dataEp)
+
     return dataYp, dataXp, dataEp
+
+
+# def filterNanColumns(dataY, dataX, dataE):
+#     zeroCol = np.all(dataY == 0, axis=0)   # When whole column is zero, take it out of point data
+
+#     dataYf = dataY[:, ~zeroCol]
+#     dataXf = dataX[:, ~zeroCol]
+#     dataEf = dataE[:, ~zeroCol]
+#     return dataYf, dataXf, dataEf
+
+# def jackSampleFromPointData(dataY, dataX, dataE, j):
+#     jackDataY = np.delete(dataY, j, axis=1)
+#     jackDataX = np.delete(dataX, j, axis=1)
+#     jackDataE = np.delete(dataE, j, axis=1)
+#     return jackDataY, jackDataX, jackDataE
 
 
 def prepareFitArgs(ic, dataX):
@@ -323,7 +373,7 @@ def calculateNcpRow(initPars, ySpacesForEachMass, resolutionPars, instrPars, kin
     return ncpForEachMass
 
 
-def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
+def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     """Creates workspaces from ncp array data"""
 
     # Need to rearrage array of yspaces into seperate arrays for each mass
@@ -331,25 +381,46 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws):
 
     # Use ws dataX to match with histogram data
     dataX = ws.extractX()[:, :-1]
+
+    # if ic.runningJackknife:
+    #     dataX = np.delete(dataX, ic.jackIter, axis=1)
+
     assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
 
     # Total ncp workspace
+
+    # # Add zeros column
+    # ncpTotalf = addZeroCol(ncpTotal, ws)
+    # assert ncpTotalf.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
+    ncpTotalf = ncpTotal
+
     ncpTotWs = CreateWorkspace(
         DataX=dataX.flatten(), 
-        DataY=ncpTotal.flatten(),
+        DataY=ncpTotalf.flatten(),
         Nspec=len(dataX), 
         OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
     SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
 
     # Individual ncp workspaces
     for i, ncp_m in enumerate(ncpForEachMass):
+
+        # ncp_mf = addZeroCol(ncp_m, ws)
+        ncp_mf = ncp_m
+
         ncpMWs = CreateWorkspace(
             DataX=dataX.flatten(), 
-            DataY=ncp_m.flatten(), 
+            DataY=ncp_mf.flatten(), 
             Nspec=len(dataX),
             OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
         SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
 
+
+# def addZeroCol(ncp, ws):
+#     ncpf = ws.extractY()[:, :-1]
+#     zeroCol = np.all(ncpf==0, axis=0)
+#     ncpf[:, ~zeroCol] = ncp
+#     return ncpf
+  
 
 def switchFirstTwoAxis(A):
     """Exchanges the first two indices of an array A,
@@ -451,14 +522,24 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
 
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
+    # Additional treatement for jackknife
+    zerosMask = dataY==0
+    ncpTotal = ncpTotal[~zerosMask]
+    dataYf = dataY[~zerosMask]   
+    dataEf = dataE[~zerosMask]   
+
+    # dataYf = dataY
+    # dataEf = dataE
+
+
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is currently never satisfied, 
         # but I am keeping it for the unlikely case of fitting NCP data without errors.
         # In this case, we can use a statistical weight to make sure 
         # chi2 is not too small for minimize.optimize().
-        chi2 = (ncpTotal - dataY)**2 / dataY**2
+        chi2 = (ncpTotal - dataYf)**2 / dataYf**2
     else:
-        chi2 =  (ncpTotal - dataY)**2 / dataE**2    
+        chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
     return np.sum(chi2)
 
 
@@ -644,7 +725,11 @@ def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
     sampleProperties = calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios)
     print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
             sampleProperties, "\n")
-    createMulScatWorkspaces(ic, ic.name, sampleProperties)
+    
+    if ic.jackSample:
+        return createMulScatWorkspaces(ic, ic.parentWS.name(), sampleProperties)
+    else:
+        return createMulScatWorkspaces(ic, ic.name, sampleProperties)
 
 
 def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
@@ -700,30 +785,38 @@ def createMulScatWorkspaces(ic, wsName, sampleProperties):
                  OutputWorkspace=workspace)
         RenameWorkspace(InputWorkspace=workspace,
                         OutputWorkspace=str(wsName)+workspace)
+        SumSpectra(wsName+workspace, OutputWorkspace=wsName+workspace+"_Sum")
+        
     DeleteWorkspaces(
         [data_normalisation, simulation_normalisation, trans, dens]
         )
-  # The only remaining workspaces are the _MulScattering and _TotScattering
+    # The only remaining workspaces are the _MulScattering and _TotScattering
+    return mtd[wsName+"_MulScattering"]
 
 
 def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios):
     """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
+    if ic.jackSample:
+        inputWS = ic.parentWS.name()
+    else:
+        inputWS = ic.name
+
     # I do not know why, but setting these instrument parameters is required
-    SetInstrumentParameter(ic.name, ParameterName='hwhm_lorentz', 
+    SetInstrumentParameter(inputWS, ParameterName='hwhm_lorentz', 
                             ParameterType='Number', Value='24.0')
-    SetInstrumentParameter(ic.name, ParameterName='sigma_gauss', 
+    SetInstrumentParameter(inputWS, ParameterName='sigma_gauss', 
                             ParameterType='Number', Value='73.0')
 
     profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
-    background, corrected = VesuvioCalculateGammaBackground(
-        InputWorkspace=ic.name, ComptonFunction=profiles
-        )
-    RenameWorkspace(InputWorkspace= background, OutputWorkspace = ic.name+"_gamma_background")
-    Scale(InputWorkspace = ic.name+"_gamma_background", OutputWorkspace = ic.name+"_gamma_background", 
-        Factor=0.9, Operation="Multiply")
 
+    background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
+    
+    RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS+"_Gamma_Background")
+    Scale(InputWorkspace = inputWS+"_Gamma_Background", OutputWorkspace = inputWS+"_Gamma_Background", 
+        Factor=0.9, Operation="Multiply")
     DeleteWorkspace(corrected)
+    return mtd[inputWS+"_Gamma_Background"]
 
 
 def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):

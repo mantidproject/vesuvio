@@ -245,7 +245,7 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
     fileName = f"spec_{firstSpec}-{lastSpec}_iter_{msIter}{corr}"
     fileNameZ = fileName + ".npz"
 
-    bootOutPath = experimentsPath / sampleName / "bootstrap_data"
+    bootOutPath = experimentsPath / sampleName / "jackknife_data"
     
     bootName = fileName + f"_nsampl_{nSamples}"
     bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"
@@ -278,9 +278,9 @@ firstSpec = 3
 lastSpec = 134
 msIter = 4
 MS = True
-GC = False
-nSamples = 2500
-nBins = int(nSamples/25)
+GC = True
+nSamples = 144
+nBins = 20 #int(nSamples/25)
 speed = "quick"
 ySpaceFit = False
 IPPath = currentPath / "vesuvio_analysis" / "ip_files" / "ip2018_3.par"

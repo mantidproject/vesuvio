@@ -14,6 +14,7 @@ bckwdICDefault = bckwdIC
 yfitICDefault = yfitIC
 
 #TODO: Figure out why doing the two tests simultaneously fails the testing
+# Probably because running bootstrap alters the initial conditions of forward scattering
 
 # Test Joint procedure
 bootJointResults = runJointBootstrap(bckwdICDefault, fwdICDefault, nSamples, yfitICDefault, checkUserIn=False)
