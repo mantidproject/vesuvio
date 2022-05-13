@@ -274,12 +274,12 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # ySpaceFit = False
 
 sampleName = "starch_80_RD"
-firstSpec = 3
-lastSpec = 134
+firstSpec = 144
+lastSpec = 182
 msIter = 4
 MS = True
 GC = True
-nSamples = 144
+nSamples = 319
 nBins = 20 #int(nSamples/25)
 speed = "quick"
 ySpaceFit = False
@@ -290,6 +290,11 @@ dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, 
 bootData = np.load(dataPath)
 bootPars = bootData["boot_samples"][:, :, 1:-2]
 parentPars = bootData["parent_result"][:, 1:-2]
+
+print(f"\nNumber of samples: {len(bootData)}")
+
+assert ~np.all(bootPars[-1] == parentPars), "Error in Jackknife due to last column."
+
 checkBootSamplesVSParent(bootPars, parentPars)
 
 
