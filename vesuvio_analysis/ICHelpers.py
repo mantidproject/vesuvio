@@ -33,9 +33,7 @@ def completeICFromInputs(ic, scriptName, icWS):
     setOutputDirsForSample(ic, scriptName)
     
     # Do not run bootstrap sample, by default
-    ic.bootSample = False
-    # ic.bootWS = None
-    ic.jackSample = False
+    ic.runningSampleWS = False
 
     # Store script name
     ic.scriptName = scriptName

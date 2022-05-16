@@ -13,106 +13,111 @@ plt.style.use("ggplot")
 currentPath = Path(__file__).parent.absolute()
 
 
-def runIndependentBootstrap(singleIC, nSamples, yFitIC, checkUserIn=True, fastBootstrap=False):
-    inputIC = [singleIC]
-    return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
+def runIndependentBootstrap(singleIC, bootIC, yFitIC):
+    return runBootstrap(bootIC, [singleIC], yFitIC)
 
 
-def runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=True, fastBootstrap=False):
-    inputIC = [bckwdIC, fwdIC]
-    return runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap)
+def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
-
-def runIndependentHackknife(singleIC, yFitIC, fastBootstrap=False, runningTest=False):
-    inputIC = [singleIC]
-    return runJackknife(inputIC, yFitIC, fastBootstrap, runningTest)
-
-
-def runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False, runningTest=False):
-    # Run entire joint procedure just to change fwdIC initial widths
-    # TODO: Write function for this?
-    runOriginalBeforeBootstrap([bckwdIC, fwdIC], yFitIC, fastBootstrap, runYFit=False)
-    bckwdJackResults = runJackknife([bckwdIC], yFitIC, fastBootstrap, runningTest)
-    
-    # Can insert change to the fwd inputs here
-    #  Write function that changes inputs
-    
-    fwdJackResults = runJackknife([fwdIC], yFitIC, fastBootstrap, runningTest)
-    return [bckwdJackResults[0], fwdJackResults[0]]    # For consistency
-    
-
-def runBootstrap(inputIC, nSamples, yFitIC, checkUserIn, fastBootstrap):
-    """inutIC can have one or two (back, forward) IC inputs."""
-
-    t0 = time.time()
-    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap)
-    t1 = time.time()
-
-    if checkUserIn:
-        userIn = checkUserInput(t1-t0, nSamples)
-        if (userIn != "y") and (userIn != "Y"): return
-
-    parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
-    setOutputDirs(inputIC, nSamples)
-    bootResults = initializeResults(parentResults, nSamples)
-    # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(nSamples):
-        AnalysisDataService.clear()
-
-        bootInputWS = createBootstrapWS(parentWSNCPSavePaths)
-
-        plugBootWSIntoIC(inputIC, bootInputWS, fastBootstrap)   
-
-        # Run procedure for bootstrap ws
-        iterResults = runMainProcedure(inputIC, yFitIC)
-
-        storeBootIter(bootResults, j, iterResults)
-        saveBootstrapResults(bootResults, inputIC, fastBootstrap)      
-    return bootResults
-
-
-def runJackknife(inputIC, yFitIC, fastBootstrap, runningTest):
-
-    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=False)
-    
-    nSamples = parentWSnNCPs[0][0].dataY(0).size - 1  # Because last column is ignored
-    parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
-
-    setOutputDirs(inputIC, nSamples, runningJackknife=True)
-    bootResults = initializeResults(parentResults, nSamples)
-
-    if runningTest:
-        start = int(nSamples/2)
-        end = start + 3
+    if bootIC.runningJackknife:
+        runOriginalBeforeBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)
+        bckwdJackRes = runBootstrap(bootIC, [bckwdIC], yFitIC)
+        fwdJackRes = runBootstrap(bootIC, [fwdIC], yFitIC)
+        return [bckwdJackRes[0], fwdJackRes[0]]    # For consistency
     else:
-        start = 0
-        end = nSamples
+        return runBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)
+
+
+def runBootstrap(bootIC, inputIC, yFitIC):
+    """
+    Main algorithm for the Bootstrap.
+    Allows for Jackknife or Bootstrap depending on bool flag set in bootIC.
+    Chooses fast or slow (correct) version of bootstrap depending on flag set in bootIC.
+    Performs either independent or joint procedure depending of len(inputIC).
+    """
+    askUserConfirmation(inputIC, bootIC)
+ 
+    parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC)
+
+    nSamples = chooseNSamples(bootIC, parentWSnNCPs)
+
+    setOutputDirs(inputIC, nSamples, bootIC)
+    bootResults = initializeResults(parentResults, nSamples)
+    parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
+
+    iStart, iEnd = chooseLoopRange(bootIC, nSamples)
 
     # Form each bootstrap workspace and run ncp fit with MS corrections
-    for j in range(start, end):
+    for i in range(iStart, iEnd):
         AnalysisDataService.clear()
 
-        jackInputWS, parentInputWS = createJackknifeWS(parentWSNCPSavePaths, j)
+        sampleInputWS, parentWS = createSampleWS(bootIC.runningJackknife, parentWSNCPSavePaths, i)   # Creates ith sample
 
-        plugJackWSIntoIC(inputIC, jackInputWS, parentInputWS, fastBootstrap) 
+        formSampleIC(inputIC, bootIC, sampleInputWS, parentWS)  
 
-        # Run procedure for bootstrap ws
-        iterResults = runMainProcedure(inputIC, yFitIC, runYFit=False)
+        iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
 
-        storeBootIter(bootResults, j, iterResults)
-        saveBootstrapResults(bootResults, inputIC, fastBootstrap)
-        # if input("Press s to stop.") == "s": return    
+        storeBootIter(bootResults, i, iterResults)
+        saveBootstrapResults(bootResults, inputIC)      
     return bootResults
 
 
-def runOriginalBeforeBootstrap(inputIC, yFitIC, fastBootstrap, runYFit=True):
+def askUserConfirmation(inputIC, bootIC):
+    #TODO: Fix this for the jackknife
+
+    if not(bootIC.userConfirmation):   # Skip user confirmation 
+        return
+
+    totalTimeOriginal = 0
+    totalTimeBootstrap = 0
+    for IC in inputIC:
+        if IC.modeRunning == "FORWARD":
+            timeNoMS = 0.13
+            timePerMS = 1.2
+
+        elif IC.modeRunning == "BACKWARD":
+            timeNoMS = 0.27
+            timePerMS = 2.6
+        
+        else:
+            raise ValueError("Mode running not recognized.")
+        
+        timeOriginalIC = timeNoMS + (IC.noOfMSIterations-1) * (timeNoMS+timePerMS)
+        totalTimeOriginal += timeOriginalIC      
+        
+        if bootIC.skipMSIterations:
+            totalTimeBootstrap += bootIC.nSamples * timeNoMS
+        else:
+            totalTimeBootstrap += bootIC.nSamples * timeOriginalIC
+
+    print(f"\n\nEstimated time for original procedure: {totalTimeOriginal:.2f} minutes.")
+    print(f"\nEstimated time for all Bootstrap samples: {totalTimeBootstrap/60:.3f} hours.")
+    if input(f"\nProceed? (y/n): ") == "y":
+        return
+    else:
+        raise KeyboardInterrupt ("Bootstrap procedure interrupted.")
+
+
+def runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC):
     """Runs unaltered procedure to store parent results and select parent ws"""
 
     setICsToDefault(inputIC, yFitIC)
-    parentResults = runMainProcedure(inputIC, yFitIC, runYFit)
-    parentWSnNCPs = selectParentWorkspaces(inputIC, fastBootstrap)
+
+    parentResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
+    parentWSnNCPs = selectParentWorkspaces(inputIC, bootIC.skipMSIterations)
     checkResiduals(parentWSnNCPs)
     return parentResults, parentWSnNCPs
+
+
+def chooseNSamples(bootIC, parentWSnNCPs):
+
+    if bootIC.runningJackknife:
+        assert len(parentWSnNCPs) == 1, "Running Jackknife, supports only one IC at a time."
+        nSamples = parentWSnNCPs[0][0].blocksize()-1
+    else:
+        nSamples = bootIC.nSamples
+
+    return nSamples
 
 
 def setICsToDefault(inputIC, yFitIC):
@@ -125,44 +130,7 @@ def setICsToDefault(inputIC, yFitIC):
     yFitIC.showPlots = False
 
     for IC in inputIC:    # Default is not to run with bootstrap ws
-        IC.bootSample = False
-        IC.jackSample = False
-
-
-def setOutputDirs(inputIC, nSamples, runningJackknife=False):
-    """Form bootstrap output paths"""
-
-    # Select script name and experiments path
-    sampleName = inputIC[0].scriptName   # Name of sample currently running
-    experimentsPath = currentPath/".."/".."/"experiments"
-
-    if runningJackknife:
-        bootOutPath = experimentsPath / sampleName / "jackknife_data"
-    else:
-        bootOutPath = experimentsPath / sampleName / "bootstrap_data"
-    bootOutPath.mkdir(exist_ok=True)
-
-    quickPath = bootOutPath / "quick"
-    slowPath = bootOutPath / "slow"
-    quickPath.mkdir(exist_ok=True)
-    slowPath.mkdir(exist_ok=True)
-
-    for IC in inputIC:    # Make save paths for .npz files
-        # Build Filename based on ic
-        corr = ""
-        if IC.MSCorrectionFlag & (IC.noOfMSIterations>1):
-            corr+="_MS"
-        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>1):
-            corr+="_GC"
-
-        fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
-        bootName = fileName + f"_nsampl_{nSamples}"+".npz"
-        bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
-
-        IC.bootQuickSavePath = quickPath / bootName
-        IC.bootQuickYFitSavePath = quickPath / bootNameYFit
-        IC.bootSlowSavePath = slowPath / bootName
-        IC.bootSlowYFitSavePath = slowPath / bootNameYFit
+        IC.runningSampleWS = False
 
 
 def runMainProcedure(inputIC, yFitIC, runYFit=True):
@@ -191,13 +159,6 @@ def runMainProcedure(inputIC, yFitIC, runYFit=True):
     return parentResults
 
 
-def checkUserInput(t, nSamples):
-    print(f"\nRan original procedure, time: {t:.2f} s.")
-    print(f"Estimated time for {nSamples} samples: {nSamples*t/60/60:.1f} hours.")
-    userIn = input("Continue with Bootstrap? y/n: ")
-    return userIn
-
-
 def selectParentWorkspaces(inputIC, fastBoot):
     """
     Selects parent workspace from which the Bootstrap replicas will be created.
@@ -220,11 +181,132 @@ def selectParentWorkspaces(inputIC, fastBoot):
     return parentWSnNCPs
 
 
+#TODO: Revise this check
+def checkResiduals(parentWSnNCP):
+    """
+    Calculates the self-correlation of residuals for each spectrum.
+    When correlation is detected, plots the spectrum.
+    """
+    for (parentWS, parentNCP) in parentWSnNCP:
+        dataY = parentWS.extractY()[:, :-1]
+        totNcp = parentNCP.extractY()[:, :]     
+        residuals = dataY - totNcp 
+
+        lag = 1     # For lag-plot of self-correlation
+        print(f"Correlation Coefficients for lag={lag}:\n")
+        for rowRes in residuals:
+            corrCoef = stats.pearsonr(rowRes[:-lag], rowRes[lag:])  
+            print(corrCoef[0])
+            if np.abs(corrCoef[0]) >= 0.5:
+                plt.scatter(rowRes[:-lag], rowRes[lag:], label=f"r={corrCoef}")
+                plt.legend()
+                plt.show()
+
+
+def setOutputDirs(inputIC, nSamples, bootIC):
+    """Form bootstrap output paths"""
+
+    # Select script name and experiments path
+    sampleName = inputIC[0].scriptName   # Name of sample currently running
+    experimentsPath = currentPath/".."/".."/"experiments"
+
+    if bootIC.runningJackknife:
+        bootPath = experimentsPath / sampleName / "jackknife_data"
+    else:
+        bootPath = experimentsPath / sampleName / "bootstrap_data"
+    bootPath.mkdir(exist_ok=True)
+
+    if bootIC.skipMSIterations:
+        speedPath = bootPath / "quick"
+    else:
+        speedPath = bootPath / "slow"
+    speedPath.mkdir(exist_ok=True)
+
+    for IC in inputIC:    # Make save paths for .npz files
+        # Build Filename based on ic
+        corr = ""
+        if IC.MSCorrectionFlag & (IC.noOfMSIterations>1):
+            corr+="_MS"
+        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>1):
+            corr+="_GC"
+
+        fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
+        bootName = fileName + f"_nsampl_{nSamples}"+".npz"
+        bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
+
+        IC.bootSavePath = speedPath / bootName
+        IC.bootYFitSavePath = speedPath / bootNameYFit
+
+
+def initializeResults(parentResults, nSamples):
+    bootResultObjs = []
+    for pResults in parentResults:
+        try:
+            resultsObj = BootScattResults(pResults, nSamples)
+        except AttributeError:
+            resultsObj = BootYFitResults(pResults, nSamples)
+
+        bootResultObjs.append(resultsObj)
+    return bootResultObjs
+
+
+class BootScattResults:
+
+    def __init__(self, parentResults, nSamples):
+        self.parentResult = parentResults.all_spec_best_par_chi_nit[-1]
+        self.bootSamples = np.zeros((nSamples, *self.parentResult.shape))
+
+    def storeBootIterResults(self, j, bootResult):
+        self.bootSamples[j] = bootResult.all_spec_best_par_chi_nit[-1]
+    
+    def saveResults(self, IC):
+        np.savez(IC.bootSavePath, boot_samples=self.bootSamples,
+             parent_result=self.parentResult)
+
+
+class BootYFitResults:
+
+    def __init__(self, parentResults, nSamples):
+        self.parentPopt = parentResults.popt
+        self.parentPerr = parentResults.perr
+        self.bootSamples = np.zeros((nSamples, *self.parentPopt.shape))
+
+    def storeBootIterResults(self, j, bootResult):
+        self.bootSamples[j] = bootResult.popt
+    
+    def saveResults(self, IC):
+        np.savez(IC.bootYFitSavePath, boot_samples=self.bootSamples,
+             parent_popt=self.parentPopt, parent_perr=self.parentPerr)    
+
+
+def storeBootIter(bootResultObjs, j, bootIterResults):
+    for bootObj, iterRes in zip(bootResultObjs, bootIterResults):
+        bootObj.storeBootIterResults(j, iterRes)
+
+
+def saveBootstrapResults(bootResultObjs, inputIC):
+    for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
+        bootObj.saveResults(IC)
+    bootResultObjs[-1].saveResults(inputIC[-1])   # Account for YFit object
+
+
 def convertWSToSavePaths(parentWSnNCPs):
     savePaths = []
     for wsList in parentWSnNCPs:
         savePaths.append(saveWorkspacesLocally(wsList))
     return savePaths
+
+
+def chooseLoopRange(bootIC, nSamples):
+
+    if bootIC.runningJackknife and bootIC.runningTest:
+        iStart = int(nSamples/2)
+        iEnd = iStart + 3   
+    else:
+        iStart = 0
+        iEnd = nSamples
+
+    return iStart, iEnd
 
 
 def saveWorkspacesLocally(args):
@@ -250,75 +332,25 @@ def saveWorkspacesLocally(args):
     return wsSavePaths
 
 
-def initializeResults(parentResults, nSamples):
-    bootResultObjs = []
-    for pResults in parentResults:
-        try:
-            resultsObj = BootScattResults(pResults, nSamples)
-        except AttributeError:
-            resultsObj = BootYFitResults(pResults, nSamples)
 
-        bootResultObjs.append(resultsObj)
-    return bootResultObjs
+def createSampleWS(runningJackknife, parentWSNCPSavePaths, j):
+
+    if runningJackknife:
+        return createJackknifeWS(parentWSNCPSavePaths, j)
+    else:
+        return createBootstrapWS(parentWSNCPSavePaths, j)
 
 
-class BootScattResults:
 
-    def __init__(self, parentResults, nSamples):
-        self.parentResult = parentResults.all_spec_best_par_chi_nit[-1]
-        self.bootSamples = np.zeros((nSamples, *self.parentResult.shape))
-
-    def storeBootIterResults(self, j, bootResult):
-        self.bootSamples[j] = bootResult.all_spec_best_par_chi_nit[-1]
-    
-    def saveResults(self, IC, fastBootstrap):
-        if fastBootstrap:
-            savePath = IC.bootQuickSavePath
-        else:
-            savePath = IC.bootSlowSavePath
-
-        np.savez(savePath, boot_samples=self.bootSamples,
-             parent_result=self.parentResult)
-
-
-class BootYFitResults:
-
-    def __init__(self, parentResults, nSamples):
-        self.parentPopt = parentResults.popt
-        self.parentPerr = parentResults.perr
-        self.bootSamples = np.zeros((nSamples, *self.parentPopt.shape))
-
-    def storeBootIterResults(self, j, bootResult):
-        self.bootSamples[j] = bootResult.popt
-    
-    def saveResults(self, IC, fastBootstrap):
-        if fastBootstrap:
-            savePath = IC.bootQuickYFitSavePath
-        else:
-            savePath = IC.bootSlowYFitSavePath
-
-        np.savez(savePath, boot_samples=self.bootSamples,
-             parent_popt=self.parentPopt, parent_perr=self.parentPerr)    
-
-
-def storeBootIter(bootResultObjs, j, bootIterResults):
-    for bootObj, iterRes in zip(bootResultObjs, bootIterResults):
-        bootObj.storeBootIterResults(j, iterRes)
-
-
-def saveBootstrapResults(bootResultObjs, inputIC, fastBootstrap):
-    for bootObj, IC in zip(bootResultObjs, inputIC):
-        bootObj.saveResults(IC, fastBootstrap)
-    bootResultObjs[-1].saveResults(inputIC[-1], fastBootstrap)
-
-
-def createBootstrapWS(parentWSNCPSavePaths):
+def createBootstrapWS(parentWSNCPSavePaths, j):
+    # TODO: use j iteration somewhere?
     """
     Creates bootstrap ws replica.
     Inputs: Experimental (parent) workspace and corresponding NCP total fit
     """
 
     bootInputWS = []
+    parentInputWS = []
     for (parentWSPath, totNcpWSPath) in parentWSNCPSavePaths:
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
@@ -337,7 +369,19 @@ def createBootstrapWS(parentWSNCPSavePaths):
         assert np.all(wsBoot.extractY()[:, :-1] == bootDataY), "Bootstrap data not being correctly passed onto ws."
 
         bootInputWS.append(wsBoot)
-    return bootInputWS
+        parentInputWS.append([parentWS, totNcpWS])
+
+    return bootInputWS, parentInputWS
+
+
+def bootstrapResidualsSample(residuals):
+    """Randomly choose points from residuals of each spectra (same statistical weigth)"""
+
+    bootRes = np.zeros(residuals.shape)
+    for i, res in enumerate(residuals):
+        rowIdxs = np.random.randint(0, len(res), len(res))    # [low, high)
+        bootRes[i] = res[rowIdxs]
+    return bootRes
 
 
 def createJackknifeWS(parentWSNCPSavePaths, j):
@@ -373,28 +417,6 @@ def createJackknifeWS(parentWSNCPSavePaths, j):
     return jackInputWS, parentInputWS
 
 
-#TODO: Figure out how to include this check in the code
-def checkResiduals(parentWSnNCP):
-    """
-    Calculates the self-correlation of residuals for each spectrum.
-    When correlation is detected, plots the spectrum.
-    """
-    for (parentWS, parentNCP) in parentWSnNCP:
-        dataY = parentWS.extractY()[:, :-1]
-        totNcp = parentNCP.extractY()[:, :]     
-        residuals = dataY - totNcp 
-
-        lag = 1     # For lag-plot of self-correlation
-        print(f"Correlation Coefficients for lag={lag}:\n")
-        for rowRes in residuals:
-            corrCoef = stats.pearsonr(rowRes[:-lag], rowRes[lag:])  
-            print(corrCoef[0])
-            if np.abs(corrCoef[0]) >= 0.5:
-                plt.scatter(rowRes[:-lag], rowRes[lag:], label=f"r={corrCoef}")
-                plt.legend()
-                plt.show()
-
-
 def loadWorkspacesFromPath(*args):
     wsList = []
     for path in args:
@@ -406,40 +428,16 @@ def loadWorkspacesFromPath(*args):
     return wsList
 
 
-def bootstrapResidualsSample(residuals):
-    """Randomly choose points from residuals of each spectra (same statistical weigth)"""
+def formSampleIC(inputIC, bootIC, sampleInputWS, parentWS):
 
-    bootRes = np.zeros(residuals.shape)
-    for i, res in enumerate(residuals):
-        rowIdxs = np.random.randint(0, len(res), len(res))    # [low, high)
-        bootRes[i] = res[rowIdxs]
-    return bootRes
+    for IC, wsSample, parentWSnNCP in zip(inputIC, sampleInputWS, parentWS):
+        IC.runningSampleWS = True
+        IC.runningJackknife = bootIC.runningJackknife
 
-
-
-def plugBootWSIntoIC(inputIC, bootInputWS, fastBootstrap):
-    """
-    Changes initial conditions to take in the bootstrap workspace.
-    If bootstrap is on fast mode, change MS iterations to 1.
-    """
-    for IC, wsBoot in zip(inputIC, bootInputWS):
-        IC.bootSample = True
-        IC.bootWS = wsBoot
-
-        if fastBootstrap:
+        if bootIC.skipMSIterations:
             IC.noOfMSIterations = 1
 
-
-def plugJackWSIntoIC(inputIC, jackInputWS, parentInputWS, fastJackknife):
-    """
-    Similar to the bootstrap case, except it takes parent ws used in GC and MS corrections.
-    """
-
-    for IC, wsJack, parentWSnNCP in zip(inputIC, jackInputWS, parentInputWS):
-        IC.jackSample = True
-        IC.jackWS = wsJack
+        IC.sampleWS = wsSample
         IC.parentWS = parentWSnNCP[0]     # Select workspace with parent data
-
-        if fastJackknife:
-            IC.noOfMSIterations = 1
+   
 
