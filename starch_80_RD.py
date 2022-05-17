@@ -40,7 +40,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
+    HToMass0Ratio = 19.0620008206  # TODO: Check what happens when set to zero
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
@@ -60,8 +60,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
     constraints = ()
 
     noOfMSIterations = 1     #4
-    firstSpec = 3    #3
-    lastSpec = 134   #134
+    firstSpec = 23    #3
+    lastSpec = 43   #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     noOfMSIterations = 1   #4
     firstSpec = 144   #144
-    lastSpec = 182   #182
+    lastSpec = 164   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -160,7 +160,7 @@ start_time = time.time()
 #     runIndependentIterativeProcedure(fwdIC)
     
 #     # Joint procedure
-#     # runJointBackAndForwardProcedure(bckwdIC, fwdIC)
+runJointBackAndForwardProcedure(bckwdIC, fwdIC)
 
 #     # Select final ws created by the procedure
 #     wsFinal = mtd[wsName]
@@ -174,7 +174,7 @@ start_time = time.time()
 # YSpace fit is performed automatically by default
 
 # runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
-runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+# runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 # ----- End of iteractive section
 end_time = time.time()

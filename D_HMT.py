@@ -137,29 +137,7 @@ completeICFromInputs(bckwdIC, scriptName, icWSBack)
 
 start_time = time.time()
 # Start of interactive section 
-
-# wsName = f"{fwdIC.name}{fwdIC.noOfMSIterations-1}"   #"DHMT_300K_RD_forward_"+str(fwdIC.noOfMSIterations-1)
-# if wsName in mtd:
-#     wsFinal = mtd[wsName]
-#     allNCP = extractNCPFromWorkspaces(wsFinal)     # Seems that it is not working
-# else:
-#     wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
-#     lastIterationNCP = forwardScatteringResults.all_ncp_for_each_mass[-1]
-#     allNCP = lastIterationNCP
-
-# assert ~np.all(allNCP==0), "NCP extraction not working!"
-
-# print("\nFitting workspace ", wsFinal.name(), " in Y Space.")
-# fitInYSpaceProcedure(yfitIC, wsFinal, allNCP)
-
-# wsFinal, scatteringResults = runIndependentIterativeProcedure(fwdIC)
-# fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
-
-
-# Run Bootstrap procedures
-nSamples = 5
-runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
-
+runJointBackAndForwardProcedure(bckwdIC, fwdIC)
 
 # End of iteractive section
 end_time = time.time()

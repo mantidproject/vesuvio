@@ -731,7 +731,7 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
 
     # If Backsscattering mode and H is present in the sample, add H to MS properties
     if (ic.modeRunning == "BACKWARD"):
-        if (ic.HToMass0Ratio != None) and (ic.HToMass0Ratio != 0):  # If H is present, ratio is a number
+        if (ic.HToMass0Ratio != None):  # If H is present, ratio is a number
             masses = np.append(masses, 1.0079)
             meanWidths = np.append(meanWidths, 5.0)
             HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]

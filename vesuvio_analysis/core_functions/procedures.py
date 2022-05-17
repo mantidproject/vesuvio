@@ -2,6 +2,7 @@ from .analysis_functions import iterativeFitForDataReduction, switchFirstTwoAxis
 from mantid.api import AnalysisDataService, mtd
 import numpy as np
 
+
 def runIndependentIterativeProcedure(IC, clearWS=True):
     """
     Runs the iterative fitting of NCP, cleaning any previously stored workspaces.
@@ -25,128 +26,119 @@ def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    
-    Hmask = np.abs(fwdIC.masses-1)/1 < 0.1
-    if np.any(Hmask):  # Check if H present
-        print("\nH mass detected.\n")
-        assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
+    if isHPresent(fwdIC.masses) and (bckwdIC.HToMass0Ratio==None):
+        wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
 
-        if (bckwdIC.HToMass0Ratio==None) or (bckwdIC.HToMass0Ratio==0):
-            wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
-        else:
-            wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndKnownHRatio(bckwdIC, fwdIC)
     else:
-        wsFinal, bckwdScatResults, fwdScatResults = runHNotPresent(bckwdIC, fwdIC)
+        assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMass0Ratio==None)), "When H is not present, HToMass0Ratio has to be set to None"
+        
+        wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
-    return wsFinal, bckwdScatResults, fwdScatResults
-
-
-def runHNotPresent(bckwdIC, fwdIC):
-    """
-    Used when H is not present and for one or several masses.
-    Runs backward scattering and uses the resulting widhts and intensity ratios
-    to set all initial forward scattering widths and intensities.
-    First width is not fixed.
-    In the case of more than one mass present, all other widths are fixed.
-    """
-
-
-    # Run backward scattering
-    wsFinal, bckwdScatResults = iterativeFitForDataReduction(bckwdIC)
-
-    # Extract mean widhts and intensity ratios from backscattering results
-    backMeanWidths = bckwdScatResults.all_mean_widths[-1]
-    backMeanIntensityRatios = bckwdScatResults.all_mean_intensities[-1] 
-
-    # Set widths and intensity ratios
-    fwdIC.initPars[1::3] = backMeanWidths       
-    fwdIC.initPars[0::3] = backMeanIntensityRatios  
-
-    if len(backMeanWidths) > 1:
-        # Fix all widhts except first
-        fwdIC.bounds[4::3] = backMeanWidths[1:][:, np.newaxis] * np.ones((1,2))   
-
-    print("\nStarting forward scattering with mean widhts and intensity ratios from backscattering:")
-    print("Assigned all widths and intensities and fixed all widths excet first.\n")
-
-    # Run forward scattering
-    wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)  
-
-    return wsFinal, bckwdScatResults, fwdScatResults
-
-
-def runHPresentAndKnownHRatio(bckwdIC, fwdIC):
-    """
-    Used when H is present and H to first mass ratio is known. 
-    Assumes more than one mass.
-    Assumes H is the first mass.
-    Runs backscattering and uses results and H to mass ratio to set up initial forward parameters.
-    """
-
-    # If H to first mass ratio is known, can run MS correction for backscattering
-    # Back scattering produces precise results for widhts and intensity ratios for non-H masses
-    wsFinal, bckwdScatResults = iterativeFitForDataReduction(bckwdIC)
-    setInitFwdParsFromBackResultsAndHRatio(bckwdScatResults, bckwdIC.HToMass0Ratio, fwdIC)
-    wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
     return wsFinal, bckwdScatResults, fwdScatResults
 
 
 def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
     """
     Used when H is present and H to first mass ratio is not known.
-    Assumes more than one mass.
-    Assumes H is the first mass.
     Preliminary forward scattering is run to get rough estimate of H to first mass ratio.
     Runs iterative procedure with alternating back and forward scattering.
     """
-    #TODO: Have not tried this procedure with Bootstrap, but I believe it is not suitable
 
+    assert bckwdIC.runningSampleWS == False, "Procedure not suitable for Bootstrap."
+
+    nIter = askUserNoOfIterations()
+ 
     # Run preliminary forward with a good guess for the widths of non-H masses
     wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
-    for i in range(2):    # Loop until convergence is achieved
+    for i in range(int(nIter)):    # Loop until convergence is achieved
 
         AnalysisDataService.clear()    # Clears all Workspaces
 
-        # Get estimate of H to mass0 ratio
-        fwdMeanIntensityRatios = fwdScatResults.all_mean_intensities[-1] 
-        bckwdIC.HToMass0Ratio = fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
+        bckwdIC.HToMass0Ratio = calculateHToMass0Ratio(fwdScatResults)
+        wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
-        # Run backward procedure with this estimate
-        wsFinal, bckwdScatResults = iterativeFitForDataReduction(bckwdIC)
-        # Set forward scatterign initial widths and intensity ratios
-        setInitFwdParsFromBackResultsAndHRatio(bckwdScatResults, bckwdIC.HToMass0Ratio, fwdIC)
-        # Run forward procedure with altered withs and intensity ratios
-        wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
-
+    print(f"\n\nFinal estimate for HToMass0Ratio: {calculateHToMass0Ratio(fwdScatResults):.3f}\n")
     return wsFinal, bckwdScatResults, fwdScatResults
+
+
+def askUserNoOfIterations():
+    print("\nH was detected but HToMass0Ratio was not provided.")
+    print("\nSugested preliminary procedure:\n\nrun_forward\nfor n:\n    estimate_HToMass0Ratio\n    run_backward\n    run_forward")
+    userInput = input("\n\nDo you wish to run preliminary procedure to estimate HToMass0Ratio? (y/n)") 
+    if not((userInput=="y") or (userInput=="Y")): raise KeyboardInterrupt("Preliminary procedure interrupted.")
+    
+    nIter = int(input("\nHow many iterations do you wish to run? n="))
+    return nIter
  
 
-def setInitFwdParsFromBackResultsAndHRatio(bckwdScatResults, HToMass0Ratio, fwdIC):
+def calculateHToMass0Ratio(fwdScatResults):
+    fwdMeanIntensityRatios = fwdScatResults.all_mean_intensities[-1] 
+    return fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
+
+
+def runJoint(bckwdIC, fwdIC):
+    wsFinal, bckwdScatResults = iterativeFitForDataReduction(bckwdIC)
+    setInitFwdParsFromBackResults(bckwdScatResults, bckwdIC.HToMass0Ratio, fwdIC)
+    wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
+    return wsFinal, bckwdScatResults, fwdScatResults   
+
+
+def setInitFwdParsFromBackResults(bckwdScatResults, HToMass0Ratio, fwdIC):
     """
-    Used in the case of H present and H ratio to first mass known.
-    Assumes more than one mass present.
-    Takes the backscattering results and H ratio to set forward scattering widths and intensity ratios.
+    Used to pass mean widths and intensities from back scattering onto intial conditions of forward scattering.
+    Checks if H is present and adjust the passing accordingly:
+    If H present, use HToMass0Ratio to recalculate intensities and fix only non-H widths.
+    If H not present, widths and intensities are directly mapped and all widhts except first are fixed. 
     """
 
     # Get widts and intensity ratios from backscattering results
     backMeanWidths = bckwdScatResults.all_mean_widths[-1]
     backMeanIntensityRatios = bckwdScatResults.all_mean_intensities[-1] 
 
-    # Use H ratio to calculate intensity ratios 
-    HIntensity = HToMass0Ratio * backMeanIntensityRatios[0]
-    initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
-    initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
+    if isHPresent(fwdIC.masses):
 
-    # Set calculated intensity ratios to forward scattering 
-    fwdIC.initPars[0::3] = initialFwdIntensityRatios
+        assert len(backMeanWidths) == fwdIC.noOfMasses-1, "H Mass present, no of masses in front needs to be bigger than back by 1."
 
-    # Set forward widths from backscattering
-    fwdIC.initPars[4::3] = backMeanWidths
+        # Use H ratio to calculate intensity ratios 
+        HIntensity = HToMass0Ratio * backMeanIntensityRatios[0]
+        initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
+        initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
 
-    # Fix all widths except for H, i.e. the first one
-    fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+        # Set calculated intensity ratios to forward scattering 
+        fwdIC.initPars[0::3] = initialFwdIntensityRatios
+        # Set forward widths from backscattering
+        fwdIC.initPars[4::3] = backMeanWidths
+        # Fix all widths except for H, i.e. the first one
+        fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1,2))
+
+    else:   # H mass not present anywhere
+
+        assert len(backMeanWidths) == fwdIC.noOfMasses, "H Mass not present, no of masses needs to be the same for front and back scattering."
+
+        # Set widths and intensity ratios
+        fwdIC.initPars[1::3] = backMeanWidths       
+        fwdIC.initPars[0::3] = backMeanIntensityRatios  
+
+        if len(backMeanWidths) > 1:           # In the case of single mass, width is not fixed
+            # Fix all widhts except first
+            fwdIC.bounds[4::3] = backMeanWidths[1:][:, np.newaxis] * np.ones((1,2))   
 
     print("\nChanged initial conditions of forward scattering according to mean widhts and intensity ratios from backscattering.\n")
-    return    # Changes were implemented of fwdIC object
+    return
 
- 
+
+def isHPresent(masses) -> bool:
+
+    Hmask = np.abs(masses-1)/1 < 0.1        # H mass whithin 10% of 1 au
+
+    if np.any(Hmask):    # H present
+
+        print("\nH mass detected.\n")
+        assert len(Hmask) > 1, "When H is only mass present, run independent forward procedure, not joint."
+        assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
+        assert sum(Hmask) == 1, "More than one mass very close to H were detected."
+        return True
+    else:
+        return False
+
+
