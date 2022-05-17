@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 plt.style.use("ggplot")
 currentPath = Path(__file__).parent.absolute()
 
+# TODO: Warn user to only use one of these procedures isolated and not one after the other
 
 def runIndependentBootstrap(singleIC, bootIC, yFitIC):
     return runBootstrap(bootIC, [singleIC], yFitIC)
@@ -20,21 +21,23 @@ def runIndependentBootstrap(singleIC, bootIC, yFitIC):
 def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
     if bootIC.runningJackknife:
-        runOriginalBeforeBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)
+        runOriginalBeforeBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)  # Just to alter initial conditions fwdIC
         bckwdJackRes = runBootstrap(bootIC, [bckwdIC], yFitIC)
+        bootIC.userConfirmation = False
         fwdJackRes = runBootstrap(bootIC, [fwdIC], yFitIC)
         return [bckwdJackRes[0], fwdJackRes[0]]    # For consistency
     else:
         return runBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)
 
 
-def runBootstrap(bootIC, inputIC, yFitIC):
+def runBootstrap(bootIC, inputIC: list, yFitIC):
     """
     Main algorithm for the Bootstrap.
     Allows for Jackknife or Bootstrap depending on bool flag set in bootIC.
     Chooses fast or slow (correct) version of bootstrap depending on flag set in bootIC.
     Performs either independent or joint procedure depending of len(inputIC).
     """
+    AnalysisDataService.clear()
     askUserConfirmation(inputIC, bootIC)
  
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC)
@@ -62,9 +65,9 @@ def runBootstrap(bootIC, inputIC, yFitIC):
     return bootResults
 
 
-def askUserConfirmation(inputIC, bootIC):
-    #TODO: Fix this for the jackknife
-
+def askUserConfirmation(inputIC: list, bootIC):
+    """Estimates running time for all samples and asks the user to confirm the run."""
+    
     if not(bootIC.userConfirmation):   # Skip user confirmation 
         return
 
@@ -84,32 +87,43 @@ def askUserConfirmation(inputIC, bootIC):
         
         timeOriginalIC = timeNoMS + (IC.noOfMSIterations-1) * (timeNoMS+timePerMS)
         totalTimeOriginal += timeOriginalIC      
-        
-        if bootIC.skipMSIterations:
-            totalTimeBootstrap += bootIC.nSamples * timeNoMS
-        else:
-            totalTimeBootstrap += bootIC.nSamples * timeOriginalIC
 
-    print(f"\n\nEstimated time for original procedure: {totalTimeOriginal:.2f} minutes.")
-    print(f"\nEstimated time for all Bootstrap samples: {totalTimeBootstrap/60:.3f} hours.")
+        # nSamples for either Bootstap or Jackknife
+        nSamples = bootIC.nSamples 
+        if bootIC.runningJackknife:
+            start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
+            nSamples = int((end-start)/spacing) - 2   # -2 is small correction
+
+        # Either fast or slow bootstrap
+        if bootIC.skipMSIterations:
+            totalTimeBootstrap += nSamples * timeNoMS
+        else:
+            totalTimeBootstrap += nSamples * timeOriginalIC
+
+    print(f"\n\nTime estimates are based on a personal laptop with 4 cores, likely oversestimated.")
+    print(f"\nEstimated time for original procedure: {totalTimeOriginal:.2f} minutes.")
+    print(f"\nEstimated time for {nSamples} Bootstrap samples: {totalTimeBootstrap/60:.3f} hours.")
     if input(f"\nProceed? (y/n): ") == "y":
         return
     else:
         raise KeyboardInterrupt ("Bootstrap procedure interrupted.")
 
 
-def runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC):
+def runOriginalBeforeBootstrap(bootIC, inputIC: list, yFitIC):
     """Runs unaltered procedure to store parent results and select parent ws"""
 
     setICsToDefault(inputIC, yFitIC)
-
     parentResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
     parentWSnNCPs = selectParentWorkspaces(inputIC, bootIC.skipMSIterations)
     checkResiduals(parentWSnNCPs)
+
     return parentResults, parentWSnNCPs
 
 
-def chooseNSamples(bootIC, parentWSnNCPs):
+def chooseNSamples(bootIC, parentWSnNCPs: list):
+    """
+    Returns number of samples to run.
+    If Jackknife is running, no of samples is the number of bins in the workspace."""
 
     if bootIC.runningJackknife:
         assert len(parentWSnNCPs) == 1, "Running Jackknife, supports only one IC at a time."
@@ -120,8 +134,9 @@ def chooseNSamples(bootIC, parentWSnNCPs):
     return nSamples
 
 
-def setICsToDefault(inputIC, yFitIC):
+def setICsToDefault(inputIC: list, yFitIC):
     """Disables some features of yspace fit, makes sure the default """
+
     # Disable global fit 
     yFitIC.globalFitFlag = False
     # Run automatic minos by default
@@ -133,7 +148,8 @@ def setICsToDefault(inputIC, yFitIC):
         IC.runningSampleWS = False
 
 
-def runMainProcedure(inputIC, yFitIC, runYFit=True):
+def runMainProcedure(inputIC: list, yFitIC, runYFit: bool = True):
+    """Decides main procedure to run based on the initial conditions offered as inputs."""
 
     if len(inputIC) == 2:
         bckwdIC, fwdIC = inputIC
@@ -154,15 +170,16 @@ def runMainProcedure(inputIC, yFitIC, runYFit=True):
             parentResults = [singleScatResP, yFitResultsParent]  
 
     else:
-        raise ValueError("len(inputIC) needs to be one or two.")
+        raise ValueError("len(inputIC) needs to be one or two initial conditions (forward and backward).")
 
     return parentResults
 
 
-def selectParentWorkspaces(inputIC, fastBoot):
+def selectParentWorkspaces(inputIC: list, fastBoot: bool):
     """
     Selects parent workspace from which the Bootstrap replicas will be created.
-    If fast mode, the parent ws is the final ws after MS corrections."""
+    If fast mode, the parent ws is the final ws after MS corrections.
+    """
     
     parentWSnNCPs = []
     for IC in inputIC:
@@ -182,7 +199,7 @@ def selectParentWorkspaces(inputIC, fastBoot):
 
 
 #TODO: Revise this check
-def checkResiduals(parentWSnNCP):
+def checkResiduals(parentWSnNCP: list):
     """
     Calculates the self-correlation of residuals for each spectrum.
     When correlation is detected, plots the spectrum.
@@ -203,8 +220,8 @@ def checkResiduals(parentWSnNCP):
                 plt.show()
 
 
-def setOutputDirs(inputIC, nSamples, bootIC):
-    """Form bootstrap output paths"""
+def setOutputDirs(inputIC: list, nSamples, bootIC):
+    """Form bootstrap output data paths"""
 
     # Select script name and experiments path
     sampleName = inputIC[0].scriptName   # Name of sample currently running
@@ -238,7 +255,8 @@ def setOutputDirs(inputIC, nSamples, bootIC):
         IC.bootYFitSavePath = speedPath / bootNameYFit
 
 
-def initializeResults(parentResults, nSamples):
+def initializeResults(parentResults: list, nSamples):
+    """Initializes a list with objects to store output data."""
     bootResultObjs = []
     for pResults in parentResults:
         try:
@@ -279,18 +297,18 @@ class BootYFitResults:
              parent_popt=self.parentPopt, parent_perr=self.parentPerr)    
 
 
-def storeBootIter(bootResultObjs, j, bootIterResults):
+def storeBootIter(bootResultObjs: list, j: int, bootIterResults: list):
     for bootObj, iterRes in zip(bootResultObjs, bootIterResults):
         bootObj.storeBootIterResults(j, iterRes)
 
 
-def saveBootstrapResults(bootResultObjs, inputIC):
+def saveBootstrapResults(bootResultObjs: list, inputIC: list):
     for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
         bootObj.saveResults(IC)
     bootResultObjs[-1].saveResults(inputIC[-1])   # Account for YFit object
 
 
-def convertWSToSavePaths(parentWSnNCPs):
+def convertWSToSavePaths(parentWSnNCPs: list):
     savePaths = []
     for wsList in parentWSnNCPs:
         savePaths.append(saveWorkspacesLocally(wsList))
@@ -309,7 +327,7 @@ def chooseLoopRange(bootIC, nSamples):
     return iStart, iEnd
 
 
-def saveWorkspacesLocally(args):
+def saveWorkspacesLocally(args: list):
     wsSavePaths = []
     for ws in args:
 
@@ -333,7 +351,7 @@ def saveWorkspacesLocally(args):
 
 
 
-def createSampleWS(runningJackknife, parentWSNCPSavePaths, j):
+def createSampleWS(runningJackknife: bool, parentWSNCPSavePaths: list, j: int):
 
     if runningJackknife:
         return createJackknifeWS(parentWSNCPSavePaths, j)
@@ -384,9 +402,9 @@ def bootstrapResidualsSample(residuals):
     return bootRes
 
 
-def createJackknifeWS(parentWSNCPSavePaths, j):
+def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
     """
-    Creates bootstrap ws replica.
+    Creates jackknife ws replicas.
     Inputs: Experimental (parent) workspace and corresponding NCP total fit
     """
 
@@ -417,9 +435,9 @@ def createJackknifeWS(parentWSNCPSavePaths, j):
     return jackInputWS, parentInputWS
 
 
-def loadWorkspacesFromPath(*args):
+def loadWorkspacesFromPath(*savePaths):
     wsList = []
-    for path in args:
+    for path in savePaths:
         saveName = path.name.split(".")[0]
         ws = Load(str(path), OutputWorkspace=saveName)
         SumSpectra(ws, OutputWorkspace=ws.name()+"_Sum")
@@ -429,6 +447,7 @@ def loadWorkspacesFromPath(*args):
 
 
 def formSampleIC(inputIC, bootIC, sampleInputWS, parentWS):
+    """Adds atributes to initial conditions to start procedure with sample ws."""
 
     for IC, wsSample, parentWSnNCP in zip(inputIC, sampleInputWS, parentWS):
         IC.runningSampleWS = True

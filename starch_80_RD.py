@@ -59,9 +59,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2    #4
-    firstSpec = 3    #3
-    lastSpec = 134   #134
+    noOfMSIterations = 1    #4
+    firstSpec = 23    #3
+    lastSpec = 43   #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -94,9 +94,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
-    lastSpec = 182   #182
+    lastSpec = 164   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -120,7 +120,7 @@ class YSpaceFitInitialConditions:
 
 class BootstrapInitialConditions:
     runningJackknife = False
-    nSamples = 5
+    nSamples = 2
     skipMSIterations = False
     runningTest = True
     userConfirmation = True
@@ -172,8 +172,8 @@ start_time = time.time()
 
 # Run either joint or independent bootstrap
 # YSpace fit is performed automatically by default
-runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
-# runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+# runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
+runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 # ----- End of iteractive section
 end_time = time.time()

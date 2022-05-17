@@ -18,3 +18,7 @@ B = [a[0] for a in A]
 print(B)
 
 print(~False)
+
+s = "15."
+print(s)
+print(int(float(s)))
