@@ -1,5 +1,5 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, extractNCPFromWorkspaces
+from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -106,22 +106,15 @@ class ForwardInitialConditions(GeneralInitialConditions):
     tof_binning="110,1,430"                 # Binning of ToF spectra
   
 
-class bootstrapInitialConditions:     # Only used to create bootstrap directories
-    speedQuick = False
-    nSamples = None
-
-
 icWSBack = LoadVesuvioBackParameters
 icWSFront = LoadVesuvioFrontParameters  
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 
-bootIC = bootstrapInitialConditions
-
 # Need to run this function, otherwise will not work
-completeICFromInputs(fwdIC, scriptName, icWSFront, bootIC)
-completeICFromInputs(bckwdIC, scriptName, icWSBack, bootIC)
+completeICFromInputs(fwdIC, scriptName, icWSFront)
+completeICFromInputs(bckwdIC, scriptName, icWSBack)
 
 
 # if __name__ == "main":

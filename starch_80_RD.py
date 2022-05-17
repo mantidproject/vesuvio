@@ -59,7 +59,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -94,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -115,7 +115,7 @@ class YSpaceFitInitialConditions:
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
-    nGlobalFitGroups = 4
+    nGlobalFitGroups = 4   
 
 
 class BootstrapInitialConditions:
@@ -172,6 +172,7 @@ start_time = time.time()
 
 # Run either joint or independent bootstrap
 # YSpace fit is performed automatically by default
+
 # runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
 runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 

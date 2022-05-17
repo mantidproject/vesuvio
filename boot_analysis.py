@@ -274,14 +274,14 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # ySpaceFit = False
 
 sampleName = "starch_80_RD"
-firstSpec = 144
-lastSpec = 182
+firstSpec = 3
+lastSpec = 134
 msIter = 4
 MS = True
-GC = True
-nSamples = 319
+GC = False
+nSamples = 144
 nBins = 20 #int(nSamples/25)
-speed = "quick"
+speed = "slow"
 ySpaceFit = False
 IPPath = currentPath / "vesuvio_analysis" / "ip_files" / "ip2018_3.par"
 
