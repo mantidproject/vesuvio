@@ -17,8 +17,8 @@ suite.addTests(loader.loadTestsFromModule(yspacefit))
 import vesuvio_analysis.tests.test_bootstrap as bootstrap
 suite.addTests(loader.loadTestsFromModule(bootstrap))
 
-# import vesuvio_analysis.tests.test_jackknife as jackknife
-# suite.addTests(loader.loadTestsFromModule(jackknife))
+import vesuvio_analysis.tests.test_jackknife as jackknife
+suite.addTests(loader.loadTestsFromModule(jackknife))
 
 
 # Initialize a runner, pass it your suite and run it

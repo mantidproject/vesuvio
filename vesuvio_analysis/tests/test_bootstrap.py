@@ -1,4 +1,4 @@
-from ..core_functions.bootstrap import runIndependentBootstrap, runJointBootstrap
+from ..core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
 from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np
@@ -13,11 +13,20 @@ fwdICDefault = fwdIC
 bckwdICDefault = bckwdIC
 yfitICDefault = yfitIC
 
+class BootstrapInitialConditions:
+    runningJackknife = False
+    nSamples = 3
+    skipMSIterations = False
+    runningTest = False
+    userConfirmation = False
+
+bootIC = BootstrapInitialConditions
+
 #TODO: Figure out why doing the two tests simultaneously fails the testing
 # Probably because running bootstrap alters the initial conditions of forward scattering
 
 # Test Joint procedure
-bootJointResults = runJointBootstrap(bckwdICDefault, fwdICDefault, nSamples, yfitICDefault, checkUserIn=False)
+bootJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
 
 bootSamples = []
 for bootRes in bootJointResults:
@@ -47,7 +56,7 @@ class TestJointBootstrap(unittest.TestCase):
 
 
 # # Test Single procedure
-# bootSingleResults = runIndependentBootstrap(bckwdIC, nSamples, yfitIC, checkUserIn=False)
+# bootSingleResults = runIndependentBootstrap(bckwdIC, bootIC, yfitIC)
 
 # bootSingleBackSamples = bootSingleResults[0].bootSamples
 # bootSingleYFitSamples = bootSingleResults[1].bootSamples

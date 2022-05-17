@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap, runIndependentBootstrap, runJointBootstrap, runJointJackknife
+from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
@@ -118,14 +118,22 @@ class YSpaceFitInitialConditions:
     nGlobalFitGroups = 4
 
 
+class BootstrapInitialConditions:
+    runningJackknife = False
+    nSamples = 2
+    skipMSIterations = False
+    runningTest = True
+    userConfirmation = True
+
+
 icWSBack = LoadVesuvioBackParameters
 icWSFront = LoadVesuvioFrontParameters  
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
-
-# bootIC = bootstrapInitialConditions
+bootIC = BootstrapInitialConditions
+bootIC = BootstrapInitialConditions
 
 # Need to run this function, otherwise will not work
 completeICFromInputs(fwdIC, scriptName, icWSFront)
@@ -136,8 +144,8 @@ start_time = time.time()
 # ----- Interactive section 
 
 
-# # Runing some procedure and y-space fit at the final workspace;
-# # If final workspace is loaded in Mantid, run only y-space fit:
+# Runing some procedure and y-space fit at the final workspace;
+# If final workspace is loaded in Mantid, run only y-space fit:
 
 # # Name of final workspace produced by procedure
 # wsName = "starch_80_RD_FORWARD_"+str(fwdIC.noOfMSIterations-1)
@@ -164,11 +172,8 @@ start_time = time.time()
 
 # Run either joint or independent bootstrap
 # YSpace fit is performed automatically by default
-
-# nSamples = 10
-# runJointBootstrap(bckwdIC, fwdIC, nSamples, yFitIC)
-# runIndependentBootstrap(fwdIC, nSamples, yFitIC, checkUserIn=False, fastBootstrap=True)
-runJointJackknife(bckwdIC, fwdIC, yFitIC, fastBootstrap=False)
+# runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
+runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 # ----- End of iteractive section
 end_time = time.time()

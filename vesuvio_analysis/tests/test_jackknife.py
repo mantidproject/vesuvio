@@ -1,4 +1,4 @@
-from ..core_functions.bootstrap import runIndependentBootstrap, runJointBootstrap, runJointJackknife
+from ..core_functions.bootstrap import runJointBootstrap
 from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np
@@ -9,8 +9,17 @@ testPath = Path(__file__).absolute().parent
 
 np.random.seed(3)   # Set seed so that tests match everytime
 
+class BootstrapInitialConditions:
+    runningJackknife = True
+    nSamples = 3   # Overwritten by running Jackknife
+    skipMSIterations = False
+    runningTest = True
+    userConfirmation = False
 
-jackJointResults = runJointJackknife(bckwdIC, fwdIC, yfitIC, fastBootstrap=False, runningTest=True)
+bootIC = BootstrapInitialConditions
+
+jackJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
+# jackJointResults = runJointJackknife(bckwdIC, fwdIC, yfitIC, fastBootstrap=False, runningTest=True)
 
 
 jackSamples = []

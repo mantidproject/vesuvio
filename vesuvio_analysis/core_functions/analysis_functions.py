@@ -11,11 +11,8 @@ def iterativeFitForDataReduction(ic):
 
     initialWs = loadRawAndEmptyWsFromUserPath(ic)  # Do this before alternative bootstrap to extract name()   
 
-    if ic.bootSample:
-        initialWs = RenameWorkspace(InputWorkspace=ic.bootWS, OutputWorkspace=initialWs.name())
-    elif ic.jackSample:
-        initialWs = RenameWorkspace(InputWorkspace=ic.jackWS, OutputWorkspace=initialWs.name())
-
+    if ic.runningSampleWS:
+        initialWs = RenameWorkspace(InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name())
 
     cropedWs = cropAndMaskWorkspace(ic, initialWs)
 
@@ -48,7 +45,7 @@ def iterativeFitForDataReduction(ic):
 
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
 
-        if ic.jackSample:
+        if ic.runningSampleWS and ic.runningJackknife:
             maskColumnWithZeros(ic.name, ic.name+str(iteration+1))
 
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
@@ -148,7 +145,7 @@ def createSlabGeometry(ic):
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
 
-    if ic.jackSample:
+    if ic.runningSampleWS and ic.runningJackknife:
         CreateSampleShape(ic.parentWS, xml_str)
     else:
         CreateSampleShape(ic.name, xml_str)
@@ -162,9 +159,6 @@ def fitNcpToWorkspace(ic, ws):
     """
     dataYws, dataXws, dataEws = arraysFromWS(ws)   
     dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)      
-
-    # if ic.runningJackknife:   # Creates a jackknife sample data
-    #     dataY, dataX, dataE = jackSampleFromPointData(dataY, dataX, dataE, ic.jackIter)
 
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
     
@@ -726,7 +720,7 @@ def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
     print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
             sampleProperties, "\n")
     
-    if ic.jackSample:
+    if ic.runningSampleWS and ic.runningJackknife:
         return createMulScatWorkspaces(ic, ic.parentWS.name(), sampleProperties)
     else:
         return createMulScatWorkspaces(ic, ic.name, sampleProperties)
@@ -797,7 +791,7 @@ def createMulScatWorkspaces(ic, wsName, sampleProperties):
 def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios):
     """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
-    if ic.jackSample:
+    if ic.runningSampleWS and ic.runningJackknife:
         inputWS = ic.parentWS.name()
     else:
         inputWS = ic.name
