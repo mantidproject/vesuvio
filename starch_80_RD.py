@@ -1,7 +1,7 @@
-from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runScript, runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
-from vesuvio_analysis.ICHelpers import completeICFromInputs
+# from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
+from vesuvio_analysis.core_functions.run_script import runScript#, runIndependentIterativeProcedure, runJointBackAndForwardProcedure
+# from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
+# from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
@@ -131,7 +131,7 @@ class UserScriptControls:
     procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    runFitInYSpace = "JOINT"    # Options: "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "JOINT"    # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
