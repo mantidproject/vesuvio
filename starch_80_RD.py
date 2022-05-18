@@ -1,5 +1,5 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
+from vesuvio_analysis.core_functions.procedures import runScript, runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
 from vesuvio_analysis.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
@@ -126,56 +126,33 @@ class BootstrapInitialConditions:
     userConfirmation = True
 
 
-icWSBack = LoadVesuvioBackParameters
-icWSFront = LoadVesuvioFrontParameters  
+class UserScriptControls:
+    # Choose main procedure to run
+    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
+
+    # Choose on which ws to perform the fit in y space
+    runFitInYSpace = "JOINT"    # Options: "BACKWARD", "FORWARD", "JOINT"
+
+    # Perform bootstrap procedure
+    # Independent of procedure and runFItInYSpace
+    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+
+start_time = time.time()
+
+wsBackIC = LoadVesuvioBackParameters
+wsFrontIC = LoadVesuvioFrontParameters  
 
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 bootIC = BootstrapInitialConditions
-bootIC = BootstrapInitialConditions
 
-# Need to run this function, otherwise will not work
-completeICFromInputs(fwdIC, scriptName, icWSFront)
-completeICFromInputs(bckwdIC, scriptName, icWSBack)
+userCtr = UserScriptControls
 
 
-start_time = time.time()
-# ----- Interactive section 
+runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 
-# Runing some procedure and y-space fit at the final workspace;
-# If final workspace is loaded in Mantid, run only y-space fit:
-
-# # Name of final workspace produced by procedure
-# wsName = "starch_80_RD_FORWARD_"+str(fwdIC.noOfMSIterations-1)
-
-# if wsName in mtd:
-#     wsFinal = mtd[wsName]
-
-# else:
-#     # Uncomment either independent OR joint procedure;
-
-#     # Independent procedure
-#     runIndependentIterativeProcedure(fwdIC)
-    
-#     # Joint procedure
-runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-
-#     # Select final ws created by the procedure
-#     wsFinal = mtd[wsName]
-
-
-# # Run Y-Space fit on selected ws
-# fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
-
-
-# Run either joint or independent bootstrap
-# YSpace fit is performed automatically by default
-
-# runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
-# runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-
-# ----- End of iteractive section
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
