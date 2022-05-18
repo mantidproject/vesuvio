@@ -1,15 +1,35 @@
 
+from vesuvio_analysis.core_functions.run_script import runScript
 from ..core_functions.procedures import runIndependentIterativeProcedure
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 import matplotlib.pyplot as plt
-from .tests_IC import icWSFront, fwdIC#, bootIC
+from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 testPath = Path(__file__).absolute().parent 
 
 
-wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
+class BootstrapInitialConditions: # Not used, but still need to pass as arg
+    runningJackknife = False
+    nSamples = 0
+    skipMSIterations = False
+    runningTest = True
+    userConfirmation = True
+
+
+class UserScriptControls:
+    procedure = "FORWARD"   
+    fitInYSpace = None    
+    bootstrap = None   
+
+bootIC = BootstrapInitialConditions
+userCtr = UserScriptControls
+
+scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+
+wsFinal, forwardScatteringResults = scattRes
+# wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
 
 # Test the results
 np.set_printoptions(suppress=True, precision=8, linewidth=150)

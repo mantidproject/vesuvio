@@ -22,3 +22,19 @@ print(~False)
 s = "15."
 print(s)
 print(int(float(s)))
+
+
+def multipleArgs():
+    return 2, 3, 4
+
+res = multipleArgs()
+print(res)
+
+someList = [1, 2, 3]
+values = []
+ICs = []
+
+booleans = [a in someList for a in values]
+print(all(booleans))
+for v, ic in zip(values, ICs):
+    print("Some command!") 

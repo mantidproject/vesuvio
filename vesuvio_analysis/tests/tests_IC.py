@@ -102,12 +102,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     tof_binning="110,1.,430"                 # Binning of ToF spectra
 
 
-# class bootstrapInitialConditions:
-#     speedQuick = False
-#     nSamples = 3
-#     ySpaceFit = True
-nSamples = 3
-
 class YSpaceFitInitialConditions:
     showPlots = False
     symmetrisationFlag = True
@@ -117,16 +111,18 @@ class YSpaceFitInitialConditions:
     forceManualMinos = False
     nGlobalFitGroups = 4
 
+# userControls and bootIC defined in corresponding test scripts
 
-icWSFront = LoadVesuvioFrontParameters
-icWSBack = LoadVesuvioFrontParameters  
+wsFrontIC = LoadVesuvioFrontParameters
+wsBackIC = LoadVesuvioBackParameters     # THIS WAS SET TO FRONT
 
 fwdIC = ForwardInitialConditions
 bckwdIC = BackwardInitialConditions
-yfitIC = YSpaceFitInitialConditions
+yFitIC = YSpaceFitInitialConditions
 
+scriptName = "tests"
 # bootIC = bootstrapInitialConditions
 
-completeICFromInputs(fwdIC, "tests", icWSFront)
-completeICFromInputs(bckwdIC, "tests", icWSBack)
+# completeICFromInputs(fwdIC, "tests", icWSFront)
+# completeICFromInputs(bckwdIC, "tests", icWSBack)
 

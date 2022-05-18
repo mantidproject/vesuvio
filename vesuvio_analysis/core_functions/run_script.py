@@ -14,12 +14,14 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
 
 
     if userCtr.procedure == "BACKWARD":
-        assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
+        if userCtr.fitInYSpace != None:
+            assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
         def runProcedure():
             return runIndependentIterativeProcedure(bckwdIC)
 
     elif userCtr.procedure == "FORWARD":
-        assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
+        if userCtr.fitInYSpace != None:
+            assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
         def runProcedure():
             return runIndependentIterativeProcedure(fwdIC)
     
@@ -30,7 +32,11 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         raise ValueError("Procedure not recognized.")
 
 
-    if userCtr.fitInYSpace == "BACKWARD":
+    if userCtr.fitInYSpace == None:
+        wsNames = []
+        ICs = []
+
+    elif userCtr.fitInYSpace == "BACKWARD":
         wsNames = buildFinalWSNames(scriptName, ["BACKWARD"], [bckwdIC])
         ICs = [bckwdIC]
 
@@ -49,16 +55,13 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         pass
 
     elif userCtr.bootstrap == "BACKWARD":
-        runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
-        return
+        return runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
 
     elif userCtr.bootstrap == "FORWARD":
-        runIndependentBootstrap(fwdIC, bootIC, yFitIC)
-        return
+        return runIndependentBootstrap(fwdIC, bootIC, yFitIC)
 
     elif userCtr.bootstrap == "JOINT":
-        runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-        return
+        return runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
     else:
         raise ValueError("Bootstrap option not recognized.")
 
@@ -67,16 +70,18 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     wsInMtd = [ws in mtd for ws in wsNames]   # List of bool
 
     # If final ws are already loaded
-    if all(wsInMtd):
-        for wsName, IC in zip(wsNames, ICs):
-            fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
-        return
+    if (len(wsInMtd)>0) and all(wsInMtd):
+        for wsName, IC in zip(wsNames, ICs):    # When wsName is empty list, loop doesn't run
+            resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+        return None, resYFit       # To match return below. TODO: Need to match all retruns for tests
     
-    runProcedure()
+    res = runProcedure()
 
+    resYFit = None
     for wsName, IC in zip(wsNames, ICs):
-        fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
-    return
+        resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+    
+    return res, resYFit   # Return results used only in tests
 
 
 def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):

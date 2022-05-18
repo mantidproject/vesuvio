@@ -1,3 +1,4 @@
+from vesuvio_analysis.core_functions.run_script import runScript
 from ..core_functions.fit_in_yspace import fitInYSpaceProcedure
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
@@ -5,19 +6,32 @@ from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from .tests_IC import icWSFront, fwdIC, yfitIC# bootIC
+from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 testPath = Path(__file__).absolute().parent 
 
 AnalysisDataService.clear()
 
-wsFinal = Load(str(testPath / "wsFinal.nxs"))
-for i in range(fwdIC.noOfMasses):
+wsFinal = Load(str(testPath / "wsFinal.nxs"), OutputWorkspace=scriptName+"_FORWARD_1")
+for i in range(len(fwdIC.masses)):
     fileName = "wsFinal_ncp_"+str(i)+".nxs"
-    Load(str(testPath / fileName), 
-        OutputWorkspace=wsFinal.name()+"_TOF_Fitted_Profile_"+str(i))
+    Load(str(testPath / fileName), OutputWorkspace=wsFinal.name()+"_TOF_Fitted_Profile_"+str(i))
+
+class BootstrapInitialConditions: # Not used, but still need to pass as arg
+    nSamples = 0
+
+class UserScriptControls:
+    procedure = "FORWARD"   
+    fitInYSpace = "FORWARD"
+    bootstrap = None   
+
+bootIC = BootstrapInitialConditions
+userCtr = UserScriptControls
+
+scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 
-ySpaceFitResults = fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
+ySpaceFitResults = yfitRes
+# ySpaceFitResults = fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
 # Test yspace
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
