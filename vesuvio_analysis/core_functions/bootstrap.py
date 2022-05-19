@@ -24,6 +24,15 @@ def runIndependentBootstrap(singleIC, bootIC, yFitIC):
 
 def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
+    setOutputDirs([bckwdIC, fwdIC], bootIC)
+    for IC in [bckwdIC, fwdIC]:                # Check files already exist
+        if IC.bootSavePath.is_file() or IC.bootYFitSavePath.is_file():
+            print(f"\nOutput data files were detected:" \
+                f"\n{IC.bootSavePath.name}\n{IC.bootYFitSavePath.name}" \
+                f"\nAborting Run of Bootstrap to prevent overwriting data." \
+                f"\nTo avoid this issue you can change the number of samples to run.")
+            return
+
     askUserConfirmation([bckwdIC, fwdIC], bootIC)
     AnalysisDataService.clear()
 
@@ -51,7 +60,7 @@ def runBootstrap(bootIC, inputIC: list, yFitIC):
 
     nSamples = chooseNSamples(bootIC, parentWSnNCPs)
 
-    setOutputDirs(inputIC, nSamples, bootIC)
+    # setOutputDirs(inputIC, bootIC)
     bootResults = initializeResults(parentResults, nSamples)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
@@ -101,8 +110,9 @@ def askUserConfirmation(inputIC: list, bootIC):
             if bootIC.runningTest:
                 nSamples = 3
             else:
-                start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
-                nSamples = int((end-start)/spacing) - 2   # -2 is small correction
+                nSamples = noOfHistsFromTOFBinning(IC)
+                # start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
+                # nSamples = int((end-start)/spacing) - 2   # -2 is small correction
 
         # Either fast or slow bootstrap
         if bootIC.skipMSIterations:
@@ -117,6 +127,12 @@ def askUserConfirmation(inputIC: list, bootIC):
         return
     else:
         raise KeyboardInterrupt ("Bootstrap procedure interrupted.")
+
+
+def noOfHistsFromTOFBinning(IC):
+    start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
+    return int((end-start)/spacing) - 1 # To account for last column being ignored
+
 
 
 def runOriginalBeforeBootstrap(bootIC, inputIC: list, yFitIC):
@@ -137,7 +153,7 @@ def chooseNSamples(bootIC, parentWSnNCPs: list):
 
     if bootIC.runningJackknife:
         assert len(parentWSnNCPs) == 1, "Running Jackknife, supports only one IC at a time."
-        nSamples = parentWSnNCPs[0][0].blocksize()-1
+        nSamples = parentWSnNCPs[0][0].blocksize()-1   # -1 becuase last column is ignored during procedure
     else:
         nSamples = bootIC.nSamples
 
@@ -230,7 +246,7 @@ def checkResiduals(parentWSnNCP: list):
                 plt.show()
 
 
-def setOutputDirs(inputIC: list, nSamples, bootIC):
+def setOutputDirs(inputIC: list, bootIC):
     """Form bootstrap output data paths"""
 
     # Select script name and experiments path
@@ -250,6 +266,11 @@ def setOutputDirs(inputIC: list, nSamples, bootIC):
     speedPath.mkdir(exist_ok=True)
 
     for IC in inputIC:    # Make save paths for .npz files
+
+        nSamples = bootIC.nSamples
+        if bootIC.runningJackknife: 
+            nSamples = noOfHistsFromTOFBinning(IC)
+
         # Build Filename based on ic
         corr = ""
         if IC.MSCorrectionFlag & (IC.noOfMSIterations>1):
@@ -266,7 +287,10 @@ def setOutputDirs(inputIC: list, nSamples, bootIC):
 
 
 def initializeResults(parentResults: list, nSamples):
-    """Initializes a list with objects to store output data."""
+    """
+    Initializes a list with objects to store output data.
+    [BootBackResults, BootFrontResults, BootYSpaceResults]
+    """
     bootResultObjs = []
     for pResults in parentResults:
         try:

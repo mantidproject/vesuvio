@@ -5,8 +5,12 @@ from pathlib import Path
 from scipy import stats
 from vesuvio_analysis.core_functions.analysis_functions import filterWidthsAndIntensities, calculateMeansAndStds, filterWidthsAndIntensities
 from vesuvio_analysis.core_functions.analysis_functions import loadInstrParsFileIntoArray
+from vesuvio_analysis.core_functions.bootstrap import setOutputDirs
+
 currentPath = Path(__file__).parent.absolute() 
-experimentsPath = currentPath / "experiments"
+experimentsPath = currentPath / ".." / ".. " / "experiments"
+IPFilesPath = currentPath / ".." / "ip_files" 
+
 
 
 def calcBootMeans(bestPars):
@@ -234,31 +238,31 @@ def printResults(arrM, arrE, mode):
         print(f"{mode} {i}: {m:>6.3f} \u00B1 {e:<6.3f}")
 
 
-def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
-    # Build Filename based on ic
-    corr = ""
-    if MS & (msIter>1):
-        corr+="_MS"
-    if GC & (msIter>1):
-        corr+="_GC"
+# def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
+#     # Build Filename based on ic
+#     corr = ""
+#     if MS & (msIter>1):
+#         corr+="_MS"
+#     if GC & (msIter>1):
+#         corr+="_GC"
 
-    fileName = f"spec_{firstSpec}-{lastSpec}_iter_{msIter}{corr}"
-    fileNameZ = fileName + ".npz"
+#     fileName = f"spec_{firstSpec}-{lastSpec}_iter_{msIter}{corr}"
+#     fileNameZ = fileName + ".npz"
 
-    bootOutPath = experimentsPath / sampleName / "jackknife_data"
+#     bootOutPath = experimentsPath / sampleName / "jackknife_data"
     
-    bootName = fileName + f"_nsampl_{nSamples}"
-    bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"
+#     bootName = fileName + f"_nsampl_{nSamples}"
+#     bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"
 
-    bootNameZ = bootName + ".npz"
-    bootNameYFitZ = bootNameYFit + ".npz"
+#     bootNameZ = bootName + ".npz"
+#     bootNameYFitZ = bootNameYFit + ".npz"
 
-    loadPath = bootOutPath / speed / bootNameZ
-    bootData = np.load(loadPath)
+#     loadPath = bootOutPath / speed / bootNameZ
+#     bootData = np.load(loadPath)
 
-    loadYFitPath = bootOutPath / speed / bootNameYFitZ
+#     loadYFitPath = bootOutPath / speed / bootNameYFitZ
 
-    return loadPath, loadYFitPath
+#     return loadPath, loadYFitPath
 
 
 
@@ -273,50 +277,70 @@ def dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed):
 # speed = "slow"
 # ySpaceFit = False
 
-sampleName = "starch_80_RD"
-firstSpec = 3
-lastSpec = 134
-msIter = 4
-MS = True
-GC = False
-nSamples = 144
-nBins = 20 #int(nSamples/25)
-speed = "slow"
-ySpaceFit = False
-IPPath = currentPath / "vesuvio_analysis" / "ip_files" / "ip2018_3.par"
+# sampleName = "starch_80_RD"
+# firstSpec = 3
+# lastSpec = 134
+# msIter = 4
+# MS = True
+# GC = False
+# nSamples = 144
+# nBins = 20 #int(nSamples/25)
+# speed = "slow"
+# ySpaceFit = False
+# IPPath = IPFilesPath / "ip2018_3.par"
 
-dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
-
-bootData = np.load(dataPath)
-bootPars = bootData["boot_samples"][:, :, 1:-2]
-parentPars = bootData["parent_result"][:, 1:-2]
-
-print(f"\nNumber of samples: {len(bootData)}")
-
-assert ~np.all(bootPars[-1] == parentPars), "Error in Jackknife due to last column."
-
-checkBootSamplesVSParent(bootPars, parentPars)
+def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC):
 
 
-filteredBootPars = bootPars.copy()
-# filteredBootPars = filteredBootMeans(bootPars)
-# plotRawHists(filteredBootPars, 1, [0, 38], IPPath)
+    setOutputDirs([bckwdIC, fwdIC], bootIC)
+    
+    for IC in [bckwdIC, fwdIC]:
+        if not(IC.bootSavePath.is_file()):
+            print("Bootstrap data files not found, unable to run analysis!")
+            print(f"{IC.bootSavePath.name}")
+        
+        bootData = np.load(IC.bootSavePath)
+        bootPars = bootData["boot_samples"][:, :, 1:-2]
+        parentPars = bootData["parent_result"][:, 1:-2]
+
+        print("Success! Data files found:")
+        print(f"{IC.bootSavePath.name}")
+        print("no of samples: ", len(bootPars))
 
 
-meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
-meanWp = meanWp.flatten()
-meanIp = meanIp.flatten()
 
-meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
+# dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
 
-# plotMeansOverNoSamples(np.linspace(50, 2500, 20).astype(int), meanW, "Widths")
+# bootData = np.load(dataPath)
+# bootPars = bootData["boot_samples"][:, :, 1:-2]
+# parentPars = bootData["parent_result"][:, 1:-2]
+
+# print(f"\nNumber of samples: {len(bootData)}")
+
+# assert ~np.all(bootPars[-1] == parentPars), "Error in Jackknife due to last column."
+
+# checkBootSamplesVSParent(bootPars, parentPars)
 
 
-fig, axs = plt.subplots(1, 2, figsize=(15, 3))
-for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
-    plotHists(ax, means, nBins, title, disableCI=True)
-    # addParentMeans(ax, meanp)
-plt.show()
+# filteredBootPars = bootPars.copy()
+# # filteredBootPars = filteredBootMeans(bootPars)
+# # plotRawHists(filteredBootPars, 1, [0, 38], IPPath)
+
+
+# meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
+# meanWp = meanWp.flatten()
+# meanIp = meanIp.flatten()
+
+# meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
+
+# # plotMeansOverNoSamples(np.linspace(50, 2500, 20).astype(int), meanW, "Widths")
+
+
+# fig, axs = plt.subplots(1, 2, figsize=(15, 3))
+# for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
+#     plotHists(ax, means, nBins, title, disableCI=True)
+#     # addParentMeans(ax, meanp)
+# plt.show()
 
 
 # if ySpaceFit:

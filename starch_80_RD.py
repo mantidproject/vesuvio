@@ -2,6 +2,7 @@
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
@@ -56,8 +57,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
     constraints = ()
 
     noOfMSIterations = 1     #4
-    firstSpec = 23    #3
-    lastSpec = 43   #134
+    firstSpec = 3    #3
+    lastSpec = 134   #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -91,7 +92,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     noOfMSIterations = 1   #4
     firstSpec = 144   #144
-    lastSpec = 164   #182
+    lastSpec = 182   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -115,7 +116,7 @@ class YSpaceFitInitialConditions:
 
 class BootstrapInitialConditions:
     runningJackknife = False
-    nSamples = 2
+    nSamples = 40
     skipMSIterations = False
     runningTest = True
     userConfirmation = True
@@ -123,15 +124,15 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = None   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
     # TODO: Prevent bootstrap from running if file with these initial conditions is found
-    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 start_time = time.time()
@@ -156,3 +157,5 @@ class BootstrapAnalysis:
 
     procedure = "BACKWARD"     # back or forward
     # Add boolean flags to control analysis script
+
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC)

@@ -13,7 +13,11 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     completeICFromInputs(bckwdIC, scriptName, wsBackIC)
 
 
-    if userCtr.procedure == "BACKWARD":
+    if userCtr.procedure == None:
+         def runProcedure():
+            return None 
+    
+    elif userCtr.procedure == "BACKWARD":
         if userCtr.fitInYSpace != None:
             assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
         def runProcedure():
