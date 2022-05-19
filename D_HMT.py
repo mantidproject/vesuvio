@@ -1,12 +1,7 @@
-from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap
-from vesuvio_analysis.ICHelpers import completeICFromInputs
-from mantid.api import AnalysisDataService, mtd
+
 import time
 import numpy as np
 from pathlib import Path
-
 from vesuvio_analysis.core_functions.run_script import runScript
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
@@ -47,7 +42,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015, 12, 14, 27])
-    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers   
@@ -81,11 +75,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
 class ForwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    # HToMass0Ratio = None
-
     masses = np.array([2.015, 12, 14, 27]) 
-    # noOfMasses = len(masses)
-
+  
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
         0.4569, 6.5532, 0.,     
@@ -138,7 +129,7 @@ class UserScriptControls:
     procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"    # Options: "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
@@ -159,25 +150,3 @@ runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, boot
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
-
-
-
-# icWSBack = LoadVesuvioBackParameters
-# icWSFront = LoadVesuvioFrontParameters  
-
-# bckwdIC = BackwardInitialConditions
-# fwdIC = ForwardInitialConditions
-# yFitIC = YSpaceFitInitialConditions
-
-
-# completeICFromInputs(fwdIC, scriptName, icWSFront)
-# completeICFromInputs(bckwdIC, scriptName, icWSBack)
-
-
-# start_time = time.time()
-# # Start of interactive section 
-# runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-
-# # End of iteractive section
-# end_time = time.time()
-# print("\nRunning time: ", end_time-start_time, " seconds")

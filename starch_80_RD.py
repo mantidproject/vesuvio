@@ -1,11 +1,8 @@
-# from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.run_script import runScript#, runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-# from vesuvio_analysis.core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
-# from vesuvio_analysis.ICHelpers import completeICFromInputs
-from mantid.api import AnalysisDataService, mtd
+
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.run_script import runScript
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
@@ -40,11 +37,10 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 19.0620008206  # TODO: Check what happens when set to zero
+    HToMass0Ratio = 19.0620008206  # Set to None when either unknown or H not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
-    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers   
@@ -77,7 +73,6 @@ class ForwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 12, 16, 27]) 
-    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
@@ -131,7 +126,7 @@ class UserScriptControls:
     procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "JOINT"    # Options: "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
