@@ -54,7 +54,7 @@ class TestJointBootstrap(unittest.TestCase):
     def setUp(self):
         self.oriJointBack = np.load(oriBootBack)["boot_samples"]
         self.oriJointFront = np.load(oriBootFront)["boot_samples"]
-        self.oriJointYFit = np.load(oriBootYFit)["boot_vals"]
+        self.oriJointYFit = np.load(oriBootYFit)["boot_samples"]
 
     def testBack(self):
         nptest.assert_array_almost_equal(bootBackSamples, self.oriJointBack)
