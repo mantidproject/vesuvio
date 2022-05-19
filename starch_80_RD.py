@@ -130,6 +130,7 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
+    # TODO: Prevent bootstrap from running if file with these initial conditions is found
     bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
@@ -147,3 +148,11 @@ runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, boot
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
+
+
+# TODO: Control analysis script with another class
+
+class BootstrapAnalysis:
+
+    procedure = "BACKWARD"     # back or forward
+    # Add boolean flags to control analysis script

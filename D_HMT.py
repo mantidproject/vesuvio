@@ -37,8 +37,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    # TODO: Automatically prevent MS from adding H even if ratio!=None
-    HToMass0Ratio = None   # Set to zero or None when H is not present
+    HToMass0Ratio = None   # Set to None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015, 12, 14, 27])
