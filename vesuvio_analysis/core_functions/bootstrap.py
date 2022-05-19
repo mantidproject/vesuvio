@@ -15,15 +15,22 @@ currentPath = Path(__file__).parent.absolute()
 # TODO: Warn user to only use one of these procedures isolated and not one after the other
 
 def runIndependentBootstrap(singleIC, bootIC, yFitIC):
+
+    askUserConfirmation([singleIC], bootIC)
+    AnalysisDataService.clear()
+
     return runBootstrap(bootIC, [singleIC], yFitIC)
 
 
 def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
+    askUserConfirmation([bckwdIC, fwdIC], bootIC)
+    AnalysisDataService.clear()
+
     if bootIC.runningJackknife:
         runOriginalBeforeBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)  # Just to alter initial conditions fwdIC
         bckwdJackRes = runBootstrap(bootIC, [bckwdIC], yFitIC)
-        bootIC.userConfirmation = False
+        # bootIC.userConfirmation = False
         fwdJackRes = runBootstrap(bootIC, [fwdIC], yFitIC)
         return [bckwdJackRes[0], fwdJackRes[0]]    # For consistency
     else:
@@ -38,7 +45,7 @@ def runBootstrap(bootIC, inputIC: list, yFitIC):
     Performs either independent or joint procedure depending of len(inputIC).
     """
     AnalysisDataService.clear()
-    askUserConfirmation(inputIC, bootIC)
+    # askUserConfirmation(inputIC, bootIC)
  
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC)
 
@@ -91,8 +98,11 @@ def askUserConfirmation(inputIC: list, bootIC):
         # nSamples for either Bootstap or Jackknife
         nSamples = bootIC.nSamples 
         if bootIC.runningJackknife:
-            start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
-            nSamples = int((end-start)/spacing) - 2   # -2 is small correction
+            if bootIC.runningTest:
+                nSamples = 3
+            else:
+                start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
+                nSamples = int((end-start)/spacing) - 2   # -2 is small correction
 
         # Either fast or slow bootstrap
         if bootIC.skipMSIterations:
@@ -102,8 +112,8 @@ def askUserConfirmation(inputIC: list, bootIC):
 
     print(f"\n\nTime estimates are based on a personal laptop with 4 cores, likely oversestimated.")
     print(f"\nEstimated time for original procedure: {totalTimeOriginal:.2f} minutes.")
-    print(f"\nEstimated time for {nSamples} Bootstrap samples: {totalTimeBootstrap/60:.3f} hours.")
-    if input(f"\nProceed? (y/n): ") == "y":
+    userInput = input(f"\nEstimated time for {nSamples} Bootstrap samples: {totalTimeBootstrap/60:.3f} hours.\nProceed? (y/n): ")
+    if (userInput == "y") or (userInput == "Y"):
         return
     else:
         raise KeyboardInterrupt ("Bootstrap procedure interrupted.")

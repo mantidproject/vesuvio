@@ -29,7 +29,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         def runProcedure():
             return runJointBackAndForwardProcedure(bckwdIC, fwdIC)
     else:
-        raise ValueError("Procedure not recognized.")
+        raise ValueError("Procedure option not recognized.")
 
 
     if userCtr.fitInYSpace == None:
@@ -48,32 +48,35 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         wsNames = buildFinalWSNames(scriptName, ["BACKWARD", "FORWARD"], [bckwdIC, fwdIC])
         ICs = [bckwdIC, fwdIC]
     else:
-        raise ValueError("fitInYSpace not recognized.")
+        raise ValueError("fitInYSpace option not recognized.")
 
 
+    # If bootstrap is not None, run bootstrap procedure and finish
     if userCtr.bootstrap == None:
         pass
 
     elif userCtr.bootstrap == "BACKWARD":
-        return runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
+        return runIndependentBootstrap(bckwdIC, bootIC, yFitIC), None
 
     elif userCtr.bootstrap == "FORWARD":
-        return runIndependentBootstrap(fwdIC, bootIC, yFitIC)
+        return runIndependentBootstrap(fwdIC, bootIC, yFitIC), None
 
     elif userCtr.bootstrap == "JOINT":
-        return runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
+        return runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
     else:
         raise ValueError("Bootstrap option not recognized.")
 
+    
+    # Default workflow for procedure + fit in y space
 
     # Check if final ws are loaded:
     wsInMtd = [ws in mtd for ws in wsNames]   # List of bool
 
     # If final ws are already loaded
-    if (len(wsInMtd)>0) and all(wsInMtd):
-        for wsName, IC in zip(wsNames, ICs):    # When wsName is empty list, loop doesn't run
+    if (len(wsInMtd)>0) and all(wsInMtd):       # When wsName is empty list, loop doesn't run
+        for wsName, IC in zip(wsNames, ICs):  
             resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
-        return None, resYFit       # To match return below. TODO: Need to match all retruns for tests
+        return None, resYFit       # To match return below. 
     
     res = runProcedure()
 

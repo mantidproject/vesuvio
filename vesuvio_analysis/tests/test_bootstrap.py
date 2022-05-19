@@ -1,17 +1,15 @@
+from vesuvio_analysis.core_functions.run_script import runScript
 from ..core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
 from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from .tests_IC import fwdIC, bckwdIC, nSamples, yfitIC
+from .tests_IC import  scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 testPath = Path(__file__).absolute().parent 
 
 np.random.seed(1)   # Set seed so that tests match everytime
 
-fwdICDefault = fwdIC
-bckwdICDefault = bckwdIC
-yfitICDefault = yfitIC
 
 class BootstrapInitialConditions:
     runningJackknife = False
@@ -20,13 +18,26 @@ class BootstrapInitialConditions:
     runningTest = False
     userConfirmation = False
 
+class UserScriptControls:
+    procedure = "FORWARD"   
+    fitInYSpace = None    
+    bootstrap = "JOINT"   
+
 bootIC = BootstrapInitialConditions
+userCtr = UserScriptControls
+
+bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 #TODO: Figure out why doing the two tests simultaneously fails the testing
 # Probably because running bootstrap alters the initial conditions of forward scattering
-
 # Test Joint procedure
-bootJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
+
+bootJointResults = bootRes
+
+
+# completeICFromInputs(fwdIC, "tests", wsFrontIC)
+# completeICFromInputs(bckwdIC, "tests", wsBackIC)
+# bootJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
 bootSamples = []
 for bootRes in bootJointResults:

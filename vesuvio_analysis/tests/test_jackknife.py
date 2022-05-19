@@ -1,10 +1,11 @@
+from vesuvio_analysis.core_functions.run_script import runScript
 from ..core_functions.bootstrap import runJointBootstrap
 from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from .tests_IC import fwdIC, bckwdIC, nSamples, yfitIC
+from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 testPath = Path(__file__).absolute().parent 
 
 np.random.seed(3)   # Set seed so that tests match everytime
@@ -16,10 +17,20 @@ class BootstrapInitialConditions:
     runningTest = True
     userConfirmation = False
 
-bootIC = BootstrapInitialConditions
 
-jackJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
-# jackJointResults = runJointJackknife(bckwdIC, fwdIC, yfitIC, fastBootstrap=False, runningTest=True)
+class UserScriptControls:
+    procedure = "FORWARD"   
+    fitInYSpace = None    
+    bootstrap = "JOINT"   
+
+bootIC = BootstrapInitialConditions
+userCtr = UserScriptControls
+
+bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+
+
+jackJointResults = bootRes
+# jackJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
 
 
 jackSamples = []

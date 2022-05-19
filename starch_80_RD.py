@@ -142,17 +142,13 @@ start_time = time.time()
 
 wsBackIC = LoadVesuvioBackParameters
 wsFrontIC = LoadVesuvioFrontParameters  
-
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 bootIC = BootstrapInitialConditions
-
 userCtr = UserScriptControls
 
-
 runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
