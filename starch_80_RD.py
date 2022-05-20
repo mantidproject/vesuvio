@@ -124,7 +124,7 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = None   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -132,7 +132,7 @@ class UserScriptControls:
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
     # TODO: Prevent bootstrap from running if file with these initial conditions is found
-    bootstrap = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 start_time = time.time()
@@ -151,11 +151,14 @@ end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
 
 
-# TODO: Control analysis script with another class
-
 class BootstrapAnalysis:
 
     procedure = "BACKWARD"     # back or forward
-    # Add boolean flags to control analysis script
+    filterAvg = True
+    plotRawWidthsIntensities = False
+    plotMeansEvolution = True
+    plot2DHists = True
 
-runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC)
+analysisIC = BootstrapAnalysis
+
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC, analysisIC)

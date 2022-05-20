@@ -14,39 +14,44 @@ currentPath = Path(__file__).parent.absolute()
 
 # TODO: Warn user to only use one of these procedures isolated and not one after the other
 
-def runIndependentBootstrap(singleIC, bootIC, yFitIC):
+# def runIndependentBootstrap(singleIC, bootIC, yFitIC):
 
-    askUserConfirmation([singleIC], bootIC)
+#     askUserConfirmation([singleIC], bootIC)
+#     AnalysisDataService.clear()
+
+#     return bootstrapProcedure(bootIC, [singleIC], yFitIC)
+
+
+def runBootstrap(inputIC, bootIC, yFitIC):
+
+    setOutputDirs(inputIC, bootIC)        # Sets data directiies to inputIC objects
+    checkOutputDirExists(inputIC)            # Checks to see if those directories exits already
+    askUserConfirmation(inputIC, bootIC)
     AnalysisDataService.clear()
 
-    return runBootstrap(bootIC, [singleIC], yFitIC)
+    if bootIC.runningJackknife and (len(inputIC)==2):
+        runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC)  # Just to alter initial conditions fwdIC
+        bckwdIC, fwdIC = inputIC
+        bckwdJackRes = bootstrapProcedure(bootIC, [bckwdIC], yFitIC)
+        fwdJackRes = bootstrapProcedure(bootIC, [fwdIC], yFitIC)
+        return [bckwdJackRes[0], fwdJackRes[0]]    # For consistency
+    
+    else:
+        assert (len(inputIC)==1) or (len(inputIC)==2), "Wrong length of inputIC"
+        return bootstrapProcedure(bootIC, inputIC, yFitIC)
 
 
-def runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
-
-    setOutputDirs([bckwdIC, fwdIC], bootIC)
-    for IC in [bckwdIC, fwdIC]:                # Check files already exist
+def checkOutputDirExists(inputIC):
+    for IC in inputIC:                # Check files already exist
         if IC.bootSavePath.is_file() or IC.bootYFitSavePath.is_file():
             print(f"\nOutput data files were detected:" \
                 f"\n{IC.bootSavePath.name}\n{IC.bootYFitSavePath.name}" \
                 f"\nAborting Run of Bootstrap to prevent overwriting data." \
                 f"\nTo avoid this issue you can change the number of samples to run.")
-            return
-
-    askUserConfirmation([bckwdIC, fwdIC], bootIC)
-    AnalysisDataService.clear()
-
-    if bootIC.runningJackknife:
-        runOriginalBeforeBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)  # Just to alter initial conditions fwdIC
-        bckwdJackRes = runBootstrap(bootIC, [bckwdIC], yFitIC)
-        # bootIC.userConfirmation = False
-        fwdJackRes = runBootstrap(bootIC, [fwdIC], yFitIC)
-        return [bckwdJackRes[0], fwdJackRes[0]]    # For consistency
-    else:
-        return runBootstrap(bootIC, [bckwdIC, fwdIC], yFitIC)
+            raise ValueError("Output data directories already exist. Aborted Bootstrap.")
 
 
-def runBootstrap(bootIC, inputIC: list, yFitIC):
+def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
     """
     Main algorithm for the Bootstrap.
     Allows for Jackknife or Bootstrap depending on bool flag set in bootIC.
@@ -111,8 +116,6 @@ def askUserConfirmation(inputIC: list, bootIC):
                 nSamples = 3
             else:
                 nSamples = noOfHistsFromTOFBinning(IC)
-                # start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
-                # nSamples = int((end-start)/spacing) - 2   # -2 is small correction
 
         # Either fast or slow bootstrap
         if bootIC.skipMSIterations:

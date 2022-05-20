@@ -13,8 +13,9 @@ IPFilesPath = currentPath / ".." / "ip_files"
 
 
 
-def calcBootMeans(bestPars):
-    """Performs the means and std on each bootstrap sample"""
+def calcMeansWithOriginalProc(bestPars):
+    """Performs the means and std on each bootstrap sample according to original procedure"""
+    
     bootWidths = bestPars[:, :, 1::3]
     bootIntensities = bestPars[:, :, 0::3]
 
@@ -27,63 +28,74 @@ def calcBootMeans(bestPars):
 
         meanW, stdW, meanI, stdI = calculateMeansAndStds(widths.T, intensities.T)
 
-        bootMeanW[:, j] = meanW
-        bootStdW[:, j] = stdW
+        bootMeanW[:, j] = meanW       # Interested only in the means 
         bootMeanI[:, j] = meanI
-        bootStdI[:, j] = stdI
 
-    return bootMeanW, bootMeanI, bootStdW, bootStdI
+    return bootMeanW, bootMeanI
 
 
 def filteredBootMeans(bestPars):
+    """Use same filtering function used on original procedure"""
+
+    # Extract Widths and Intensities from bootstrap samples
     bootWidths = bestPars[:, :, 1::3]
     bootIntensities = bestPars[:, :, 0::3]
 
+    # Perform the filter
     for i, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
         filteredWidths, filteredIntensities = filterWidthsAndIntensities(widths.T, intensities.T)
-
+        
         bootWidths[i] = filteredWidths.T
         bootIntensities[i] = filteredIntensities.T
     
+    # Convert back to format of bootstrap samples
     filteredBestPars = bestPars.copy()
     filteredBestPars[:, :, 1::3] = bootWidths
     filteredBestPars[:, :, 0::3] = bootIntensities
     return filteredBestPars
 
 
-def plotHists(ax, samples, nBins, title, disableCI=False, disableLeg=False):
-    ax.set_title(f"Histogram of {title}")
-    for i, bootHist in enumerate(samples):
+# def plotHists(ax, samples, disableCI=False, disableLeg=False):
+#     """Plots each row of 2D samples array."""
 
-        if np.all(bootHist==0) or np.all(np.isnan(bootHist)):
-            continue
+#     # ax.set_title(f"Histogram of {title}")
+#     for i, bootHist in enumerate(samples):
+
+#         if np.all(bootHist==0) or np.all(np.isnan(bootHist)):
+#             continue
         
-        mean = np.nanmean(bootHist)
-        bounds = np.percentile(bootHist, [5, 95])
-        errors = bounds - mean
+#         mean = np.nanmean(bootHist)
+#         bounds = np.percentile(bootHist, [5, 95])
+#         errors = bounds - mean
+#         leg = f"Row {i}: {mean:>6.3f} +{errors[1]:.3f} {errors[0]:.3f}"
 
-        leg = f"Row {i}: {mean:>6.3f} +{errors[1]:.3f} {errors[0]:.3f}"
-        ax.hist(bootHist, nBins, histtype="step", label=leg)
+#         ax.hist(bootHist, histtype="step", label=leg)
 
-        ax.axvline(mean, 0.9, 0.97, color="k", ls="--", alpha=0.4)
+#         ax.axvline(mean, 0.9, 0.97, color="k", ls="--", alpha=0.4)
         
-        if disableCI:
-            pass
-        else:
-            ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
+#         if disableCI:
+#             pass
+#         else:
+#             ax.axvspan(bounds[0], bounds[1], alpha=0.2, color="r")
     
-    if disableLeg:
-        pass
-    else:
-        ax.legend(loc="upper center")
+#     if disableLeg:
+#         pass
+#     else:
+#         ax.legend(loc="upper center")
 
 
-def plotMeansOverNoSamples(sampleNos, samples, title):
+def plotMeansOverNoSamples(ax, bootMeans):
 
-    sampleMeans = np.zeros((len(samples), len(sampleNos)))
-    sampleErrors = np.zeros((len(samples), 2, len(sampleNos)))
-    for i, N in enumerate(sampleNos):
-        subSample = samples[:, :N]
+    nSamples = len(bootMeans[0])
+    assert nSamples >= 10, "To plot evolution of means, need at least 10 samples!"
+    noOfPoints = int(nSamples / 10)
+    sampleSizes = np.linspace(10, nSamples, noOfPoints).astype(int)
+
+    sampleMeans = np.zeros((len(bootMeans), len(sampleSizes)))
+    sampleErrors = np.zeros((len(bootMeans), 2, len(sampleSizes)))
+
+    for i, N in enumerate(sampleSizes):
+        subSample = bootMeans[:, :N]
 
         mean = np.mean(subSample, axis=1)
 
@@ -94,67 +106,66 @@ def plotMeansOverNoSamples(sampleNos, samples, title):
         sampleMeans[:, i] = mean
         sampleErrors[:, :, i] = errors
 
-    sampleMeans = sampleMeans - sampleMeans[:, 0][:, np.newaxis]
-    for i, (means, errors) in enumerate(zip(sampleMeans, sampleErrors)):
-        plt.plot(sampleNos, means, label=f"idx {i}")
-        plt.fill_between(sampleNos, errors[0, :], errors[1, :], alpha=0.2)
+    firstValues = sampleMeans[:, 0][:, np.newaxis]
+    meansRelDiff = (sampleMeans - firstValues) / firstValues
     
-    plt.title(f"Evolution of {title} over the sample size.")
-    plt.legend()
-    plt.show()
+    errorsRel = sampleErrors / sampleMeans[:, np.newaxis, :]
 
-
-def plotRawHists(bootSamples, idx, specRange, IPPath):
-
-    firstIdx = specRange[0]
-    lastIdx = specRange[1]
-    samples = bootSamples[:, firstIdx:lastIdx, idx].T
-    nBins = 100
-    print(f"\nShape: {samples.shape}\n")
-    # assert samples.shape == (len(samples[0, 0, :]), len(samples)), f"Wrong shape: {samples.shape}"
+    for i, (means, errors) in enumerate(zip(meansRelDiff, errorsRel)):
+        ax.plot(sampleSizes, means, label=f"idx {i}")
+        ax.fill_between(sampleSizes, errors[0, :], errors[1, :], alpha=0.1)
     
-    print(f"\nNaNs positions: {np.argwhere(samples==np.nan)}\n")
-    fig, ax = plt.subplots()
-    plotHists(ax, samples, nBins, f"idx {idx}", disableCI=True, disableLeg=True)
+    ax.legend()
 
-    meanSamples = np.nanmean(samples, axis=0).flatten()
-    ax.hist(meanSamples, nBins, color="r", histtype="step", linewidth=2)
-    ax.axvline(np.nanmean(meanSamples), 0.9, 0.97, color="r", ls="--", linewidth=2)
-    # ax.axvline(np.percentile(meanSamples, 0.5), 0.9, 0.97, color="r", ls="--", linewidth=2)
 
-    # Calculate correlation with scattering angle
-    ipMatrix = np.loadtxt(IPPath, dtype=str)[1:].astype(float)
+# def plotHistsAndMeanHists(sampleHists, meanHist, ax):
 
-    thetas = ipMatrix[firstIdx : lastIdx, 2]    # Scattering angle on third column
+#     # firstIdx = specRange[0]
+#     # lastIdx = specRange[1]
+#     # samples = bootSamples[:, firstIdx:lastIdx, idx].T
+#     # samples, meanSamples = selectRawSamplesPerIdx(bootSamples, idx)
+#     # nBins = int(len(samples[0] / 10))
+
+#     plotHists(ax, sampleHists, disableCI=True, disableLeg=True)
+#     # meanSamples = np.nanmean(samples, axis=0).flatten()
+#     ax.hist(meanHist, color="r", histtype="step", linewidth=2)
+#     ax.axvline(np.nanmean(meanHist), 0.9, 0.97, color="r", ls="--", linewidth=2)
+#     # ax.axvline(np.percentile(meanSamples, 0.5), 0.9, 0.97, color="r", ls="--", linewidth=2)
+
+
+# def selectRawSamplesPerIdx(bootSamples, idx):
+#     """
+#     Returns samples and mean for a single width or intensity at a given index.
+#     Samples shape: (No of spectra, No of boot samples)
+#     Samples mean: Mean of spectra (mean of histograms)
+#     """
+#     samples = bootSamples[:, :, idx].T
+#     return samples
+
+
+def calcCorrWithScatAngle(samples, IC):
+    """Calculate correlation coefficient between histogram means and scattering angle."""
+    
+    ipMatrix = np.loadtxt(IC.instrParsPath, dtype=str)[1:].astype(float)
+    
+    firstSpec, lastSpec = IC.bootSavePath.name.split("_")[1].split("-")
+    allSpec = ipMatrix[:, 0]
+    selectedSpec = (allSpec>=int(firstSpec)) & (allSpec>=int(lastSpec))
+    
+    thetas = ipMatrix[selectedSpec, 2]  # Scattering angle on third column
+
+    # thetas = ipMatrix[firstIdx : lastIdx, 2]    # Scattering angle on third column
     assert thetas.shape == (len(samples),), f"Wrong shape: {thetas.shape}"
 
-    histMeansCorr = True
-    if histMeansCorr:
-        deltaMeans = np.nanmean(samples, axis=1) #- np.nanmean(meanSamples)
-        # deltaMeans = np.percentile(samples, 0.5, axis=1) - np.percentile(meanSamples, 0.5)
+    histMeans = np.nanmean(samples, axis=1) 
 
-        # Remove masked spectra:
-        nanMask = np.isnan(deltaMeans)
-        deltaMeans = deltaMeans[~nanMask]
-        thetas = thetas[~nanMask]
+    # Remove masked spectra:
+    nanMask = np.isnan(histMeans)
+    histMeans = histMeans[~nanMask]
+    thetas = thetas[~nanMask]
 
-        print(thetas[:10])
-        corr = stats.pearsonr(thetas, deltaMeans)
-        ax.set_title(f"Correlation scatt angle: {corr[0]:.3f}")
-    else:
-        bounds = np.percentile(samples, [5, 95], axis=1).T
-        assert bounds.shape == (len(samples), 2), f"Wrong shape: {bounds.shape}"
-        histWidths = bounds[:, 1] - bounds[:, 0]
-
-        nanMask = np.isnan(histWidths)
-        histWidths = histWidths[~nanMask]
-        thetas = thetas[~nanMask]
-
-        corr = stats.pearsonr(thetas, histWidths)
-        ax.set_title(f"Correlation scatt angle: {corr[0]:.3f}")
-
-
-    plt.show()
+    corr = stats.pearsonr(thetas, histMeans)
+    return corr
 
 
 def checkBootSamplesVSParent(bestPars, parentPars):
@@ -166,7 +177,6 @@ def checkBootSamplesVSParent(bestPars, parentPars):
     bootWidths = bestPars[:, :, 1::3]
     bootIntensities = bestPars[:, :, 0::3]
 
-    # TODO: Need to decide on wether to use mean, median or mode
     meanBootWidths = np.mean(bootWidths, axis=0)
     meanBootIntensities = np.mean(bootIntensities, axis=0)
 
@@ -184,7 +194,7 @@ def checkBootSamplesVSParent(bestPars, parentPars):
     printResults(avgIntP, stdIntP, "Parent Intensities")
     
 
-def plot2DHists(bootSamples, nBins, mode):
+def plot2DHists(bootSamples, mode):
     """bootSamples has histogram rows for each parameter"""
 
     plotSize = len(bootSamples)
@@ -204,10 +214,10 @@ def plot2DHists(bootSamples, nBins, mode):
                 else:
                     orientation="vertical"
 
-                axs[i, j].hist(bootSamples[i], nBins, orientation=orientation)
+                axs[i, j].hist(bootSamples[i], orientation=orientation)
 
             else:
-                axs[i, j].hist2d(bootSamples[j], bootSamples[i], nBins)
+                axs[i, j].hist2d(bootSamples[j], bootSamples[i])
                 
             if j==0:
                 axs[i, j].set_ylabel(f"idx {i}")  
@@ -227,9 +237,9 @@ def plot2DHists(bootSamples, nBins, mode):
     plt.show()
 
 
-def addParentMeans(ax, means):
-    for mean in means:
-        ax.axvline(mean, 0, 0.97, color="k", ls=":")
+# def addParentMeans(ax, means):
+#     for mean in means:
+#         ax.axvline(mean, 0, 0.97, color="k", ls=":")
         
 
 def printResults(arrM, arrE, mode):
@@ -289,59 +299,97 @@ def printResults(arrM, arrE, mode):
 # ySpaceFit = False
 # IPPath = IPFilesPath / "ip2018_3.par"
 
-def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC):
+def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC, analysisIC):
 
 
     setOutputDirs([bckwdIC, fwdIC], bootIC)
     
+    #
     for IC in [bckwdIC, fwdIC]:
         if not(IC.bootSavePath.is_file()):
             print("Bootstrap data files not found, unable to run analysis!")
             print(f"{IC.bootSavePath.name}")
+            continue       # If files are not found for backward, look for forward
         
         bootData = np.load(IC.bootSavePath)
-        bootPars = bootData["boot_samples"][:, :, 1:-2]
-        parentPars = bootData["parent_result"][:, 1:-2]
 
-        print("Success! Data files found:")
-        print(f"{IC.bootSavePath.name}")
-        print("no of samples: ", len(bootPars))
+        bootParsRaw = bootData["boot_samples"][:, :, 1:-2]
+        parentParsRaw = bootData["parent_result"][:, 1:-2]
+        
+        nSamples = len(bootParsRaw)
 
+        print(f"\nData files found:\n{IC.bootSavePath.name}")
+        print(f"\nNumber of samples in the file: {nSamples}")
+        assert ~np.all(bootParsRaw[-1] == parentParsRaw), "Error in Jackknife due to last column."
 
+        checkBootSamplesVSParent(bootParsRaw, parentParsRaw)    # Prints comparison
 
-# dataPath, dataYFitPath = dataPaths(sampleName, firstSpec, lastSpec, msIter, MS, GC, nSamples, speed)
+        bootPars = bootParsRaw.copy()      # By default, do not filter means
+        if analysisIC.filterAvg:
+            bootPars = filteredBootMeans(bootParsRaw.copy())
+        
+        if analysisIC.plotRawWidthsIntensities:
 
-# bootData = np.load(dataPath)
-# bootPars = bootData["boot_samples"][:, :, 1:-2]
-# parentPars = bootData["parent_result"][:, 1:-2]
+            fig, axs = plt.subplots(2, len(IC.masses))
+            for i, j in enumerate(range(1, 3*len(IC.masses), 3)):
+                axs[0, i].set_title(f"Width {i}")
+                idxSamples = selectRawSamplesPerIdx(bootPars, j)
+                plotHists(axs[0, i], idxSamples, disableCI=True, disableLeg=True)
 
-# print(f"\nNumber of samples: {len(bootData)}")
+            for i, j in enumerate(range(0, 3*len(IC.masses), 3)):
+                axs[1, i].set_title(f"Intensity {i}")
+                idxSamples = selectRawSamplesPerIdx(bootPars, j)
+                plotHists(axs[1, i], idxSamples, disableCI=True, disableLeg=True)
 
-# assert ~np.all(bootPars[-1] == parentPars), "Error in Jackknife due to last column."
-
-# checkBootSamplesVSParent(bootPars, parentPars)
-
-
-# filteredBootPars = bootPars.copy()
-# # filteredBootPars = filteredBootMeans(bootPars)
-# # plotRawHists(filteredBootPars, 1, [0, 38], IPPath)
-
-
-# meanWp, meanIp, stdWp, stdIp = calcBootMeans(parentPars[np.newaxis, :, :])
-# meanWp = meanWp.flatten()
-# meanIp = meanIp.flatten()
-
-# meanW, meanI, stdW, stdI = calcBootMeans(bootPars)
-
-# # plotMeansOverNoSamples(np.linspace(50, 2500, 20).astype(int), meanW, "Widths")
+            plt.show()
 
 
-# fig, axs = plt.subplots(1, 2, figsize=(15, 3))
-# for ax, means, title, meanp in zip(axs.flatten(), [meanW, meanI], ["Widths", "Intensities"], [meanWp, meanIp]):
-#     plotHists(ax, means, nBins, title, disableCI=True)
-#     # addParentMeans(ax, meanp)
-# plt.show()
+        # # Modify so that the filtering doesn't happen by default
+        # meanWp, meanIp, stdWp, stdIp = calcMeansWithOriginalProc(parentPars[np.newaxis, :, :])
+        # meanWp = meanWp.flatten()
+        # meanIp = meanIp.flatten()
+        
+        meanWidths = np.zeros((len(IC.masses), nSamples))
+        for i, j in enumerate(range(1, 3*len(IC.masses), 3)):
+            idxSamples = selectRawSamplesPerIdx(bootPars, j)
+            meanWidths[i] = np.nanmean(idxSamples, axis=0)
 
+        meanIntensities = np.zeros((len(IC.masses), nSamples))
+        for i, j in enumerate(range(0, 3*len(IC.masses), 3)):
+            idxSamples = selectRawSamplesPerIdx(bootPars, j)
+            meanIntensities[i] = np.nanmean(idxSamples, axis=0)
+
+        if analysisIC.filterAvg == True:     # Check that treatment of data is 
+            meanWOri, meanIOri = calcMeansWithOriginalProc(bootParsRaw)
+            np.testing.assert_array_almost_equal(meanWOri, meanWidths)
+            np.testing.assert_array_almost_equal(meanIOri, meanIntensities)
+            
+        print("\n\n Test passed! Mean Widths match!")
+
+        fig, axs = plt.subplots(2, 1)
+        axs[0].set_title("Histograms of mean Widths")
+        plotHists(axs[0], meanWidths, disableAvg=True, disableCI=True)
+
+        axs[1].set_title("Histograms of mean Intensitiess")
+        plotHists(axs[1], meanIntensities, disableAvg=True, disableCI=True)
+        
+        plt.show()
+
+        if analysisIC.plotMeansEvolution:
+            fig, axs = plt.subplots(2, 1)
+            axs[0].set_title("Evolution of mean Widths over sample size")
+            plotMeansOverNoSamples(axs[0], meanWidths)
+
+            axs[1].set_title("Evolution of mean Intensities over sample size")
+            plotMeansOverNoSamples(axs[1], meanIntensities)
+
+            plt.show()
+
+        if analysisIC.plot2DHists:
+            plot2DHists(meanWidths, "Widths")    
+            plot2DHists(meanIntensities, "Intensities")   
+                    
+        # if analysisIC.plotYFitHists:
 
 # if ySpaceFit:
 #     bootYFitData = np.load(dataYFitPath)
@@ -351,10 +399,48 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC):
 #     # Plot each parameter in an individual histogram
 #     fig, axs = plt.subplots(len(mFitVals), 1, figsize=(8, 10))
 #     for i, (ax, hist) in enumerate(zip(axs.flatten(), mFitVals)):
-#         plotHists(ax, hist[np.newaxis, :], nBins, f"idx {i}")
+#         plotHists(ax, hist[np.newaxis, :])
 #     plt.show()
 
 
 # plot2DHists(meanW, nBins, "Widths")    
 # plot2DHists(meanI, nBins, "Intensities")   
 
+def plotHists(ax, samples, disableCI=False, disableLeg=False, disableAvg=False):
+    """Plots each row of 2D samples array as a histogram."""
+
+    # ax.set_title(f"Histogram of {title}")
+    for i, bootHist in enumerate(samples):
+
+        if np.all(bootHist==0) or np.all(np.isnan(bootHist)):
+            continue
+        
+        mean = np.nanmean(bootHist)
+        bounds = np.percentile(bootHist, [5, 95])
+        errors = bounds - mean
+        leg = f"Row {i}: {mean:>6.3f} +{errors[1]:.3f} {errors[0]:.3f}"
+
+        ax.hist(bootHist, histtype="step", label=leg)
+        ax.axvline(mean, 0.9, 0.97, color="k", ls="--", alpha=0.4)
+        
+        if not(disableCI):
+            ax.axvspan(bounds[0], bounds[1], alpha=0.1, color="r")
+    
+    if not(disableAvg):
+        # Plot average over histograms
+        avgHist = np.nanmean(samples, axis=0).flatten()
+        ax.hist(avgHist, color="r", histtype="step", linewidth=2)
+        ax.axvline(np.nanmean(avgHist), 0.9, 0.97, color="r", ls="--", linewidth=2)
+    
+    if not(disableLeg):
+        ax.legend(loc="upper center")
+
+
+def selectRawSamplesPerIdx(bootSamples, idx):
+    """
+    Returns samples and mean for a single width or intensity at a given index.
+    Samples shape: (No of spectra, No of boot samples)
+    Samples mean: Mean of spectra (mean of histograms)
+    """
+    samples = bootSamples[:, :, idx].T
+    return samples

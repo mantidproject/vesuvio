@@ -1,6 +1,6 @@
 
 from vesuvio_analysis.ICHelpers import completeICFromInputs
-from vesuvio_analysis.core_functions.bootstrap import runIndependentBootstrap, runJointBootstrap
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from mantid.api import mtd
@@ -60,13 +60,13 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         pass
 
     elif userCtr.bootstrap == "BACKWARD":
-        return runIndependentBootstrap(bckwdIC, bootIC, yFitIC), None
+        return runBootstrap([bckwdIC], bootIC, yFitIC), None
 
     elif userCtr.bootstrap == "FORWARD":
-        return runIndependentBootstrap(fwdIC, bootIC, yFitIC), None
+        return runBootstrap([fwdIC], bootIC, yFitIC), None
 
     elif userCtr.bootstrap == "JOINT":
-        return runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
+        return runBootstrap([bckwdIC, fwdIC], bootIC, yFitIC), None
     else:
         raise ValueError("Bootstrap option not recognized.")
 
