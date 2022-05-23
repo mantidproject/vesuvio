@@ -56,7 +56,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -90,7 +90,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 4   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -116,9 +116,8 @@ class YSpaceFitInitialConditions:
 
 class BootstrapInitialConditions:
     runningJackknife = False
-    nSamples = 40
+    nSamples = 650
     skipMSIterations = False
-    # runningTest = True
     userConfirmation = True
 
 
@@ -132,7 +131,7 @@ class UserScriptControls:
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
     # TODO: Prevent bootstrap from running if file with these initial conditions is found
-    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 start_time = time.time()
@@ -152,12 +151,12 @@ print("\nRunning time: ", end_time-start_time, " seconds")
 
 
 class BootstrapAnalysis:
-    filterAvg = True
+    filterAvg = False
     plotRawWidthsIntensities = True
-    plotMeanWidthsIntensities = True
-    plotMeansEvolution = True
-    plot2DHists = True
-    plotYFitHists = True
+    plotMeanWidthsIntensities = False
+    plotMeansEvolution = False
+    plot2DHists = False
+    plotYFitHists = False
 
 analysisIC = BootstrapAnalysis
 

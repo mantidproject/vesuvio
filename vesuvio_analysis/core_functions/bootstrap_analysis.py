@@ -136,13 +136,13 @@ def plotRawWidthsAndIntensities(IC, bootPars, parentPars):
 
     fig, axs = plt.subplots(2, noOfMasses)
 
-    for axIdx, startIdx, kind in zip([0, 1], [1, 0], ["Width", "Intensity"]):
+    for axIdx, startIdx, kind, parentMeans in zip([0, 1], [1, 0], ["Width", "Intensity"], [parentWidths, parentIntensities]):
 
         for i, j in enumerate(range(startIdx, 3*noOfMasses, 3)):
             axs[axIdx, i].set_title(f"{kind} {i}")
             idxSamples = selectRawSamplesPerIdx(bootPars, j)
             plotHists(axs[axIdx, i], idxSamples, disableCI=True, disableLeg=True)
-            axs[axIdx, i].axvline(parentWidths[i], 0.75, 0.97, color="b", ls="-", alpha=0.4)
+            axs[axIdx, i].axvline(parentMeans[i], 0.75, 0.97, color="b", ls="-", alpha=0.4)
             
     plt.show()
     return
