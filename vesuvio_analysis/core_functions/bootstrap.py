@@ -25,7 +25,7 @@ currentPath = Path(__file__).parent.absolute()
 def runBootstrap(inputIC, bootIC, yFitIC):
 
     setOutputDirs(inputIC, bootIC)        # Sets data directiies to inputIC objects
-    checkOutputDirExists(inputIC)            # Checks to see if those directories exits already
+    checkOutputDirExists(inputIC, bootIC.runningTest)            # Checks to see if those directories exits already
     askUserConfirmation(inputIC, bootIC)
     AnalysisDataService.clear()
 
@@ -41,14 +41,18 @@ def runBootstrap(inputIC, bootIC, yFitIC):
         return bootstrapProcedure(bootIC, inputIC, yFitIC)
 
 
-def checkOutputDirExists(inputIC):
+def checkOutputDirExists(inputIC, runningTestFlag):
     for IC in inputIC:                # Check files already exist
+        if runningTestFlag:
+            continue
+
         if IC.bootSavePath.is_file() or IC.bootYFitSavePath.is_file():
             print(f"\nOutput data files were detected:" \
                 f"\n{IC.bootSavePath.name}\n{IC.bootYFitSavePath.name}" \
                 f"\nAborting Run of Bootstrap to prevent overwriting data." \
                 f"\nTo avoid this issue you can change the number of samples to run.")
             raise ValueError("Output data directories already exist. Aborted Bootstrap.")
+    return 
 
 
 def bootstrapProcedure(bootIC, inputIC: list, yFitIC):

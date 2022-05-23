@@ -118,7 +118,7 @@ class BootstrapInitialConditions:
     runningJackknife = False
     nSamples = 40
     skipMSIterations = False
-    runningTest = True
+    # runningTest = True
     userConfirmation = True
 
 

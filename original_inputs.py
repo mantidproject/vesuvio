@@ -1,6 +1,6 @@
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.ICHelpers import completeICFromInputs
+from vesuvio_analysis.core_functions.ICHelpers import completeICFromInputs
 from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np

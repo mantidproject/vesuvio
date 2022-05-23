@@ -1,5 +1,4 @@
 from vesuvio_analysis.core_functions.run_script import runScript
-from ..core_functions.fit_in_yspace import fitInYSpaceProcedure
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
