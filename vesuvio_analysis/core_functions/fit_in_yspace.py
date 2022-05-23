@@ -237,7 +237,7 @@ def symmetrizeArr(dataYOri, dataEOri):
 
 
 def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
-    #TODO: Try out with point data
+    #TODO: Clean this function by seperating it to smaller functions
     dataY = wsYSpaceSym.extractY()[0]
     dataX = wsYSpaceSym.extractX()[0]
     dataE = wsYSpaceSym.extractE()[0]
@@ -245,7 +245,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     resY = wsRes.extractY()[0]
     resX = wsRes. extractX()[0]
 
-    if yFitIC.singleGaussFitToHProfile:
+    if yFitIC.singleGaussFitToHProfile:    # TODO: This is almost identical to function choose model below
         def model(x, y0, A, x0, sigma):
             return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
@@ -657,10 +657,12 @@ class ResultsYFitObject:
 # Functions for Global Fit Mantid
 
 def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+    """Uses original Mantid procedure to perform global fit on groups with 8 detectors"""
+    
     replaceNansWithZeros(wsJoY)
     wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
     wsQInv = createOneOverQWs(wsQ)
-    avgWidths = globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
+    avgWidths = mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
 
 
 def replaceNansWithZeros(ws):
@@ -692,7 +694,7 @@ def createOneOverQWs(wsQ):
     return wsInvQ
 
 
-def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
     """Original Implementation of Global Fit using Mantid"""
 
     if gaussFitFlag:

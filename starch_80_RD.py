@@ -152,13 +152,13 @@ print("\nRunning time: ", end_time-start_time, " seconds")
 
 
 class BootstrapAnalysis:
-
-    procedure = "BACKWARD"     # back or forward
     filterAvg = True
-    plotRawWidthsIntensities = False
+    plotRawWidthsIntensities = True
+    plotMeanWidthsIntensities = True
     plotMeansEvolution = True
     plot2DHists = True
+    plotYFitHists = True
 
 analysisIC = BootstrapAnalysis
 
-runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, bootIC, analysisIC)
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC)
