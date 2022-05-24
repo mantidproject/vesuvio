@@ -56,9 +56,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
-    lastSpec = 134   #134
+    lastSpec = 23   #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -90,9 +90,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
-    lastSpec = 182   #182
+    lastSpec = 164   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -111,7 +111,7 @@ class YSpaceFitInitialConditions:
     singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
-    nGlobalFitGroups = 4   
+    nGlobalFitGroups = "ALL"       # Number or string "ALL"
 
 
 class BootstrapInitialConditions:
@@ -123,10 +123,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "BACKWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace

@@ -11,14 +11,14 @@ import time
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(yFitIC, ic, wsFinal):
+def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 
-    ncpForEachMass = extractNCPFromWorkspaces(wsFinal, ic)
+    ncpForEachMass = extractNCPFromWorkspaces(wsFinal, IC)
 
-    firstMass = ic.masses[0]
-    wsResSum, wsRes = calculateMantidResolution(ic, yFitIC, wsFinal, firstMass)
+    firstMass = IC.masses[0]
+    wsResSum, wsRes = calculateMantidResolution(IC, yFitIC, wsFinal, firstMass)
     
-    wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
+    wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
@@ -30,12 +30,12 @@ def fitInYSpaceProcedure(yFitIC, ic, wsFinal):
     
     printYSpaceFitResults(wsYSpaceAvg.name())
 
-    yfitResults = ResultsYFitObject(ic, yFitIC, wsFinal.name())
+    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name())
     yfitResults.save()
 
     if yFitIC.globalFitFlag:
         # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
-        fitMinuitGlobalFit(wsYSpace, wsRes, ic, yFitIC)
+        fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
     
     return yfitResults
 
@@ -788,7 +788,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, ic)   
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
-    idxList = groupDetectors(instrPars, yFitIC.nGlobalFitGroups, yFitIC.showPlots)
+    idxList = groupDetectors(instrPars, yFitIC)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
     if yFitIC.symmetrisationFlag:  
@@ -1010,15 +1010,16 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
 
 # ------- Groupings 
 
-def groupDetectors(ipData, nGroups, showPlots):
+def groupDetectors(ipData, yFitIC):
     """
     Uses the method of k-means to find clusters in theta-L1 space.
     Input: instrument parameters to extract L1 and theta of detectors.
     Output: list of group lists containing the idx of spectra.
     """
-    assert nGroups > 0, "Number of groups must be bigger than zero."
-    assert nGroups <= len(ipData), "Number of groups cannot exceed no of unmasked detectors"
-    print(f"\nNumber of gropus: {nGroups}")
+
+    checkNGroupsValid(yFitIC, ipData)
+
+    print(f"\nNumber of gropus: {yFitIC.nGlobalFitGroups}")
 
     L1 = ipData[:, -1]    
     theta = ipData[:, 2]  
@@ -1032,7 +1033,9 @@ def groupDetectors(ipData, nGroups, showPlots):
 
     points = np.vstack((L1, theta)).T
     assert points.shape == (len(L1), 2), "Wrong shape."
-    centers = points[np.linspace(0, len(points)-1, nGroups).astype(int), :]
+    # Initial centers of groups
+    startingIdxs = np.linspace(0, len(points)-1, yFitIC.nGlobalFitGroups).astype(int)
+    centers = points[startingIdxs, :]    # Centers of cluster groups, NOT fitting parameter
 
     if False:    # Set to True to investigate problems with groupings
         plotDetsAndInitialCenters(L1, theta, centers)
@@ -1040,10 +1043,24 @@ def groupDetectors(ipData, nGroups, showPlots):
     clusters, n = kMeansClustering(points, centers)
     idxList = formIdxList(clusters, n, len(L1))
 
-    if showPlots:
+    if yFitIC.showPlots:
         plotFinalGroups(points, clusters, n)
 
     return idxList
+
+
+def checkNGroupsValid(yFitIC, ipData):
+
+    nSpectra = len(ipData)  # Number of spectra in the workspace
+
+    if (yFitIC.nGlobalFitGroups=="ALL"):
+        yFitIC.nGlobalFitGroups = nSpectra
+    else:
+        assert type(yFitIC.nGlobalFitGroups)==int, "Number of global groups needs to be an integer."
+        assert yFitIC.nGlobalFitGroups<=nSpectra, "Number of global groups needs to be less or equal to the no of unmasked spectra."
+        assert yFitIC.nGlobalFitGroups>0, "NUmber of global groups needs to be bigger than zero"
+    return 
+
 
 
 def plotDetsAndInitialCenters(L1, theta, centers):
