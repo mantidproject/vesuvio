@@ -357,10 +357,9 @@ def plotYFitHists(analysisIC, yFitIC, yFitHists):
     fig, axs = plt.subplots(len(yFitHists), 1, figsize=(8, 10))
 
     # To label each histogram, extract signature of function used for the fit
-    model, modelDefaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)
-    fitModelSignature = [key for key in modelDefaultPars]
+    model, fitModelSignature, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)
 
-    for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, fitModelSignature)):
+    for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, fitModelSignature[1:])):
         ax.set_title(f"Fit Parameter: {par}")
         plotHists(ax, hist[np.newaxis, :], disableAvg=True)
     

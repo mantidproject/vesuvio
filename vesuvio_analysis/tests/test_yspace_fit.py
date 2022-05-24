@@ -30,7 +30,6 @@ scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC,
 
 
 ySpaceFitResults = yfitRes
-# ySpaceFitResults = fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
 # Test yspace
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
