@@ -27,7 +27,14 @@ def completeICFromInputs(IC, scriptName, wsIC):
     IC.maskedSpecNo = IC.maskedSpecAllNo[(IC.maskedSpecAllNo>=IC.firstSpec) & (IC.maskedSpecAllNo<=IC.lastSpec)]
     IC.maskedDetectorIdx = IC.maskedSpecNo - IC.firstSpec
 
+    # Extract some attributes from wsIC
     IC.mode = wsIC.mode
+    # When attribute InstrParsPath is not present, set it equal to path from wsIC
+    try:    
+        reading = IC.InstrParsPath    # If present, leave it unaltered
+    except AttributeError:
+        IC.InstrParsPath = wsIC.ipfile
+
     # Sort out input and output paths
     inputDirsForSample(IC, scriptName, wsIC)
     setOutputDirsForSample(IC, scriptName)
@@ -97,22 +104,22 @@ def setOutputDirsForSample(IC, sampleName):
     return
 
 
-def loadWsFromLoadVesuvio(IC, inputWSPath, sampleName):
+def loadWsFromLoadVesuvio(wsIC, inputWSPath, sampleName):
     
-    print(f"\nLoading and storing workspace sample runs: {IC.runs}\n")
+    print(f"\nLoading and storing workspace sample runs: {wsIC.runs}\n")
 
-    if int(IC.spectra.split("-")[1])<135:
+    if int(wsIC.spectra.split("-")[1])<135:
         runningType = "backward"
-    elif int(IC.spectra.split("-")[0])>=135:
+    elif int(wsIC.spectra.split("-")[0])>=135:
         runningType = "forward"
     else:
         print("Problem in loading workspace spectra.")
 
     rawVesuvio = LoadVesuvio(
-        Filename=IC.runs, 
-        SpectrumList=IC.spectra, 
-        Mode=IC.mode,
-        InstrumentParFile=IC.ipfile, 
+        Filename=wsIC.runs, 
+        SpectrumList=wsIC.spectra, 
+        Mode=wsIC.mode,
+        InstrumentParFile=str(wsIC.ipfile), 
         OutputWorkspace=sampleName+'_raw_'+runningType
         )
 
@@ -122,10 +129,10 @@ def loadWsFromLoadVesuvio(IC, inputWSPath, sampleName):
     print("Raw workspace stored locally.")
 
     emptyVesuvio = LoadVesuvio(
-        Filename=IC.empty_runs, 
-        SpectrumList=IC.spectra, 
-        Mode=IC.mode,
-        InstrumentParFile=IC.ipfile, 
+        Filename=wsIC.empty_runs, 
+        SpectrumList=wsIC.spectra, 
+        Mode=wsIC.mode,
+        InstrumentParFile=str(wsIC.ipfile), 
         OutputWorkspace=sampleName+'_empty_'+runningType
         )
 

@@ -11,19 +11,19 @@ ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
 class LoadVesuvioBackParameters:
-    runs="43066-43076"         # 77K         # The numbers of the runs to be analysed
-    empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
-    spectra='3-134'                          # Spectra to be analysed
-    mode='DoubleDifference'
-    ipfile=str(ipFilesPath / "ip2019.par")   
+    runs = "43066-43076"         # 77K         # The numbers of the runs to be analysed
+    empty_runs = "41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
+    spectra = '3-134'                          # Spectra to be analysed
+    mode = 'DoubleDifference'
+    ipfile = ipFilesPath / "ip2019.par"  
 
 
 class LoadVesuvioFrontParameters:
-    runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-    spectra='144-182'                        # Spectra to be analysed
-    mode='SingleDifference'
-    ipfile=str(ipFilesPath / "ip2018_3.par") 
+    runs = '43066-43076'         # 100K        # The numbers of the runs to be analysed
+    empty_runs = '43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+    spectra = '144-182'                        # Spectra to be analysed
+    mode = 'SingleDifference'  
+    ipfile = ipFilesPath / "ip2018_3.par"
 
 
 class GeneralInitialConditions:
@@ -71,7 +71,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 12, 16, 27]) 
 
@@ -133,6 +133,24 @@ class UserScriptControls:
     bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
+class BootstrapAnalysis:
+    # Flag below controls whether or not analysis is run
+    runAnalysis = False    
+
+    # Choose whether to filter averages as done in original procedure
+    filterAvg = False                 # True discards some unreasonable values of widths and intensities
+    
+    # Flags below control the plots to show
+    plotRawWidthsIntensities = True
+    plotMeanWidthsIntensities = False
+    plotMeansEvolution = False
+    plot2DHists = False
+    plotYFitHists = False
+
+
+# Initialize classes and run script below
+# Not for useers
+
 start_time = time.time()
 
 wsBackIC = LoadVesuvioBackParameters
@@ -147,21 +165,6 @@ runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, boot
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
-
-
-class BootstrapAnalysis:
-    # Flag below controls whether or not analysis is run
-    runAnalysis = False    
-
-    # Choose whether to filter averages as done in original procedure
-    filterAvg = False                 # True discards some unreasonable values of widths and intensities
-    
-    # Flags below control the plots to show
-    plotRawWidthsIntensities = True
-    plotMeanWidthsIntensities = False
-    plotMeansEvolution = False
-    plot2DHists = False
-    plotYFitHists = False
 
 analysisIC = BootstrapAnalysis
 
