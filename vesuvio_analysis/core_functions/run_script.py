@@ -82,6 +82,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
             resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
         return None, resYFit       # To match return below. 
     
+    checkUserClearWS()        # Check if user is OK with cleaning all workspaces
     res = runProcedure()
 
     resYFit = None
@@ -98,3 +99,16 @@ def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
         name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations-1)
         wsNames.append(name)
     return wsNames
+
+
+def checkUserClearWS():
+    """If any workspace is loaded, check if user is sure to start new procedure."""
+
+    if len(mtd) != 0:
+        userInput = input("This action will clean all current workspaces to start anew. Proceed? (y/n): ")
+        if (userInput == "y") | (userInput == "Y"):
+            pass
+        else:
+            raise KeyboardInterrupt("Run of procedure canceled.")
+
+    return

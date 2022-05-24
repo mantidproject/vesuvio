@@ -130,7 +130,6 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
-    # TODO: Prevent bootstrap from running if file with these initial conditions is found
     bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
