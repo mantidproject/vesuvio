@@ -15,14 +15,17 @@ IPFilesPath = currentPath / ".." / "ip_files"
 
 def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
 
-    setOutputDirs([bckwdIC, fwdIC], bootIC)
+    if not(analysisIC.runAnalysis):
+        return
+
+    setOutputDirs([bckwdIC, fwdIC], bootIC)   # Same function used to store data, to check below if dirs exist
 
     for IC in [bckwdIC, fwdIC]:
 
         if not(IC.bootSavePath.is_file()):
             print("Bootstrap data files not found, unable to run analysis!")
             print(f"{IC.bootSavePath.name}")
-            continue
+            continue    # If main results are not present, assume ysapce results are also missing
 
         bootParsRaw, parentParsRaw, nSamples = readBootData(IC.bootSavePath)
         checkBootSamplesVSParent(bootParsRaw, parentParsRaw)    # Prints comparison
@@ -31,6 +34,7 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
         if analysisIC.filterAvg:
             bootPars = filteredBootMeans(bootParsRaw.copy())
         
+        # Plots histograms of all spectra for a given width or intensity
         plotRawWidthsAndIntensities(analysisIC, bootPars, parentParsRaw)
         
         # Calculate bootstrap histograms for mean widths and intensities 

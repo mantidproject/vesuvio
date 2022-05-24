@@ -151,7 +151,13 @@ print("\nRunning time: ", end_time-start_time, " seconds")
 
 
 class BootstrapAnalysis:
-    filterAvg = False
+    # Flag below controls whether or not analysis is run
+    runAnalysis = False    
+
+    # Choose whether to filter averages as done in original procedure
+    filterAvg = False                 # True discards some unreasonable values of widths and intensities
+    
+    # Flags below control the plots to show
     plotRawWidthsIntensities = True
     plotMeanWidthsIntensities = False
     plotMeansEvolution = False
