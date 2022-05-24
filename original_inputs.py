@@ -105,32 +105,12 @@ class ForwardInitialConditions(GeneralInitialConditions):
     tof_binning="110,1,430"                 # Binning of ToF spectra
   
 
-# icWSBack = LoadVesuvioBackParameters
-# icWSFront = LoadVesuvioFrontParameters  
-
-# bckwdIC = BackwardInitialConditions
-# fwdIC = ForwardInitialConditions
-
-# # Need to run this function, otherwise will not work
-# completeICFromInputs(fwdIC, scriptName, icWSFront)
-# completeICFromInputs(bckwdIC, scriptName, icWSBack)
-
-# This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = True
-    symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = True      # When False, use Hermite expansion
-    globalFitFlag = True
-    forceManualMinos = False
-    nGlobalFitGroups = 4   
+    anything = True
 
 
 class BootstrapInitialConditions:
-    runningJackknife = False
-    nSamples = 650
-    skipMSIterations = False
-    userConfirmation = True
+    anything = True
 
 
 class UserScriptControls:
@@ -164,16 +144,3 @@ runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, boot
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
-
-
-
-# # if __name__ == "main":
-# start_time = time.time()
-# # Interactive section 
-
-# runIndependentIterativeProcedure(fwdIC)
-# runIndependentIterativeProcedure(bckwdIC)
-
-# # End of iteractive section
-# end_time = time.time()
-# print("\nRunning time: ", end_time-start_time, " seconds")
