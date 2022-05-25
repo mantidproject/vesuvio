@@ -54,7 +54,10 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
             continue
 
         bootYFitData = np.load(IC.bootYFitSavePath)
-        bootYFitVals = bootYFitData["boot_vals"]    # Previously boot_samples
+        try:
+            bootYFitVals = bootYFitData["boot_samples"]   
+        except KeyError:
+            bootYFitVals = bootYFitData["boot_vals"]      # To account for some previous samples
         minuitFitVals = bootYFitVals[:, 0, :-1].T   # Discard last value chi2
 
         plotYFitHists(analysisIC, yFitIC, minuitFitVals)
@@ -269,7 +272,7 @@ def plotMeansOverNoSamples(ax, bootMeans):
     sampleErrors = np.zeros((len(bootMeans), 2, len(sampleSizes)))
 
     for i, N in enumerate(sampleSizes):
-        subSample = bootMeans[:, :N]
+        subSample = bootMeans[:, :N].copy()
 
         mean = np.mean(subSample, axis=1)
 
@@ -299,6 +302,8 @@ def plot2DHistsWidthsAndIntensities(IC, meanWidths, meanIntensities):
     if not(IC.plot2DHists):
         return
 
+    assert meanWidths.shape == meanIntensities.shape, "Widths and Intensities need to be the same shape."
+    
     plot2DHists(meanWidths, "Widths")    
     plot2DHists(meanIntensities, "Intensities")   
     return

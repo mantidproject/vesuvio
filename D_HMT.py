@@ -126,29 +126,29 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = None   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
-    bootstrap = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = False    
+    runAnalysis = True  
 
     # Choose whether to filter averages as done in original procedure
-    filterAvg = False                 # True discards some unreasonable values of widths and intensities
+    filterAvg = True                 # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
     plotRawWidthsIntensities = True
-    plotMeanWidthsIntensities = False
-    plotMeansEvolution = False
-    plot2DHists = False
-    plotYFitHists = False
+    plotMeanWidthsIntensities = True
+    plotMeansEvolution = True
+    plot2DHists = True
+    plotYFitHists = True
 
 
 start_time = time.time()
