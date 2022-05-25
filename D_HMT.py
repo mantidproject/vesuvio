@@ -37,7 +37,6 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    # TODO: Automatically prevent MS from adding H even if ratio!=None
     HToMass0Ratio = None   # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
@@ -58,7 +57,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -92,7 +91,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 2 #2   #4
+    noOfMSIterations = 4 #2   #4
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -107,7 +106,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = True
+    showPlots = False
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     singleGaussFitToHProfile = False    # When False, use Hermite expansion
@@ -118,9 +117,9 @@ class YSpaceFitInitialConditions:
 
 class BootstrapInitialConditions:
     runningJackknife = False
-    nSamples = 2
+    nSamples = 500
     skipMSIterations = False
-    runningTest = True
+    runningTest = False
     userConfirmation = True
 
 
@@ -133,7 +132,7 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
-    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 start_time = time.time()
