@@ -2,6 +2,7 @@
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
@@ -10,19 +11,19 @@ ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
 class LoadVesuvioBackParameters:
-    runs="43066-43076"         # 77K         # The numbers of the runs to be analysed
-    empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
-    spectra='3-134'                          # Spectra to be analysed
-    mode='DoubleDifference'
-    ipfile=str(ipFilesPath / "ip2019.par")   
+    runs = "43066-43076"         # 77K         # The numbers of the runs to be analysed
+    empty_runs = "41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
+    spectra = '3-134'                          # Spectra to be analysed
+    mode = 'DoubleDifference'
+    ipfile = ipFilesPath / "ip2019.par"  
 
 
 class LoadVesuvioFrontParameters:
-    runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
-    empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-    spectra='144-182'                        # Spectra to be analysed
-    mode='SingleDifference'
-    ipfile=str(ipFilesPath / "ip2018_3.par") 
+    runs = '43066-43076'         # 100K        # The numbers of the runs to be analysed
+    empty_runs = '43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
+    spectra = '144-182'                        # Spectra to be analysed
+    mode = 'SingleDifference'  
+    ipfile = ipFilesPath / "ip2018_3.par"
 
 
 class GeneralInitialConditions:
@@ -55,9 +56,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
-    firstSpec = 23    #3
-    lastSpec = 43   #134
+    noOfMSIterations = 4     #4
+    firstSpec = 3    #3
+    lastSpec = 134   #134
 
     maskedSpecAllNo = np.array([18, 34, 42, 43, 59, 60, 62, 118, 119, 133])
 
@@ -70,7 +71,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 12, 16, 27]) 
 
@@ -89,9 +90,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 4   #4
     firstSpec = 144   #144
-    lastSpec = 164   #182
+    lastSpec = 182   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -107,31 +108,48 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = True      # When False, use Hermite expansion
+    singleGaussFitToHProfile = True     # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
-    nGlobalFitGroups = 4   
+    nGlobalFitGroups = 4       # Number or string "ALL"
 
 
 class BootstrapInitialConditions:
     runningJackknife = False
-    nSamples = 2
+    nSamples = 650
     skipMSIterations = False
-    runningTest = True
     userConfirmation = True
 
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
-    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
+
+class BootstrapAnalysis:
+    # Flag below controls whether or not analysis is run
+    runAnalysis = True   
+
+    # Choose whether to filter averages as done in original procedure
+    filterAvg = False                 # True discards some unreasonable values of widths and intensities
+    
+    # Flags below control the plots to show
+    plotRawWidthsIntensities = True
+    plotMeanWidthsIntensities = False
+    plotMeansEvolution = False
+    plot2DHists = False
+    plotYFitHists = True
+
+
+# Initialize classes and run script below
+# Not for useers
 
 start_time = time.time()
 
@@ -147,3 +165,7 @@ runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, boot
 
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")
+
+analysisIC = BootstrapAnalysis
+
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC)

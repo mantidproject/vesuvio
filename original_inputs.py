@@ -1,10 +1,9 @@
-from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
-from vesuvio_analysis.ICHelpers import completeICFromInputs
-from mantid.api import AnalysisDataService, mtd
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
+from vesuvio_analysis.core_functions.run_script import runScript
+from mantid.api import AnalysisDataService
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
@@ -16,7 +15,7 @@ class LoadVesuvioBackParameters:
     empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
     spectra='3-134'                          # Spectra to be analysed
     mode='DoubleDifference'
-    ipfile=str(ipFilesPath / "ip2019.par")   
+    ipfile=ipFilesPath / "ip2019.par"   
 
 
 class LoadVesuvioFrontParameters:
@@ -24,7 +23,7 @@ class LoadVesuvioFrontParameters:
     empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
     spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
-    ipfile=str(ipFilesPath / "ip2018_3.par") 
+    ipfile=ipFilesPath / "ip2018_3.par" 
 
 
 class GeneralInitialConditions:
@@ -73,7 +72,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 12, 16, 27]) 
     # noOfMasses = len(masses)
@@ -106,24 +105,42 @@ class ForwardInitialConditions(GeneralInitialConditions):
     tof_binning="110,1,430"                 # Binning of ToF spectra
   
 
-icWSBack = LoadVesuvioBackParameters
-icWSFront = LoadVesuvioFrontParameters  
+class YSpaceFitInitialConditions:
+    anything = True
 
+
+class BootstrapInitialConditions:
+    anything = True
+
+
+class UserScriptControls:
+    # Choose main procedure to run
+    procedure = "BACKWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+    # Choose on which ws to perform the fit in y space
+    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+    # Perform bootstrap procedure
+    # Independent of procedure and runFItInYSpace
+    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+start_time = time.time()
+
+wsBackIC = LoadVesuvioBackParameters
+wsFrontIC = LoadVesuvioFrontParameters  
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
+yFitIC = YSpaceFitInitialConditions
+bootIC = BootstrapInitialConditions
+userCtr = UserScriptControls
 
-# Need to run this function, otherwise will not work
-completeICFromInputs(fwdIC, scriptName, icWSFront)
-completeICFromInputs(bckwdIC, scriptName, icWSBack)
+runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+
+AnalysisDataService.clear()
+userCtr.procedure = "FORWARD"
+
+runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 
-# if __name__ == "main":
-start_time = time.time()
-# Interactive section 
-
-runIndependentIterativeProcedure(fwdIC)
-runIndependentIterativeProcedure(bckwdIC)
-
-# End of iteractive section
 end_time = time.time()
 print("\nRunning time: ", end_time-start_time, " seconds")

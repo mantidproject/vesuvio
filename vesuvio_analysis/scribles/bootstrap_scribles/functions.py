@@ -38,3 +38,10 @@ booleans = [a in someList for a in values]
 print(all(booleans))
 for v, ic in zip(values, ICs):
     print("Some command!") 
+
+
+
+def someFunc():
+     return
+
+someFunc(2, 3, 4)

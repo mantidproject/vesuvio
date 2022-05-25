@@ -1,5 +1,4 @@
 from vesuvio_analysis.core_functions.run_script import runScript
-from ..core_functions.fit_in_yspace import fitInYSpaceProcedure
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
@@ -31,7 +30,6 @@ scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC,
 
 
 ySpaceFitResults = yfitRes
-# ySpaceFitResults = fitInYSpaceProcedure(yfitIC, fwdIC, wsFinal)
 
 # Test yspace
 np.set_printoptions(suppress=True, precision=8, linewidth=150)

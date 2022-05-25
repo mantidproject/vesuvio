@@ -1,6 +1,5 @@
 
 from vesuvio_analysis.core_functions.run_script import runScript
-from ..core_functions.procedures import runIndependentIterativeProcedure
 import unittest
 import numpy as np
 import numpy.testing as nptest

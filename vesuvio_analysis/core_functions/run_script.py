@@ -1,6 +1,6 @@
 
-from vesuvio_analysis.ICHelpers import completeICFromInputs
-from vesuvio_analysis.core_functions.bootstrap import runIndependentBootstrap, runJointBootstrap
+from vesuvio_analysis.core_functions.ICHelpers import completeICFromInputs
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from mantid.api import mtd
@@ -13,7 +13,11 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     completeICFromInputs(bckwdIC, scriptName, wsBackIC)
 
 
-    if userCtr.procedure == "BACKWARD":
+    if userCtr.procedure == None:
+         def runProcedure():
+            return None 
+    
+    elif userCtr.procedure == "BACKWARD":
         if userCtr.fitInYSpace != None:
             assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
         def runProcedure():
@@ -56,13 +60,13 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         pass
 
     elif userCtr.bootstrap == "BACKWARD":
-        return runIndependentBootstrap(bckwdIC, bootIC, yFitIC), None
+        return runBootstrap([bckwdIC], bootIC, yFitIC), None
 
     elif userCtr.bootstrap == "FORWARD":
-        return runIndependentBootstrap(fwdIC, bootIC, yFitIC), None
+        return runBootstrap([fwdIC], bootIC, yFitIC), None
 
     elif userCtr.bootstrap == "JOINT":
-        return runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
+        return runBootstrap([bckwdIC, fwdIC], bootIC, yFitIC), None
     else:
         raise ValueError("Bootstrap option not recognized.")
 
@@ -78,6 +82,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
             resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
         return None, resYFit       # To match return below. 
     
+    checkUserClearWS()        # Check if user is OK with cleaning all workspaces
     res = runProcedure()
 
     resYFit = None
@@ -94,3 +99,16 @@ def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
         name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations-1)
         wsNames.append(name)
     return wsNames
+
+
+def checkUserClearWS():
+    """If any workspace is loaded, check if user is sure to start new procedure."""
+
+    if len(mtd) != 0:
+        userInput = input("This action will clean all current workspaces to start anew. Proceed? (y/n): ")
+        if (userInput == "y") | (userInput == "Y"):
+            pass
+        else:
+            raise KeyboardInterrupt("Run of procedure canceled.")
+
+    return

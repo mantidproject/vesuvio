@@ -1,4 +1,4 @@
-from ..ICHelpers import completeICFromInputs
+from ..core_functions.ICHelpers import completeICFromInputs
 import numpy as np
 from pathlib import Path
 

@@ -11,14 +11,14 @@ import time
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(yFitIC, ic, wsFinal):
+def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 
-    ncpForEachMass = extractNCPFromWorkspaces(wsFinal, ic)
+    ncpForEachMass = extractNCPFromWorkspaces(wsFinal, IC)
 
-    firstMass = ic.masses[0]
-    wsResSum, wsRes = calculateMantidResolution(ic, yFitIC, wsFinal, firstMass)
+    firstMass = IC.masses[0]
+    wsResSum, wsRes = calculateMantidResolution(IC, yFitIC, wsFinal, firstMass)
     
-    wsSubMass = subtractAllMassesExceptFirst(ic, wsFinal, ncpForEachMass)
+    wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
@@ -30,12 +30,12 @@ def fitInYSpaceProcedure(yFitIC, ic, wsFinal):
     
     printYSpaceFitResults(wsYSpaceAvg.name())
 
-    yfitResults = ResultsYFitObject(ic, yFitIC, wsFinal.name())
+    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name())
     yfitResults.save()
 
     if yFitIC.globalFitFlag:
         # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
-        fitMinuitGlobalFit(wsYSpace, wsRes, ic, yFitIC)
+        fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
     
     return yfitResults
 
@@ -237,31 +237,11 @@ def symmetrizeArr(dataYOri, dataEOri):
 
 
 def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
-    #TODO: Try out with point data
-    dataY = wsYSpaceSym.extractY()[0]
-    dataX = wsYSpaceSym.extractX()[0]
-    dataE = wsYSpaceSym.extractE()[0]
 
-    resY = wsRes.extractY()[0]
-    resX = wsRes. extractX()[0]
+    dataX, dataY, dataE = extractFirstSpectra(wsYSpaceSym)
+    resX, resY, resE = extractFirstSpectra(wsRes)
 
-    if yFitIC.singleGaussFitToHProfile:
-        def model(x, y0, A, x0, sigma):
-            return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-
-        funcSig = ["x", "y0", "A", "x0", "sigma"]
-        initPars = {"y0":0, "A":1, "x0":0, "sigma":5}
-
-    else:
-        def model(x, A, x0, sigma1, c4, c6):
-            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
-                    *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
-                    -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
-                    +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
-                    -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
-        
-        funcSig = ["x", "A", "x0", "sigma1", "c4", "c6"]
-        initPars = {"A":1, "x0":0, "sigma1":4, "c4":0, "c6":0}
+    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)
 
     xDense, xDelta, resDense = chooseXDense(resX, resY)
     def convolvedModel(x, *pars):
@@ -271,19 +251,20 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     convolvedModel.func_code = make_func_code(funcSig)
 
     # Fit only valid values, ignore cut-offs 
-    nonZeros = (dataE!=0) & (dataE!=np.nan) & (dataE!=np.inf)  # Invalid values should have errors=0, but cover other invalid cases as well
-    dataXNZ = dataX[nonZeros]
-    dataYNZ = dataY[nonZeros]
-    dataENZ = dataE[nonZeros]
+    dataXNZ, dataYNZ, dataENZ = selectNonZeros(dataX, dataY, dataE)
 
     # Fit with Minuit
     costFun = cost.LeastSquares(dataXNZ, dataYNZ, dataENZ, convolvedModel)
-    m = Minuit(costFun, **initPars)
+    m = Minuit(costFun, **defaultPars)
     m.limits["A"] = (0, None)
 
     m.simplex()
+
     if yFitIC.singleGaussFitToHProfile:
         m.migrad()
+
+        def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError
+            return
     else:
         def constrFunc(*pars):
             return model(dataX, *pars)   # GC > 0 before convolution, i.e. physical system
@@ -304,30 +285,137 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
 
     # Weight the confidence band
     dataYSigma *= chi2
-
     Residuals = dataY - dataYFit
 
     # Create workspace to store best fit curve and errors on the fit
+    createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals)
+
+    # Calculate correlation matrix
+    corrMatrix = m.covariance.correlation()
+    corrMatrix *= 100
+
+    # Create correlation tableWorkspace
+    createCorrelationTableWorkspace(wsYSpaceSym, m.parameters, corrMatrix)
+
+    # Run Minos
+    parameters, values, errors, minosAutoErr, minosManErr = runMinos(m, yFitIC, constrFunc)
+    
+    # Create workspace with final fitting parameters and their errors
+    createFitParametersTableWorkspace(wsYSpaceSym, parameters, values, errors, minosAutoErr, minosManErr, chi2)
+    return 
+
+
+def extractFirstSpectra(ws):
+    dataY = ws.extractY()[0]
+    dataX = ws.extractX()[0]
+    dataE = ws.extractE()[0]
+    return dataX, dataY, dataE
+
+
+def selectModelAndPars(gaussFlag):
+    """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
+    
+    if gaussFlag:
+        def model(x, y0, A, x0, sigma):
+            return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+
+        funcSig = ["x", "y0", "A", "x0", "sigma"]
+        defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
+        sharedPars = ["sigma"]    # Used only in Global fit
+
+    else:
+        def model(x, A, x0, sigma1, c4, c6):
+            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+                    *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
+                    -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
+                    +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
+                    -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
+        
+        funcSig = ["x", "A", "x0", "sigma1", "c4", "c6"]
+        defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0, "c6":0} 
+        sharedPars = ["sigma1", "c4", "c6"]     # Used only in Global fit
+
+    assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
+
+    return model, funcSig, defaultPars, sharedPars
+
+
+def selectNonZeros(dataX, dataY, dataE):
+    nonZeros = (dataE!=0) & (dataE!=np.nan) & (dataE!=np.inf)  # Invalid values should have errors=0, but cover other invalid cases as well
+    dataXNZ = dataX[nonZeros]
+    dataYNZ = dataY[nonZeros]
+    dataENZ = dataE[nonZeros]   
+    return dataXNZ, dataYNZ, dataENZ 
+
+
+def createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals):
+    """Creates workspace similar to the ones created by Mantid Fit."""
+
     CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, dataYFit, Residuals)), 
                     DataE=np.concatenate((dataE, dataYSigma, np.zeros(len(dataE)))),
                     NSpec=3,
                     OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit")
-    
-    # Calculate correlation matrix
-    corr = m.covariance.correlation()
-    corr *= 100
 
-    # Create correlation tableWorkspace
+
+def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_NormalizedCovarianceMatrix")
     tableWS.setTitle("Minuit Fit")
     tableWS.addColumn(type='str',name="Name")
-    for p in m.parameters:
+    for p in parameters:
         tableWS.addColumn(type='float',name=p)
-    for p, arr in zip(m.parameters, corr):
+    for p, arr in zip(parameters, corrMatrix):
         tableWS.addRow([p] + list(arr))
-    
+ 
 
+def runMinos(mObj, yFitIC, constrFunc):
+
+    # Extract info from fit before running any MINOS
+    parameters = list(mObj.parameters)
+    values = list(mObj.values)
+    errors = list(mObj.errors)
+    
+    bestFitVals = {}
+    bestFitErrs = {}
+    for p, v, e in zip(mObj.parameters, mObj.values, mObj.errors):
+        bestFitVals[p] = v
+        bestFitErrs[p] = e
+
+    try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
+        if yFitIC.forceManualMinos:
+            try:
+                constrFunc(*mObj.values)      # Check if constraint is present
+                raise(RuntimeError)           # If so, jump to Manual MINOS
+
+            except TypeError:      # Constraint not present, default to auto MINOS
+                print("\nConstraint not present, using default Automatic MINOS ...\n")
+                pass
+        
+        mObj.minos()
+        me = mObj.merrors
+
+        # Build minos errors lists in suitable format
+        minosAutoErr = []
+        for p in parameters:
+            minosAutoErr.append([me[p].lower, me[p].upper])
+        minosManErr = list(np.zeros(np.array(minosAutoErr).shape))
+
+        if yFitIC.showPlots:
+            plotAutoMinos(mObj)
+
+    except RuntimeError:
+        merrors = runAndPlotManualMinos(mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
+        
+        # Same as above, but the other way around
+        minosManErr = []
+        for p in parameters:
+            minosManErr.append(merrors[p])
+        minosAutoErr = list(np.zeros(np.array(minosManErr).shape))
+
+    return    parameters, values, errors, minosAutoErr, minosManErr
+
+
+def createFitParametersTableWorkspace(wsYSpaceSym, parameters, values, errors, minosAutoErr, minosManualErr, chi2):
     # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
     tableWS.setTitle("Minuit Fit")
@@ -339,44 +427,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     tableWS.addColumn(type='float', name="Manual Minos Error-")
     tableWS.addColumn(type='float', name="Manual Minos Error+")
 
-
-    # Extract info from fit before running any MINOS
-    parameters = list(m.parameters)
-    values = list(m.values)
-    errors = list(m.errors)
-    
-    bestFitVals = {}
-    bestFitErrs = {}
-    for p, v, e in zip(m.parameters, m.values, m.errors):
-        bestFitVals[p] = v
-        bestFitErrs[p] = e
-    # fValsMin = m.fval
-
-    try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
-        if yFitIC.forceManualMinos:
-            try:
-                constrFunc(*m.values)      # Check if constraint is present
-                raise(RuntimeError)        # If so, jump to Manual MINOS
-
-            except UnboundLocalError:      # Constraint not present, default to auto MINOS
-                print("\nConstraint not present, using default Automatic MINOS ...\n")
-                pass
-        
-        m.minos()
-        me = m.merrors
-        for p, v, e in zip(parameters, values, errors):
-            tableWS.addRow([p, v, e, me[p].lower, me[p].upper, 0, 0])   
-        
-        if yFitIC.showPlots:
-            plotAutoMinos(m)
-
-    except RuntimeError:
-        merrors = runAndPlotManualMinos(m, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
-        for p, v, e in zip(parameters, values, errors):
-            tableWS.addRow([p, v, e, 0, 0, merrors[p][0], merrors[p][1]])
+    for p, v, e, mae, mme in zip(parameters, values, errors, minosAutoErr, minosManualErr):
+        tableWS.addRow([p, v, e, mae[0], mae[1], mme[0], mme[1]])
 
     tableWS.addRow(["Cost function", chi2, 0, 0, 0, 0, 0])
-    return 
+    return
 
 
 def chooseXDense(x, res, flag=True):
@@ -403,7 +458,6 @@ def chooseXDense(x, res, flag=True):
     resDense = np.interp(xDense, x, res)
 
     return xDense, xDelta, resDense
-
 
 
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
@@ -657,10 +711,12 @@ class ResultsYFitObject:
 # Functions for Global Fit Mantid
 
 def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+    """Uses original Mantid procedure to perform global fit on groups with 8 detectors"""
+    
     replaceNansWithZeros(wsJoY)
     wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
     wsQInv = createOneOverQWs(wsQ)
-    avgWidths = globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
+    avgWidths = mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
 
 
 def replaceNansWithZeros(ws):
@@ -692,7 +748,7 @@ def createOneOverQWs(wsQ):
     return wsInvQ
 
 
-def globalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
     """Original Implementation of Global Fit using Mantid"""
 
     if gaussFitFlag:
@@ -786,13 +842,13 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, ic)   
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
-    idxList = groupDetectors(instrPars, yFitIC.nGlobalFitGroups, yFitIC.showPlots)
+    idxList = groupDetectors(instrPars, yFitIC)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
 
     if yFitIC.symmetrisationFlag:  
         dataY, dataE = symmetrizeArr(dataY, dataE)
 
-    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)   
+    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)   
     
     print("\nShared Parameters: ", [key for key in sharedPars])
     print("\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars])
@@ -892,44 +948,6 @@ def takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars):
     return dataX, dataY, dataE, dataRes, instrPars 
 
 
-def selectModelAndPars(gaussFlag):
-    """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
-    
-    if gaussFlag:
-        def model(x, sigma, y0, A, x0):
-            gauss = y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
-            return gauss 
-
-        defaultPars = {
-            "sigma" : 5,
-            "y0" : 0,
-            "A" : 1,
-            "x0" : 0,         
-        }
-        sharedPars = ["sigma"]
-
-    else:
-        def model(x, sigma1, c4, c6, A, x0):
-            return A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
-                    *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
-                    -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
-                    +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
-                    -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120)) 
-        
-        defaultPars = {
-            "sigma1" : 6,
-            "c4" : 0,
-            "c6" : 0,
-            "A" : 1,
-            "x0" : 0          
-        }
-        sharedPars = ["sigma1", "c4", "c6"]  
-
-    assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
-
-    return model, defaultPars, sharedPars
-
-
 def minuitInitialParameters(defaultPars, sharedPars, nSpec):
     """Buids dictionary to initialize Minuit with starting global+local parameters"""
     
@@ -1008,15 +1026,16 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
 
 # ------- Groupings 
 
-def groupDetectors(ipData, nGroups, showPlots):
+def groupDetectors(ipData, yFitIC):
     """
     Uses the method of k-means to find clusters in theta-L1 space.
     Input: instrument parameters to extract L1 and theta of detectors.
     Output: list of group lists containing the idx of spectra.
     """
-    assert nGroups > 0, "Number of groups must be bigger than zero."
-    assert nGroups <= len(ipData), "Number of groups cannot exceed no of unmasked detectors"
-    print(f"\nNumber of gropus: {nGroups}")
+
+    checkNGroupsValid(yFitIC, ipData)
+
+    print(f"\nNumber of gropus: {yFitIC.nGlobalFitGroups}")
 
     L1 = ipData[:, -1]    
     theta = ipData[:, 2]  
@@ -1030,7 +1049,9 @@ def groupDetectors(ipData, nGroups, showPlots):
 
     points = np.vstack((L1, theta)).T
     assert points.shape == (len(L1), 2), "Wrong shape."
-    centers = points[np.linspace(0, len(points)-1, nGroups).astype(int), :]
+    # Initial centers of groups
+    startingIdxs = np.linspace(0, len(points)-1, yFitIC.nGlobalFitGroups).astype(int)
+    centers = points[startingIdxs, :]    # Centers of cluster groups, NOT fitting parameter
 
     if False:    # Set to True to investigate problems with groupings
         plotDetsAndInitialCenters(L1, theta, centers)
@@ -1038,10 +1059,23 @@ def groupDetectors(ipData, nGroups, showPlots):
     clusters, n = kMeansClustering(points, centers)
     idxList = formIdxList(clusters, n, len(L1))
 
-    if showPlots:
+    if yFitIC.showPlots:
         plotFinalGroups(points, clusters, n)
 
     return idxList
+
+
+def checkNGroupsValid(yFitIC, ipData):
+
+    nSpectra = len(ipData)  # Number of spectra in the workspace
+
+    if (yFitIC.nGlobalFitGroups=="ALL"):
+        yFitIC.nGlobalFitGroups = nSpectra
+    else:
+        assert type(yFitIC.nGlobalFitGroups)==int, "Number of global groups needs to be an integer."
+        assert yFitIC.nGlobalFitGroups<=nSpectra, "Number of global groups needs to be less or equal to the no of unmasked spectra."
+        assert yFitIC.nGlobalFitGroups>0, "NUmber of global groups needs to be bigger than zero"
+    return 
 
 
 def plotDetsAndInitialCenters(L1, theta, centers):

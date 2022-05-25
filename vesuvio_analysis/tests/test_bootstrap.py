@@ -1,6 +1,4 @@
 from vesuvio_analysis.core_functions.run_script import runScript
-from ..core_functions.bootstrap import runJointBootstrap, runIndependentBootstrap
-from ..ICHelpers import completeICFromInputs
 import unittest
 import numpy as np
 import numpy.testing as nptest
@@ -15,7 +13,7 @@ class BootstrapInitialConditions:
     runningJackknife = False
     nSamples = 3
     skipMSIterations = False
-    runningTest = False
+    runningTest = True
     userConfirmation = False
 
 class UserScriptControls:
