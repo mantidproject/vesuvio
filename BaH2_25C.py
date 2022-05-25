@@ -16,6 +16,9 @@ class LoadVesuvioBackParameters:
     mode = "SingleDifference"
     ipfile = ipFilesPath / "ip2018.par"  
 
+    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 0.9       # None or scaling factor 
+
 
 class LoadVesuvioFrontParameters:
     runs = '38389-38413'         # 100K        # The numbers of the runs to be analysed
@@ -23,6 +26,10 @@ class LoadVesuvioFrontParameters:
     spectra = '135-182'                        # Spectra to be analysed
     mode = "SingleDifference" 
     ipfile = ipFilesPath / "ip2018_3.par"
+
+    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 0.9       # None or scaling factor 
+
 
 
 class GeneralInitialConditions:
@@ -37,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = None  # Set to None when either unknown or H not present
+    HToMass0Ratio = 1.4  # Set to None when either unknown or H not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -53,13 +60,13 @@ class BackwardInitialConditions(GeneralInitialConditions):
     bounds = np.array([
             [0, np.nan], [7, 14], [-3, 1],
             [0, np.nan], [12, 14], [-3, 1],
-            [0, np.nan], [10, 20], [-3, 1]
-            [0, np.nan], [10, 40], [-3, 1]
+            [0, np.nan], [10, 20], [-3, 1],
+            [0, np.nan], [10, 40], [-3, 1],
             [0, np.nan], [10, 40], [-3, 1]
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -91,13 +98,13 @@ class ForwardInitialConditions(GeneralInitialConditions):
             [0, np.nan], [3, 7], [-1.5, 0.5],
             [0, np.nan], [7, 14], [-3, 1],
             [0, np.nan], [12, 14], [-3, 1],
-            [0, np.nan], [10, 20], [-3, 1]
-            [0, np.nan], [10, 40], [-3, 1]
+            [0, np.nan], [10, 20], [-3, 1],
+            [0, np.nan], [10, 40], [-3, 1],
             [0, np.nan], [10, 40], [-3, 1]
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] -656/16.653*par[3] },{'type': 'eq', 'fun': lambda par:  par[0] -656/4.232*par[6] })
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -113,10 +120,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = True     # When False, use Hermite expansion
-    globalFitFlag = True
+    symmetrisationFlag = True
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    singleGaussFitToHProfile = False     # When False, use Hermite expansion
+    globalFitFlag = False
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
 
@@ -130,10 +137,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace

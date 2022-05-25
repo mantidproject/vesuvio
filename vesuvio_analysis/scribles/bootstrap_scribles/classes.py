@@ -16,3 +16,9 @@ K.color = True
 if K.color:
     print("color: ", K.color)
     print("window color: ", W.color)
+
+
+import numpy as np
+
+A = np.array([0, 1, 3, np.nan, 5])
+print(np.nanmax(A))

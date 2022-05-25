@@ -29,6 +29,9 @@ def completeICFromInputs(IC, scriptName, wsIC):
 
     # Extract some attributes from wsIC
     IC.mode = wsIC.mode
+    IC.subEmptyFromRaw = wsIC.subEmptyFromRaw
+    IC.scaleEmpty = wsIC.scaleEmpty
+    
     # When attribute InstrParsPath is not present, set it equal to path from wsIC
     try:    
         reading = IC.InstrParsPath    # If present, leave it unaltered

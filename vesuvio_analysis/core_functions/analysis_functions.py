@@ -107,10 +107,19 @@ def loadRawAndEmptyWsFromUserPath(ic):
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
     wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
-    if ic.mode=="DoubleDifference":
+    # if ic.mode=="DoubleDifference":
+    if ic.subEmptyFromRaw:
         Load(Filename=ic.userWsEmptyPath, OutputWorkspace=ic.name+"empty")
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
+
+        if (type(ic.scaleEmpty)==float) | (type(ic.scaleEmpty)==int):
+            Scale(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty', Factor=str(ic.scaleEmpty))
+        elif ic.scaleEmpty == None:
+            pass
+        else:
+            raise ValueError("Scaling factor fot empty workspace not recognized.")
+
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
                             OutputWorkspace=ic.name+"uncroped_unmasked")
     return wsToBeFitted
@@ -481,11 +490,19 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn):
     stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
 
     # Put nan in places where width deviation is bigger than std
-    betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+    filterMask = widthDeviation > stdWidths
+    betterWidths = np.where(filterMask, np.nan, widths)
     
-    betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
+    betterIntensities = np.where(filterMask, np.nan, intensities)
     betterIntensities = betterIntensities / np.sum(betterIntensities, axis=0)   # Not nansum()
 
+    assert np.all(meanWidths!=np.nan), "At least one mean of widths is nan!"
+    assert np.sum(filterMask) >= 1, "No widths satisfy filtering condition"
+    assert not(np.all(np.isnan(betterWidths))), "All filtered widths are nan"
+    assert not(np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
+    assert np.nanmax(betterWidths) != np.nanmin(betterWidths), f"All fitered widths have the same value: {np.nanmin(betterWidths)}"
+    assert np.nanmax(betterIntensities) != np.nanmin(betterIntensities), f"All fitered widths have the same value: {np.nanmin(betterIntensities)}"
+   
     return betterWidths, betterIntensities
 
 
