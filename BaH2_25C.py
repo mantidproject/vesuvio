@@ -44,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 1.4  # Set to None when either unknown or H not present
+    HToMass0Ratio = 41.8 #1.4  # Set to None when either unknown or H not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -119,9 +119,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = True
-    symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    showPlots = False
+    symmetrisationFlag = False
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     singleGaussFitToHProfile = False     # When False, use Hermite expansion
     globalFitFlag = False
     forceManualMinos = False
@@ -140,7 +140,7 @@ class UserScriptControls:
     procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
@@ -149,7 +149,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True   
+    runAnalysis = False  
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False                 # True discards some unreasonable values of widths and intensities

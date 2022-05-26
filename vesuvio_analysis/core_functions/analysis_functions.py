@@ -101,7 +101,7 @@ def createTableInitialParameters(ic):
 def loadRawAndEmptyWsFromUserPath(ic):
 
     print('\nLoading local workspaces ...\n')
-    Load(Filename=ic.userWsRawPath, OutputWorkspace=ic.name+"raw")
+    Load(Filename=str(ic.userWsRawPath), OutputWorkspace=ic.name+"raw")
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
           OutputWorkspace=ic.name+'raw')
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
@@ -109,7 +109,7 @@ def loadRawAndEmptyWsFromUserPath(ic):
 
     # if ic.mode=="DoubleDifference":
     if ic.subEmptyFromRaw:
-        Load(Filename=ic.userWsEmptyPath, OutputWorkspace=ic.name+"empty")
+        Load(Filename=str(ic.userWsEmptyPath), OutputWorkspace=ic.name+"empty")
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
 
@@ -120,6 +120,8 @@ def loadRawAndEmptyWsFromUserPath(ic):
         else:
             raise ValueError("Scaling factor fot empty workspace not recognized.")
 
+        SumSpectra(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty'+'_sum')
+        
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
                             OutputWorkspace=ic.name+"uncroped_unmasked")
     return wsToBeFitted
