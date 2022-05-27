@@ -44,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 41.8 #1.4  # Set to None when either unknown or H not present
+    HToMass0Ratio = 40 #1.4  # Set to None when either unknown or H not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -66,7 +66,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -104,7 +104,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] -656/16.653*par[3] },{'type': 'eq', 'fun': lambda par:  par[0] -656/4.232*par[6] })
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 2   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -119,11 +119,11 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = False
-    symmetrisationFlag = False
+    showPlots = True
+    symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = False     # When False, use Hermite expansion
-    globalFitFlag = False
+    singleGaussFitToHProfile = True     # When False, use Hermite expansion
+    globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
 
@@ -137,10 +137,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace

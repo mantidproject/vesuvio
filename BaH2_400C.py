@@ -44,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 31.12  # Set to None when either unknown or H not present
+    HToMass0Ratio = None #27.98  # Set to None when either unknown or H not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -120,9 +120,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-15, 0.5, 15"    # Needs to be symetric
-    singleGaussFitToHProfile = True     # When False, use Hermite expansion
+    symmetrisationFlag = True
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    singleGaussFitToHProfile = False     # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"

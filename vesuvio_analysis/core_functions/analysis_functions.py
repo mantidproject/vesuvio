@@ -445,7 +445,7 @@ def createMeansAndStdTableWS(wsName, ic):
 
     assert len(widths) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
 
-    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities)
+    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
 
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
     meansTableWS.addColumn(type='float', name="Mass")
@@ -463,9 +463,9 @@ def createMeansAndStdTableWS(wsName, ic):
     return meanWidths, meanIntensityRatios
 
 
-def calculateMeansAndStds(widthsIn, intensitiesIn):
+def calculateMeansAndStds(widthsIn, intensitiesIn, IC):
 
-    betterWidths, betterIntensities = filterWidthsAndIntensities(widthsIn, intensitiesIn)
+    betterWidths, betterIntensities = filterWidthsAndIntensities(widthsIn, intensitiesIn, IC)
     
     meanWidths = np.nanmean(betterWidths, axis=1)  
     stdWidths = np.nanstd(betterWidths, axis=1)
@@ -476,7 +476,7 @@ def calculateMeansAndStds(widthsIn, intensitiesIn):
     return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
 
 
-def filterWidthsAndIntensities(widthsIn, intensitiesIn):
+def filterWidthsAndIntensities(widthsIn, intensitiesIn, IC):
     """Puts nans in places to be ignored"""
 
     widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
@@ -495,9 +495,21 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn):
     filterMask = widthDeviation > stdWidths
     betterWidths = np.where(filterMask, np.nan, widths)
     
-    betterIntensities = np.where(filterMask, np.nan, intensities)
-    betterIntensities = betterIntensities / np.sum(betterIntensities, axis=0)   # Not nansum()
+    maskedIntensities = np.where(filterMask, np.nan, intensities)
+    betterIntensities = maskedIntensities / np.sum(maskedIntensities, axis=0)   # Not nansum()      
+    
+    if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
+        # When trying to estimate HToMass0Ratio and normalization fails, skip normalization
+        betterIntensities = maskedIntensities 
 
+    # TODO: Have not checked this actually works
+    elif IC.runningPreliminary & (IC.modeRunning=="FORWARD") & np.any(np.nanmean(betterIntensities, axis=1)[:1]==0):
+        # If first or second mass are zero, dont do normalization to avoid propagation of nans
+        betterIntensities = maskedIntensities 
+    else:
+        pass
+
+  
     assert np.all(meanWidths!=np.nan), "At least one mean of widths is nan!"
     assert np.sum(filterMask) >= 1, "No widths satisfy filtering condition"
     assert not(np.all(np.isnan(betterWidths))), "All filtered widths are nan"

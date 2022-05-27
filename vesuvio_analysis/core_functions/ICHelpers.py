@@ -56,6 +56,9 @@ def completeICFromInputs(IC, scriptName, wsIC):
 
     # Store script name
     IC.scriptName = scriptName
+
+    # Default not running preliminary procedure to estimate HToMass0Ratio
+    IC.runningPreliminary = False
     return 
 
 

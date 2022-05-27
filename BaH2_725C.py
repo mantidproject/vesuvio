@@ -28,7 +28,7 @@ class LoadVesuvioFrontParameters:
     ipfile = ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 0.9       # None or scaling factor 
+    scaleEmpty = 0.9       # Originally 0.9
 
 
 
@@ -44,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 10.3728   # Set to None when either unknown or H not present
+    HToMass0Ratio = 10   # Set to None when either unknown or H not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -104,7 +104,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 3   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -119,9 +119,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = True
+    showPlots = False
     symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     singleGaussFitToHProfile = False     # When False, use Hermite expansion
     globalFitFlag = False
     forceManualMinos = False
