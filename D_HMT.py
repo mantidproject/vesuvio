@@ -117,7 +117,7 @@ class YSpaceFitInitialConditions:
 
 
 class BootstrapInitialConditions:
-    runningJackknife = False
+    runningJackknife = True
     nSamples = 500
     skipMSIterations = False
     runningTest = False
@@ -138,7 +138,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True  
+    runAnalysis = True 
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True                 # True discards some unreasonable values of widths and intensities
