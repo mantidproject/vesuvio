@@ -45,9 +45,8 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
     Runs iterative procedure with alternating back and forward scattering.
     """
 
-    assert bckwdIC.runningSampleWS == False, "Procedure not suitable for Bootstrap."
+    assert bckwdIC.runningSampleWS == False, "Preliminary procedure not suitable for Bootstrap."
     fwdIC.runningPreliminary = True
-    assert fwdIC.noOfMSIterations == 1, "When running preliminary procedure, set noOfMSIterations of forward scattering to 1."
 
     nIter = askUserNoOfIterations()
  

@@ -42,7 +42,7 @@ def completeICFromInputs(IC, scriptName, wsIC):
     #TODO: Confirm that last cleaning is working
     # inputDirsForSample(IC, scriptName, wsIC)
     rawPath, emptyPath = inputDirsForSample(wsIC, scriptName)
-    if not(rawPath.is_file()): # or not(emptyPath.is_file()):    # Temporary while starch_80_RD doesnt have emtpy saved
+    if not(rawPath.is_file()) or not(emptyPath.is_file()):    
         print(f"\nWorkspaces not found.\nSaving Workspaces:\n{rawPath.name}\n{emptyPath.name}")
         saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath)
     

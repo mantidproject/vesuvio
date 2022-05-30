@@ -498,20 +498,21 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn, IC):
     maskedIntensities = np.where(filterMask, np.nan, intensities)
     betterIntensities = maskedIntensities / np.sum(maskedIntensities, axis=0)   # Not nansum()      
     
+    # When trying to estimate HToMass0Ratio and normalization fails, skip normalization
     if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
-        # When trying to estimate HToMass0Ratio and normalization fails, skip normalization
+        assert IC.noOfMSIterations == 1, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations = 1."
         betterIntensities = maskedIntensities 
 
     # TODO: Have not checked this actually works
-    elif IC.runningPreliminary & (IC.modeRunning=="FORWARD") & np.any(np.nanmean(betterIntensities, axis=1)[:1]==0):
-        # If first or second mass are zero, dont do normalization to avoid propagation of nans
-        betterIntensities = maskedIntensities 
+    # If first or second mass are zero, dont do normalization to avoid propagation of nans
+    # elif IC.runningPreliminary & (IC.modeRunning=="FORWARD") & np.any(np.nanmean(betterIntensities, axis=1)[:1]==0):
+    #     betterIntensities = maskedIntensities 
     else:
         pass
 
   
     assert np.all(meanWidths!=np.nan), "At least one mean of widths is nan!"
-    assert np.sum(filterMask) >= 1, "No widths satisfy filtering condition"
+    assert np.sum(filterMask) >= 1, "No widths survive filtering condition"
     assert not(np.all(np.isnan(betterWidths))), "All filtered widths are nan"
     assert not(np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
     assert np.nanmax(betterWidths) != np.nanmin(betterWidths), f"All fitered widths have the same value: {np.nanmin(betterWidths)}"
