@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
@@ -34,7 +35,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     yfitResults.save()
 
     if yFitIC.globalFitFlag:
-        # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.singleGaussFitToHProfile, wsSubMass.name())
+        # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.fitModel, wsSubMass.name())
         fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
     
     return yfitResults
@@ -241,7 +242,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     dataX, dataY, dataE = extractFirstSpectra(wsYSpaceSym)
     resX, resY, resE = extractFirstSpectra(wsRes)
 
-    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)
+    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
 
     xDense, xDelta, resDense = chooseXDense(resX, resY)
     def convolvedModel(x, *pars):
@@ -258,17 +259,32 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     m = Minuit(costFun, **defaultPars)
     m.limits["A"] = (0, None)
 
-    m.simplex()
-
-    if yFitIC.singleGaussFitToHProfile:
+    if yFitIC.fitModel=="SINGLE_GAUSSIAN":
+        m.simplex()
         m.migrad()
 
         def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError
             return
     else:
+
+        # Fix c4 or c6 according to the model chosen, defualt values already zero
+        if yFitIC.fitModel=="GC_C4":
+            m.fixed["c6"] = True
+        elif yFitIC.fitModel=="GC_C6":
+            m.fixed["c4"] = True
+        elif yFitIC.fitModel=="GC":
+            m.fixed["c4"] = True
+            m.fixed["c6"] = True
+        elif yFitIC.fitModel=="GC_C4_C6":
+            pass
+        else:
+            raise ValueError("Gram-Charlier model not recognized, options: 'GC_C4', 'GC_C6', 'GC_C4_C6'")
+        
+        
         def constrFunc(*pars):
             return model(dataX, *pars)   # GC > 0 before convolution, i.e. physical system
-
+        
+        m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
 
     # Explicit calculation of Hessian after the fit
@@ -312,10 +328,10 @@ def extractFirstSpectra(ws):
     return dataX, dataY, dataE
 
 
-def selectModelAndPars(gaussFlag):
+def selectModelAndPars(modelFlag):
     """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
     
-    if gaussFlag:
+    if modelFlag == "SINGLE_GAUSSIAN":
         def model(x, y0, A, x0, sigma):
             return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
@@ -323,7 +339,7 @@ def selectModelAndPars(gaussFlag):
         defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
         sharedPars = ["sigma"]    # Used only in Global fit
 
-    else:
+    elif (modelFlag=="GC_C4_C6") or (modelFlag=="GC_C4") or (modelFlag=="GC_C6") or (modelFlag=="GC"):
         def model(x, A, x0, sigma1, c4, c6):
             return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
@@ -335,6 +351,8 @@ def selectModelAndPars(gaussFlag):
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0, "c6":0} 
         sharedPars = ["sigma1", "c4", "c6"]     # Used only in Global fit
 
+    else:
+        raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4', 'GC_C6', 'GC'")
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
 
     return model, funcSig, defaultPars, sharedPars
@@ -466,7 +484,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
         outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
         CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
-        if yFitIC.singleGaussFitToHProfile:
+        if yFitIC.fitModel=="SINGLE_GAUSSIAN":
             function=f"""composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0+A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
@@ -557,8 +575,8 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
         # Unconstrained fit
         for i in side.astype(int):
             minuitObj.values[var] = varSpace[i]      # Fix variable
-            minuitObj.migrad()     
-            fValsMigrad[i] = minuitObj.fval
+            minuitObj.migrad()                       # Fit 
+            fValsMigrad[i] = minuitObj.fval          # Store minimum
 
         # Reset values and errors to minima
         for p in bestFitVals:
@@ -693,7 +711,7 @@ class ResultsYFitObject:
         self.perr = perr
 
         self.savePath = ic.ySpaceFitSavePath
-        self.singleGaussFitToHProfile = yFitIC.singleGaussFitToHProfile
+        self.fitModel = yFitIC.fitModel
 
 
     def save(self):
@@ -848,7 +866,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     if yFitIC.symmetrisationFlag:  
         dataY, dataE = symmetrizeArr(dataY, dataE)
 
-    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)   
+    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)   
     
     print("\nShared Parameters: ", [key for key in sharedPars])
     print("\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars])
@@ -867,15 +885,28 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     m = Minuit(totCost, **initPars)
 
     for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier
-        m.limits["A"+str(i)] = (0, np.inf)
+        m.limits["A"+str(i)] = (0, np.inf)    
 
     t0 = time.time()
-    if yFitIC.singleGaussFitToHProfile:
+    if yFitIC.fitModel=="SINGLE_GAUSSIAN":
 
         m.simplex()
         m.migrad() 
 
     else:
+        
+        # Fix c4 or c6 according to the model chosen, defualt values already zero
+        if yFitIC.fitModel=="GC_C4":
+            m.fixed["c6"] = True
+        elif yFitIC.fitModel=="GC_C6":
+            m.fixed["c4"] = True
+        elif yFitIC.fitModel=="GC":
+            m.fixed["c4"] = True
+            m.fixed["c6"] = True
+        elif yFitIC.fitModel=="GC_C4_C6":
+            pass
+        else:
+            raise ValueError("Gram-Charlier model not recognized, options: 'GC_C4', 'GC_C6', 'GC_C4_C6'")
 
         x = dataX[0]
         def constr(*pars):

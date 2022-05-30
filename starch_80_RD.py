@@ -19,6 +19,7 @@ class LoadVesuvioBackParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1       # None or scaling factor 
+    scaleRaw = 1
 
 class LoadVesuvioFrontParameters:
     runs = '43066-43076'         # 100K        # The numbers of the runs to be analysed
@@ -29,6 +30,7 @@ class LoadVesuvioFrontParameters:
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1       # None or scaling factor 
+    scaleRaw = 1
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -110,10 +112,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = False
+    showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = True     # When False, use Hermite expansion
+    fitModel = "GC_C4"     # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
@@ -128,7 +130,7 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
