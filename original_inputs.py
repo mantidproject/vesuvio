@@ -17,6 +17,10 @@ class LoadVesuvioBackParameters:
     mode='DoubleDifference'
     ipfile=ipFilesPath / "ip2019.par"   
 
+    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 1       # None or scaling factor 
+
+
 
 class LoadVesuvioFrontParameters:
     runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
@@ -24,6 +28,10 @@ class LoadVesuvioFrontParameters:
     spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
     ipfile=ipFilesPath / "ip2018_3.par" 
+
+    subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 1       # None or scaling factor 
+
 
 
 class GeneralInitialConditions:
@@ -39,6 +47,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
+    HToMassIdx = 0
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])

@@ -31,6 +31,7 @@ def completeICFromInputs(IC, scriptName, wsIC):
     IC.mode = wsIC.mode
     IC.subEmptyFromRaw = wsIC.subEmptyFromRaw
     IC.scaleEmpty = wsIC.scaleEmpty
+    IC.scaleRaw = wsIC.scaleRaw
     
     # When attribute InstrParsPath is not present, set it equal to path from wsIC
     try:    

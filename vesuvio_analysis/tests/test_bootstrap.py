@@ -32,11 +32,6 @@ bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, 
 
 bootJointResults = bootRes
 
-
-# completeICFromInputs(fwdIC, "tests", wsFrontIC)
-# completeICFromInputs(bckwdIC, "tests", wsBackIC)
-# bootJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-
 bootSamples = []
 for bootRes in bootJointResults:
     bootSamples.append(bootRes.bootSamples)

@@ -45,6 +45,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 12.66   # Set to None when either unknown or H not present
+    HToMassIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -66,7 +67,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -104,7 +105,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 

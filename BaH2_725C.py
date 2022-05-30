@@ -18,7 +18,7 @@ class LoadVesuvioBackParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 0.9       # None or scaling factor 
-
+    scaleRaw = 1
 
 class LoadVesuvioFrontParameters:
     runs = '38454-38481'       # 100K        # The numbers of the runs to be analysed
@@ -29,7 +29,7 @@ class LoadVesuvioFrontParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 0.9       # Originally 0.9
-
+    scaleRaw = 1
 
 
 class GeneralInitialConditions:
@@ -44,7 +44,8 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 10   # Set to None when either unknown or H not present
+    HToMass0Ratio = None #10   # Set to None when either unknown or H not present
+    HToMassIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -104,7 +105,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 3   #4
+    noOfMSIterations = 1   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -137,7 +138,7 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"

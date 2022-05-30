@@ -77,7 +77,7 @@ def maskColumnWithZeros(maskedWSName, wsToBeMaskedName):
 def createTableInitialParameters(ic):
     print("\nRUNNING ", ic.modeRunning, " SCATTERING.\n")
     if ic.modeRunning == "BACKWARD":
-        print("\nH to first mass ratio: ", ic.HToMass0Ratio, "\n")
+        print(f"\nH ratio to mass with idx={ic.HToMassIdx}: {ic.HToMass0Ratio}\n")
 
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=ic.name+"_Initial_Parameters")
     meansTableWS.addColumn(type='float', name="Mass")
@@ -104,6 +104,10 @@ def loadRawAndEmptyWsFromUserPath(ic):
     Load(Filename=str(ic.userWsRawPath), OutputWorkspace=ic.name+"raw")
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
           OutputWorkspace=ic.name+'raw')
+
+    assert (type(ic.scaleRaw)==float) | (type(ic.scaleRaw)==int), "Scaling factor of raw ws needs to be float or int."
+    Scale(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw', Factor=str(ic.scaleRaw))
+ 
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
     wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
@@ -113,12 +117,8 @@ def loadRawAndEmptyWsFromUserPath(ic):
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
 
-        if (type(ic.scaleEmpty)==float) | (type(ic.scaleEmpty)==int):
-            Scale(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty', Factor=str(ic.scaleEmpty))
-        elif ic.scaleEmpty == None:
-            pass
-        else:
-            raise ValueError("Scaling factor fot empty workspace not recognized.")
+        assert (type(ic.scaleEmpty)==float) | (type(ic.scaleEmpty)==int), "Scaling factor of empty ws needs to be float or int"
+        Scale(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty', Factor=str(ic.scaleEmpty))
 
         SumSpectra(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty'+'_sum')
         
@@ -500,16 +500,10 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn, IC):
     
     # When trying to estimate HToMass0Ratio and normalization fails, skip normalization
     if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
-        assert IC.noOfMSIterations == 1, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations = 1."
+        assert IC.noOfMSIterations == 1, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations=1."
         betterIntensities = maskedIntensities 
-
-    # TODO: Have not checked this actually works
-    # If first or second mass are zero, dont do normalization to avoid propagation of nans
-    # elif IC.runningPreliminary & (IC.modeRunning=="FORWARD") & np.any(np.nanmean(betterIntensities, axis=1)[:1]==0):
-    #     betterIntensities = maskedIntensities 
     else:
         pass
-
   
     assert np.all(meanWidths!=np.nan), "At least one mean of widths is nan!"
     assert np.sum(filterMask) >= 1, "No widths survive filtering condition"
@@ -709,7 +703,7 @@ def pseudoVoigt(x, sigma, gamma):
     eta = 1.36603 * fl/f - 0.47719 * (fl/f)**2 + 0.11116 * (fl/f)**3
     sigma_v, gamma_v = f/(2.*np.sqrt(2.*np.log(2.))), f / 2.
     pseudo_voigt = eta * lorentizian(x, gamma_v) + (1.-eta) * gaussian(x, sigma_v)
-    # TODO: Ask about this comment
+    # TODO: Check again to normalize
     # norm = np.sum(pseudo_voigt)*(x[1]-x[0])
     return pseudo_voigt  # /np.abs(norm)
 
@@ -766,7 +760,8 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
         if (ic.HToMass0Ratio != None):  # If H is present, ratio is a number
             masses = np.append(masses, 1.0079)
             meanWidths = np.append(meanWidths, 5.0)
-            HIntensity = ic.HToMass0Ratio * meanIntensityRatios[0]
+
+            HIntensity = ic.HToMass0Ratio * meanIntensityRatios[ic.HToMassIdx]
             meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
             meanIntensityRatios /= np.sum(meanIntensityRatios)
 

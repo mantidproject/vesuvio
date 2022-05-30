@@ -45,6 +45,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = None #27.98  # Set to None when either unknown or H not present
+    HToMassIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -149,7 +150,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True   
+    runAnalysis = False   
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False                 # True discards some unreasonable values of widths and intensities

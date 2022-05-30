@@ -14,7 +14,8 @@ class LoadVesuvioBackParameters:
     ipfile=str(ipFilesPath / "ip2019.par")   
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = None       # None or scaling factor 
+    scaleEmpty = 1       
+    scaleRaw = 1 
 
 
 class LoadVesuvioFrontParameters:
@@ -25,7 +26,8 @@ class LoadVesuvioFrontParameters:
     ipfile=str(ipFilesPath / "ip2018_3.par") 
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = None       # None or scaling factor 
+    scaleEmpty = 1
+    scaleRaw = 1 
 
 
 class GeneralInitialConditions:
@@ -41,7 +43,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
-
+    HToMassIdx = 0   # Idx of mass to take the ratio with
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
     # noOfMasses = len(masses)
@@ -127,8 +129,3 @@ bckwdIC = BackwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 
 scriptName = "tests"
-# bootIC = bootstrapInitialConditions
-
-# completeICFromInputs(fwdIC, "tests", icWSFront)
-# completeICFromInputs(bckwdIC, "tests", icWSBack)
-

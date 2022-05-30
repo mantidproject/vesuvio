@@ -18,7 +18,7 @@ class LoadVesuvioBackParameters:
     ipfile = ipFilesPath / "ip2019.par"  
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = None       # None or scaling factor 
+    scaleEmpty = 1       # None or scaling factor 
 
 class LoadVesuvioFrontParameters:
     runs = '43066-43076'         # 100K        # The numbers of the runs to be analysed
@@ -28,7 +28,7 @@ class LoadVesuvioFrontParameters:
     ipfile = ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = None       # None or scaling factor 
+    scaleEmpty = 1       # None or scaling factor 
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -43,6 +43,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 19.0620008206  # Set to None when either unknown or H not present
+    HToMassIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])

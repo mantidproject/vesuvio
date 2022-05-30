@@ -28,7 +28,6 @@ userCtr = UserScriptControls
 scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 wsFinal, forwardScatteringResults = scattRes
-# wsFinal, forwardScatteringResults = runIndependentIterativeProcedure(fwdIC)
 
 # Test the results
 np.set_printoptions(suppress=True, precision=8, linewidth=150)

@@ -17,7 +17,8 @@ class LoadVesuvioBackParameters:
     ipfile = ipFilesPath / 'ip2018_3.par'  
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 0.9       # None or scaling factor 
+    scaleEmpty = 0.8       # None or scaling factor
+    scaleRaw = 1.2 
 
 
 class LoadVesuvioFrontParameters:
@@ -28,9 +29,8 @@ class LoadVesuvioFrontParameters:
     ipfile = ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 0.9       # None or scaling factor 
-
-
+    scaleEmpty = 0.8       # None or scaling factor 
+    scaleRaw = 1
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -45,7 +45,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 10.0   # Set to None when either unknown or H not present
-
+    HToMassIdx=0
+    
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015,  16, 27, 28, 93, 137.3])
 
@@ -125,9 +126,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     singleGaussFitToHProfile = False     # When False, use Hermite expansion
-    globalFitFlag = False
+    globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
 
@@ -141,7 +142,7 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -153,7 +154,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True   
+    runAnalysis = False   
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False                 # True discards some unreasonable values of widths and intensities

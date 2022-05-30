@@ -28,8 +28,6 @@ bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, 
 
 
 jackJointResults = bootRes
-# jackJointResults = runJointBootstrap(bckwdIC, fwdIC, bootIC, yfitIC)
-
 
 jackSamples = []
 for jackRes in jackJointResults:
