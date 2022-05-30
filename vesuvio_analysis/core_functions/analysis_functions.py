@@ -101,16 +101,27 @@ def createTableInitialParameters(ic):
 def loadRawAndEmptyWsFromUserPath(ic):
 
     print('\nLoading local workspaces ...\n')
-    Load(Filename=ic.userWsRawPath, OutputWorkspace=ic.name+"raw")
+    Load(Filename=str(ic.userWsRawPath), OutputWorkspace=ic.name+"raw")
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
           OutputWorkspace=ic.name+'raw')
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
     wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
-    if ic.mode=="DoubleDifference":
-        Load(Filename=ic.userWsEmptyPath, OutputWorkspace=ic.name+"empty")
+    # if ic.mode=="DoubleDifference":
+    if ic.subEmptyFromRaw:
+        Load(Filename=str(ic.userWsEmptyPath), OutputWorkspace=ic.name+"empty")
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
             OutputWorkspace=ic.name+'empty')
+
+        if (type(ic.scaleEmpty)==float) | (type(ic.scaleEmpty)==int):
+            Scale(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty', Factor=str(ic.scaleEmpty))
+        elif ic.scaleEmpty == None:
+            pass
+        else:
+            raise ValueError("Scaling factor fot empty workspace not recognized.")
+
+        SumSpectra(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty'+'_sum')
+        
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
                             OutputWorkspace=ic.name+"uncroped_unmasked")
     return wsToBeFitted
@@ -434,7 +445,7 @@ def createMeansAndStdTableWS(wsName, ic):
 
     assert len(widths) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
 
-    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities)
+    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
 
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
     meansTableWS.addColumn(type='float', name="Mass")
@@ -452,9 +463,9 @@ def createMeansAndStdTableWS(wsName, ic):
     return meanWidths, meanIntensityRatios
 
 
-def calculateMeansAndStds(widthsIn, intensitiesIn):
+def calculateMeansAndStds(widthsIn, intensitiesIn, IC):
 
-    betterWidths, betterIntensities = filterWidthsAndIntensities(widthsIn, intensitiesIn)
+    betterWidths, betterIntensities = filterWidthsAndIntensities(widthsIn, intensitiesIn, IC)
     
     meanWidths = np.nanmean(betterWidths, axis=1)  
     stdWidths = np.nanstd(betterWidths, axis=1)
@@ -465,7 +476,7 @@ def calculateMeansAndStds(widthsIn, intensitiesIn):
     return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
 
 
-def filterWidthsAndIntensities(widthsIn, intensitiesIn):
+def filterWidthsAndIntensities(widthsIn, intensitiesIn, IC):
     """Puts nans in places to be ignored"""
 
     widths = widthsIn.copy()      # Copy to avoid accidental changes in arrays
@@ -481,11 +492,32 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn):
     stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
 
     # Put nan in places where width deviation is bigger than std
-    betterWidths = np.where(widthDeviation > stdWidths, np.nan, widths)
+    filterMask = widthDeviation > stdWidths
+    betterWidths = np.where(filterMask, np.nan, widths)
     
-    betterIntensities = np.where(widthDeviation > stdWidths, np.nan, intensities)
-    betterIntensities = betterIntensities / np.sum(betterIntensities, axis=0)   # Not nansum()
+    maskedIntensities = np.where(filterMask, np.nan, intensities)
+    betterIntensities = maskedIntensities / np.sum(maskedIntensities, axis=0)   # Not nansum()      
+    
+    # When trying to estimate HToMass0Ratio and normalization fails, skip normalization
+    if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
+        assert IC.noOfMSIterations == 1, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations = 1."
+        betterIntensities = maskedIntensities 
 
+    # TODO: Have not checked this actually works
+    # If first or second mass are zero, dont do normalization to avoid propagation of nans
+    # elif IC.runningPreliminary & (IC.modeRunning=="FORWARD") & np.any(np.nanmean(betterIntensities, axis=1)[:1]==0):
+    #     betterIntensities = maskedIntensities 
+    else:
+        pass
+
+  
+    assert np.all(meanWidths!=np.nan), "At least one mean of widths is nan!"
+    assert np.sum(filterMask) >= 1, "No widths survive filtering condition"
+    assert not(np.all(np.isnan(betterWidths))), "All filtered widths are nan"
+    assert not(np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
+    assert np.nanmax(betterWidths) != np.nanmin(betterWidths), f"All fitered widths have the same value: {np.nanmin(betterWidths)}"
+    assert np.nanmax(betterIntensities) != np.nanmin(betterIntensities), f"All fitered widths have the same value: {np.nanmin(betterIntensities)}"
+   
     return betterWidths, betterIntensities
 
 

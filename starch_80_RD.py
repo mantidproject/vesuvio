@@ -17,6 +17,8 @@ class LoadVesuvioBackParameters:
     mode = 'DoubleDifference'
     ipfile = ipFilesPath / "ip2019.par"  
 
+    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = None       # None or scaling factor 
 
 class LoadVesuvioFrontParameters:
     runs = '43066-43076'         # 100K        # The numbers of the runs to be analysed
@@ -25,6 +27,8 @@ class LoadVesuvioFrontParameters:
     mode = 'SingleDifference'  
     ipfile = ipFilesPath / "ip2018_3.par"
 
+    subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = None       # None or scaling factor 
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
@@ -56,7 +60,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -90,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -105,7 +109,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = True
+    showPlots = False
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     singleGaussFitToHProfile = True     # When False, use Hermite expansion
@@ -123,10 +127,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace

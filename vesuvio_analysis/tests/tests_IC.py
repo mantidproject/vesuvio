@@ -13,6 +13,9 @@ class LoadVesuvioBackParameters:
     mode='DoubleDifference'
     ipfile=str(ipFilesPath / "ip2019.par")   
 
+    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = None       # None or scaling factor 
+
 
 class LoadVesuvioFrontParameters:
     runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
@@ -20,6 +23,9 @@ class LoadVesuvioFrontParameters:
     spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
     ipfile=str(ipFilesPath / "ip2018_3.par") 
+
+    subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = None       # None or scaling factor 
 
 
 class GeneralInitialConditions:

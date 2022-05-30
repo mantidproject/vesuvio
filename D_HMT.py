@@ -17,6 +17,8 @@ class LoadVesuvioBackParameters:
     mode = 'DoubleDifference'
     ipfile=ipFilesPath / "ip2018_3.par" 
 
+    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = None       # None or scaling factor 
 
 class LoadVesuvioFrontParameters:
     runs='36517-36556'                       # The numbers of the runs to be analysed
@@ -25,6 +27,8 @@ class LoadVesuvioFrontParameters:
     mode='SingleDifference'
     ipfile=ipFilesPath / "ip2018_3.par"
 
+    subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = None       # None or scaling factor 
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""

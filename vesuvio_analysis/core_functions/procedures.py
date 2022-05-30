@@ -45,10 +45,12 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
     Runs iterative procedure with alternating back and forward scattering.
     """
 
-    assert bckwdIC.runningSampleWS == False, "Procedure not suitable for Bootstrap."
+    assert bckwdIC.runningSampleWS == False, "Preliminary procedure not suitable for Bootstrap."
+    fwdIC.runningPreliminary = True
 
     nIter = askUserNoOfIterations()
  
+    HRatios = []   # List to store HRatios
     # Run preliminary forward with a good guess for the widths of non-H masses
     wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
     for i in range(int(nIter)):    # Loop until convergence is achieved
@@ -56,9 +58,14 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
         AnalysisDataService.clear()    # Clears all Workspaces
 
         bckwdIC.HToMass0Ratio = calculateHToMass0Ratio(fwdScatResults)
+        HRatios.append(bckwdIC.HToMass0Ratio)
         wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
+    print(f"\nH Ratios estimates of previous iterations: {HRatios}")
     print(f"\n\nFinal estimate for HToMass0Ratio: {calculateHToMass0Ratio(fwdScatResults):.3f}\n")
+    
+    fwdIC.runningPreliminary = False  # Change to default since end of preliminary procedure
+    
     return wsFinal, bckwdScatResults, fwdScatResults
 
 
