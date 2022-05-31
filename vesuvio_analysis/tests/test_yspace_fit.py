@@ -7,6 +7,7 @@ import unittest
 import numpy.testing as nptest
 from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 testPath = Path(__file__).absolute().parent 
+np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 AnalysisDataService.clear()
 
@@ -26,15 +27,25 @@ class UserScriptControls:
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
 
+
+testGC = True
+if testGC:
+    yFitIC.symmetrisationFlag = False
+    yFitIC.fitModel = "GC_C4_C6"
+    # yFitIC.singleGaussFitToHProfile = False
+    oriPath = testPath / "stored_yspace_fit_GC.npz"
+else:
+    yFitIC.fitModel = "SINGLE_GAUSSIAN"
+    oriPath = testPath / "stored_yspace_fit.npz"
+
+
 scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 
 ySpaceFitResults = yfitRes
 
 # Test yspace
-np.set_printoptions(suppress=True, precision=8, linewidth=150)
-
-oriPath = testPath / "stored_yspace_fit.npz"
+# oriPath = testPath / "stored_yspace_fit.npz"
 storedResults = np.load(oriPath)
 currentResults = ySpaceFitResults
 
