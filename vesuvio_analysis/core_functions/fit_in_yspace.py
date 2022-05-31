@@ -249,7 +249,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
         convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
         return np.interp(x, xDense, convDense)
 
-    convolvedModel.func_code = make_func_code(funcSig)
+    convolvedModel.func_code = make_func_code(funcSig)    # TODO: Use describe(model) instead
 
     # Fit only valid values, ignore cut-offs 
     dataXNZ, dataYNZ, dataENZ = selectNonZeros(dataX, dataY, dataE)
@@ -266,21 +266,6 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
         def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError
             return
     else:
-
-        # Fix c4 or c6 according to the model chosen, defualt values already zero
-        if yFitIC.fitModel=="GC_C4":
-            m.fixed["c6"] = True
-        elif yFitIC.fitModel=="GC_C6":
-            m.fixed["c4"] = True
-        elif yFitIC.fitModel=="GC":
-            m.fixed["c4"] = True
-            m.fixed["c6"] = True
-        elif yFitIC.fitModel=="GC_C4_C6":
-            pass
-        else:
-            raise ValueError("Gram-Charlier model not recognized, options: 'GC_C4', 'GC_C6', 'GC_C4_C6'")
-        
-        
         def constrFunc(*pars):
             return model(dataX, *pars)   # GC > 0 before convolution, i.e. physical system
         
@@ -339,9 +324,9 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
         sharedPars = ["sigma"]    # Used only in Global fit
 
-    elif (modelFlag=="GC_C4_C6") or (modelFlag=="GC_C4") or (modelFlag=="GC_C6") or (modelFlag=="GC"):
+    elif (modelFlag=="GC_C4_C6") or (modelFlag=="GC_C6") or (modelFlag=="GC"):
         def model(x, A, x0, sigma1, c4, c6):
-            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*3.1415*sigma1**2)) \
+            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*np.pi*sigma1**2)) \
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12) \
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
@@ -351,6 +336,16 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0, "c6":0} 
         sharedPars = ["sigma1", "c4", "c6"]     # Used only in Global fit
 
+    elif modelFlag=="GC_C4":
+        def model(x, A, x0, sigma1, c4):
+            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*np.pi*sigma1**2)) \
+                    *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
+                    -48*((x-x0)/np.sqrt(2)/sigma1)**2+12))
+        
+        funcSig = ["x", "A", "x0", "sigma1", "c4"]
+        defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0} 
+        sharedPars = ["sigma1", "c4"]     # Used only in Global fit   
+       
     else:
         raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4', 'GC_C6', 'GC'")
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
@@ -701,12 +696,26 @@ class ResultsYFitObject:
         wsFitSimplex = mtd[wsJoYAvg.name() + "_Fitted_Simplex_Parameters"]
         wsFitMinuit = mtd[wsJoYAvg.name() + "_Fitted_Minuit_Parameters"]
 
-        noPars = len(wsFitLM.column("Value"))
-        popt = np.zeros((3, noPars))
-        perr = np.zeros((3, noPars))
-        for i, ws in enumerate([wsFitMinuit, wsFitLM, wsFitSimplex]):
-            popt[i] = ws.column("Value")
-            perr[i] = ws.column("Error")
+        poptList = [wsFitMinuit.column("Value"), wsFitLM.column("Value"), wsFitSimplex.column("Value")]
+        perrList = [wsFitMinuit.column("Error"), wsFitLM.column("Error"), wsFitSimplex.column("Error")]
+
+        # Number of parameters might not be the same, need to add zeros to some lists to match length
+        maxLen = max([len(l) for l in poptList])
+        for pList in [poptList, perrList]:
+            for l in pList:
+                while len(l) < maxLen:
+                    l.append(0)
+        
+        popt = np.array(poptList)
+        perr = np.array(perrList)
+
+        # noPars = len(wsFitLM.column("Value"))
+        # popt = np.zeros((3, noPars))
+        # perr = np.zeros((3, noPars))
+        # for i, ws in enumerate([wsFitMinuit, wsFitLM, wsFitSimplex]):
+        #     popt[i] = ws.column("Value")
+        #     perr[i] = ws.column("Error")
+
         self.popt = popt
         self.perr = perr
 
@@ -766,10 +775,10 @@ def createOneOverQWs(wsQ):
     return wsInvQ
 
 
-def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, fitModelFlag, wsFirstMassName):
     """Original Implementation of Global Fit using Mantid"""
 
-    if gaussFitFlag:
+    if fitModelFlag=="SIMPLE_GAUSSIAN":
         convolution_template = """
         (composite=Convolution,$domains=({0});
         name=Resolution,Workspace={1},WorkspaceIndex={0};
@@ -894,19 +903,14 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
         m.migrad() 
 
     else:
-        
-        # Fix c4 or c6 according to the model chosen, defualt values already zero
-        if yFitIC.fitModel=="GC_C4":
-            m.fixed["c6"] = True
-        elif yFitIC.fitModel=="GC_C6":
-            m.fixed["c4"] = True
-        elif yFitIC.fitModel=="GC":
-            m.fixed["c4"] = True
-            m.fixed["c6"] = True
-        elif yFitIC.fitModel=="GC_C4_C6":
-            pass
-        else:
-            raise ValueError("Gram-Charlier model not recognized, options: 'GC_C4', 'GC_C6', 'GC_C4_C6'")
+        # New way of calculating constraint function
+        totSig = describe(totCost)[1:]   # Remove 'x' to leave only parameters
+        print(f"\ntotSig:\n{totSig}\n")
+        sharedIdxs = [totSig.index(shPar) for shPar in sharedPars]
+        print(f"\nsharedIdxs:\n{sharedIdxs}\n")
+        nCostFunctions = len(totCost)
+        print(f"\nnCostFunctions:\n{nCostFunctions}\n")
+
 
         x = dataX[0]
         def constr(*pars):
@@ -918,10 +922,20 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
             Builds array with all constraints from individual functions.
             """
 
-            sharedPars = pars[:3]    # sigma1, c4, c6
-            joinedGC = np.zeros(int((len(pars)-3)/2) * x.size)
-            for i, (A, x0) in enumerate(zip(pars[3::2], pars[4::2])):
-                joinedGC[i*x.size : (i+1)*x.size] = model(x, *sharedPars, A, x0)
+            sharedPars = [pars[i] for i in sharedIdxs]    # sigma1, c4, c6 in original GC
+            unsharedPars = np.delete(pars, sharedIdxs, None)
+
+            joinedGC = np.zeros(nCostFunctions * x.size)   # Number of individual cost functions
+            
+            unsharedParsSplit = np.split(unsharedPars, nCostFunctions)
+
+            # TODO: Need to make sure model has signature like the calling below
+            for i, unshParsModel in enumerate(unsharedParsSplit):
+                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel, *sharedPars)
+            
+            
+            # for i, (A, x0) in enumerate(zip(pars[nShared::2], pars[nShared+1::2])):
+            #     joinedGC[i*x.size : (i+1)*x.size] = model(x, A, x0, *sharedPars)
             
             # assert np.all(joinedGC!=0), f"Args where zero: {np.argwhere(joinedGC==0)}"
      

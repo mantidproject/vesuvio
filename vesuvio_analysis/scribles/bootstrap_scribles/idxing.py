@@ -15,3 +15,19 @@ for i in range(len(A)):
     print(rowIdxs)
     B[i] = A[i, rowIdxs]
 print(B)
+
+
+C = [[1, 2, 3], [4, 5, 6], [7, 8, 9, 10, 11]]
+
+maxL = max([len(c) for c in C])
+for l in C:
+    while len(l)<maxL:
+        l.append(0)
+
+print(C)
+
+D = np.arange(10)
+print(D)
+E = np.array([[2, 4, 6, 7]])
+print(D[E])
+print(np.delete(D, E, None))
