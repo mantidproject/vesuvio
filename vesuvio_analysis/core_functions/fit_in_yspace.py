@@ -904,7 +904,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
     else:
         # New way of calculating constraint function
-        totSig = describe(totCost)[1:]   # Remove 'x' to leave only parameters
+        totSig = describe(totCost)   # Remove 'x' to leave only parameters
         print(f"\ntotSig:\n{totSig}\n")
         sharedIdxs = [totSig.index(shPar) for shPar in sharedPars]
         print(f"\nsharedIdxs:\n{sharedIdxs}\n")

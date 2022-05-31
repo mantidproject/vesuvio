@@ -115,7 +115,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "GC_C4"     # When False, use Hermite expansion
+    fitModel = "GC_C4_C6"     # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
