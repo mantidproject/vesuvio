@@ -117,7 +117,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    fitModel = "GC_C4"
+    fitModel = "GC_C4"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFitFlag = True
     forceManualMinos = True
     nGlobalFitGroups = 4   
