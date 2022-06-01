@@ -257,17 +257,18 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     # Fit with Minuit
     costFun = cost.LeastSquares(dataXNZ, dataYNZ, dataENZ, convolvedModel)
     m = Minuit(costFun, **defaultPars)
+
     m.limits["A"] = (0, None)
 
     if yFitIC.fitModel=="SINGLE_GAUSSIAN":
         m.simplex()
         m.migrad()
 
-        def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError
+        def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError later
             return
     else:
         def constrFunc(*pars):
-            return model(dataX, *pars)   # GC > 0 before convolution, i.e. physical system
+            return model(dataX, *pars)   # model GC > 0 before convolution, i.e. physical system
         
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
@@ -315,16 +316,16 @@ def extractFirstSpectra(ws):
 
 def selectModelAndPars(modelFlag):
     """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
-    
+    #TODO: Clean function siganture
     if modelFlag == "SINGLE_GAUSSIAN":
         def model(x, y0, A, x0, sigma):
             return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
-        funcSig = ["x", "y0", "A", "x0", "sigma"]
+        funcSig = describe(model)
         defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
         sharedPars = ["sigma"]    # Used only in Global fit
 
-    elif (modelFlag=="GC_C4_C6") or (modelFlag=="GC_C6") or (modelFlag=="GC"):
+    elif (modelFlag=="GC_C4_C6"):
         def model(x, A, x0, sigma1, c4, c6):
             return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*np.pi*sigma1**2)) \
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
@@ -332,7 +333,7 @@ def selectModelAndPars(modelFlag):
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
         
-        funcSig = ["x", "A", "x0", "sigma1", "c4", "c6"]
+        funcSig = describe(model)
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0, "c6":0} 
         sharedPars = ["sigma1", "c4", "c6"]     # Used only in Global fit
 
@@ -342,14 +343,14 @@ def selectModelAndPars(modelFlag):
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12))
         
-        funcSig = ["x", "A", "x0", "sigma1", "c4"]
+        funcSig = describe(model)
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0} 
         sharedPars = ["sigma1", "c4"]     # Used only in Global fit   
        
     else:
         raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4', 'GC_C6', 'GC'")
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
-
+    assert funcSig[len(sharedPars):]==sharedPars, "Function signature needs to have shared parameters at the end: model(*unsharedPars, *sharedPars)"
     return model, funcSig, defaultPars, sharedPars
 
 
@@ -904,13 +905,9 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
     else:
         # New way of calculating constraint function
-        totSig = describe(totCost)   # Remove 'x' to leave only parameters
-        print(f"\ntotSig:\n{totSig}\n")
+        totSig = describe(totCost)   # This signature has 'x' already removed
         sharedIdxs = [totSig.index(shPar) for shPar in sharedPars]
-        print(f"\nsharedIdxs:\n{sharedIdxs}\n")
         nCostFunctions = len(totCost)
-        print(f"\nnCostFunctions:\n{nCostFunctions}\n")
-
 
         x = dataX[0]
         def constr(*pars):
@@ -924,21 +921,13 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
             sharedPars = [pars[i] for i in sharedIdxs]    # sigma1, c4, c6 in original GC
             unsharedPars = np.delete(pars, sharedIdxs, None)
-
             joinedGC = np.zeros(nCostFunctions * x.size)   # Number of individual cost functions
             
             unsharedParsSplit = np.split(unsharedPars, nCostFunctions)
 
-            # TODO: Need to make sure model has signature like the calling below
             for i, unshParsModel in enumerate(unsharedParsSplit):
-                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel, *sharedPars)
-            
-            
-            # for i, (A, x0) in enumerate(zip(pars[nShared::2], pars[nShared+1::2])):
-            #     joinedGC[i*x.size : (i+1)*x.size] = model(x, A, x0, *sharedPars)
-            
-            # assert np.all(joinedGC!=0), f"Args where zero: {np.argwhere(joinedGC==0)}"
-     
+                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel, *sharedPars)   # There is an assertion after model() for this format
+                 
             return joinedGC
 
         m.simplex()
