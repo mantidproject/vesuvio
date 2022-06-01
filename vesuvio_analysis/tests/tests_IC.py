@@ -114,7 +114,8 @@ class YSpaceFitInitialConditions:
     showPlots = False
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-    singleGaussFitToHProfile = True      # When False, use Hermite expansion
+    fitModel = "SINGLE_GAUSSIAN"      
+    # singleGaussFitToHProfile = True      # When False, use Hermite expansion
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4

@@ -28,9 +28,9 @@ bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
 
 
-yFitIC.fitModel = "SINGLE_GAUSSIAN"
-oriPath = testPath / "stored_yspace_fit.npz"
-
+yFitIC.symmetrisationFlag = False
+yFitIC.fitModel = "GC_C4_C6"
+oriPath = testPath / "stored_yspace_fit_GC.npz"
 
 scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 

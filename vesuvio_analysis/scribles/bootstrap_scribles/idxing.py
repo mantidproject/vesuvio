@@ -31,3 +31,5 @@ print(D)
 E = np.array([[2, 4, 6, 7]])
 print(D[E])
 print(np.delete(D, E, None))
+
+print(['other', 'sigma1', 'c4'][-2:]==['sigma1', 'c4'])

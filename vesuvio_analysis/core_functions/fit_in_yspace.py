@@ -242,14 +242,14 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     dataX, dataY, dataE = extractFirstSpectra(wsYSpaceSym)
     resX, resY, resE = extractFirstSpectra(wsRes)
 
-    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
 
     xDense, xDelta, resDense = chooseXDense(resX, resY)
     def convolvedModel(x, *pars):
         convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
         return np.interp(x, xDense, convDense)
 
-    convolvedModel.func_code = make_func_code(funcSig)    # TODO: Use describe(model) instead
+    convolvedModel.func_code = make_func_code(describe(model))    # TODO: Use describe(model) instead
 
     # Fit only valid values, ignore cut-offs 
     dataXNZ, dataYNZ, dataENZ = selectNonZeros(dataX, dataY, dataE)
@@ -316,12 +316,11 @@ def extractFirstSpectra(ws):
 
 def selectModelAndPars(modelFlag):
     """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
-    #TODO: Clean function siganture
+
     if modelFlag == "SINGLE_GAUSSIAN":
         def model(x, y0, A, x0, sigma):
             return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
-        funcSig = describe(model)
         defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
         sharedPars = ["sigma"]    # Used only in Global fit
 
@@ -333,7 +332,6 @@ def selectModelAndPars(modelFlag):
                     +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
                     -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
         
-        funcSig = describe(model)
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0, "c6":0} 
         sharedPars = ["sigma1", "c4", "c6"]     # Used only in Global fit
 
@@ -343,15 +341,30 @@ def selectModelAndPars(modelFlag):
                     *(1 + c4/32*(16*((x-x0)/np.sqrt(2)/sigma1)**4 \
                     -48*((x-x0)/np.sqrt(2)/sigma1)**2+12))
         
-        funcSig = describe(model)
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c4":0} 
         sharedPars = ["sigma1", "c4"]     # Used only in Global fit   
-       
+    
+    elif modelFlag=="GC_C6":
+        def model(x, A, x0, sigma1, c6):
+            return  A * np.exp(-(x-x0)**2/2/sigma1**2) / (np.sqrt(2*np.pi*sigma1**2)) \
+                    *(1 + +c6/384*(64*((x-x0)/np.sqrt(2)/sigma1)**6 \
+                    -480*((x-x0)/np.sqrt(2)/sigma1)**4 + 720*((x-x0)/np.sqrt(2)/sigma1)**2 - 120))
+        
+        
+        defaultPars = {"A":1, "x0":0, "sigma1":6, "c6":0} 
+        sharedPars = ["sigma1", "c6"]     # Used only in Global fit   
+           
+
     else:
-        raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4', 'GC_C6', 'GC'")
+        raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4'")
+    
+    print("\nShared Parameters: ", [key for key in sharedPars])
+    print("\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars])
+    
     assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
-    assert funcSig[len(sharedPars):]==sharedPars, "Function signature needs to have shared parameters at the end: model(*unsharedPars, *sharedPars)"
-    return model, funcSig, defaultPars, sharedPars
+    assert describe(model)[-len(sharedPars):]==sharedPars, "Function signature needs to have shared parameters at the end: model(*unsharedPars, *sharedPars)"
+    
+    return model, defaultPars, sharedPars
 
 
 def selectNonZeros(dataX, dataY, dataE):
@@ -710,13 +723,6 @@ class ResultsYFitObject:
         popt = np.array(poptList)
         perr = np.array(perrList)
 
-        # noPars = len(wsFitLM.column("Value"))
-        # popt = np.zeros((3, noPars))
-        # perr = np.zeros((3, noPars))
-        # for i, ws in enumerate([wsFitMinuit, wsFitLM, wsFitSimplex]):
-        #     popt[i] = ws.column("Value")
-        #     perr[i] = ws.column("Error")
-
         self.popt = popt
         self.perr = perr
 
@@ -876,10 +882,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     if yFitIC.symmetrisationFlag:  
         dataY, dataE = symmetrizeArr(dataY, dataE)
 
-    model, funcSig, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)   
-    
-    print("\nShared Parameters: ", [key for key in sharedPars])
-    print("\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars])
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)   
     
     totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
@@ -888,13 +891,11 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     assert len(describe(totCost)) == len(sharedPars) + len(dataY)*(len(defaultPars)-len(sharedPars)), f"Wrong parameters for Global Fit:\n{describe(totCost)}"
     
     print("\nRunning Global Fit ...\n")
-
-    initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
-
     # Minuit Fit with global cost function and local+global parameters
+    initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
     m = Minuit(totCost, **initPars)
 
-    for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier
+    for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier, all amplitudes A>0 
         m.limits["A"+str(i)] = (0, np.inf)    
 
     t0 = time.time()
@@ -904,39 +905,37 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
         m.migrad() 
 
     else:
-        # New way of calculating constraint function
         totSig = describe(totCost)   # This signature has 'x' already removed
         sharedIdxs = [totSig.index(shPar) for shPar in sharedPars]
-        nCostFunctions = len(totCost)
-
+        nCostFunctions = len(totCost)   # Number of individual cost functions
         x = dataX[0]
+
         def constr(*pars):
             """
             Constraint for positivity of Global Gram Carlier.
             Input: All parameters defined in global cost function.
-            Format *pars as argument, to work with Minuit.
-            x is the range for each individual cost fun, defined outside.
+            x is the range for each individual cost fun, defined outside function.
             Builds array with all constraints from individual functions.
             """
 
             sharedPars = [pars[i] for i in sharedIdxs]    # sigma1, c4, c6 in original GC
             unsharedPars = np.delete(pars, sharedIdxs, None)
-            joinedGC = np.zeros(nCostFunctions * x.size)   # Number of individual cost functions
-            
-            unsharedParsSplit = np.split(unsharedPars, nCostFunctions)
+            unsharedParsSplit = np.split(unsharedPars, nCostFunctions)   # Splits unshared parameters per individual cost fun
 
+            joinedGC = np.zeros(nCostFunctions * x.size)  
             for i, unshParsModel in enumerate(unsharedParsSplit):
-                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel, *sharedPars)   # There is an assertion after model() for this format
+                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel, *sharedPars)   # There is an assertion after def model() to check this format
                  
             return joinedGC
 
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constr, 0, np.inf))
     
-    # Explicitly calculate errors
-    m.hesse()
     t1 = time.time()
     print(f"\nTime of fitting: {t1-t0:.2f} seconds")
+    
+    # Explicitly calculate errors
+    m.hesse()
 
     chi2 = m.fval / (len(dataY)*len(dataY[0])-m.nfit)
     print(f"Value of Chi2/ndof: {chi2:.2f}")

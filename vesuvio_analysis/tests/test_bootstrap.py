@@ -24,6 +24,10 @@ class UserScriptControls:
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
 
+# Change yFItIC to default settings, running tests for yfit before hand changes this
+yFitIC.fitModel = "SINGLE_GAUSSIAN"
+yFitIC.symmetrisationFlag = True
+
 bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 #TODO: Figure out why doing the two tests simultaneously fails the testing

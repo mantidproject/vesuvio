@@ -18,6 +18,7 @@ class LoadVesuvioBackParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 0.9       # None or scaling factor 
+    scaleRaw = 1
 
 
 class LoadVesuvioFrontParameters:
@@ -29,7 +30,7 @@ class LoadVesuvioFrontParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 0.9       # None or scaling factor 
-
+    scaleRaw = 1
 
 
 class GeneralInitialConditions:
@@ -122,7 +123,7 @@ class YSpaceFitInitialConditions:
     showPlots = False
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = False     # When False, use Hermite expansion
+    fitModel = "SINGLE_GAUSSIAN"
     globalFitFlag = False
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"

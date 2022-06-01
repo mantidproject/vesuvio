@@ -3,8 +3,7 @@ import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
 from scipy import stats
-from vesuvio_analysis.core_functions.analysis_functions import filterWidthsAndIntensities, calculateMeansAndStds, filterWidthsAndIntensities
-from vesuvio_analysis.core_functions.analysis_functions import loadInstrParsFileIntoArray
+from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
 from vesuvio_analysis.core_functions.bootstrap import setOutputDirs
 from vesuvio_analysis.core_functions.fit_in_yspace import selectModelAndPars
 
@@ -28,22 +27,22 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
             continue    # If main results are not present, assume ysapce results are also missing
 
         bootParsRaw, parentParsRaw, nSamples = readBootData(IC.bootSavePath)
-        checkBootSamplesVSParent(bootParsRaw, parentParsRaw)    # Prints comparison
+        checkBootSamplesVSParent(bootParsRaw, parentParsRaw, IC)    # Prints comparison
 
         bootPars = bootParsRaw.copy()      # By default do not filter means, copy to avoid accidental changes
         if analysisIC.filterAvg:
-            bootPars = filteredBootMeans(bootParsRaw.copy())
+            bootPars = filteredBootMeans(bootParsRaw.copy(), IC)
         
         # Plots histograms of all spectra for a given width or intensity
-        plotRawWidthsAndIntensities(analysisIC, bootPars, parentParsRaw)
+        plotRawWidthsAndIntensities(analysisIC, IC, bootPars, parentParsRaw)
         
         # Calculate bootstrap histograms for mean widths and intensities 
         meanWidths, meanIntensities = calculateMeanWidthsIntensities(bootPars, IC, nSamples)
 
         # If filer is on, check that it matches original procedure
-        checkMeansProcedure(analysisIC, meanWidths, meanIntensities, bootParsRaw)
+        checkMeansProcedure(analysisIC, IC, meanWidths, meanIntensities, bootParsRaw)
 
-        plotMeanWidthsAndIntensities(analysisIC, meanWidths, meanIntensities, parentParsRaw)
+        plotMeanWidthsAndIntensities(analysisIC, IC, meanWidths, meanIntensities, parentParsRaw)
         plotMeansEvolution(analysisIC, meanWidths, meanIntensities)
         plot2DHistsWidthsAndIntensities(analysisIC, meanWidths, meanIntensities)
 
@@ -76,7 +75,7 @@ def readBootData(dataPath):
         return bootParsRaw, parentParsRaw, nSamples
 
 
-def checkBootSamplesVSParent(bestPars, parentPars):
+def checkBootSamplesVSParent(bestPars, parentPars, IC):
     """
     For an unbiased estimator, the mean of the bootstrap samples will converge to 
     the mean of the experimental sample (here called parent).
@@ -88,12 +87,12 @@ def checkBootSamplesVSParent(bestPars, parentPars):
     meanBootWidths = np.mean(bootWidths, axis=0)
     meanBootIntensities = np.mean(bootIntensities, axis=0)
 
-    avgWidths, stdWidths, avgInt, stdInt = calculateMeansAndStds(meanBootWidths.T, meanBootIntensities.T)
+    avgWidths, stdWidths, avgInt, stdInt = calculateMeansAndStds(meanBootWidths.T, meanBootIntensities.T, IC)
 
     parentWidths = parentPars[:, 1::3]
     parentIntensities = parentPars[:, 0::3]
 
-    avgWidthsP, stdWidthsP, avgIntP, stdIntP = calculateMeansAndStds(parentWidths.T, parentIntensities.T)
+    avgWidthsP, stdWidthsP, avgIntP, stdIntP = calculateMeansAndStds(parentWidths.T, parentIntensities.T, IC)
   
     print("\nComparing Bootstrap means with parent means:\n")
     printResults(avgWidths, stdWidths, "Boot Widths")
@@ -108,7 +107,7 @@ def printResults(arrM, arrE, mode):
         print(f"{mode} {i}: {m:>6.3f} \u00B1 {e:<6.3f}")
 
 
-def filteredBootMeans(bestPars):
+def filteredBootMeans(bestPars, IC):  # Pass IC just to check flag for preliminary procedure
     """Use same filtering function used on original procedure"""
 
     # Extract Widths and Intensities from bootstrap samples
@@ -117,7 +116,7 @@ def filteredBootMeans(bestPars):
 
     # Perform the filter
     for i, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
-        filteredWidths, filteredIntensities = filterWidthsAndIntensities(widths.T, intensities.T)
+        filteredWidths, filteredIntensities = filterWidthsAndIntensities(widths.T, intensities.T, IC)
         
         bootWidths[i] = filteredWidths.T
         bootIntensities[i] = filteredIntensities.T
@@ -129,16 +128,16 @@ def filteredBootMeans(bestPars):
     return filteredBestPars
 
 
-def plotRawWidthsAndIntensities(IC, bootPars, parentPars):
+def plotRawWidthsAndIntensities(analysisIC, IC, bootPars, parentPars):
     """
     Plots histograms of each width and intensity seperatly.
     Plots histogram of means over spectra for each width or intensity.
     """
 
-    if not(IC.plotRawWidthsIntensities):
+    if not(analysisIC.plotRawWidthsIntensities):
         return
 
-    parentWidths, parentIntensities = extractParentMeans(parentPars)
+    parentWidths, parentIntensities = extractParentMeans(parentPars, IC)
     noOfMasses = len(parentWidths)
 
     fig, axs = plt.subplots(2, noOfMasses)
@@ -155,16 +154,16 @@ def plotRawWidthsAndIntensities(IC, bootPars, parentPars):
     return
 
 
-def extractParentMeans(parentPars):
+def extractParentMeans(parentPars, IC):
     """Uses original treatment of widths and intensities to calculate parent means."""
     # Modify so that the filtering doesn't happen by default
-    meanWp, meanIp = calcMeansWithOriginalProc(parentPars[np.newaxis, :, :])
+    meanWp, meanIp = calcMeansWithOriginalProc(parentPars[np.newaxis, :, :], IC)
     meanWp = meanWp.flatten()
     meanIp = meanIp.flatten()
     return meanWp, meanIp
 
 
-def calcMeansWithOriginalProc(bestPars):
+def calcMeansWithOriginalProc(bestPars, IC):
     """Performs the means and std on each bootstrap sample according to original procedure"""
     
     bootWidths = bestPars[:, :, 1::3]
@@ -177,7 +176,7 @@ def calcMeansWithOriginalProc(bestPars):
 
     for j, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
 
-        meanW, stdW, meanI, stdI = calculateMeansAndStds(widths.T, intensities.T)
+        meanW, stdW, meanI, stdI = calculateMeansAndStds(widths.T, intensities.T, IC)
 
         bootMeanW[:, j] = meanW       # Interested only in the means 
         bootMeanI[:, j] = meanI
@@ -205,28 +204,28 @@ def calculateMeanWidthsIntensities(bootPars, IC, nSamples):
     return meanWidths, meanIntensities
 
 
-def checkMeansProcedure(IC, meanWidths, meanIntensities, bootParsRaw):
+def checkMeansProcedure(analysisIC, IC, meanWidths, meanIntensities, bootParsRaw):
     """Checks that filtering and averaging of Bootstrap samples follows the original procedure"""
     
-    if not(IC.filterAvg):     # When filtering not present, no comparison available
+    if not(analysisIC.filterAvg):     # When filtering not present, no comparison available
         return
     
     else:         # Check that treatment of data matches original
-        meanWOri, meanIOri = calcMeansWithOriginalProc(bootParsRaw)
+        meanWOri, meanIOri = calcMeansWithOriginalProc(bootParsRaw, IC)
         np.testing.assert_array_almost_equal(meanWOri, meanWidths)
         np.testing.assert_array_almost_equal(meanIOri, meanIntensities)
         return
        
 
-def plotMeanWidthsAndIntensities(IC, meanWidths, meanIntensities, parentParsRaw):
+def plotMeanWidthsAndIntensities(analysisIC, IC, meanWidths, meanIntensities, parentParsRaw):
     """
     Most informative histograms, shows all mean widhts and intensities of Bootstrap samples
     """
 
-    if not(IC.plotMeanWidthsIntensities):
+    if not(analysisIC.plotMeanWidthsIntensities):
         return
 
-    parentWidths, parentIntensities = extractParentMeans(parentParsRaw)
+    parentWidths, parentIntensities = extractParentMeans(parentParsRaw, IC)
 
 
     print("\n\n Test passed! Mean Widths match!")

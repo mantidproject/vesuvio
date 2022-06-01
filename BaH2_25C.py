@@ -18,7 +18,7 @@ class LoadVesuvioBackParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 0.9       # None or scaling factor 
-
+    scaleRaw = 1
 
 class LoadVesuvioFrontParameters:
     runs = '38389-38413'         # 100K        # The numbers of the runs to be analysed
@@ -29,7 +29,7 @@ class LoadVesuvioFrontParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 0.9       # None or scaling factor 
-
+    scaleRaw = 1
 
 
 class GeneralInitialConditions:
@@ -122,7 +122,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    singleGaussFitToHProfile = True     # When False, use Hermite expansion
+    fitModel = "SINGLE_GAUSSIAN"
     globalFitFlag = True
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
