@@ -65,7 +65,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -76,7 +76,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
     # # Parameters of workspaces in input_ws
-    tof_binning='275.,1.,420'                    # Binning of ToF spectra
+    tof_binning='50,1.,420'                    # Binning of ToF spectra
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -114,10 +114,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = False
-    symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "GC_C4_C6"
+    showPlots = True
+    symmetrisationFlag = True
+    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
+    fitModel = "GC_C4"
     globalFitFlag = True
     forceManualMinos = True
     nGlobalFitGroups = 4   
@@ -133,10 +133,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = None   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = "BACKWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
@@ -145,7 +145,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True
+    runAnalysis = False
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True                 # True discards some unreasonable values of widths and intensities

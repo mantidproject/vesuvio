@@ -44,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = None #10   # Set to None when either unknown or H not present
+    HToMass0Ratio = 10   # Set to None when either unknown or H not present
     HToMassIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
@@ -138,7 +138,7 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
