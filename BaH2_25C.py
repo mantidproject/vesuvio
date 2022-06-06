@@ -44,8 +44,9 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 40 #1.4  # Set to None when either unknown or H not present
-
+    HToMass0Ratio = 1.16   # Set to None when either unknown or H not present
+    HToMassIdx = 2
+    
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
 
@@ -66,7 +67,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 4     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -104,7 +105,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] -656/16.653*par[3] },{'type': 'eq', 'fun': lambda par:  par[0] -656/4.232*par[6] })
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 4   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -121,7 +122,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"    # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFitFlag = True
     forceManualMinos = False
@@ -137,14 +138,14 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
-    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = "JOINT"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapAnalysis:
