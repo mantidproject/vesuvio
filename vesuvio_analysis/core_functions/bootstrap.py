@@ -88,11 +88,13 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
         AnalysisDataService.clear()
 
         sampleInputWS, parentWS = createSampleWS(bootIC.runningJackknife, parentWSNCPSavePaths, i)   # Creates ith sample
-
         formSampleIC(inputIC, bootIC, sampleInputWS, parentWS)  
 
-        iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
-
+        try:
+            iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
+        except:
+            continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
+        
         storeBootIter(bootResults, i, iterResults)
         saveBootstrapResults(bootResults, inputIC)      
     return bootResults
@@ -318,7 +320,7 @@ class BootScattResults:
 
     def __init__(self, parentResults, nSamples, corr):
         self.parentResult = parentResults.all_spec_best_par_chi_nit[-1]
-        self.bootSamples = np.zeros((nSamples, *self.parentResult.shape))
+        self.bootSamples = np.full((nSamples, *self.parentResult.shape), np.nan)
         self.corrResiduals = corr
 
     def storeBootIterResults(self, j, bootResult):
@@ -334,7 +336,7 @@ class BootYFitResults:
     def __init__(self, parentResults, nSamples):
         self.parentPopt = parentResults.popt
         self.parentPerr = parentResults.perr
-        self.bootSamples = np.zeros((nSamples, *self.parentPopt.shape))
+        self.bootSamples = np.full((nSamples, *self.parentPopt.shape), np.nan)
 
     def storeBootIterResults(self, j, bootResult):
         self.bootSamples[j] = bootResult.popt

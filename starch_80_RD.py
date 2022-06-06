@@ -118,7 +118,7 @@ class YSpaceFitInitialConditions:
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFit = "MANTID"                 # Options: None, 'Mantid', 'MINUIT' 
     forceManualMinos = False
-    nGlobalFitGroups = 4       # Number or string "ALL"
+    nGlobalFitGroups = 4               # Number or string "ALL"
 
 
 class BootstrapInitialConditions:
