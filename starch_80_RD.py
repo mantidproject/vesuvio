@@ -113,10 +113,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = False
+    symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
-    globalFitFlag = True
+    globalFit = "MANTID"                 # Options: None, 'Mantid', 'MINUIT' 
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
 
@@ -142,7 +142,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True   
+    runAnalysis = False   
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False                 # True discards some unreasonable values of widths and intensities

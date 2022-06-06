@@ -34,11 +34,9 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name())
     yfitResults.save()
 
-    if yFitIC.globalFitFlag:
-        # fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", ic.fitModel, wsSubMass.name())
-        fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
-    
+    runGlobalFit(wsYSpace, wsRes, wsQ, IC, yFitIC, wsSubMass) 
     return yfitResults
+
 
 
 def extractNCPFromWorkspaces(wsFinal, ic):
@@ -742,15 +740,26 @@ class ResultsYFitObject:
                  perr=self.perr)
 
 
-# Functions for Global Fit Mantid
+def runGlobalFit(wsYSpace, wsRes, wsQ, IC, yFitIC, wsSubMass):
+    if yFitIC.globalFit ==  None:
+        return
 
-def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, gaussFitFlag, wsFirstMassName):
+    elif yFitIC.globalFit == "MINUIT":
+        fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
+    
+    elif yFitIC.globalFit == "MANTID":
+        fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", yFitIC, wsSubMass)
+    else:
+        raise ValueError("GlobalFit not recognized. Options: None, 'MANTID', 'MINUIT'")
+
+
+def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, yFitIC, wsFirstMass):
     """Uses original Mantid procedure to perform global fit on groups with 8 detectors"""
     
     replaceNansWithZeros(wsJoY)
     wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
     wsQInv = createOneOverQWs(wsQ)
-    avgWidths = mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, gaussFitFlag, wsFirstMassName)
+    avgWidths = mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirstMass)
 
 
 def replaceNansWithZeros(ws):
@@ -782,10 +791,10 @@ def createOneOverQWs(wsQ):
     return wsInvQ
 
 
-def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, fitModelFlag, wsFirstMassName):
+def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirstMass):
     """Original Implementation of Global Fit using Mantid"""
 
-    if fitModelFlag=="SIMPLE_GAUSSIAN":
+    if yFitIC.fitModel=="SINGLE_GAUSSIAN":
         convolution_template = """
         (composite=Convolution,$domains=({0});
         name=Resolution,Workspace={1},WorkspaceIndex={0};
@@ -801,7 +810,7 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, fitModelFlag, w
                 Sigma=6.0);ties=()
                 )
             )"""
-    else:
+    elif yFitIC.fitModel=="GC_C4_C6":
         convolution_template = """
         (composite=Convolution,$domains=({0});
         name=Resolution,Workspace={1},WorkspaceIndex={0};
@@ -817,7 +826,9 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, fitModelFlag, w
                 *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
                 Sigma=6.0);ties=()
                 )
-            )"""    
+            )""" 
+    else:
+        raise ValueError(f"{yFitIC.fitModel} not supported for Global Mantid fit. Supported options: 'SINGLE_GAUSSIAN', 'GC_C4_C6'")
 
     print('\nGlobal fit in the West domain over 8 mixed banks\n')
     widths = []  
@@ -843,9 +854,13 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, fitModelFlag, w
             convolvedFunctionsList.append(thisIterationFunction)
 
             if counter > 0:
-                ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
-                #ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
-                #ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
+
+                if yFitIC.fitModel == "SINGLE_GAUSSIAN":
+                    ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
+                else:
+                    ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
+                    ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
+                    ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
 
                 # Attach datasets
                 datasets[f"InputWorkspace_{counter}"] = wsGlobal.name()
@@ -856,20 +871,19 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, fitModelFlag, w
         minimizer_string = f"{minimizer}, AbsError=0.00001, RealError=0.00001, MaxIterations=2000"
 
         # Unpack dictionary as arguments
-        Fit(multifit_func, Minimizer=minimizer_string, Output=wsFirstMassName+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
+        Fit(multifit_func, Minimizer=minimizer_string, Output=wsFirstMass.name()+f'_Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
         
         # Select ws with fit results
-        ws=mtd[wsFirstMassName+f'Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
+        ws=mtd[wsFirstMass.name()+f'_Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
         print(f"Bank: {str(bank)} -- sigma={ws.cell(2,1)} +/- {ws.cell(2,2)}")
         widths.append(ws.cell(2,1))
 
-        # DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
-        # DeleteWorkspace(name+'joy_mixed_banks_bank_'+str(bank)+'_fit_Workspaces') 
+        DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
+        DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_Workspaces') 
+
     print('\nAverage hydrogen standard deviation: ',np.mean(widths),' +/- ', np.std(widths))
     return widths
 
-
-# ------ Global Fit Minuit Procedure
 
 def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
@@ -900,7 +914,6 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
     t0 = time.time()
     if yFitIC.fitModel=="SINGLE_GAUSSIAN":
-
         m.simplex()
         m.migrad() 
 

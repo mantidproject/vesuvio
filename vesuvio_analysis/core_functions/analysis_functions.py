@@ -64,14 +64,10 @@ def maskColumnWithZeros(maskedWSName, wsToBeMaskedName):
 
     zeroCol = np.all(dataE==0, axis=0)
     assert np.all(zeroCol == np.all(dataY==0, axis=0)), "Jackknife column needs to be masked in dataY and dataE"
-    # zeroIdx = np.argwhere(zeroCol)
 
     for i in range(wsToBeMasked.getNumberHistograms()):
         wsToBeMasked.dataY(i)[zeroCol] = 0
         wsToBeMasked.dataE(i)[zeroCol] = 0
-    
-    # Check if this was successful
-
 
 
 def createTableInitialParameters(ic):
@@ -204,21 +200,6 @@ def histToPointData(dataY, dataX, dataE):
     # dataYp, dataXp, dataEp = filterNanColumns(dataYp, dataXp, dataEp)
 
     return dataYp, dataXp, dataEp
-
-
-# def filterNanColumns(dataY, dataX, dataE):
-#     zeroCol = np.all(dataY == 0, axis=0)   # When whole column is zero, take it out of point data
-
-#     dataYf = dataY[:, ~zeroCol]
-#     dataXf = dataX[:, ~zeroCol]
-#     dataEf = dataE[:, ~zeroCol]
-#     return dataYf, dataXf, dataEf
-
-# def jackSampleFromPointData(dataY, dataX, dataE, j):
-#     jackDataY = np.delete(dataY, j, axis=1)
-#     jackDataX = np.delete(dataX, j, axis=1)
-#     jackDataE = np.delete(dataE, j, axis=1)
-#     return jackDataY, jackDataX, jackDataE
 
 
 def prepareFitArgs(ic, dataX):
@@ -387,16 +368,9 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     # Use ws dataX to match with histogram data
     dataX = ws.extractX()[:, :-1]
 
-    # if ic.runningJackknife:
-    #     dataX = np.delete(dataX, ic.jackIter, axis=1)
-
     assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
 
     # Total ncp workspace
-
-    # # Add zeros column
-    # ncpTotalf = addZeroCol(ncpTotal, ws)
-    # assert ncpTotalf.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
     ncpTotalf = ncpTotal
 
     ncpTotWs = CreateWorkspace(
@@ -409,7 +383,6 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     # Individual ncp workspaces
     for i, ncp_m in enumerate(ncpForEachMass):
 
-        # ncp_mf = addZeroCol(ncp_m, ws)
         ncp_mf = ncp_m
 
         ncpMWs = CreateWorkspace(
@@ -419,13 +392,6 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
             OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
         SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
 
-
-# def addZeroCol(ncp, ws):
-#     ncpf = ws.extractY()[:, :-1]
-#     zeroCol = np.all(ncpf==0, axis=0)
-#     ncpf[:, ~zeroCol] = ncp
-#     return ncpf
-  
 
 def switchFirstTwoAxis(A):
     """Exchanges the first two indices of an array A,
