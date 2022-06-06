@@ -26,7 +26,8 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
             print(f"{IC.bootSavePath.name}")
             continue    # If main results are not present, assume ysapce results are also missing
 
-        bootParsRaw, parentParsRaw, nSamples = readBootData(IC.bootSavePath)
+        bootParsRaw, parentParsRaw, nSamples, corrResiduals = readBootData(IC.bootSavePath)
+        checkResiduals(corrResiduals)
         checkBootSamplesVSParent(bootParsRaw, parentParsRaw, IC)    # Prints comparison
 
         bootPars = bootParsRaw.copy()      # By default do not filter means, copy to avoid accidental changes
@@ -68,11 +69,27 @@ def readBootData(dataPath):
         bootParsRaw = bootData["boot_samples"][:, :, 1:-2]
         parentParsRaw = bootData["parent_result"][:, 1:-2]
         nSamples = len(bootParsRaw)
+        try:
+            corrResiduals = bootData["corr_residuals"]
+        except KeyError:
+            corrResiduals = None
+            print("\nCorrelation of coefficients not found!\n")
+
 
         print(f"\nData files found:\n{dataPath.name}")
         print(f"\nNumber of samples in the file: {nSamples}")
         assert ~np.all(bootParsRaw[-1] == parentParsRaw), "Error in Jackknife due to last column."
-        return bootParsRaw, parentParsRaw, nSamples
+        return bootParsRaw, parentParsRaw, nSamples, corrResiduals
+
+
+def checkResiduals(corrRes):
+    if corrRes == None:
+        return
+    
+    corrCoef = corrRes[:, 0]
+    nCorrelated = np.sum(corrCoef>0.5)
+    print(f"\nNumber of spectra with pearson r > 0.5: {nCorrelated}")
+    return
 
 
 def checkBootSamplesVSParent(bestPars, parentPars, IC):

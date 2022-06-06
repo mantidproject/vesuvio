@@ -73,11 +73,12 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
     # askUserConfirmation(inputIC, bootIC)
  
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC)
+    corrCoefs = autoCorrResiduals(parentWSnNCPs)
 
     nSamples = chooseNSamples(bootIC, parentWSnNCPs)
 
     # setOutputDirs(inputIC, bootIC)
-    bootResults = initializeResults(parentResults, nSamples)
+    bootResults = initializeResults(parentResults, nSamples, corrCoefs)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
     iStart, iEnd = chooseLoopRange(bootIC, nSamples)
@@ -155,7 +156,6 @@ def runOriginalBeforeBootstrap(bootIC, inputIC: list, yFitIC):
     setICsToDefault(inputIC, yFitIC)
     parentResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
     parentWSnNCPs = selectParentWorkspaces(inputIC, bootIC.skipMSIterations)
-    checkResiduals(parentWSnNCPs)
 
     return parentResults, parentWSnNCPs
 
@@ -239,26 +239,24 @@ def selectParentWorkspaces(inputIC: list, fastBoot: bool):
 
 
 #TODO: Revise this check
-def checkResiduals(parentWSnNCP: list):
+def autoCorrResiduals(parentWSnNCP: list):
     """
     Calculates the self-correlation of residuals for each spectrum.
     When correlation is detected, plots the spectrum.
     """
+    corrCoefs = []
     for (parentWS, parentNCP) in parentWSnNCP:
         dataY = parentWS.extractY()[:, :-1]
         totNcp = parentNCP.extractY()[:, :]     
         residuals = dataY - totNcp 
 
         lag = 1     # For lag-plot of self-correlation
-        print(f"Correlation Coefficients for lag={lag}:\n")
-        for rowRes in residuals:
-            corrCoef = stats.pearsonr(rowRes[:-lag], rowRes[lag:])  
-            print(corrCoef[0])
-            if np.abs(corrCoef[0]) >= 0.5:
-                plt.scatter(rowRes[:-lag], rowRes[lag:], label=f"r={corrCoef}")
-                plt.legend()
-                plt.show()
-
+        corr = np.zeros((len(residuals), 2))
+        for i, rowRes in enumerate(residuals):
+            corr[i] = stats.pearsonr(rowRes[:-lag], rowRes[lag:])  
+        corrCoefs.append(corr)
+    return corrCoefs
+    
 
 def setOutputDirs(inputIC: list, bootIC):
     """Form bootstrap output data paths"""
@@ -300,34 +298,35 @@ def setOutputDirs(inputIC: list, bootIC):
         IC.bootYFitSavePath = speedPath / bootNameYFit
 
 
-def initializeResults(parentResults: list, nSamples):
+def initializeResults(parentResults: list, nSamples, corrCoefs):
     """
     Initializes a list with objects to store output data.
     [BootBackResults, BootFrontResults, BootYSpaceResults]
     """
     bootResultObjs = []
-    for pResults in parentResults:
-        try:
-            resultsObj = BootScattResults(pResults, nSamples)
-        except AttributeError:
-            resultsObj = BootYFitResults(pResults, nSamples)
-
-        bootResultObjs.append(resultsObj)
+    # Initialize results for scattering, no of iteratons = len(corrCoefs) 
+    for pResults, corr in zip(parentResults, corrCoefs):
+        bootResultObjs.append(BootScattResults(pResults, nSamples, corr))
+    
+    # Initialize result for y-space fit
+    if len(parentResults) == len(corrCoefs) + 1:
+        bootResultObjs.append(BootYFitResults(parentResults[-1], nSamples))
     return bootResultObjs
 
 
 class BootScattResults:
 
-    def __init__(self, parentResults, nSamples):
+    def __init__(self, parentResults, nSamples, corr):
         self.parentResult = parentResults.all_spec_best_par_chi_nit[-1]
         self.bootSamples = np.zeros((nSamples, *self.parentResult.shape))
+        self.corrResiduals = corr
 
     def storeBootIterResults(self, j, bootResult):
         self.bootSamples[j] = bootResult.all_spec_best_par_chi_nit[-1]
     
     def saveResults(self, IC):
         np.savez(IC.bootSavePath, boot_samples=self.bootSamples,
-             parent_result=self.parentResult)
+             parent_result=self.parentResult, corr_residuals=self.corrResiduals)
 
 
 class BootYFitResults:
