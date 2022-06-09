@@ -712,7 +712,7 @@ def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
     print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
             sampleProperties, "\n")
     
-    if ic.runningSampleWS and ic.runningJackknife:
+    if ic.runningSampleWS and ic.runningJackknife:    # MS correction does not work when one column is zero, the best we can do is use parent WS
         return createMulScatWorkspaces(ic, ic.parentWS.name(), sampleProperties)
     else:
         return createMulScatWorkspaces(ic, ic.name, sampleProperties)

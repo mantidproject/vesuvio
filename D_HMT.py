@@ -65,7 +65,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -116,9 +116,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
-    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    fitModel = "GC_C4"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
-    globalFitFlag = True
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
+    globalFit = "MINUIT"
     forceManualMinos = True
     nGlobalFitGroups = 4   
 

@@ -97,7 +97,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -113,10 +113,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = True
+    symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
-    globalFit = None                 # Options: None, 'Mantid', 'MINUIT' 
+    globalFit = "MINUIT"                 # Options: None, 'Mantid', 'MINUIT' 
     forceManualMinos = False
     nGlobalFitGroups = 4               # Number or string "ALL"
 
@@ -130,10 +130,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
@@ -142,7 +142,7 @@ class UserScriptControls:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True   
+    runAnalysis = False   
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True                 # True discards some unreasonable values of widths and intensities
