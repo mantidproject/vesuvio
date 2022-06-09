@@ -1,4 +1,5 @@
 
+from email.policy import default
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
@@ -53,15 +54,25 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
             print(f"{IC.bootYFitSavePath.name}")
             continue
 
+        fitIdx = 0   # 0 for Minuit, 1 for LM
+
         bootYFitData = np.load(IC.bootYFitSavePath)
         try:
             bootYFitVals = bootYFitData["boot_samples"]   
         except KeyError:
             bootYFitVals = bootYFitData["boot_vals"]      # To account for some previous samples
-        minuitFitVals = bootYFitVals[:, 0, :-1].T   # Discard last value chi2
+        minuitFitVals = bootYFitVals[:, fitIdx, :-1].T   # Select Minuit values and Discard last value chi2
+        
+        try:
+            parentPopt = bootYFitData["parent_popt"][fitIdx]
+            parentPerr = bootYFitData["parent_perr"][fitIdx]
+            printYFitParentPars(yFitIC, parentPopt, parentPerr)  # TODO: Test this function
+        except KeyError:
+            pass
 
+        plotMeansEvolutionYFit(analysisIC, minuitFitVals)
         plotYFitHists(analysisIC, yFitIC, minuitFitVals)
-
+        plot2DHistsYFit(analysisIC, minuitFitVals)
 
 def readBootData(dataPath):
         bootData = np.load(dataPath)
@@ -72,7 +83,7 @@ def readBootData(dataPath):
         try:
             corrResiduals = bootData["corr_residuals"]
         except KeyError:
-            corrResiduals = None
+            corrResiduals = np.array([np.nan]) 
             print("\nCorrelation of coefficients not found!\n")
 
 
@@ -83,7 +94,7 @@ def readBootData(dataPath):
 
 
 def checkResiduals(corrRes):
-    if corrRes == None:
+    if np.all(np.isnan(corrRes)):
         return
     
     corrCoef = corrRes[:, 0]
@@ -265,13 +276,27 @@ def plotMeansEvolution(IC, meanWidths, meanIntensities):
     
     if not(IC.plotMeansEvolution):
         return
-    
+
     fig, axs = plt.subplots(2, 1)
     axs[0].set_title("Evolution of mean Widths")
     plotMeansOverNoSamples(axs[0], meanWidths)
 
     axs[1].set_title("Evolution of mean Intensities")
     plotMeansOverNoSamples(axs[1], meanIntensities)
+
+    plt.show()
+    return
+
+
+    
+def plotMeansEvolutionYFit(analysisIC, minuitFitVals):
+
+    if not(analysisIC.plotMeansEvolution):
+        return
+    
+    fig, ax = plt.subplots()
+    ax.set_title("Evolution of y-space fit parameters")
+    plotMeansOverNoSamples(ax, minuitFitVals)
 
     plt.show()
     return
@@ -329,7 +354,7 @@ def plot2DHists(bootSamples, mode):
     """bootSamples has histogram rows for each parameter"""
 
     plotSize = len(bootSamples)
-    fig, axs = plt.subplots(plotSize, plotSize, figsize=(8, 8))
+    fig, axs = plt.subplots(plotSize, plotSize, figsize=(6, 10), tight_layout=True)
 
     for i in range(plotSize):
         for j in range(plotSize):
@@ -368,6 +393,16 @@ def plot2DHists(bootSamples, mode):
     plt.show()
 
 
+def printYFitParentPars(yFitIC, parentPopt, parentPerr):
+
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
+
+    print("\nParent parameters of y-sapce fit:\n")
+    for p, m, e in zip(defaultPars, parentPopt, parentPerr):
+        print(f"{p:5s}:  {m:8.3f} +/- {e:8.3f}")
+
+
+
 def plotYFitHists(analysisIC, yFitIC, yFitHists):
     """Histogram for each parameter of model used for fit in y-space."""
 
@@ -375,16 +410,30 @@ def plotYFitHists(analysisIC, yFitIC, yFitHists):
         return
 
     # Plot each parameter in an individual histogram
-    fig, axs = plt.subplots(len(yFitHists), 1, figsize=(8, 10))
+    fig, axs = plt.subplots(2, int(np.ceil(len(yFitHists)/2)), figsize=(12, 7), tight_layout=True)
 
     # To label each histogram, extract signature of function used for the fit
-    model, fitModelSignature, defaultPars, sharedPars = selectModelAndPars(yFitIC.singleGaussFitToHProfile)
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
 
-    for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, fitModelSignature[1:])):
+    for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, defaultPars)):
         ax.set_title(f"Fit Parameter: {par}")
         plotHists(ax, hist[np.newaxis, :], disableAvg=True)
     
+    # Hide plots not in use:
+    for ax in axs.flat:
+        if not ax.lines:   # If empty list
+            ax.set_visible(False)
+
     plt.show()
+    return
+
+
+def plot2DHistsYFit(analysisIC, minuitFitVals):
+
+    if not(analysisIC.plot2DHists):
+        return
+    
+    plot2DHists(minuitFitVals, "Y-space Fit parameters")
     return
 
 
@@ -398,15 +447,15 @@ def plotHists(ax, samples, disableCI=False, disableLeg=False, disableAvg=False):
             continue
         
         mean = np.nanmean(bootHist)
-        bounds = np.percentile(bootHist, [5, 95])
+        bounds = np.percentile(bootHist, [16, 68+16])   # 1 std: 68%, 2 std: 95%
         errors = bounds - mean
         leg = f"Row {i}: {mean:>6.3f} +{errors[1]:.3f} {errors[0]:.3f}"
 
-        ax.hist(bootHist, histtype="step", label=leg)
+        ax.hist(bootHist, histtype="step", label=leg, linewidth=1)
         ax.axvline(mean, 0.9, 0.97, color="k", ls="--", alpha=0.4)
         
         if not(disableCI):
-            ax.axvspan(bounds[0], bounds[1], alpha=0.1, color="r")
+            ax.axvspan(bounds[0], bounds[1], alpha=0.1, color="b")
     
     if not(disableAvg):
         # Plot average over histograms
