@@ -19,7 +19,7 @@ class LoadVesuvioBackParameters:
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1       # None or scaling factor 
-
+    scaleRaw = 1
 
 
 class LoadVesuvioFrontParameters:
@@ -31,7 +31,7 @@ class LoadVesuvioFrontParameters:
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1       # None or scaling factor 
-
+    scaleRaw = 1
 
 
 class GeneralInitialConditions:

@@ -29,7 +29,7 @@ from pathlib import Path
 
 # ------------ sort out paths
 currentPath = Path(__file__).absolute().parent 
-ipFilesPath = currentPath / ".." / "vesuvio_analysis" / "ip_files"
+ipFilesPath = currentPath / ".." / ".." / "vesuvio_analysis" / "ip_files"
 inputWSPath = currentPath / "input_ws"
 
 start_time = time.time()

@@ -30,7 +30,7 @@ start_time = time.time()
 
 # ------------ sort out paths
 currentPath = Path(__file__).absolute().parent 
-ipFilesPath = currentPath / ".." / "vesuvio_analysis" / "ip_files"
+ipFilesPath = currentPath / ".."/ ".." / "vesuvio_analysis" / "ip_files"
 inputWSPath = currentPath / "input_ws"
 
 
