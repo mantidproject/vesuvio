@@ -42,9 +42,8 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = None   # Set to zero or None when H is not present
+    HToMass0Ratio = None   # Set to None when H is not present or not known
     HToMassIdx = 0
 
     # Masses, instrument parameters and initial fitting parameters

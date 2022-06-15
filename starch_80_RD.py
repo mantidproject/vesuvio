@@ -44,7 +44,7 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 19.0620008206  # Set to None when either unknown or H not present
+    HToMass0Ratio = 19.0620008206   # Ratio of H to peak of chosen mass 
     HToMassIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
@@ -63,7 +63,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 2     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -97,7 +97,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 2   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -112,7 +112,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = True
+    showPlots = False
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
@@ -130,10 +130,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "JOINT"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
