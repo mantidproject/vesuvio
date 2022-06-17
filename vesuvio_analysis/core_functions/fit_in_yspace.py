@@ -245,7 +245,6 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     xDelta, resDense = oddPointsRes(resX, resY)
     def convolvedModel(x, *pars):
         return signal.convolve(model(x, *pars), resDense, mode="same") * xDelta
-        # return np.interp(x, xDense, convDense)
 
     convolvedModel.func_code = make_func_code(describe(model))    # TODO: Use describe(model) instead
 
@@ -1010,9 +1009,7 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     xDelta, resDense = oddPointsRes(x, res)
     def convolvedModel(xrange, *pars):
         """Performs convolution first on high density grid and interpolates to desired x range"""
-        # convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
         return signal.convolve(model(xrange, *pars), resDense, mode="same") * xDelta
-        # return np.interp(xrange, xDense, convDense)
 
     costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
     convolvedModel.func_code = make_func_code(costSig)
