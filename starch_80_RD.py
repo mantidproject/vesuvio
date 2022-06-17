@@ -84,16 +84,16 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
-        1, 4.7, 0, 
-        1, 12.71, 0.,    
-        1, 8.76, 0.,   
-        1, 13.897, 0.    
+        0.902, 4.7, 0, 
+        0.047, 14.594, 0.,    
+        0.020, 8.841, 0.,   
+        0.031, 13.896, 0.    
     ])
     bounds = np.array([
         [0, np.nan], [3, 6], [-3, 1],
-        [0, np.nan], [12.71, 12.71], [-3, 1],
-        [0, np.nan], [8.76, 8.76], [-3, 1],
-        [0, np.nan], [13.897, 13.897], [-3, 1]
+        [0, np.nan], [14.594, 14.594], [-3, 1],
+        [0, np.nan], [8.841, 8.841], [-3, 1],
+        [0, np.nan], [13.896, 13.896], [-3, 1]
     ])
     constraints = ()
 

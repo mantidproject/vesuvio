@@ -16,7 +16,7 @@ wsRes = Load(str(resPath), OutputWorkspace="wsRes")
 
 res = wsRes.dataY(0)
 x = wsRes.dataX(0)
-y = gauss(x, 0, 1, 0, 5)
+y = gauss(x, 0.1, 1, 0, 8)
 
 assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
 if x.size % 2 == 0:

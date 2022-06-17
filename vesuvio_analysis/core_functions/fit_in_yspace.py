@@ -242,10 +242,10 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
 
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
 
-    xDense, xDelta, resDense = chooseXDense(resX, resY)
+    xDelta, resDense = oddPointsRes(resX, resY)
     def convolvedModel(x, *pars):
-        convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
-        return np.interp(x, xDense, convDense)
+        return signal.convolve(model(x, *pars), resDense, mode="same") * xDelta
+        # return np.interp(x, xDense, convDense)
 
     convolvedModel.func_code = make_func_code(describe(model))    # TODO: Use describe(model) instead
 
@@ -459,30 +459,25 @@ def createFitParametersTableWorkspace(wsYSpaceSym, parameters, values, errors, m
     return
 
 
-def chooseXDense(x, res, flag=True):
+def oddPointsRes(x, res):
     """
-    Make either odd grid or high density symmetric grid for convolution.
-    The default mode makes a odd grid and ensures a resolution with a single peak at the center.
-    The deault mode is significantly faster than using the dense grid.
-    Default odd grid also makes resolution more symetric, which is also desirable.
+    Make a odd grid that ensures a resolution with a single peak at the center.
     """
 
     assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
     assert x.size == res.size, "x and res need to be the same size!"
 
-    if flag:  
-        if res.size % 2 == 0:
-            dens = res.size+1  # If even change to odd
-        else:
-            dens = res.size    # If odd, keep being odd)
+    if res.size % 2 == 0:
+        dens = res.size+1  # If even change to odd
     else:
-        dens = 1000
+        dens = res.size    # If odd, keep being odd
 
-    xDense = np.linspace(np.min(x), np.max(x), dens)
+    xDense = np.linspace(np.min(x), np.max(x), dens)    # Make gridd with odd number of points - peak at center
     xDelta = xDense[1] - xDense[0]
+
     resDense = np.interp(xDense, x, res)
 
-    return xDense, xDelta, resDense
+    return xDelta, resDense
 
 
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
@@ -1012,11 +1007,12 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
 def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
    
-    xDense, xDelta, resDense = chooseXDense(x, res)
+    xDelta, resDense = oddPointsRes(x, res)
     def convolvedModel(xrange, *pars):
         """Performs convolution first on high density grid and interpolates to desired x range"""
-        convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
-        return np.interp(xrange, xDense, convDense)
+        # convDense = signal.convolve(model(xDense, *pars), resDense, mode="same") * xDelta
+        return signal.convolve(model(xrange, *pars), resDense, mode="same") * xDelta
+        # return np.interp(xrange, xDense, convDense)
 
     costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
     convolvedModel.func_code = make_func_code(costSig)
