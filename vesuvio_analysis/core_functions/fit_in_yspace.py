@@ -1,3 +1,4 @@
+from inspect import signature
 from multiprocessing.sharedctypes import Value
 import matplotlib.pyplot as plt
 import numpy as np
@@ -243,10 +244,14 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
 
     xDelta, resDense = oddPointsRes(resX, resY)
-    def convolvedModel(x, *pars):
-        return signal.convolve(model(x, *pars), resDense, mode="same") * xDelta
+    def convolvedModel(x, y0, *pars):
+        return y0 + signal.convolve(model(x, *pars), resDense, mode="same") * xDelta
 
-    convolvedModel.func_code = make_func_code(describe(model))    # TODO: Use describe(model) instead
+    signature = describe(model)[:]      # Build signature of convolved function
+    signature[1:1] = ["y0"]     # Add intercept as first fitting parameter after range 'x'
+
+    convolvedModel.func_code = make_func_code(signature)    
+    defaultPars["y0"] = 0    # Add initialization of parameter to dictionary
 
     # Fit only valid values, ignore cut-offs 
     dataXNZ, dataYNZ, dataENZ = selectNonZeros(dataX, dataY, dataE)
@@ -264,14 +269,16 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
         def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError later
             return
     else:
-        def constrFunc(*pars):
-            return model(dataX, *pars)   # model GC > 0 before convolution, i.e. physical system
+        def constrFunc(*pars):   # Constrain physical model before convolution
+            return pars[0] + model(dataXNZ, *pars[1:])   # First parameter is intercept, not part of model()
         
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
 
     # Explicit calculation of Hessian after the fit
     m.hesse()
+
+    #TODO: Fix dataX to dataXNZ in the calls below
 
     # Weighted Chi2
     chi2 = m.fval / (len(dataX)-m.nfit)
@@ -315,8 +322,8 @@ def selectModelAndPars(modelFlag):
     """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
 
     if modelFlag == "SINGLE_GAUSSIAN":
-        def model(x, y0, A, x0, sigma):
-            return y0 + A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
+        def model(x, A, x0, sigma):
+            return  A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
         defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
         sharedPars = ["sigma"]    # Used only in Global fit
@@ -896,11 +903,14 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
         totCost += calcCostFun(model, i, x, y, yerr, res, sharedPars)
     
+    defaultPars["y0"] = 0    # Introduce default parameter for convolved model
+
     assert len(describe(totCost)) == len(sharedPars) + len(dataY)*(len(defaultPars)-len(sharedPars)), f"Wrong parameters for Global Fit:\n{describe(totCost)}"
-    
-    print("\nRunning Global Fit ...\n")
+   
     # Minuit Fit with global cost function and local+global parameters
     initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
+
+    print("\nRunning Global Fit ...\n")
     m = Minuit(totCost, **initPars)
 
     for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier, all amplitudes A>0 
@@ -930,8 +940,8 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
             unsharedParsSplit = np.split(unsharedPars, nCostFunctions)   # Splits unshared parameters per individual cost fun
 
             joinedGC = np.zeros(nCostFunctions * x.size)  
-            for i, unshParsModel in enumerate(unsharedParsSplit):
-                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel, *sharedPars)   # There is an assertion after def model() to check this format
+            for i, unshParsModel in enumerate(unsharedParsSplit):    # Attention to format of unshared and shared parameters when calling model
+                joinedGC[i*x.size : (i+1)*x.size] = unshParsModel[0] + model(x, *unshParsModel[1:], *sharedPars)   # Intercept is first of unshared parameters 
                  
             return joinedGC
 
@@ -1007,11 +1017,14 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     "Returns cost function for one spectrum i to be summed to total cost function"
    
     xDelta, resDense = oddPointsRes(x, res)
-    def convolvedModel(xrange, *pars):
+    def convolvedModel(xrange, y0, *pars):
         """Performs convolution first on high density grid and interpolates to desired x range"""
-        return signal.convolve(model(xrange, *pars), resDense, mode="same") * xDelta
+        return y0 + signal.convolve(model(xrange, *pars), resDense, mode="same") * xDelta
 
-    costSig = [key if key in sharedPars else key+str(i) for key in describe(model)]
+    signature = describe(model)[:]
+    signature[1:1] = ["y0"]
+
+    costSig = [key if key in sharedPars else key+str(i) for key in signature]
     convolvedModel.func_code = make_func_code(costSig)
 
     # Select only valid data, i.e. when error is not 0 or nan or inf
