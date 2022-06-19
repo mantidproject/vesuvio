@@ -270,7 +270,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
             return
     else:
         def constrFunc(*pars):   # Constrain physical model before convolution
-            return pars[0] + model(dataXNZ, *pars[1:])   # First parameter is intercept, not part of model()
+            return model(dataXNZ, *pars[1:])   # First parameter is intercept, not part of model()
         
         m.simplex()
         m.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
@@ -941,7 +941,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
 
             joinedGC = np.zeros(nCostFunctions * x.size)  
             for i, unshParsModel in enumerate(unsharedParsSplit):    # Attention to format of unshared and shared parameters when calling model
-                joinedGC[i*x.size : (i+1)*x.size] = unshParsModel[0] + model(x, *unshParsModel[1:], *sharedPars)   # Intercept is first of unshared parameters 
+                joinedGC[i*x.size : (i+1)*x.size] = model(x, *unshParsModel[1:], *sharedPars)   # Intercept is first of unshared parameters 
                  
             return joinedGC
 
