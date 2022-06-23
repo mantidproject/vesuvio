@@ -281,14 +281,13 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     #TODO: Fix dataX to dataXNZ in the calls below
 
     # Weighted Chi2
-    chi2 = m.fval / (len(dataX)-m.nfit)
+    chi2 = m.fval / (len(dataXNZ)-m.nfit)
 
     # Propagate error to yfit
     # Takes in the best fit parameters and their covariance matrix
     # Outputs the best fit curve with std in the diagonal
     dataYFit, dataYCov = util.propagate(lambda pars: convolvedModel(dataX, *pars), m.values, m.covariance)
     dataYSigma = np.sqrt(np.diag(dataYCov))
-
     # Weight the confidence band
     dataYSigma *= chi2
     Residuals = dataY - dataYFit

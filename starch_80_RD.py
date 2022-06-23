@@ -97,7 +97,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 1   #4
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -114,7 +114,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 class YSpaceFitInitialConditions:
     showPlots = False
     symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFit = "MINUIT"                 # Options: None, 'Mantid', 'MINUIT' 
     forceManualMinos = False
@@ -122,18 +122,19 @@ class YSpaceFitInitialConditions:
 
 
 class BootstrapInitialConditions:
-    runningJackknife = False
+    runningJackknife = True
     nSamples = 650
     skipMSIterations = False
     userConfirmation = True
+    runningTest = True
 
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "JOINT"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace

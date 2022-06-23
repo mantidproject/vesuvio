@@ -14,13 +14,6 @@ currentPath = Path(__file__).parent.absolute()
 
 # TODO: Warn user to only use one of these procedures isolated and not one after the other
 
-# def runIndependentBootstrap(singleIC, bootIC, yFitIC):
-
-#     askUserConfirmation([singleIC], bootIC)
-#     AnalysisDataService.clear()
-
-#     return bootstrapProcedure(bootIC, [singleIC], yFitIC)
-
 
 def runBootstrap(inputIC, bootIC, yFitIC):
 
@@ -91,8 +84,8 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
         formSampleIC(inputIC, bootIC, sampleInputWS, parentWS)  
 
         try:
-            iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))
-        except:
+            iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))   # Conversion to YSpace with masked column
+        except RuntimeError:    # TODO: Think about the errors to except
             continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
         
         storeBootIter(bootResults, i, iterResults)
