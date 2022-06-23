@@ -266,7 +266,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
         m.simplex()
         m.migrad()
 
-        def constrFunc():  # Initialize constr func to pass as arg, will raise TypeError later
+        def constrFunc()->None:  # No constraint function for gaussian profile
             return
     else:
         def constrFunc(*pars):   # Constrain physical model before convolution
@@ -278,18 +278,14 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     # Explicit calculation of Hessian after the fit
     m.hesse()
 
-    #TODO: Fix dataX to dataXNZ in the calls below
-
     # Weighted Chi2
     chi2 = m.fval / (len(dataXNZ)-m.nfit)
 
-    # Propagate error to yfit
-    # Takes in the best fit parameters and their covariance matrix
-    # Outputs the best fit curve with std in the diagonal
+    # Best fit and confidence band
+    # Calculated for the whole range of dataX, including where zero
     dataYFit, dataYCov = util.propagate(lambda pars: convolvedModel(dataX, *pars), m.values, m.covariance)
     dataYSigma = np.sqrt(np.diag(dataYCov))
-    # Weight the confidence band
-    dataYSigma *= chi2
+    dataYSigma *= chi2        # Weight the confidence band
     Residuals = dataY - dataYFit
 
     # Create workspace to store best fit curve and errors on the fit
@@ -411,16 +407,7 @@ def runMinos(mObj, yFitIC, constrFunc):
         bestFitVals[p] = v
         bestFitErrs[p] = e
 
-    try:  # Compute errors from MINOS, fails if constraint forces result away from minimum
-        if yFitIC.forceManualMinos:
-            try:
-                constrFunc(*mObj.values)      # Check if constraint is present
-                raise(RuntimeError)           # If so, jump to Manual MINOS
-
-            except TypeError:      # Constraint not present, default to auto MINOS
-                print("\nConstraint not present, using default Automatic MINOS ...\n")
-                pass
-        
+    if (yFitIC.fitModel=="SINGLE_GAUSSIAN"):   # Case with no positivity constraint, can use automatic minos()
         mObj.minos()
         me = mObj.merrors
 
@@ -433,7 +420,7 @@ def runMinos(mObj, yFitIC, constrFunc):
         if yFitIC.showPlots:
             plotAutoMinos(mObj)
 
-    except RuntimeError:
+    else:   # Case with positivity constraint on function, use manual implementation
         merrors = runAndPlotManualMinos(mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
         
         # Same as above, but the other way around
@@ -953,7 +940,7 @@ def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
     # Explicitly calculate errors
     m.hesse()
 
-    chi2 = m.fval / (len(dataY)*len(dataY[0])-m.nfit)
+    chi2 = m.fval / (np.sum(dataE!=0)-m.nfit)   # Number of non zero points (considered in the fit) minus no of parameters
     print(f"Value of Chi2/ndof: {chi2:.2f}")
     print(f"Migrad Minimum valid: {m.valid}")
 
