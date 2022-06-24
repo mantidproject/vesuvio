@@ -757,23 +757,6 @@ class ResultsYFitObject:
                  perr=self.perr)
 
 
-# def runGlobalFit(wsYSpace, wsRes, wsQ, IC, yFitIC, wsSubMass):
-#     if yFitIC.globalFit:
-#         fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
-
-    # if yFitIC.globalFit ==  None:
-    #     return
-
-    # elif yFitIC.globalFit == "MINUIT":
-    #     fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
-    
-    # elif yFitIC.globalFit == "MANTID":
-    #     fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", yFitIC, wsSubMass)
-    # else:
-    #     raise ValueError("GlobalFit not recognized. Options: None, 'MANTID', 'MINUIT'")
-
-
-
 def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)   
@@ -977,15 +960,14 @@ def groupDetectors(ipData, yFitIC):
 
     print(f"\nNumber of gropus: {yFitIC.nGlobalFitGroups}")
 
-    L1 = ipData[:, -1]    
-    theta = ipData[:, 2]  
+    L1 = ipData[:, -1].copy()
+    theta = ipData[:, 2].copy()  
 
     # Normalize  ranges to similar values
     L1 /= np.sum(L1)       
     theta /= np.sum(theta)
 
     L1 *= 2           # Bigger weight to L1
-
 
     points = np.vstack((L1, theta)).T
     assert points.shape == (len(L1), 2), "Wrong shape."
@@ -1000,8 +982,10 @@ def groupDetectors(ipData, yFitIC):
     idxList = formIdxList(clusters, n, len(L1))
 
     if yFitIC.showPlots:
-        plotFinalGroups(points, clusters, n)
-
+        fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})  
+        fig.canvas.set_window_title("Grouping of detectors")
+        plotFinalGroups(ax, ipData, idxList)
+        fig.show()
     return idxList
 
 
@@ -1031,18 +1015,20 @@ def plotDetsAndInitialCenters(L1, theta, centers):
     fig.show()
 
 
-def plotFinalGroups(points, clusters, nGroups):
-    fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})  
-    fig.canvas.set_window_title("Calculated groups of detectors")
-    for i in range(nGroups):
-        clus = points[clusters==i]
-        ax.scatter(clus[:, 0], clus[:, 1], label=f"group {i}")
-    ax.axes.xaxis.set_ticks([])  # Numbers plotted do not correspond to real numbers, so hide them
-    ax.axes.yaxis.set_ticks([]) 
+def plotFinalGroups(ax, ipData, idxList):
+    for i, idxs in enumerate(idxList):
+        L1 = ipData[idxs, -1]
+        theta = ipData[idxs, 2]
+        ax.scatter(L1, theta, label=f"Group {i}")
+
+        dets = ipData[idxs, 0]
+        for det, x, y in zip(dets, L1, theta):
+            ax.text(x, y, str(int(det)), fontsize=8)
+
     ax.set_xlabel("L1")
     ax.set_ylabel("Theta")
     ax.legend()
-    fig.show()
+    return
 
 
 def kMeansClustering(points, centers):
