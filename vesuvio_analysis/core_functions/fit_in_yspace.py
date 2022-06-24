@@ -35,7 +35,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name())
     yfitResults.save()
 
-    runGlobalFit(wsYSpace, wsRes, wsQ, IC, yFitIC, wsSubMass) 
+    runGlobalFit(wsYSpace, wsRes, IC, yFitIC) 
     return yfitResults
 
 
@@ -421,13 +421,17 @@ def runMinos(mObj, yFitIC, constrFunc):
             plotAutoMinos(mObj)
 
     else:   # Case with positivity constraint on function, use manual implementation
-        merrors = runAndPlotManualMinos(mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
+        merrors, fig = runAndPlotManualMinos(mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
         
         # Same as above, but the other way around
         minosManErr = []
         for p in parameters:
             minosManErr.append(merrors[p])
         minosAutoErr = list(np.zeros(np.array(minosManErr).shape))
+
+        if yFitIC.showPlots:
+            fig.canvas.set_window_title("Manual Implementation MINOS")
+            fig.show()
 
     return    parameters, values, errors, minosAutoErr, minosManErr
 
@@ -503,39 +507,42 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
 
 
 def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showPlots):
+    """
+    Runs brute implementation of minos algorithm and
+    plots the profile for each parameter along the way.
+    """
+    # Reason for two distinct operations inside the same function is that its easier
+    # to build the minos plots for each parameter as they are being calculated.
+
     # Set format of subplots
     height = 2
     width = int(np.ceil(len(minuitObj.parameters)/2))
     figsize = (12, 7)
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
-    fig.canvas.set_window_title("Plot of Manual Implementation MINOS")
+    # fig.canvas.set_window_title("Plot of Manual Implementation MINOS")
 
     merrors = {}
     for p, ax in zip(minuitObj.parameters, axs.flat):
         lerr, uerr = runMinosForPar(minuitObj, constrFunc, p, 2, ax, bestFitVals, bestFitErrs, showPlots)
         merrors[p] = np.array([lerr, uerr])
 
-    if showPlots:
-        # Hide plots not in use:
-        for ax in axs.flat:
-            if not ax.lines:   # If empty list
-                ax.set_visible(False)
+    # if showPlots:
+    # Hide plots not in use:
+    for ax in axs.flat:
+        if not ax.lines:   # If empty list
+            ax.set_visible(False)
 
-        # ALl axes share same legend, so set figure legend to first axis
-        handle, label = axs[0, 0].get_legend_handles_labels()
-        fig.legend(handle, label, loc='lower right')
-        fig.show()
-    return merrors
+    # ALl axes share same legend, so set figure legend to first axis
+    handle, label = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handle, label, loc='lower right')
+        # fig.show()
+    return merrors, fig
 
 
 def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, bestFitErrs, showPlots):
 
-    # Set parameters to previously found minimum to restart procedure
-    for p in bestFitVals:
-        minuitObj.values[p] = bestFitVals[p]
-        minuitObj.errors[p] = bestFitErrs[p]
-
+    resetMinuit(minuitObj, bestFitVals, bestFitErrs)
     # Run Fitting procedures again to be on the safe side and reset to minimum
     minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
     minuitObj.hesse()
@@ -546,45 +553,73 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
     # Store fval of best fit
     fValsMin = minuitObj.fval      # Used to calculate error bands at the end
 
-    # Create variable space more dense near the minima
-    limit = (bound*varErr)**(1/2)
+    varSpace = buildVarRange(bound, varVal, varErr) 
+    
+    # Split variable space into right and left side
+    lhsVarSpace, rhsVarSpace = np.split(varSpace, 2)
+    lhsVarSpace = np.flip(lhsVarSpace)   # Flip to start at minimum
+
+    for minimizer in ("Scipy", "Migrad"):
+        resetMinuit(minuitObj, bestFitVals, bestFitErrs)
+        rhsMinos = runMinosOnRange(minuitObj, var, rhsVarSpace, minimizer, constrFunc)
+        
+        resetMinuit(minuitObj, bestFitVals, bestFitErrs)
+        lhsMinos = runMinosOnRange(minuitObj, var, lhsVarSpace, minimizer, constrFunc)
+
+        wholeMinos = np.concatenate((np.flip(lhsMinos), rhsMinos), axis=None)   # Flip left hand side again
+
+        if minimizer == "Scipy":   # Calculate minos errors from constrained scipy
+            lerr, uerr = errsFromMinosCurve(varSpace, varVal, wholeMinos, fValsMin, dChi2=1)
+            ax.plot(varSpace, wholeMinos, label="fVals Constr Scipy")
+
+        elif minimizer == "Migrad":   # Plot migrad as well to see the difference between constrained and unconstrained
+            plotProfile(ax, var, varSpace, wholeMinos, lerr, uerr, fValsMin, varVal, varErr)
+        else:
+            raise ValueError("Minimizer not recognized.")
+
+    resetMinuit(minuitObj, bestFitVals, bestFitErrs)
+    return lerr, uerr
+
+
+def resetMinuit(minuitObj, bestFitVals, bestFitErrs):
+    # Set Minuit parameters to best fit values and errors
+    for p in bestFitVals:
+        minuitObj.values[p] = bestFitVals[p]
+        minuitObj.errors[p] = bestFitErrs[p]
+    return
+
+
+def buildVarRange(bound, varVal, varErr):
+    # Create variable space more dense near the minima using a quadratic density
+    limit = (bound*varErr)**(1/2)     # Square root is corrected below
     varSpace = np.linspace(-limit, limit, 30)
     varSpace = varSpace**2 * np.sign(varSpace) + varVal
-  
-    fValsScipy = np.zeros(varSpace.shape)
-    fValsMigrad = np.zeros(varSpace.shape)
+    assert len(varSpace)%2 == 0, "Number of points in Minos range needs to be even"
+    return varSpace
 
-    # Run Minos algorithm
-    minuitObj.fixed[var] = True        # Variable is fixed at each iteration
 
-    # Split variable space in two parts to start loop from minimum
-    lhsRange, rhsRange = np.split(np.arange(varSpace.size), 2)
-    betterRange = [rhsRange, np.flip(lhsRange)]  # First do rhs, then lhs, starting from minima
-    for side in betterRange:
-        # Reset values and errors to minima
-        for p in bestFitVals:
-            minuitObj.values[p] = bestFitVals[p]
-            minuitObj.errors[p] = bestFitErrs[p]
+def runMinosOnRange(minuitObj, var, varRange, minimizer, constrFunc):
 
-        # Unconstrained fit
-        for i in side.astype(int):
-            minuitObj.values[var] = varSpace[i]      # Fix variable
+    result = np.zeros(varRange.size)
+    minuitObj.fixed[var] = True
+
+    # Unconstrained fit over side range
+    for i, value in enumerate(varRange):
+
+        minuitObj.values[var] = value      # Fix variable
+
+        if minimizer == "Migrad":
             minuitObj.migrad()                       # Fit 
-            fValsMigrad[i] = minuitObj.fval          # Store minimum
-
-        # Reset values and errors to minima
-        for p in bestFitVals:
-            minuitObj.values[p] = bestFitVals[p]
-            minuitObj.errors[p] = bestFitErrs[p]
-
-        # Constrained fit       
-        for i in side.astype(int):
-            minuitObj.values[var] = varSpace[i]      # Fix variable
+        elif minimizer == "Scipy":
             minuitObj.scipy(constraints=optimize.NonlinearConstraint(constrFunc, 0, np.inf))
-            fValsScipy[i] = minuitObj.fval
-        
-    minuitObj.fixed[var] = False    # Release variable       
 
+        result[i] = minuitObj.fval          # Store minimum
+
+    minuitObj.fixed[var] = False 
+    return result                    
+
+
+def errsFromMinosCurve(varSpace, varVal, fValsScipy, fValsMin, dChi2=1):
     # Use intenpolation to create dense array of fmin values 
     varSpaceDense = np.linspace(np.min(varSpace), np.max(varSpace), 100000)
     fValsScipyDense = np.interp(varSpaceDense, varSpace, fValsScipy)
@@ -595,11 +630,7 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
         lerr, uerr = 0., 0.   
     else:
         lerr, uerr = varSpaceDense[idxErr].flatten() - varVal
-
-    if showPlots:
-        ax.plot(varSpaceDense, fValsScipyDense, label="fVals Constr Scipy")
-        plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr)
-  
+ 
     return lerr, uerr
 
 
@@ -611,10 +642,9 @@ def plotAutoMinos(minuitObj):
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})
     fig.canvas.set_window_title("Plot of Automatic Minuit MINOS")
-
+ 
     for p, ax in zip(minuitObj.parameters, axs.flat):
         loc, fvals, status = minuitObj.mnprofile(p, bound=2)
-        
 
         minfval = minuitObj.fval
         minp = minuitObj.values[p]
@@ -727,154 +757,26 @@ class ResultsYFitObject:
                  perr=self.perr)
 
 
-def runGlobalFit(wsYSpace, wsRes, wsQ, IC, yFitIC, wsSubMass):
-    if yFitIC.globalFit ==  None:
-        return
+# def runGlobalFit(wsYSpace, wsRes, wsQ, IC, yFitIC, wsSubMass):
+#     if yFitIC.globalFit:
+#         fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
 
-    elif yFitIC.globalFit == "MINUIT":
-        fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
+    # if yFitIC.globalFit ==  None:
+    #     return
+
+    # elif yFitIC.globalFit == "MINUIT":
+    #     fitMinuitGlobalFit(wsYSpace, wsRes, IC, yFitIC)
     
-    elif yFitIC.globalFit == "MANTID":
-        fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", yFitIC, wsSubMass)
-    else:
-        raise ValueError("GlobalFit not recognized. Options: None, 'MANTID', 'MINUIT'")
+    # elif yFitIC.globalFit == "MANTID":
+    #     fitGlobalMantidFit(wsYSpace, wsQ, wsRes, "Simplex", yFitIC, wsSubMass)
+    # else:
+    #     raise ValueError("GlobalFit not recognized. Options: None, 'MANTID', 'MINUIT'")
 
 
-def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, yFitIC, wsFirstMass):
-    """Uses original Mantid procedure to perform global fit on groups with 8 detectors"""
-    
-    replaceNansWithZeros(wsJoY)
-    wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
-    wsQInv = createOneOverQWs(wsQ)
-    avgWidths = mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirstMass)
 
+def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
 
-def replaceNansWithZeros(ws):
-    for j in range(ws.getNumberHistograms()):
-        ws.dataY(j)[np.isnan(ws.dataY(j)[:])] = 0
-        ws.dataE(j)[np.isnan(ws.dataE(j)[:])] = 0
-
-
-def artificialErrorsInUnphysicalBins(wsJoY):
-    wsGlobal = CloneWorkspace(InputWorkspace=wsJoY, OutputWorkspace=wsJoY.name()+'_Global')
-    for j in range(wsGlobal.getNumberHistograms()):
-        wsGlobal.dataE(j)[wsGlobal.dataE(j)[:]==0] = 0.1
-    
-    assert np.any(np.isnan(wsGlobal.extractE())) == False, "Nan present in input workspace need to be replaced by zeros."
-
-    return wsGlobal
-
-
-def createOneOverQWs(wsQ):
-    wsInvQ = CloneWorkspace(InputWorkspace=wsQ, OutputWorkspace=wsQ.name()+"_Inverse")
-    for j in range(wsInvQ.getNumberHistograms()):
-        nonZeroFlag = wsInvQ.dataY(j)[:] != 0
-        wsInvQ.dataY(j)[nonZeroFlag] = 1 / wsInvQ.dataY(j)[nonZeroFlag]
-
-        ZeroIdxs = np.argwhere(wsInvQ.dataY(j)[:]==0)   # Indxs of zero elements
-        if ZeroIdxs.size != 0:     # When zeros are present
-            wsInvQ.dataY(j)[ZeroIdxs[0] - 1] = 0       # Put a zero before the first zero
-    
-    return wsInvQ
-
-
-def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirstMass):
-    """Original Implementation of Global Fit using Mantid"""
-
-    if yFitIC.fitModel=="SINGLE_GAUSSIAN":
-        convolution_template = """
-        (composite=Convolution,$domains=({0});
-        name=Resolution,Workspace={1},WorkspaceIndex={0};
-            (
-            name=UserFunction,Formula=
-            A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5,
-            A=1.,x0=0.,Sigma=6.0,  ties=();
-                (
-                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
-                name=UserFunction,Formula=
-                Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
-                *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
-                Sigma=6.0);ties=()
-                )
-            )"""
-    elif yFitIC.fitModel=="GC_C4_C6":
-        convolution_template = """
-        (composite=Convolution,$domains=({0});
-        name=Resolution,Workspace={1},WorkspaceIndex={0};
-            (
-            name=UserFunction,Formula=
-            A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
-            *(1+c4/32*(16*((x-x0)/sqrt(2.)/Sigma)^4-48*((x-x0)/sqrt(2.)/Sigma)^2+12)),
-            A=1.,x0=0.,Sigma=6.0, c4=0, ties=();
-                (
-                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
-                name=UserFunction,Formula=
-                Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
-                *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
-                Sigma=6.0);ties=()
-                )
-            )""" 
-    else:
-        raise ValueError(f"{yFitIC.fitModel} not supported for Global Mantid fit. Supported options: 'SINGLE_GAUSSIAN', 'GC_C4_C6'")
-
-    print('\nGlobal fit in the West domain over 8 mixed banks\n')
-    widths = []  
-    for bank in range(8):
-        dets=[bank, bank+8, bank+16, bank+24]
-
-        convolvedFunctionsList = []
-        ties = ["f0.f1.f1.f1.Sigma=f0.f1.f0.Sigma"]
-        datasets = {'InputWorkspace' : wsGlobal.name(),
-                    'WorkspaceIndex' : dets[0]}
-
-        print("Detectors: ", dets)
-
-        counter = 0
-        for i in dets:
-
-            print(f"Considering spectrum {wsGlobal.getSpectrumNumbers()[i]}")
-            if wsGlobal.spectrumInfo().isMasked(i):
-                print(f"Skipping masked spectrum {wsGlobal.getSpectrumNumbers()[i]}")
-                continue
-
-            thisIterationFunction = convolution_template.format(counter, wsRes.name(), wsQInv.name())
-            convolvedFunctionsList.append(thisIterationFunction)
-
-            if counter > 0:
-
-                if yFitIC.fitModel == "SINGLE_GAUSSIAN":
-                    ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
-                else:
-                    ties.append('f{0}.f1.f0.Sigma= f{0}.f1.f1.f1.Sigma=f0.f1.f0.Sigma'.format(counter))
-                    ties.append('f{0}.f1.f0.c4=f0.f1.f0.c4'.format(counter))
-                    ties.append('f{0}.f1.f1.f1.c3=f0.f1.f1.f1.c3'.format(counter))
-
-                # Attach datasets
-                datasets[f"InputWorkspace_{counter}"] = wsGlobal.name()
-                datasets[f"WorkspaceIndex_{counter}"] = i
-            counter += 1
-
-        multifit_func = f"composite=MultiDomainFunction; {';'.join(convolvedFunctionsList)}; ties=({','.join(ties)})"
-        minimizer_string = f"{minimizer}, AbsError=0.00001, RealError=0.00001, MaxIterations=2000"
-
-        # Unpack dictionary as arguments
-        Fit(multifit_func, Minimizer=minimizer_string, Output=wsFirstMass.name()+f'_Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
-        
-        # Select ws with fit results
-        ws=mtd[wsFirstMass.name()+f'_Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
-        print(f"Bank: {str(bank)} -- sigma={ws.cell(2,1)} +/- {ws.cell(2,2)}")
-        widths.append(ws.cell(2,1))
-
-        DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
-        DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_Workspaces') 
-
-    print('\nAverage hydrogen standard deviation: ',np.mean(widths),' +/- ', np.std(widths))
-    return widths
-
-
-def fitMinuitGlobalFit(ws, wsRes, ic, yFitIC):
-
-    dataX, dataY, dataE, dataRes, instrPars = extractData(ws, wsRes, ic)   
+    dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)   
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
     idxList = groupDetectors(instrPars, yFitIC)

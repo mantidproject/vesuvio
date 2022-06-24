@@ -116,7 +116,7 @@ class YSpaceFitInitialConditions:
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
-    globalFit = "MINUIT"                 # Options: None, 'Mantid', 'MINUIT' 
+    globalFit = True    #"MINUIT"                 # Options: None, 'Mantid', 'MINUIT' 
     nGlobalFitGroups = 4               # Number or string "ALL"
 
 
