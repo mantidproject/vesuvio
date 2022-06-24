@@ -18,7 +18,7 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 oriResultsPatth = currentPath / "original_results"
 currResultsPatth = currentPath / "output_npz_for_testing"
 
-testForward = False
+testForward = True 
 if testForward:
     pathToOriginal = oriResultsPatth / "4iter_forward_GB_MS.npz" 
     pathToOptimized = currResultsPatth / "spec_144-182_iter_4_MS_GC.npz" 
