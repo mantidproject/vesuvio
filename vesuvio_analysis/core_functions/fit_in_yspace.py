@@ -39,7 +39,6 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     return yfitResults
 
 
-
 def extractNCPFromWorkspaces(wsFinal, ic):
     """Extra function to extract ncps from loaded ws in mantid."""
 
@@ -828,7 +827,6 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     chi2 = m.fval / (np.sum(dataE!=0)-m.nfit)   # Number of non zero points (considered in the fit) minus no of parameters
     print(f"Value of Chi2/ndof: {chi2:.2f}")
     print(f"Migrad Minimum valid: {m.valid}")
-
 
     print("\nResults of Global Fit:\n")
     for p, v, e in zip(m.parameters, m.values, m.errors):

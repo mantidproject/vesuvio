@@ -11,34 +11,33 @@ ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
 class LoadVesuvioBackParameters:
-    runs='36517-36556'              # The numbers of the runs to be analysed
-    empty_runs='34038-34045'                # The numbers of the empty runs to be subtracted
-    spectra='3-134'                            # Spectra to be analysed
+    runs='36517-36556'           
+    empty_runs='34038-34045'           
+    spectra='3-134'                    
     mode = 'DoubleDifference'
     ipfile=ipFilesPath / "ip2018_3.par" 
 
-    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       # None or scaling factor
+    subEmptyFromRaw = True      
+    scaleEmpty = 1    
     scaleRaw = 1  
 
 class LoadVesuvioFrontParameters:
-    runs='36517-36556'                       # The numbers of the runs to be analysed
-    empty_runs='34038-34045'                 # The numbers of the empty runs to be subtracted
-    spectra='135-182'                        # Spectra to be analysed
+    runs='36517-36556'                   
+    empty_runs='34038-34045'                 
+    spectra='135-182'                       
     mode='SingleDifference'
     ipfile=ipFilesPath / "ip2018_3.par"
 
-    subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       # None or scaling factor 
+    subEmptyFromRaw = False        
+    scaleEmpty = 1      
     scaleRaw = 1
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
     
-    transmission_guess =  0.92        # Experimental value from VesuvioTransmission
+    transmission_guess =  0.92      
     multiple_scattering_order, number_of_events = 2, 1.e5
-    # Sample slab parameters
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
@@ -64,7 +63,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 0     #4
+    noOfMSIterations = 0     
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -74,8 +73,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     MSCorrectionFlag = True
     GammaCorrectionFlag = False
 
-    # # Parameters of workspaces in input_ws
-    tofBinning='50,1.,420'                    # Binning of ToF spectra
+    tofBinning='50,1.,420'           
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -97,7 +95,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 3 #3   
+    noOfMSIterations = 3    
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -107,16 +105,15 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([180])
 
-    tofBinning="110,1.,430"                 # Binning of ToF spectra
+    tofBinning="110,1.,430"         
  
 
-# This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
-    globalFit = "MINUIT"
+    globalFit = True 
     nGlobalFitGroups = 4   
 
 
@@ -141,7 +138,6 @@ class UserScriptControls:
 
 
 class BootstrapAnalysis:
-    # Flag below controls whether or not analysis is run
     runAnalysis = False
 
     # Choose whether to filter averages as done in original procedure

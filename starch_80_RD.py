@@ -11,41 +11,40 @@ ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
 class LoadVesuvioBackParameters:
-    runs = "43066-43076"         # 77K         # The numbers of the runs to be analysed
-    empty_runs = "41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
-    spectra = '3-134'                          # Spectra to be analysed
-    mode = 'DoubleDifference'
-    ipfile = ipFilesPath / "ip2019.par"  
+    runs = "43066-43076"             # The numbers of the runs to be analysed
+    empty_runs = "41876-41923"       # The numbers of the empty runs to be subtracted
+    spectra = '3-134'                # Spectra to be analysed
+    mode = 'DoubleDifference'           
+    ipfile = ipFilesPath / "ip2019.par"    # Name of ip file in ip_files folder
 
-    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       # None or scaling factor 
-    scaleRaw = 1
+    subEmptyFromRaw = True    # Subtracts Empty WS from Raw WS 
+    scaleEmpty = 1       # Scaling factor 
+    scaleRaw = 1         # Scaling factor
 
-class LoadVesuvioFrontParameters:
-    runs = '43066-43076'         # 100K        # The numbers of the runs to be analysed
-    empty_runs = '43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-    spectra = '144-182'                        # Spectra to be analysed
+class LoadVesuvioFrontParameters:    # Same as previous class but for forward ws
+    runs = '43066-43076'         
+    empty_runs = '43868-43911'   
+    spectra = '144-182'         
     mode = 'SingleDifference'  
     ipfile = ipFilesPath / "ip2018_3.par"
 
-    subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       # None or scaling factor 
+    subEmptyFromRaw = False     
+    scaleEmpty = 1      
     scaleRaw = 1
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
     
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5
-    # Sample slab parameters
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+    multiple_scattering_order, number_of_events = 2, 1.e5    # Used in MS correction
+    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001     # Sample slab parameters, expressed in meters
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMassIdxRatio = 19.0620008206   # Ratio of H to peak of chosen mass 
-    massIdx = 0   # Idx of mass to take the ratio with
+    # Ratio of H peak to chosen mass
+    HToMassIdxRatio = 19.0620008206   # Set to None either when H not present or ratio not known 
+    massIdx = 0   # Idx of mass to take the ratio with, idx is relative to backward scattering masses
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
@@ -63,7 +62,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     
+    noOfMSIterations = 1     # Number of MS corrections, 0 is no correction
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -73,12 +72,10 @@ class BackwardInitialConditions(GeneralInitialConditions):
     MSCorrectionFlag = True
     GammaCorrectionFlag = False
 
-    # # Parameters of workspaces in input_ws
-    tofBinning='275.,1.,420'                    # Binning of ToF spectra
+    tofBinning='275.,1.,420'   
 
 
-class ForwardInitialConditions(GeneralInitialConditions):
-    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
+class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as above
 
     masses = np.array([1.0079, 12, 16, 27]) 
 
@@ -97,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 0      # Number of MS corrections, 0 is NCP fit with no correction
+    noOfMSIterations = 0      
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -107,25 +104,24 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tofBinning="110,1,430"                 # Binning of ToF spectra
+    tofBinning="110,1,430"
  
 
-# This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
-    globalFit = True    #"MINUIT"                 # Options: None, 'Mantid', 'MINUIT' 
-    nGlobalFitGroups = 4               # Number or string "ALL"
+    globalFit = True                 # Performs global fit with Minuit by default
+    nGlobalFitGroups = 4             # Number or string "ALL"
 
 
 class BootstrapInitialConditions:
-    runningJackknife = True
-    nSamples = 650
-    skipMSIterations = False
-    userConfirmation = True
-    runningTest = True
+    runningJackknife = True         # Overwrites normal Bootstrap with Jackknife
+    nSamples = 650                  # Used if running Bootstrap, otherwise code ignores it
+    skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
+    userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
+    # runningTest = True
 
 
 class UserScriptControls:
@@ -136,16 +132,15 @@ class UserScriptControls:
     fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
-    # Independent of procedure and runFItInYSpace
-    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    # If set, ignores procedure and runFItInYSpace
+    bootstrap = None         # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapAnalysis:
-    # Flag below controls whether or not analysis is run
-    runAnalysis = False   
+    runAnalysis = False      # Controls whether or not analysis is run
 
     # Choose whether to filter averages as done in original procedure
-    filterAvg = True                 # True discards some unreasonable values of widths and intensities
+    filterAvg = True      # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
     plotRawWidthsIntensities = False
@@ -156,7 +151,7 @@ class BootstrapAnalysis:
 
 
 # Initialize classes and run script below
-# Not for useers
+#  ------------- Not for users ----------------
 
 start_time = time.time()
 
