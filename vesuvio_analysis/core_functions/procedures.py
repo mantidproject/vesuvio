@@ -27,11 +27,11 @@ def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    if isHPresent(fwdIC.masses) and (bckwdIC.HToMass0Ratio==None):
+    if isHPresent(fwdIC.masses) and (bckwdIC.HToMassIdxRatio==None):
         wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
 
     else:
-        assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMass0Ratio==None)), "When H is not present, HToMass0Ratio has to be set to None"
+        assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMassIdxRatio==None)), "When H is not present, HToMassIdxRatio has to be set to None"
         
         wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
@@ -51,25 +51,25 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
     nIter = askUserNoOfIterations()
  
     HRatios = []   # List to store HRatios
-    HToMassIdxs = []
+    massIdxs = []
     # Run preliminary forward with a good guess for the widths of non-H masses
     wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
     for i in range(int(nIter)):    # Loop until convergence is achieved
 
         AnalysisDataService.clear()    # Clears all Workspaces
 
-        massIdx, HRatio = calculateHToMass0Ratio(fwdScatResults)
+        massIdx, HRatio = calculateHToMassIdxRatio(fwdScatResults)
 
-        bckwdIC.HToMass0Ratio = HRatio
-        bckwdIC.HToMassIdx = massIdx
+        bckwdIC.HToMassIdxRatio = HRatio
+        bckwdIC.massIdx = massIdx
 
         wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
         HRatios.append(HRatio)
-        HToMassIdxs.append(massIdx)
+        massIdxs.append(massIdx)
         
 
-    print(f"\nIdxs of masses for H ratio for each iteration: \n{HToMassIdxs}")
+    print(f"\nIdxs of masses for H ratio for each iteration: \n{massIdxs}")
     print(f"\nCorresponding H ratios: \n{HRatios}")
 
     fwdIC.runningPreliminary = False  # Change to default since end of preliminary procedure
@@ -78,16 +78,16 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
 
 
 def askUserNoOfIterations():
-    print("\nH was detected but HToMass0Ratio was not provided.")
-    print("\nSugested preliminary procedure:\n\nrun_forward\nfor n:\n    estimate_HToMass0Ratio\n    run_backward\n    run_forward")
-    userInput = input("\n\nDo you wish to run preliminary procedure to estimate HToMass0Ratio? (y/n)") 
+    print("\nH was detected but HToMassIdxRatio was not provided.")
+    print("\nSugested preliminary procedure:\n\nrun_forward\nfor n:\n    estimate_HToMassIdxRatio\n    run_backward\n    run_forward")
+    userInput = input("\n\nDo you wish to run preliminary procedure to estimate HToMassIdxRatio? (y/n)") 
     if not((userInput=="y") or (userInput=="Y")): raise KeyboardInterrupt("Preliminary procedure interrupted.")
     
     nIter = int(input("\nHow many iterations do you wish to run? n="))
     return nIter
  
 
-def calculateHToMass0Ratio(fwdScatResults):
+def calculateHToMassIdxRatio(fwdScatResults):
     """
     Calculate H ratio to mass with highest peak.
     Returns idx of mass and corresponding H ratio.
@@ -117,7 +117,7 @@ def setInitFwdParsFromBackResults(bckwdScatResults, bckwdIC, fwdIC):
     """
     Used to pass mean widths and intensities from back scattering onto intial conditions of forward scattering.
     Checks if H is present and adjust the passing accordingly:
-    If H present, use HToMass0Ratio to recalculate intensities and fix only non-H widths.
+    If H present, use HToMassIdxRatio to recalculate intensities and fix only non-H widths.
     If H not present, widths and intensities are directly mapped and all widhts except first are fixed. 
     """
 
@@ -130,7 +130,7 @@ def setInitFwdParsFromBackResults(bckwdScatResults, bckwdIC, fwdIC):
         assert len(backMeanWidths) == fwdIC.noOfMasses-1, "H Mass present, no of masses in front needs to be bigger than back by 1."
 
         # Use H ratio to calculate intensity ratios 
-        HIntensity = bckwdIC.HToMass0Ratio * backMeanIntensityRatios[bckwdIC.HToMassIdx]
+        HIntensity = bckwdIC.HToMassIdxRatio * backMeanIntensityRatios[bckwdIC.massIdx]
         # Add H intensity in the first idx
         initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
         # Normalize intensities

@@ -609,8 +609,8 @@ def plotAutoMinos(minuitObj):
     width = int(np.ceil(len(minuitObj.parameters)/2))
     figsize = (12, 7)
     # Output plot to Mantid
-    fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
-    fig.canvas.set_window_title("Plot of Automatic MINOS")
+    fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})
+    fig.canvas.set_window_title("Plot of Automatic Minuit MINOS")
 
     for p, ax in zip(minuitObj.parameters, axs.flat):
         loc, fvals, status = minuitObj.mnprofile(p, bound=2)
@@ -646,7 +646,7 @@ def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, va
     ax.plot(varSpace, fValsMigrad, label="fVals Migrad")
 
     ax.axvspan(lerr+varVal, uerr+varVal, alpha=0.2, color="red", label="Minos error")
-    ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="grey", label="Hessian Std error")
+    ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="blue", label="Hessian Std error")
     
     ax.axvline(varVal, 0.03, 0.97, color="k", ls="--")
     ax.axhline(fValsMin+1, 0.03, 0.97, color="k")

@@ -128,9 +128,9 @@ def setOutputDirsForSample(IC, sampleName):
 
     # Build Filename based on ic
     corr = ""
-    if IC.MSCorrectionFlag & (IC.noOfMSIterations>1):
+    if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
         corr+="_MS"
-    if IC.GammaCorrectionFlag & (IC.noOfMSIterations>1):
+    if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
         corr+="_GC"
 
     fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"+".npz"

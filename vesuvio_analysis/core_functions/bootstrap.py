@@ -113,7 +113,7 @@ def askUserConfirmation(inputIC: list, bootIC):
         else:
             raise ValueError("Mode running not recognized.")
         
-        timeOriginalIC = timeNoMS + (IC.noOfMSIterations-1) * (timeNoMS+timePerMS)
+        timeOriginalIC = timeNoMS + (IC.noOfMSIterations) * (timeNoMS+timePerMS)
         totalTimeOriginal += timeOriginalIC      
 
         # nSamples for either Bootstap or Jackknife
@@ -140,7 +140,7 @@ def askUserConfirmation(inputIC: list, bootIC):
 
 
 def noOfHistsFromTOFBinning(IC):
-    start, spacing, end = [int(float(s)) for s in IC.tof_binning.split(",")]  # Convert first to float and then to int because of decimal points
+    start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
 
@@ -220,7 +220,8 @@ def selectParentWorkspaces(inputIC: list, fastBoot: bool):
     for IC in inputIC:
 
         if fastBoot:
-            wsIter = str(IC.noOfMSIterations - 1)    # Selects last ws after MS corrections
+            wsIter = str(IC.noOfMSIterations)    # Selects last ws after MS corrections
+
         else:
             wsIter = "0"
 
@@ -280,9 +281,9 @@ def setOutputDirs(inputIC: list, bootIC):
 
         # Build Filename based on ic
         corr = ""
-        if IC.MSCorrectionFlag & (IC.noOfMSIterations>1):
+        if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
             corr+="_MS"
-        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>1):
+        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
             corr+="_GC"
 
         fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
@@ -496,7 +497,7 @@ def formSampleIC(inputIC, bootIC, sampleInputWS, parentWS):
         IC.runningJackknife = bootIC.runningJackknife
 
         if bootIC.skipMSIterations:
-            IC.noOfMSIterations = 1
+            IC.noOfMSIterations = 0
 
         IC.sampleWS = wsSample
         IC.parentWS = parentWSnNCP[0]     # Select workspace with parent data

@@ -43,8 +43,8 @@ class GeneralInitialConditions:
 
 class BackwardInitialConditions(GeneralInitialConditions):
 
-    HToMass0Ratio = None   # Set to None when H is not present or not known
-    HToMassIdx = 0
+    HToMassIdxRatio = None   # Set to None when H is not present or not known
+    massIdx = 0
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015, 12, 14, 27])
@@ -64,7 +64,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 1     #4
+    noOfMSIterations = 0     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -75,11 +75,10 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
     # # Parameters of workspaces in input_ws
-    tof_binning='50,1.,420'                    # Binning of ToF spectra
+    tofBinning='50,1.,420'                    # Binning of ToF spectra
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([2.015, 12, 14, 27]) 
   
@@ -98,7 +97,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 4 #2   #4
+    noOfMSIterations = 3 #3   
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -108,7 +107,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([180])
 
-    tof_binning="110,1.,430"                 # Binning of ToF spectra
+    tofBinning="110,1.,430"                 # Binning of ToF spectra
  
 
 # This class inherits all of the atributes in ForwardInitialConditions
@@ -116,9 +115,8 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
+    fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFit = "MINUIT"
-    #forceManualMinos = True
     nGlobalFitGroups = 4   
 
 

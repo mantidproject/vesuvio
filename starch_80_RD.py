@@ -44,8 +44,8 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 19.0620008206   # Ratio of H to peak of chosen mass 
-    HToMassIdx = 0   # Idx of mass to take the ratio with
+    HToMassIdxRatio = 19.0620008206   # Ratio of H to peak of chosen mass 
+    massIdx = 0   # Idx of mass to take the ratio with
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
@@ -63,7 +63,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 1     
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -74,7 +74,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
     # # Parameters of workspaces in input_ws
-    tof_binning='275.,1.,420'                    # Binning of ToF spectra
+    tofBinning='275.,1.,420'                    # Binning of ToF spectra
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -97,7 +97,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 1   #4
+    noOfMSIterations = 0      # Number of MS corrections, 0 is NCP fit with no correction
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -107,17 +107,16 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,1,430"                 # Binning of ToF spectra
+    tofBinning="110,1,430"                 # Binning of ToF spectra
  
 
 # This class inherits all of the atributes in ForwardInitialConditions
 class YSpaceFitInitialConditions:
-    showPlots = False
+    showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
+    fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFit = "MINUIT"                 # Options: None, 'Mantid', 'MINUIT' 
-    forceManualMinos = False
     nGlobalFitGroups = 4               # Number or string "ALL"
 
 

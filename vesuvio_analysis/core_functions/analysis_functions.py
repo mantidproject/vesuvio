@@ -20,7 +20,7 @@ def iterativeFitForDataReduction(ic):
    
     createSlabGeometry(ic)  # TODO: Move this function inside the MS correction, not used otherwise
 
-    for iteration in range(ic.noOfMSIterations):
+    for iteration in range(ic.noOfMSIterations + 1):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
         SumSpectra(InputWorkspace=wsToBeFitted, OutputWorkspace=wsToBeFitted.name()+"_Sum")
@@ -30,7 +30,7 @@ def iterativeFitForDataReduction(ic):
         meanWidths, meanIntensityRatios = createMeansAndStdTableWS(wsToBeFitted.name(), ic)
    
         # When last iteration, skip MS and GC
-        if iteration == ic.noOfMSIterations - 1:
+        if iteration == ic.noOfMSIterations:
           break 
 
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
@@ -48,7 +48,7 @@ def iterativeFitForDataReduction(ic):
         if ic.runningSampleWS and ic.runningJackknife:
             maskColumnWithZeros(ic.name, ic.name+str(iteration+1))
 
-    wsFinal = mtd[ic.name+str(ic.noOfMSIterations - 1)]
+    wsFinal = mtd[ic.name+str(ic.noOfMSIterations)]
     fittingResults = resultsObject(ic)
     fittingResults.save()
     return wsFinal, fittingResults
@@ -73,7 +73,7 @@ def maskColumnWithZeros(maskedWSName, wsToBeMaskedName):
 def createTableInitialParameters(ic):
     print("\nRUNNING ", ic.modeRunning, " SCATTERING.\n")
     if ic.modeRunning == "BACKWARD":
-        print(f"\nH ratio to mass with idx={ic.HToMassIdx}: {ic.HToMass0Ratio}\n")
+        print(f"\nH ratio to mass with idx={ic.massIdx}: {ic.HToMassIdxRatio}\n")
 
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=ic.name+"_Initial_Parameters")
     meansTableWS.addColumn(type='float', name="Mass")
@@ -98,7 +98,7 @@ def loadRawAndEmptyWsFromUserPath(ic):
 
     print('\nLoading local workspaces ...\n')
     Load(Filename=str(ic.userWsRawPath), OutputWorkspace=ic.name+"raw")
-    Rebin(InputWorkspace=ic.name+'raw', Params=ic.tof_binning,
+    Rebin(InputWorkspace=ic.name+'raw', Params=ic.tofBinning,
           OutputWorkspace=ic.name+'raw')
 
     assert (type(ic.scaleRaw)==float) | (type(ic.scaleRaw)==int), "Scaling factor of raw ws needs to be float or int."
@@ -110,7 +110,7 @@ def loadRawAndEmptyWsFromUserPath(ic):
     # if ic.mode=="DoubleDifference":
     if ic.subEmptyFromRaw:
         Load(Filename=str(ic.userWsEmptyPath), OutputWorkspace=ic.name+"empty")
-        Rebin(InputWorkspace=ic.name+'empty', Params=ic.tof_binning,
+        Rebin(InputWorkspace=ic.name+'empty', Params=ic.tofBinning,
             OutputWorkspace=ic.name+'empty')
 
         assert (type(ic.scaleEmpty)==float) | (type(ic.scaleEmpty)==int), "Scaling factor of empty ws needs to be float or int"
@@ -464,9 +464,9 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn, IC):
     maskedIntensities = np.where(filterMask, np.nan, intensities)
     betterIntensities = maskedIntensities / np.sum(maskedIntensities, axis=0)   # Not nansum()      
     
-    # When trying to estimate HToMass0Ratio and normalization fails, skip normalization
+    # When trying to estimate HToMassIdxRatio and normalization fails, skip normalization
     if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
-        assert IC.noOfMSIterations == 1, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations=1."
+        assert IC.noOfMSIterations == 0, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations=0."
         betterIntensities = maskedIntensities 
     else:
         pass
@@ -723,11 +723,11 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
 
     # If Backsscattering mode and H is present in the sample, add H to MS properties
     if (ic.modeRunning == "BACKWARD"):
-        if (ic.HToMass0Ratio != None):  # If H is present, ratio is a number
+        if (ic.HToMassIdxRatio != None):  # If H is present, ratio is a number
             masses = np.append(masses, 1.0079)
             meanWidths = np.append(meanWidths, 5.0)
 
-            HIntensity = ic.HToMass0Ratio * meanIntensityRatios[ic.HToMassIdx]
+            HIntensity = ic.HToMassIdxRatio * meanIntensityRatios[ic.massIdx]
             meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
             meanIntensityRatios /= np.sum(meanIntensityRatios)
 

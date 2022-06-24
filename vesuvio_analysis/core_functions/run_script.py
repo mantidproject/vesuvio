@@ -96,7 +96,7 @@ def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
     wsNames = []
     for proc, IC in zip(procedures, inputIC):
         # Format of corrected ws from last iteration
-        name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations-1)
+        name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
         wsNames.append(name)
     return wsNames
 

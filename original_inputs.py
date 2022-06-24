@@ -46,8 +46,8 @@ class GeneralInitialConditions:
 class BackwardInitialConditions(GeneralInitialConditions):
     InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
-    HToMass0Ratio = 19.0620008206  # Set to zero or None when H is not present
-    HToMassIdx = 0
+    HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
+    massIdx = 0
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
@@ -66,7 +66,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     #4
+    noOfMSIterations = 3     #4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -77,14 +77,12 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
     # # Parameters of workspaces in input_ws
-    tof_binning='275.,1.,420'                    # Binning of ToF spectra
+    tofBinning='275.,1.,420'                    # Binning of ToF spectra
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 12, 16, 27]) 
-    # noOfMasses = len(masses)
 
     initPars = np.array([ 
     # Intensities, NCP widths, NCP centers  
@@ -101,7 +99,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 4   #4
+    noOfMSIterations = 3   #4
     firstSpec = 144   #144
     lastSpec = 182    #182
 
@@ -111,7 +109,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tof_binning="110,1,430"                 # Binning of ToF spectra
+    tofBinning="110,1,430"                 # Binning of ToF spectra
   
 
 class YSpaceFitInitialConditions:
