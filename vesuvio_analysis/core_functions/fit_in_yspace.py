@@ -19,8 +19,8 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     ncpForEachMass = extractNCPFromWorkspaces(wsFinal, IC)
 
     wsToFit = wsFinal
-    if IC.maskTOFRange != None:
-        wsToFit = maskResonancePeak(IC, wsFinal, ncpForEachMass)
+    if yFitIC.maskTOFRange != None:     # Mask resonance peak
+        wsToFit = maskResonancePeak(yFitIC, wsFinal, ncpForEachMass)
 
     firstMass = IC.masses[0]
     wsResSum, wsRes = calculateMantidResolution(IC, yFitIC, wsToFit, firstMass)
@@ -59,17 +59,21 @@ def extractNCPFromWorkspaces(wsFinal, ic):
     return ncpForEachMass
 
 
-def maskResonancePeak(IC, wsFinal, ncpForEachMass):
+def maskResonancePeak(yFitIC, wsFinal, ncpForEachMass):
     ncpTotal = np.sum(ncpForEachMass, axis=1)
-    start, end = IC.maskTOFRange.split(",")
-    dataY = wsFinal.extractY()
+    start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
+    dataY = wsFinal.extractY()[:, :-1]
+    dataX = wsFinal.extractX()[:, :-1]
 
     # Mask dataY with NCP in given TOF region
-    dataY[:, start:end] = ncpTotal[:, start:end]
+    mask = (dataX >= start) & (dataX <= end)
+    dataY[mask] = ncpTotal[mask]
 
     wsMasked = CloneWorkspace(wsFinal, OutputWorkspace=wsFinal.name()+"_Masked")
-    for i in range(wsMasked.getNumberHistograms):
-        wsMasked.dataY(i)[:] = dataY[i, :]
+    for i in range(wsMasked.getNumberHistograms()):
+        wsMasked.dataY(i)[:-1] = dataY[i, :]
+    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
+
     return wsMasked
     
 

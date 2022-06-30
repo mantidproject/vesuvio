@@ -114,6 +114,7 @@ class YSpaceFitInitialConditions:
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
+    maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
 
 
 class BootstrapInitialConditions:

@@ -17,7 +17,7 @@ class LoadVesuvioBackParameters:
     ipfile = ipFilesPath / 'ip2018_3.par'  
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 0.9       # None or scaling factor 
+    scaleEmpty = 0.9        
     scaleRaw = 1
 
 
@@ -28,8 +28,8 @@ class LoadVesuvioFrontParameters:
     mode = "SingleDifference" 
     ipfile = ipFilesPath / "ip2018_3.par"
 
-    subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 0.9       # None or scaling factor 
+    subEmptyFromRaw = True     # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 0.9       
     scaleRaw = 1
 
 
@@ -43,7 +43,6 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     HToMass0Ratio = 21  # Set to None when either unknown or H not present
     HToMassIdx = 0
@@ -68,7 +67,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 2     #4
+    noOfMSIterations = 0     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -79,11 +78,10 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
     # # Parameters of workspaces in input_ws
-    tof_binning="110,1.,420"                    # Binning of ToF spectra
+    tofBinning="110,1.,420"                    # Binning of ToF spectra
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    # InstrParsPath = ipFilesPath / "ip2018_3.par" 
 
     masses = np.array([1.0079, 16, 27, 28, 93, 137.3]) 
 
@@ -106,7 +104,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ()
 
-    noOfMSIterations = 2   #4
+    noOfMSIterations = 0   #4
     firstSpec = 135   #135
     lastSpec = 182   #182
 
@@ -116,10 +114,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([171, 172, 173, 174])
 
-    tof_binning="110,1.,420"                 # Binning of ToF spectra
- 
+    tofBinning="110,1.,420"                 # Binning of ToF spectra
 
-# This class inherits all of the atributes in ForwardInitialConditions
+
 class YSpaceFitInitialConditions:
     showPlots = False
     symmetrisationFlag = True
@@ -128,6 +125,7 @@ class YSpaceFitInitialConditions:
     globalFitFlag = False
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"
+    maskTOFRange = "157, 163"    # Range for the resonance peak, masks with NCP fit values
 
 
 class BootstrapInitialConditions:
@@ -142,7 +140,7 @@ class UserScriptControls:
     procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
@@ -154,7 +152,7 @@ class BootstrapAnalysis:
     runAnalysis = False 
 
     # Choose whether to filter averages as done in original procedure
-    filterAvg = False                 # True discards some unreasonable values of widths and intensities
+    filterAvg = False       # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
     plotRawWidthsIntensities = True

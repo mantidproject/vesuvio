@@ -115,6 +115,7 @@ class YSpaceFitInitialConditions:
     fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFit = True 
     nGlobalFitGroups = 4   
+    maskTOFRange = None 
 
 
 class BootstrapInitialConditions:

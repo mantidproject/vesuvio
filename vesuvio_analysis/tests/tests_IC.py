@@ -117,6 +117,7 @@ class YSpaceFitInitialConditions:
     fitModel = "SINGLE_GAUSSIAN"      
     globalFit = None 
     nGlobalFitGroups = 4
+    maskTOFRange = None
 
 # userControls and bootIC defined in corresponding test scripts
 
