@@ -1,5 +1,6 @@
 from inspect import signature
 from multiprocessing.sharedctypes import Value
+from tracemalloc import start
 import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
@@ -17,10 +18,14 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 
     ncpForEachMass = extractNCPFromWorkspaces(wsFinal, IC)
 
+    wsToFit = wsFinal
+    if IC.maskTOFRange != None:
+        wsToFit = maskResonancePeak(IC, wsFinal, ncpForEachMass)
+
     firstMass = IC.masses[0]
-    wsResSum, wsRes = calculateMantidResolution(IC, yFitIC, wsFinal, firstMass)
+    wsResSum, wsRes = calculateMantidResolution(IC, yFitIC, wsToFit, firstMass)
     
-    wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
+    wsSubMass = subtractAllMassesExceptFirst(IC, wsToFit, ncpForEachMass)
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
@@ -32,7 +37,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     
     printYSpaceFitResults(wsYSpaceAvg.name())
 
-    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name())
+    yfitResults = ResultsYFitObject(IC, yFitIC, wsToFit.name())
     yfitResults.save()
 
     runGlobalFit(wsYSpace, wsRes, IC, yFitIC) 
@@ -53,6 +58,20 @@ def extractNCPFromWorkspaces(wsFinal, ic):
     print(f"\nExtracted NCP profiles from workspaces.\n")
     return ncpForEachMass
 
+
+def maskResonancePeak(IC, wsFinal, ncpForEachMass):
+    ncpTotal = np.sum(ncpForEachMass, axis=1)
+    start, end = IC.maskTOFRange.split(",")
+    dataY = wsFinal.extractY()
+
+    # Mask dataY with NCP in given TOF region
+    dataY[:, start:end] = ncpTotal[:, start:end]
+
+    wsMasked = CloneWorkspace(wsFinal, OutputWorkspace=wsFinal.name()+"_Masked")
+    for i in range(wsMasked.getNumberHistograms):
+        wsMasked.dataY(i)[:] = dataY[i, :]
+    return wsMasked
+    
 
 def calculateMantidResolution(ic, yFitIC, ws, mass):
     resName = ws.name()+"_Resolution"
