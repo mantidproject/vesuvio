@@ -15,10 +15,7 @@ def iterativeFitForDataReduction(ic):
         initialWs = RenameWorkspace(InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name())
 
     cropedWs = cropAndMaskWorkspace(ic, initialWs)
-
     wsToBeFitted = CloneWorkspace(InputWorkspace=cropedWs, OutputWorkspace=cropedWs.name()+"0")
-   
-    createSlabGeometry(ic)  # TODO: Move this function inside the MS correction, not used otherwise
 
     for iteration in range(ic.noOfMSIterations + 1):
         # Workspace from previous iteration
@@ -27,7 +24,8 @@ def iterativeFitForDataReduction(ic):
 
         fitNcpToWorkspace(ic, wsToBeFitted)
         
-        meanWidths, meanIntensityRatios = createMeansAndStdTableWS(wsToBeFitted.name(), ic)
+        mWidths, stdWidths, mIntRatios, stdIntRatios = extractMeans(wsToBeFitted.name(), ic)
+        createMeansAndStdTableWS(wsToBeFitted.name(), ic, mWidths, stdWidths, mIntRatios, stdIntRatios)
    
         # When last iteration, skip MS and GC
         if iteration == ic.noOfMSIterations:
@@ -36,11 +34,11 @@ def iterativeFitForDataReduction(ic):
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
         if ic.MSCorrectionFlag:
-            wsMS = createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios)
+            wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs")
 
         if ic.GammaCorrectionFlag:  
-            wsGC = createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios)
+            wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
 
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
@@ -196,9 +194,6 @@ def histToPointData(dataY, dataX, dataE):
     dataYp = dataY[:, :-1]
     dataEp = dataE[:, :-1] 
     dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
-
-    # dataYp, dataXp, dataEp = filterNanColumns(dataYp, dataXp, dataEp)
-
     return dataYp, dataXp, dataEp
 
 
@@ -270,7 +265,7 @@ def reshapeArrayPerSpectrum(A):
 def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
     "Calculates y spaces from TOF data, each row corresponds to one mass" 
     
-    #prepare arrays to broadcast
+    # Prepare arrays to broadcast
     dataX = dataX[np.newaxis, :, :]
     delta_Q = delta_Q[np.newaxis, :, :]
     delta_E = delta_E[np.newaxis, :, :]  
@@ -399,20 +394,23 @@ def switchFirstTwoAxis(A):
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
+def extractMeans(wsName, IC):
+    """Extract widths and intensities from tableWorkspace"""
 
-def createMeansAndStdTableWS(wsName, ic):
-    # Extract widths and intensities from tableWorkspace
     fitParsTable = mtd[wsName+"_Best_Fit_NCP_Parameters"]
-    widths = np.zeros((ic.noOfMasses, fitParsTable.rowCount()))
+    widths = np.zeros((IC.noOfMasses, fitParsTable.rowCount()))
     intensities = np.zeros(widths.shape)
-    for i in range(ic.noOfMasses):
+    for i in range(IC.noOfMasses):
         widths[i] = fitParsTable.column(f"Width {i}")
         intensities[i] = fitParsTable.column(f"Intensity {i}")
 
-    assert len(widths) == ic.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, IC)
 
-    meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios = calculateMeansAndStds(widths, intensities, ic)
+    assert len(widths) == IC.noOfMasses, "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
+    return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
 
+
+def createMeansAndStdTableWS(wsName, IC, meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
     meansTableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsName+"_Mean_Widths_And_Intensities")
     meansTableWS.addColumn(type='float', name="Mass")
     meansTableWS.addColumn(type='float', name="Mean Widths")
@@ -422,11 +420,11 @@ def createMeansAndStdTableWS(wsName, ic):
 
     print("\nCreated Table with means and std:")
     print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
-    for m, mw, stdw, mi, stdi in zip(ic.masses.astype(float), meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
+    for m, mw, stdw, mi, stdi in zip(IC.masses.astype(float), meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios):
         meansTableWS.addRow([m, mw, stdw, mi, stdi])
         print(f"{m:5.2f}  {mw:10.5f} \u00B1 {stdw:7.5f}  {mi:10.5f} \u00B1 {stdi:7.5f}")
     print("\n")
-    return meanWidths, meanIntensityRatios
+    return 
 
 
 def calculateMeansAndStds(widthsIn, intensitiesIn, IC):
@@ -509,14 +507,10 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
     # Additional treatement for jackknife
-    zerosMask = dataY==0
+    zerosMask = dataE==0     # Zero errors means point is to be ignored
     ncpTotal = ncpTotal[~zerosMask]
     dataYf = dataY[~zerosMask]   
     dataEf = dataE[~zerosMask]   
-
-    # dataYf = dataY
-    # dataEf = dataE
-
 
     if np.all(dataE == 0) | np.all(np.isnan(dataE)):
         # This condition is currently never satisfied, 
@@ -707,6 +701,8 @@ def numericalThirdDerivative(x, fun):
 
 def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
+
+    createSlabGeometry(ic)    # Sample properties for MS correction 
 
     sampleProperties = calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios)
     print("\nThe sample properties for Multiple Scattering correction are:\n\n", 

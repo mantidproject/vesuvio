@@ -62,6 +62,7 @@ def extractNCPFromWorkspaces(wsFinal, ic):
 def maskResonancePeak(yFitIC, wsFinal, ncpForEachMass):
     ncpTotal = np.sum(ncpForEachMass, axis=1)
     start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
+    assert start <= end, "Start value for masking needs to be smaller or equal than end."
     dataY = wsFinal.extractY()[:, :-1]
     dataX = wsFinal.extractX()[:, :-1]
 
@@ -73,7 +74,6 @@ def maskResonancePeak(yFitIC, wsFinal, ncpForEachMass):
     for i in range(wsMasked.getNumberHistograms()):
         wsMasked.dataY(i)[:-1] = dataY[i, :]
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
-
     return wsMasked
     
 
