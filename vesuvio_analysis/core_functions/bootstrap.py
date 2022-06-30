@@ -36,7 +36,7 @@ def runBootstrap(inputIC, bootIC, yFitIC):
 
 def checkOutputDirExists(inputIC, bootIC):
 
-    try:
+    try:    # Assume it is not running a test if atribute is not found
         reading = bootIC.runningTest
     except AttributeError:
         bootIC.runningTest = False
@@ -63,14 +63,12 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
     Performs either independent or joint procedure depending of len(inputIC).
     """
     AnalysisDataService.clear()
-    # askUserConfirmation(inputIC, bootIC)
  
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bootIC, inputIC, yFitIC)
-    corrCoefs = autoCorrResiduals(parentWSnNCPs)
+    corrCoefs = autoCorrResiduals(parentWSnNCPs)   # TODO: Introduce some check here for the autocorrelation of residuals
 
     nSamples = chooseNSamples(bootIC, parentWSnNCPs)
 
-    # setOutputDirs(inputIC, bootIC)
     bootResults = initializeResults(parentResults, nSamples, corrCoefs)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
@@ -88,7 +86,7 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
         except RuntimeError:    # TODO: Think about the errors to except
             continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
         
-        storeBootIter(bootResults, i, iterResults)
+        storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
         saveBootstrapResults(bootResults, inputIC)      
     return bootResults
 
@@ -234,11 +232,9 @@ def selectParentWorkspaces(inputIC: list, fastBoot: bool):
     return parentWSnNCPs
 
 
-#TODO: Revise this check
 def autoCorrResiduals(parentWSnNCP: list):
     """
     Calculates the self-correlation of residuals for each spectrum.
-    When correlation is detected, plots the spectrum.
     """
     corrCoefs = []
     for (parentWS, parentNCP) in parentWSnNCP:
