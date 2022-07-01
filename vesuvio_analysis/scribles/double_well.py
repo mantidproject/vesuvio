@@ -47,8 +47,9 @@ def modelJit(x, A, d, R, sig1, sig2):
         
         JBest = np.trapz(jp, theta)      # Integrate over theta
         result[i] = JBest
-        
-    result /= np.abs(np.trapz(result, x))     # Normalize
+
+    # norm = np.abs(np.trapz(result, x))    #TODO: Failing on numba, don't know why
+    # result /= norm 
     result *= A
     return result
 
@@ -95,6 +96,7 @@ error = noise * 0.04
 plt.errorbar(y, data, error, fmt=".")
 for model in [modelJit, modelTrpz, modelQuad]:
     t0 = time.time()
+
     costFun = cost.LeastSquares(y, data, error, model)
     m = Minuit(costFun, **defaultPars)
     m.simplex()
