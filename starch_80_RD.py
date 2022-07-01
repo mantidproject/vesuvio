@@ -104,7 +104,7 @@ class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as
 
     maskedSpecAllNo = np.array([173, 174, 179])
 
-    tofBinning="110,1,430"
+    tofBinning="110,1,430"       
  
 
 class YSpaceFitInitialConditions:
@@ -122,7 +122,6 @@ class BootstrapInitialConditions:
     nSamples = 650                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
-    # runningTest = True
 
 
 class UserScriptControls:

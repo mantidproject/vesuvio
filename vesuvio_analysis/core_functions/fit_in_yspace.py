@@ -374,7 +374,30 @@ def selectModelAndPars(modelFlag):
         
         defaultPars = {"A":1, "x0":0, "sigma1":6, "c6":0} 
         sharedPars = ["sigma1", "c6"]     # Used only in Global fit   
-           
+
+    elif modelFlag=="DOUBLE_WELL":
+        def model(x, A, d, R, sig1, sig2):
+
+            h = 2.04
+            theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
+            y = x[np.newaxis, :]
+
+            sigTH = np.sqrt( sig1**2*np.cos(theta)**2 + sig2**2*np.sin(theta)**2 )
+
+            alpha = 2*( d*sig2*sig1*np.sin(theta) / sigTH )**2
+            beta = ( 2*sig1**2*d*np.cos(theta) / sigTH**2 ) * y
+
+            denom = 2.506628 * sigTH * (1 + R**2 + 2*R*np.exp(-2*d**2*sig1**2))
+            jp = np.exp( -y**2/(2*sigTH**2)) * (1 + R**2 + 2*R*np.exp(-alpha)*np.cos(beta)) / denom
+            jp *= np.sin(theta)
+
+            JBest = np.trapz(jp, x=theta, axis=0)
+            JBest /= np.abs(np.trapz(JBest, x=y))
+            JBest *= A
+            return JBest
+
+        defaultPars = {"A" : 1, "d" : 1, "sig1" : 3, "sig2" : 5, "R" : 1}
+        sharedPars = ["sig1", "sig2"]           
 
     else:
         raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4'")
@@ -534,6 +557,8 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
+        elif yFitIC.fitModel=="DOUBLE_WELL":
+            return
         else: raise ValueError("fitmodel not recognized.")
 
         Fit(

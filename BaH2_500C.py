@@ -44,8 +44,8 @@ class GeneralInitialConditions:
 
 class BackwardInitialConditions(GeneralInitialConditions):
 
-    HToMass0Ratio = 21  # Set to None when either unknown or H not present
-    HToMassIdx = 0
+    HToMassIdxRatio = 21  # Set to None when either unknown or H not present
+    massIdx = 0
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([16, 27, 28, 93, 137.3])
@@ -121,7 +121,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "GC_C6"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
+    fitModel = "DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
     globalFitFlag = False
     forceManualMinos = False
     nGlobalFitGroups = 4       # Number or string "ALL"

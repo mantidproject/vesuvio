@@ -95,7 +95,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 3    
+    noOfMSIterations = 0    
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -128,10 +128,10 @@ class BootstrapInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "BACKWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Perform bootstrap procedure
     # Independent of procedure and runFItInYSpace
