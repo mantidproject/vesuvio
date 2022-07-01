@@ -750,12 +750,21 @@ def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, va
 
 def printYSpaceFitResults(wsJoYName):
     print("\nFit in Y Space results:")
+    foundWS = []
+    try:
+        wsFitLM = mtd[wsJoYName + "_Fitted_Levenberg-Marquardt_Parameters"]
+        foundWS.append(wsFitLM)
+    except KeyError: pass
+    try:
+        wsFitSimplex = mtd[wsJoYName + "_Fitted_Simplex_Parameters"]
+        foundWS.append(wsFitSimplex)
+    except KeyError: pass
+    try:
+        wsFitMinuit = mtd[wsJoYName + "_Fitted_Minuit_Parameters"]
+        foundWS.append(wsFitMinuit)
+    except KeyError: pass
 
-    wsFitLM = mtd[wsJoYName + "_Fitted_Levenberg-Marquardt_Parameters"]
-    wsFitSimplex = mtd[wsJoYName + "_Fitted_Simplex_Parameters"]
-    wsFitMinuit = mtd[wsJoYName + "_Fitted_Minuit_Parameters"]
-
-    for tableWS in [wsFitLM, wsFitSimplex, wsFitMinuit]:
+    for tableWS in foundWS:
         print("\n"+" ".join(tableWS.getName().split("_")[-3:])+":")
         # print("    ".join(tableWS.keys()))
         for key in tableWS.keys():
@@ -786,12 +795,23 @@ class ResultsYFitObject:
         self.resolution = wsResSum.extractY()
 
         # Extract best fit parameters from workspaces
-        wsFitLM = mtd[wsJoYAvg.name() + "_Fitted_Levenberg-Marquardt_Parameters"]
-        wsFitSimplex = mtd[wsJoYAvg.name() + "_Fitted_Simplex_Parameters"]
-        wsFitMinuit = mtd[wsJoYAvg.name() + "_Fitted_Minuit_Parameters"]
-
-        poptList = [wsFitMinuit.column("Value"), wsFitLM.column("Value"), wsFitSimplex.column("Value")]
-        perrList = [wsFitMinuit.column("Error"), wsFitLM.column("Error"), wsFitSimplex.column("Error")]
+        poptList = []
+        perrList = []
+        try:
+            wsFitMinuit = mtd[wsJoYAvg.name() + "_Fitted_Minuit_Parameters"]
+            poptList.append(wsFitMinuit.column("Value"))
+            perrList.append(wsFitMinuit.column("Error"))
+        except: pass
+        try:
+            wsFitLM = mtd[wsJoYAvg.name() + "_Fitted_Levenberg-Marquardt_Parameters"]
+            poptList.append(wsFitLM.column("Value"))
+            perrList.append(wsFitLM.column("Error"))
+        except: pass
+        try:
+            wsFitSimplex = mtd[wsJoYAvg.name() + "_Fitted_Simplex_Parameters"]
+            poptList.append(wsFitSimplex.column("Value"))
+            perrList.append(wsFitSimplex.column("Error"))
+        except: pass
 
         # Number of parameters might not be the same, need to add zeros to some lists to match length
         maxLen = max([len(l) for l in poptList])
