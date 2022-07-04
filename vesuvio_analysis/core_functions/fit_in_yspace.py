@@ -17,16 +17,13 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 
     ncpForEachMass = extractNCPFromWorkspaces(wsFinal, IC)
+    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsFinal)
 
-    wsToFit = wsFinal
+    wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
     if yFitIC.maskTOFRange != None:     # Mask resonance peak
-        wsToFit = maskResonancePeak(yFitIC, wsFinal, ncpForEachMass)
+        wsSubMass = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
-    firstMass = IC.masses[0]
-    wsResSum, wsRes = calculateMantidResolution(IC, yFitIC, wsToFit, firstMass)
-    
-    wsSubMass = subtractAllMassesExceptFirst(IC, wsToFit, ncpForEachMass)
-    wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, firstMass) 
+    wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
     if yFitIC.symmetrisationFlag:
@@ -37,7 +34,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     
     printYSpaceFitResults(wsYSpaceAvg.name())
 
-    yfitResults = ResultsYFitObject(IC, yFitIC, wsToFit.name())
+    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name(), wsSubMass.name())
     yfitResults.save()
 
     runGlobalFit(wsYSpace, wsRes, IC, yFitIC) 
@@ -59,25 +56,28 @@ def extractNCPFromWorkspaces(wsFinal, ic):
     return ncpForEachMass
 
 
-def maskResonancePeak(yFitIC, wsFinal, ncpForEachMass):
-    ncpTotal = np.sum(ncpForEachMass, axis=1)
+def maskResonancePeak(yFitIC, ws, ncp):
+    # ncpTotal = np.sum(ncpForEachMass, axis=1)
     start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
     assert start <= end, "Start value for masking needs to be smaller or equal than end."
-    dataY = wsFinal.extractY()[:, :-1]
-    dataX = wsFinal.extractX()[:, :-1]
+    dataY = ws.extractY()[:, :-1]
+    dataX = ws.extractX()[:, :-1]
 
     # Mask dataY with NCP in given TOF region
     mask = (dataX >= start) & (dataX <= end)
-    dataY[mask] = ncpTotal[mask]
+    # dataY[mask] = ncpTotal[mask]
+    dataY[mask] = ncp[mask]
 
-    wsMasked = CloneWorkspace(wsFinal, OutputWorkspace=wsFinal.name()+"_Masked")
+    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
     for i in range(wsMasked.getNumberHistograms()):
         wsMasked.dataY(i)[:-1] = dataY[i, :]
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
     return wsMasked
     
 
-def calculateMantidResolution(ic, yFitIC, ws, mass):
+def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
+    mass = IC.masses[0]
+
     resName = ws.name()+"_Resolution"
     for index in range(ws.getNumberHistograms()):
         VesuvioResolution(Workspace=ws,WorkspaceIndex=index,Mass=mass,OutputWorkspaceYSpace="tmp")
@@ -88,7 +88,7 @@ def calculateMantidResolution(ic, yFitIC, ws, mass):
         else:
             AppendSpectra(resName, "tmp", OutputWorkspace=resName)
    
-    MaskDetectors(resName, WorkspaceIndexList=ic.maskedDetectorIdx)
+    MaskDetectors(resName, WorkspaceIndexList=IC.maskedDetectorIdx)
     wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName+"_Sum")
  
     normalise_workspace(wsResSum)
@@ -141,7 +141,7 @@ def switchFirstTwoAxis(A):
 def convertToYSpace(rebinPars, ws0, mass):
     wsJoY, wsQ = ConvertToYSpace(
         InputWorkspace=ws0, Mass=mass, 
-        OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
+    OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
     wsJoY = Rebin(
         InputWorkspace=wsJoY, Params=rebinPars, 
@@ -797,14 +797,14 @@ def printYSpaceFitResults(wsJoYName):
 
 class ResultsYFitObject:
 
-    def __init__(self, ic, yFitIC, wsFinalName):
+    def __init__(self, ic, yFitIC, wsFinalName, wsSubMassName):
         # Extract most relevant information from ws
         wsFinal = mtd[wsFinalName]
-        wsMass0 = mtd[wsFinalName + "_Mass0"]
+        wsMass0 = mtd[wsSubMassName]
         if yFitIC.symmetrisationFlag:
-            wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg_Symmetrised"]
+            wsJoYAvg = mtd[wsSubMassName + "_JoY_Weighted_Avg_Symmetrised"]
         else:
-            wsJoYAvg = mtd[wsFinalName + "_Mass0_JoY_Weighted_Avg"]
+            wsJoYAvg = mtd[wsSubMassName + "_JoY_Weighted_Avg"]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
 
         self.finalRawDataY = wsFinal.extractY()
