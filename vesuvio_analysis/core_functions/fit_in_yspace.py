@@ -283,6 +283,9 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     m = Minuit(costFun, **defaultPars)
 
     m.limits["A"] = (0, None)
+    if yFitIC.fitModel=="DOUBLE_WELL":
+        m.limits["d"] = (0, None)
+        m.limits["R"] = (0, None)
 
     if yFitIC.fitModel=="SINGLE_GAUSSIAN":
         m.simplex()
@@ -377,16 +380,13 @@ def selectModelAndPars(modelFlag):
 
     elif modelFlag=="DOUBLE_WELL":
         def model(x, A, d, R, sig1, sig2):
-
             h = 2.04
             theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
             y = x[np.newaxis, :]
 
             sigTH = np.sqrt( sig1**2*np.cos(theta)**2 + sig2**2*np.sin(theta)**2 )
-
             alpha = 2*( d*sig2*sig1*np.sin(theta) / sigTH )**2
             beta = ( 2*sig1**2*d*np.cos(theta) / sigTH**2 ) * y
-
             denom = 2.506628 * sigTH * (1 + R**2 + 2*R*np.exp(-2*d**2*sig1**2))
             jp = np.exp( -y**2/(2*sigTH**2)) * (1 + R**2 + 2*R*np.exp(-alpha)*np.cos(beta)) / denom
             jp *= np.sin(theta)
@@ -396,7 +396,26 @@ def selectModelAndPars(modelFlag):
             JBest *= A
             return JBest
 
-        defaultPars = {"A" : 1, "d" : 1, "sig1" : 3, "sig2" : 5, "R" : 1}
+        defaultPars = {"A":1, "d":1, "R":1, "sig1":3, "sig2":5}  # TODO: Starting parameters and bounds?
+        sharedPars = ["sig1", "sig2"]           
+
+    elif modelFlag=="DOUBLE_WELL_ANSIO":
+        # Ansiotropic case
+        def model(x, A, sig1, sig2):
+            h = 2.04
+            theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
+            y = x[np.newaxis, :]
+
+            sigTH = np.sqrt( sig1**2*np.cos(theta)**2 + sig2**2*np.sin(theta)**2 )
+            jp = np.exp( -y**2/(2*sigTH**2)) / (2.506628*sigTH)
+            jp *= np.sin(theta)
+
+            JBest = np.trapz(jp, x=theta, axis=0)
+            JBest /= np.abs(np.trapz(JBest, x=y))
+            JBest *= A
+            return JBest
+
+        defaultPars = {"A":1, "sig1":3, "sig2":5}
         sharedPars = ["sig1", "sig2"]           
 
     else:
@@ -481,96 +500,6 @@ def runMinos(mObj, yFitIC, constrFunc):
     return    parameters, values, errors, minosAutoErr, minosManErr
 
 
-def createFitParametersTableWorkspace(wsYSpaceSym, parameters, values, errors, minosAutoErr, minosManualErr, chi2):
-    # Create Parameters workspace
-    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
-    tableWS.setTitle("Minuit Fit")
-    tableWS.addColumn(type='str', name="Name")
-    tableWS.addColumn(type='float', name="Value")
-    tableWS.addColumn(type='float', name="Error")
-    tableWS.addColumn(type='float', name="Auto Minos Error-")
-    tableWS.addColumn(type='float', name="Auto Minos Error+")
-    tableWS.addColumn(type='float', name="Manual Minos Error-")
-    tableWS.addColumn(type='float', name="Manual Minos Error+")
-
-    for p, v, e, mae, mme in zip(parameters, values, errors, minosAutoErr, minosManualErr):
-        tableWS.addRow([p, v, e, mae[0], mae[1], mme[0], mme[1]])
-
-    tableWS.addRow(["Cost function", chi2, 0, 0, 0, 0, 0])
-    return
-
-
-def oddPointsRes(x, res):
-    """
-    Make a odd grid that ensures a resolution with a single peak at the center.
-    """
-
-    assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
-    assert x.size == res.size, "x and res need to be the same size!"
-
-    if res.size % 2 == 0:
-        dens = res.size+1  # If even change to odd
-    else:
-        dens = res.size    # If odd, keep being odd
-
-    xDense = np.linspace(np.min(x), np.max(x), dens)    # Make gridd with odd number of points - peak at center
-    xDelta = xDense[1] - xDense[0]
-
-    resDense = np.interp(xDense, x, res)
-
-    return xDelta, resDense
-
-
-def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
-    print('\nFitting on the sum of spectra in the West domain ...\n')     
-    for minimizer in ['Levenberg-Marquardt','Simplex']:
-        outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
-        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
-        
-        if yFitIC.fitModel=="SINGLE_GAUSSIAN":
-            function=f"""composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
-            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
-            y0=0,A=1,x0=0,sigma=5,   ties=()"""
-
-        elif yFitIC.fitModel=="GC_C4_C6":
-            function = f"""
-            composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
-            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
-            *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
-            y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
-            """
-        elif yFitIC.fitModel=="GC_C4":
-            function = f"""
-            composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
-            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
-            *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)),
-            y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,ties=()
-            """
-        elif yFitIC.fitModel=="GC_C6":
-            function = f"""
-            composite=Convolution,FixResolution=true,NumDeriv=true;
-            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
-            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
-            *(1.+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
-            y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
-            """
-        elif yFitIC.fitModel=="DOUBLE_WELL":
-            return
-        else: raise ValueError("fitmodel not recognized.")
-
-        Fit(
-            Function=function, 
-            InputWorkspace=outputName,
-            Output=outputName,
-            Minimizer=minimizer
-            )
-        # Fit produces output workspaces with results
-    return 
-
-
 def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showPlots):
     """
     Runs brute implementation of minos algorithm and
@@ -578,6 +507,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
     """
     # Reason for two distinct operations inside the same function is that its easier
     # to build the minos plots for each parameter as they are being calculated.
+    print("\nRunning Minos ... \n")
 
     # Set format of subplots
     height = 2
@@ -748,6 +678,96 @@ def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, va
     ax.axhline(fValsMin, 0.03, 0.97, color="k")
 
 
+def createFitParametersTableWorkspace(wsYSpaceSym, parameters, values, errors, minosAutoErr, minosManualErr, chi2):
+    # Create Parameters workspace
+    tableWS = CreateEmptyTableWorkspace(OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit_Parameters")
+    tableWS.setTitle("Minuit Fit")
+    tableWS.addColumn(type='str', name="Name")
+    tableWS.addColumn(type='float', name="Value")
+    tableWS.addColumn(type='float', name="Error")
+    tableWS.addColumn(type='float', name="Auto Minos Error-")
+    tableWS.addColumn(type='float', name="Auto Minos Error+")
+    tableWS.addColumn(type='float', name="Manual Minos Error-")
+    tableWS.addColumn(type='float', name="Manual Minos Error+")
+
+    for p, v, e, mae, mme in zip(parameters, values, errors, minosAutoErr, minosManualErr):
+        tableWS.addRow([p, v, e, mae[0], mae[1], mme[0], mme[1]])
+
+    tableWS.addRow(["Cost function", chi2, 0, 0, 0, 0, 0])
+    return
+
+
+def oddPointsRes(x, res):
+    """
+    Make a odd grid that ensures a resolution with a single peak at the center.
+    """
+
+    assert np.min(x) == -np.max(x), "Resolution needs to be in symetric range!"
+    assert x.size == res.size, "x and res need to be the same size!"
+
+    if res.size % 2 == 0:
+        dens = res.size+1  # If even change to odd
+    else:
+        dens = res.size    # If odd, keep being odd
+
+    xDense = np.linspace(np.min(x), np.max(x), dens)    # Make gridd with odd number of points - peak at center
+    xDelta = xDense[1] - xDense[0]
+
+    resDense = np.interp(xDense, x, res)
+
+    return xDelta, resDense
+
+
+def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
+    print('\nFitting on the sum of spectra in the West domain ...\n')     
+    for minimizer in ['Levenberg-Marquardt','Simplex']:
+        outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
+        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
+        
+        if yFitIC.fitModel=="SINGLE_GAUSSIAN":
+            function=f"""composite=Convolution,FixResolution=true,NumDeriv=true;
+            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
+            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
+            y0=0,A=1,x0=0,sigma=5,   ties=()"""
+
+        elif yFitIC.fitModel=="GC_C4_C6":
+            function = f"""
+            composite=Convolution,FixResolution=true,NumDeriv=true;
+            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
+            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
+            *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
+            y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
+            """
+        elif yFitIC.fitModel=="GC_C4":
+            function = f"""
+            composite=Convolution,FixResolution=true,NumDeriv=true;
+            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
+            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
+            *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)),
+            y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,ties=()
+            """
+        elif yFitIC.fitModel=="GC_C6":
+            function = f"""
+            composite=Convolution,FixResolution=true,NumDeriv=true;
+            name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
+            name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2./sigma1^2)/(sqrt(2.*3.1415*sigma1^2))
+            *(1.+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
+            y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
+            """
+        elif (yFitIC.fitModel=="DOUBLE_WELL") | (yFitIC.fitModel=="DOUBLE_WELL_ANSIO"):
+            return
+        else: raise ValueError("fitmodel not recognized.")
+
+        Fit(
+            Function=function, 
+            InputWorkspace=outputName,
+            Output=outputName,
+            Minimizer=minimizer
+            )
+        # Fit produces output workspaces with results
+    return 
+
+
 def printYSpaceFitResults(wsJoYName):
     print("\nFit in Y Space results:")
     foundWS = []
@@ -844,6 +864,8 @@ class ResultsYFitObject:
 
 def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
 
+    print("\nRunning GLobal Fit ...\n")
+
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)   
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
@@ -869,8 +891,12 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     print("\nRunning Global Fit ...\n")
     m = Minuit(totCost, **initPars)
 
-    for i in range(len(dataY)):     # Limit for both Gauss and Gram Charlier, all amplitudes A>0 
-        m.limits["A"+str(i)] = (0, np.inf)    
+    for i in range(len(dataY)):     # Set limits for unshared parameters
+        m.limits["A"+str(i)] = (0, np.inf)   
+
+        if yFitIC.fitModel=="DOUBLE_WELL":
+            m.limits["d"+str(i)] = (0, np.inf)
+            m.limits["R"+str(i)] = (0, np.inf) 
 
     t0 = time.time()
     if yFitIC.fitModel=="SINGLE_GAUSSIAN":

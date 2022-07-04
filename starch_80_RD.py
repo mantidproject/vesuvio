@@ -62,7 +62,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 1     # Number of MS corrections, 0 is no correction
+    noOfMSIterations = 0     # Number of MS corrections, 0 is no correction
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -111,7 +111,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6'
+    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
     maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
