@@ -4,6 +4,7 @@ from .analysis_functions import arraysFromWS, histToPointData, prepareFitArgs, f
 from .analysis_functions import iterativeFitForDataReduction
 from .fit_in_yspace import fitInYSpaceProcedure
 from .procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
+from vesuvio_analysis.core_functions.ICHelpers import noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
@@ -17,7 +18,6 @@ currentPath = Path(__file__).parent.absolute()
 
 def runBootstrap(inputIC, bootIC, yFitIC):
 
-    setOutputDirs(inputIC, bootIC)        # Sets data directiies to inputIC objects
     checkOutputDirExists(inputIC, bootIC)            # Checks to see if those directories exits already
     askUserConfirmation(inputIC, bootIC)
     AnalysisDataService.clear()
@@ -81,10 +81,10 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
         sampleInputWS, parentWS = createSampleWS(bootIC.runningJackknife, parentWSNCPSavePaths, i)   # Creates ith sample
         formSampleIC(inputIC, bootIC, sampleInputWS, parentWS)  
 
-        try:
-            iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))   # Conversion to YSpace with masked column
-        except RuntimeError:    # TODO: Think about the errors to except
-            continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
+        # try:
+        iterResults = runMainProcedure(inputIC, yFitIC, runYFit=not(bootIC.runningJackknife))   # Conversion to YSpace with masked column
+        # except RuntimeError:    # TODO: Think about the errors to except
+        #     continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
         
         storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
         saveBootstrapResults(bootResults, inputIC)      
@@ -137,10 +137,16 @@ def askUserConfirmation(inputIC: list, bootIC):
         raise KeyboardInterrupt ("Bootstrap procedure interrupted.")
 
 
-def noOfHistsFromTOFBinning(IC):
-    start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
-    return int((end-start)/spacing) - 1 # To account for last column being ignored
+def chooseLoopRange(bootIC, nSamples):
 
+    if bootIC.runningJackknife and bootIC.runningTest:
+        iStart = int(nSamples/2)
+        iEnd = iStart + 3   
+    else:
+        iStart = 0
+        iEnd = nSamples
+
+    return iStart, iEnd
 
 
 def runOriginalBeforeBootstrap(bootIC, inputIC: list, yFitIC):
@@ -250,46 +256,6 @@ def autoCorrResiduals(parentWSnNCP: list):
     return corrCoefs
     
 
-def setOutputDirs(inputIC: list, bootIC):
-    """Form bootstrap output data paths"""
-
-    # Select script name and experiments path
-    sampleName = inputIC[0].scriptName   # Name of sample currently running
-    experimentsPath = currentPath/".."/".."/"experiments"
-
-    if bootIC.runningJackknife:
-        bootPath = experimentsPath / sampleName / "jackknife_data"
-    else:
-        bootPath = experimentsPath / sampleName / "bootstrap_data"
-    bootPath.mkdir(exist_ok=True)
-
-    if bootIC.skipMSIterations:
-        speedPath = bootPath / "quick"
-    else:
-        speedPath = bootPath / "slow"
-    speedPath.mkdir(exist_ok=True)
-
-    for IC in inputIC:    # Make save paths for .npz files
-
-        nSamples = bootIC.nSamples
-        if bootIC.runningJackknife: 
-            nSamples = noOfHistsFromTOFBinning(IC)
-
-        # Build Filename based on ic
-        corr = ""
-        if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
-            corr+="_MS"
-        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
-            corr+="_GC"
-
-        fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
-        bootName = fileName + f"_nsampl_{nSamples}"+".npz"
-        bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
-
-        IC.bootSavePath = speedPath / bootName
-        IC.bootYFitSavePath = speedPath / bootNameYFit
-
-
 def initializeResults(parentResults: list, nSamples, corrCoefs):
     """
     Initializes a list with objects to store output data.
@@ -352,18 +318,6 @@ def convertWSToSavePaths(parentWSnNCPs: list):
     for wsList in parentWSnNCPs:
         savePaths.append(saveWorkspacesLocally(wsList))
     return savePaths
-
-
-def chooseLoopRange(bootIC, nSamples):
-
-    if bootIC.runningJackknife and bootIC.runningTest:
-        iStart = int(nSamples/2)
-        iEnd = iStart + 3   
-    else:
-        iStart = 0
-        iEnd = nSamples
-
-    return iStart, iEnd
 
 
 def saveWorkspacesLocally(args: list):

@@ -1,4 +1,5 @@
 
+from unittest.loader import VALID_MODULE_NAME
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
 import numpy as np
@@ -40,8 +41,6 @@ def completeICFromInputs(IC, scriptName, wsIC):
         IC.InstrParsPath = wsIC.ipfile
 
     # Sort out input and output paths
-    #TODO: Confirm that last cleaning is working
-    # inputDirsForSample(IC, scriptName, wsIC)
     rawPath, emptyPath = inputDirsForSample(wsIC, scriptName)
     if not(rawPath.is_file()) or not(emptyPath.is_file()):    
         print(f"\nWorkspaces not found.\nSaving Workspaces:\n{rawPath.name}\n{emptyPath.name}")
@@ -60,6 +59,9 @@ def completeICFromInputs(IC, scriptName, wsIC):
 
     # Default not running preliminary procedure to estimate HToMass0Ratio
     IC.runningPreliminary = False
+    
+
+    # Set directories for figures
     return 
 
 
@@ -80,46 +82,6 @@ def inputDirsForSample(wsIC, sampleName):
     rawPath = inputWSPath / rawWSName
     emptyPath = inputWSPath / emptyWSName
     return rawPath, emptyPath
-
-
-# def inputDirsForSample(IC, sampleName, wsIC):
-#     inputWSPath = experimentsPath / sampleName / "input_ws"
-#     inputWSPath.mkdir(parents=True, exist_ok=True)
-
-#     wsPresent = False
-#     for wsPath in inputWSPath.iterdir():
-#         keywords = wsPath.name.split(".")[0].split("_")
-
-#         if IC.modeRunning == "BACKWARD":
-#             modeName = "backward"
-#         else:
-#             modeName = "forward"
-
-#         for key in keywords:
-#             if key == modeName:
-#                 wsPresent = True
-
-#     if not wsPresent:
-#         saveWSFromLoadVesuvio(wsIC, inputWSPath, sampleName)
-
-#     for wsPath in inputWSPath.iterdir():
-
-#         keywords = wsPath.name.split(".")[0].split("_")
-
-#         if IC.modeRunning == "BACKWARD":
-#             if "raw" in keywords and "backward" in keywords:
-#                 IC.userWsRawPath = str(wsPath)          
-#             if "empty" in keywords and "backward" in keywords:
-#                 IC.userWsEmptyPath = str(wsPath)
-
-#         elif IC.modeRunning == "FORWARD":
-#             if "raw" in keywords and "forward" in keywords:
-#                 IC.userWsRawPath = str(wsPath)          
-#             if "empty" in keywords and "forward" in keywords:
-#                 IC.userWsEmptyPath = str(wsPath)  
-#         else:
-#             raise ValueError("Mode running not recognized.")
-#     return
 
 
 def setOutputDirsForSample(IC, sampleName):
@@ -145,13 +107,6 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     
     print(f"\nLoading and storing workspace sample runs: {wsIC.runs}\n")
 
-    # if int(wsIC.spectra.split("-")[1])<135:
-    #     runningType = "backward"
-    # elif int(wsIC.spectra.split("-")[0])>=135:
-    #     runningType = "forward"
-    # else:
-    #     print("Problem in loading workspaces: invalid range of spectra.")
-
     rawVesuvio = LoadVesuvio(
         Filename=wsIC.runs, 
         SpectrumList=wsIC.spectra, 
@@ -160,8 +115,6 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
         OutputWorkspace=rawPath.name
         )
 
-    # rawName = rawVesuvio.name() + ".nxs"
-    # rawPath = inputWSPath / rawName
     SaveNexus(rawVesuvio, str(rawPath))
     print("\nRaw workspace stored locally.\n")
 
@@ -173,8 +126,58 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
         OutputWorkspace=emptyPath.name
         )
 
-    # emptyName = emptyVesuvio.name() + ".nxs"
-    # emptyPath = inputWSPath / emptyName
     SaveNexus(emptyVesuvio, str(emptyPath))
     print("\nEmpty workspace stored locally.\n")
     return 
+
+
+def setBootstrapDirs(inputIC: list, bootIC, userCtr):
+    """Form bootstrap output data paths"""
+
+    # Select script name and experiments path
+    sampleName = inputIC[0].scriptName   # Name of sample currently running
+    experimentsPath = currentPath/".."/".."/"experiments"
+
+    if bootIC.runningJackknife:
+        bootPath = experimentsPath / sampleName / "jackknife_data"
+    else:
+        bootPath = experimentsPath / sampleName / "bootstrap_data"
+    bootPath.mkdir(exist_ok=True)
+
+    if bootIC.skipMSIterations:
+        speedPath = bootPath / "skip_MS_corrections"
+    else:
+        speedPath = bootPath / "with_MS_corrections"
+    speedPath.mkdir(exist_ok=True)
+
+    if (userCtr.bootstrap == "FORWARD") | (userCtr.bootstrap=="BACKWARD") | (userCtr.bootstrap=="JOINT"):
+        finalPath = speedPath / userCtr.bootstrap
+    else:
+        raise ValueError("Procedure in UserScriptControls not recognized.")
+    finalPath.mkdir(exist_ok=True)
+
+    for IC in inputIC:    # Make save paths for .npz files
+
+        nSamples = bootIC.nSamples
+        if bootIC.runningJackknife: 
+            nSamples = noOfHistsFromTOFBinning(IC)
+
+        # Build Filename based on ic
+        corr = ""
+        if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
+            corr+="_MS"
+        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
+            corr+="_GC"
+
+        fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
+        bootName = fileName + f"_nsampl_{nSamples}"+".npz"
+        bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
+
+        IC.bootSavePath = finalPath / bootName
+        IC.bootYFitSavePath = finalPath / bootNameYFit
+    return 
+
+def noOfHistsFromTOFBinning(IC):
+    start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
+    return int((end-start)/spacing) - 1 # To account for last column being ignored
+

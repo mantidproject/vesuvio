@@ -5,7 +5,7 @@ import matplotlib .pyplot as plt
 from pathlib import Path
 from scipy import stats
 from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
-from vesuvio_analysis.core_functions.bootstrap import setOutputDirs
+from vesuvio_analysis.core_functions.ICHelpers import setBootstrapDirs
 from vesuvio_analysis.core_functions.fit_in_yspace import selectModelAndPars
 
 currentPath = Path(__file__).parent.absolute() 
@@ -13,12 +13,12 @@ experimentsPath = currentPath / ".." / ".. " / "experiments"
 IPFilesPath = currentPath / ".." / "ip_files" 
 
 
-def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC):
+def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, userCtr):
 
     if not(analysisIC.runAnalysis):
         return
 
-    setOutputDirs([bckwdIC, fwdIC], bootIC)   # Same function used to store data, to check below if dirs exist
+    setBootstrapDirs([bckwdIC, fwdIC], bootIC, userCtr)   # Same function used to store data, to check below if dirs exist
 
     for IC in [bckwdIC, fwdIC]:
 
