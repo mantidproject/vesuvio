@@ -1,5 +1,5 @@
 
-from vesuvio_analysis.core_functions.ICHelpers import completeICFromInputs, setBootstrapDirs
+from vesuvio_analysis.core_functions.ICHelpers import completeICFromInputs, completeBootIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
@@ -55,7 +55,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         raise ValueError("fitInYSpace option not recognized.")
 
 
-    setBootstrapDirs([bckwdIC, fwdIC], bootIC, userCtr)
+    completeBootIC(bootIC, [bckwdIC, fwdIC], userCtr)
     # If bootstrap is not None, run bootstrap procedure and finish
     if userCtr.bootstrap == None:
         pass

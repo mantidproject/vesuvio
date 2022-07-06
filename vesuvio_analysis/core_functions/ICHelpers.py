@@ -130,6 +130,16 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     print("\nEmpty workspace stored locally.\n")
     return 
 
+def completeBootIC(bootIC, inputIC, userCtr):
+
+    try:    # Assume it is not running a test if atribute is not found
+        reading = bootIC.runningTest
+    except AttributeError:
+        bootIC.runningTest = False
+
+    setBootstrapDirs(inputIC, bootIC, userCtr)
+    return
+
 
 def setBootstrapDirs(inputIC: list, bootIC, userCtr):
     """Form bootstrap output data paths"""
@@ -138,29 +148,44 @@ def setBootstrapDirs(inputIC: list, bootIC, userCtr):
     sampleName = inputIC[0].scriptName   # Name of sample currently running
     experimentsPath = currentPath/".."/".."/"experiments"
 
+    # Make bootstrap and jackknife data directories
     if bootIC.runningJackknife:
         bootPath = experimentsPath / sampleName / "jackknife_data"
     else:
         bootPath = experimentsPath / sampleName / "bootstrap_data"
     bootPath.mkdir(exist_ok=True)
 
+    # Folders for skipped and unskipped MS
     if bootIC.skipMSIterations:
         speedPath = bootPath / "skip_MS_corrections"
     else:
         speedPath = bootPath / "with_MS_corrections"
     speedPath.mkdir(exist_ok=True)
 
-    if (userCtr.bootstrap == "FORWARD") | (userCtr.bootstrap=="BACKWARD") | (userCtr.bootstrap=="JOINT"):
-        finalPath = speedPath / userCtr.bootstrap
+    # Create subfolders dependin no procedure running
+    if (userCtr.bootstrap == "FORWARD") | (userCtr.bootstrap=="BACKWARD"):
+        Path(speedPath / userCtr.bootstrap).mkdir(exist_ok=True)
+    elif userCtr.bootstrap=="JOINT":
+        if bootIC.runningJackknife:
+            Path(speedPath / "FORWARD").mkdir(exist_ok=True)
+            Path(speedPath / "BACKWARD").mkdir(exist_ok=True)
+        else:
+            Path(speedPath / "JOINT").mkdir(exist_ok=True)
     else:
         raise ValueError("Procedure in UserScriptControls not recognized.")
-    finalPath.mkdir(exist_ok=True)
+
+
+    # if (userCtr.bootstrap == "FORWARD") | (userCtr.bootstrap=="BACKWARD") | (userCtr.bootstrap=="JOINT"):
+    #     finalPath = speedPath / userCtr.bootstrap
+    # else:
+    #     raise ValueError("Procedure in UserScriptControls not recognized.")
+    # finalPath.mkdir(exist_ok=True)
 
     for IC in inputIC:    # Make save paths for .npz files
 
         nSamples = bootIC.nSamples
         if bootIC.runningJackknife: 
-            nSamples = noOfHistsFromTOFBinning(IC)
+            nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
 
         # Build Filename based on ic
         corr = ""
@@ -173,8 +198,12 @@ def setBootstrapDirs(inputIC: list, bootIC, userCtr):
         bootName = fileName + f"_nsampl_{nSamples}"+".npz"
         bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
 
-        IC.bootSavePath = finalPath / bootName
-        IC.bootYFitSavePath = finalPath / bootNameYFit
+        if bootIC.runningJackknife:
+            IC.bootSavePath = speedPath / IC.modeRunning / bootName          # works because modeRunning has same strings as procedure
+            IC.bootYFitSavePath = speedPath / IC.modeRunning / bootNameYFit
+        else:
+            IC.bootSavePath = speedPath / userCtr.bootstrap / bootName          # works because modeRunning has same strings as procedure
+            IC.bootYFitSavePath = speedPath / userCtr.bootstrap / bootNameYFit
     return 
 
 def noOfHistsFromTOFBinning(IC):

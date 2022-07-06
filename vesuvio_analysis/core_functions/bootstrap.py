@@ -35,13 +35,6 @@ def runBootstrap(inputIC, bootIC, yFitIC):
 
 
 def checkOutputDirExists(inputIC, bootIC):
-
-    try:    # Assume it is not running a test if atribute is not found
-        reading = bootIC.runningTest
-    except AttributeError:
-        bootIC.runningTest = False
-
-
     for IC in inputIC:                # Check files already exist
         if bootIC.runningTest:
             continue
@@ -117,10 +110,7 @@ def askUserConfirmation(inputIC: list, bootIC):
         # nSamples for either Bootstap or Jackknife
         nSamples = bootIC.nSamples 
         if bootIC.runningJackknife:
-            if bootIC.runningTest:
-                nSamples = 3
-            else:
-                nSamples = noOfHistsFromTOFBinning(IC)
+            nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
 
         # Either fast or slow bootstrap
         if bootIC.skipMSIterations:
@@ -138,14 +128,11 @@ def askUserConfirmation(inputIC: list, bootIC):
 
 
 def chooseLoopRange(bootIC, nSamples):
-
+    iStart = 0
+    iEnd = nSamples
     if bootIC.runningJackknife and bootIC.runningTest:
         iStart = int(nSamples/2)
         iEnd = iStart + 3   
-    else:
-        iStart = 0
-        iEnd = nSamples
-
     return iStart, iEnd
 
 
@@ -164,12 +151,10 @@ def chooseNSamples(bootIC, parentWSnNCPs: list):
     Returns number of samples to run.
     If Jackknife is running, no of samples is the number of bins in the workspace."""
 
+    nSamples = bootIC.nSamples
     if bootIC.runningJackknife:
         assert len(parentWSnNCPs) == 1, "Running Jackknife, supports only one IC at a time."
         nSamples = parentWSnNCPs[0][0].blocksize()-1   # -1 becuase last column is ignored during procedure
-    else:
-        nSamples = bootIC.nSamples
-
     return nSamples
 
 

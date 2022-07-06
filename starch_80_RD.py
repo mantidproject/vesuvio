@@ -62,7 +62,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 4     # Number of MS corrections, 0 is no correction
+    noOfMSIterations = 0     # Number of MS corrections, 0 is no correction
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -94,7 +94,7 @@ class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as
     ])
     constraints = ()
 
-    noOfMSIterations = 4      
+    noOfMSIterations = 0      
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -119,7 +119,7 @@ class YSpaceFitInitialConditions:
 
 class BootstrapInitialConditions:
     runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
-    nSamples = 650                  # Used if running Bootstrap, otherwise code ignores it
+    nSamples = 2                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = True        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
 
@@ -133,7 +133,7 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # If set, ignores procedure and runFItInYSpace
-    bootstrap = "BACKWARD"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = "JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapAnalysis:
