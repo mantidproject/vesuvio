@@ -110,7 +110,7 @@ class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
-    rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
+    rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
@@ -120,7 +120,7 @@ class YSpaceFitInitialConditions:
 class BootstrapInitialConditions:
     runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
     nSamples = 2                  # Used if running Bootstrap, otherwise code ignores it
-    skipMSIterations = True        # Each replica runs with no MS or Gamma corrections
+    skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
 
 
@@ -133,7 +133,7 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # If set, ignores procedure and runFItInYSpace
-    bootstrap = "JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = None #"JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapAnalysis:
@@ -170,4 +170,4 @@ print("\nRunning time: ", end_time-start_time, " seconds")
 
 analysisIC = BootstrapAnalysis
 
-runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC)
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, userCtr)

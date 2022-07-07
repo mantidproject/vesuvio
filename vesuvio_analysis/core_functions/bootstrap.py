@@ -80,7 +80,9 @@ def bootstrapProcedure(bootIC, inputIC: list, yFitIC):
         #     continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
         
         storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
-        saveBootstrapResults(bootResults, inputIC)      
+        saveBootstrapResults(bootResults, inputIC)
+
+    saveBootstrapLogs(bootResults, inputIC)
     return bootResults
 
 
@@ -162,11 +164,9 @@ def setICsToDefault(inputIC: list, yFitIC):
     """Disables some features of yspace fit, makes sure the default """
 
     # Disable global fit 
-    yFitIC.globalFitFlag = False
-    # Run automatic minos by default
-    yFitIC.forceManualMinos = False
+    if yFitIC.globalFit: yFitIC.globalFit = False
     # Hide plots
-    yFitIC.showPlots = False
+    yFitIC.showPlots: yFitIC.showPlots = False
 
     for IC in inputIC:    # Default is not to run with bootstrap ws
         IC.runningSampleWS = False
@@ -271,6 +271,10 @@ class BootScattResults:
         np.savez(IC.bootSavePath, boot_samples=self.bootSamples,
              parent_result=self.parentResult, corr_residuals=self.corrResiduals)
 
+    def saveLog(self, IC):
+        with open(IC.logFilePath, "a") as logFile:
+            logFile.write("\n"+IC.bootSavePathLog)
+
 
 class BootYFitResults:
 
@@ -286,6 +290,10 @@ class BootYFitResults:
         np.savez(IC.bootYFitSavePath, boot_samples=self.bootSamples,
              parent_popt=self.parentPopt, parent_perr=self.parentPerr)    
 
+    def saveLog(self, IC):
+        with open(IC.logFilePath, "a") as logFile:
+            logFile.write("\n"+IC.bootYFitSavePathLog)
+
 
 def storeBootIter(bootResultObjs: list, j: int, bootIterResults: list):
     for bootObj, iterRes in zip(bootResultObjs, bootIterResults):
@@ -293,9 +301,17 @@ def storeBootIter(bootResultObjs: list, j: int, bootIterResults: list):
 
 
 def saveBootstrapResults(bootResultObjs: list, inputIC: list):
+    # This format is not elegant 
+    # Assumes any yfit result will be at the end of list
     for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
         bootObj.saveResults(IC)
     bootResultObjs[-1].saveResults(inputIC[-1])   # Account for YFit object
+
+
+def saveBootstrapLogs(bootResultObjs: list, inputIC: list):
+    for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
+        bootObj.saveLog(IC)
+    bootResultObjs[-1].saveLog(inputIC[-1])   # Account for YFit object
 
 
 def convertWSToSavePaths(parentWSnNCPs: list):

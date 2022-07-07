@@ -36,8 +36,9 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 
     yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name(), wsSubMass.name())
     yfitResults.save()
-
-    runGlobalFit(wsYSpace, wsRes, IC, yFitIC) 
+    
+    if yFitIC.globalFit:
+        runGlobalFit(wsYSpace, wsRes, IC, yFitIC) 
     return yfitResults
 
 

@@ -1,5 +1,7 @@
 
 from email.policy import default
+from fileinput import filename
+from xml.dom import NotFoundErr
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
@@ -18,7 +20,7 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
     if not(analysisIC.runAnalysis):
         return
 
-    setBootstrapDirs([bckwdIC, fwdIC], bootIC, userCtr)   # Same function used to store data, to check below if dirs exist
+    setBootstrapDirs([bckwdIC, fwdIC], bootIC, yFitIC, userCtr)   # Same function used to store data, to check below if dirs exist
 
     for IC in [bckwdIC, fwdIC]:
 
@@ -26,6 +28,8 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
             print("Bootstrap data files not found, unable to run analysis!")
             print(f"{IC.bootSavePath.name}")
             continue    # If main results are not present, assume ysapce results are also missing
+        
+        checkLogMatch(IC, isYFitFile=False)
 
         bootParsRaw, parentParsRaw, nSamples, corrResiduals = readBootData(IC.bootSavePath)
         checkResiduals(corrResiduals)
@@ -54,6 +58,8 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
             print(f"{IC.bootYFitSavePath.name}")
             continue
 
+        checkLogMatch(IC, isYFitFile=True)
+
         fitIdx = 0   # 0 for Minuit, 1 for LM
 
         bootYFitData = np.load(IC.bootYFitSavePath)
@@ -73,6 +79,32 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
         plotMeansEvolutionYFit(analysisIC, minuitFitVals)
         plotYFitHists(analysisIC, yFitIC, minuitFitVals)
         plot2DHistsYFit(analysisIC, minuitFitVals)
+
+
+def checkLogMatch(IC, isYFitFile):
+    """Checks if currently selected data file matches stored logs."""
+    if isYFitFile:
+        currentLog = IC.bootYFitSavePathLog
+        currName = currentLog.split(" : ")[0]
+        # Check sample present in log file
+        with open(IC.logFilePath, "r") as logFile:
+            for line in logFile:
+                # Check if name of file is present
+                if line.split(" : ")[0] == currName:
+                    # If yfit results, compare full line
+                    if isYFitFile:
+                        if line == currentLog:
+                            return
+                    # If not yfit resutts, ignore last part for bootstrap type
+                    # This is because when running analysis can have bootstrap=None
+                    else:
+                        curr = currentLog.split(" - ")[:-1]
+                        stored = line.split(" - ")[:-1]
+                        if curr == stored:
+                            return
+                    raise NotFoundErr(IC.bootYFitSavePath.name+" found but corresponding log does not match.") 
+            raise NotFoundErr(IC.bootYFitSavePath.name+" not found in logs file") 
+ 
 
 def readBootData(dataPath):
         bootData = np.load(dataPath)
@@ -277,12 +309,18 @@ def plotMeansEvolution(IC, meanWidths, meanIntensities):
     if not(IC.plotMeansEvolution):
         return
 
-    fig, axs = plt.subplots(2, 1)
-    axs[0].set_title("Evolution of mean Widths")
-    plotMeansOverNoSamples(axs[0], meanWidths)
+    fig, axs = plt.subplots(2, 2)
+    axs[0, 0].set_title("Evolution of mean Widths")
+    plotMeansOverNoSamples(axs[0, 0], meanWidths)
 
-    axs[1].set_title("Evolution of mean Intensities")
-    plotMeansOverNoSamples(axs[1], meanIntensities)
+    axs[1, 0].set_title("Widths normalized to last value")
+    plotMeansOverNoSamples(axs[1, 0], meanWidths, normFlag=True)
+
+    axs[0, 1].set_title("Evolution of mean Intensities")
+    plotMeansOverNoSamples(axs[0, 1], meanIntensities)
+
+    axs[1, 1].set_title("Intensities normalized to last value")
+    plotMeansOverNoSamples(axs[1, 1], meanIntensities, normFlag=True)
 
     plt.show()
     return
@@ -294,15 +332,18 @@ def plotMeansEvolutionYFit(analysisIC, minuitFitVals):
     if not(analysisIC.plotMeansEvolution):
         return
     
-    fig, ax = plt.subplots()
-    ax.set_title("Evolution of y-space fit parameters")
-    plotMeansOverNoSamples(ax, minuitFitVals)
+    fig, ax = plt.subplots(2, 1)
+    ax[0].set_title("Evolution of y-space fit parameters")
+    plotMeansOverNoSamples(ax[0], minuitFitVals)
+
+    ax[1].set_title("y-space fit parameters normalized to last value")
+    plotMeansOverNoSamples(ax[1], minuitFitVals, normFlag=True)
 
     plt.show()
     return
 
 
-def plotMeansOverNoSamples(ax, bootMeans):
+def plotMeansOverNoSamples(ax, bootMeans, normFlag=False):
 
     nSamples = len(bootMeans[0])
     assert nSamples >= 10, "To plot evolution of means, need at least 10 samples!"
@@ -317,25 +358,32 @@ def plotMeansOverNoSamples(ax, bootMeans):
 
         mean = np.mean(subSample, axis=1)
 
-        bounds = np.percentile(subSample, [5, 95], axis=1).T
+        bounds = np.percentile(subSample, [16, 68+16], axis=1).T   # 1 standard dev
         assert bounds.shape == (len(subSample), 2), f"Wrong shape: {bounds.shape}"
         errors = bounds - mean[:, np.newaxis]
 
         sampleMeans[:, i] = mean
         sampleErrors[:, :, i] = errors
 
-    firstValues = sampleMeans[:, 0][:, np.newaxis]
-    meansRelDiff = (sampleMeans - firstValues) / firstValues * 100  # %
-    
-    errorsRel = sampleErrors / sampleMeans[:, np.newaxis, :] * 100  # %
+    meansFinal = sampleMeans
+    errorsFinal = sampleErrors
+    ylabel = "Means and Errors Values"
+    if normFlag:   # Rescale and normalize to last value, so all points are converging to zero
+        lastValue = sampleMeans[:, -1][:, np.newaxis]
+        meansFinal = (sampleMeans - lastValue) / lastValue * 100   # Percent change to last value
+        errorsFinal = (sampleErrors - lastValue[:, np.newaxis, :]) / lastValue[:, np.newaxis, :] * 100 
+        ylabel = "Percent Change [%]"
+    # firstValues = sampleMeans[:, 0][:, np.newaxis]
+    # meansFinal = (sampleMeans - firstValues) / firstValues * 100  # %
+    # errorsFinal = sampleErrors / sampleMeans[:, np.newaxis, :] * 100  # %
 
-    for i, (means, errors) in enumerate(zip(meansRelDiff, errorsRel)):
+    for i, (means, errors) in enumerate(zip(meansFinal, errorsFinal)):
         ax.plot(sampleSizes, means, label=f"idx {i}")
         ax.fill_between(sampleSizes, errors[0, :], errors[1, :], alpha=0.1)
     
     ax.legend()
     ax.set_xlabel("Number of Bootstrap samples")
-    ax.set_ylabel("Percent change (%)")
+    ax.set_ylabel(ylabel)
 
 
 def plot2DHistsWidthsAndIntensities(IC, meanWidths, meanIntensities):

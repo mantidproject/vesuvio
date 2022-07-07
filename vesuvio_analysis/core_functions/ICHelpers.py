@@ -1,4 +1,5 @@
 
+from genericpath import exists
 from unittest.loader import VALID_MODULE_NAME
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
@@ -130,18 +131,18 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     print("\nEmpty workspace stored locally.\n")
     return 
 
-def completeBootIC(bootIC, inputIC, userCtr):
+def completeBootIC(bootIC, inputIC, yFitIC, userCtr):
 
     try:    # Assume it is not running a test if atribute is not found
         reading = bootIC.runningTest
     except AttributeError:
         bootIC.runningTest = False
 
-    setBootstrapDirs(inputIC, bootIC, userCtr)
+    setBootstrapDirs(inputIC, bootIC, yFitIC, userCtr)
     return
 
 
-def setBootstrapDirs(inputIC: list, bootIC, userCtr):
+def setBootstrapDirs(inputIC: list, bootIC, yFitIC, userCtr):
     """Form bootstrap output data paths"""
 
     # Select script name and experiments path
@@ -157,56 +158,71 @@ def setBootstrapDirs(inputIC: list, bootIC, userCtr):
 
     # Folders for skipped and unskipped MS
     if bootIC.skipMSIterations:
-        speedPath = bootPath / "skip_MS_corrections"
+        dataPath = bootPath / "skip_MS_corrections"
     else:
-        speedPath = bootPath / "with_MS_corrections"
-    speedPath.mkdir(exist_ok=True)
+        dataPath = bootPath / "with_MS_corrections"
+    dataPath.mkdir(exist_ok=True)
 
-    # Create subfolders dependin no procedure running
-    if (userCtr.bootstrap == "FORWARD") | (userCtr.bootstrap=="BACKWARD"):
-        Path(speedPath / userCtr.bootstrap).mkdir(exist_ok=True)
-    elif userCtr.bootstrap=="JOINT":
-        if bootIC.runningJackknife:
-            Path(speedPath / "FORWARD").mkdir(exist_ok=True)
-            Path(speedPath / "BACKWARD").mkdir(exist_ok=True)
-        else:
-            Path(speedPath / "JOINT").mkdir(exist_ok=True)
-    else:
-        raise ValueError("Procedure in UserScriptControls not recognized.")
+    # Create text file for logs
+    logFilePath = dataPath / "data_files_log.txt"
+    if not(logFilePath.is_file()):
+        with open(logFilePath, "w") as txtFile:
+            txtFile.write("This file contains some information about each data file in the folder:\n")
 
-
-    # if (userCtr.bootstrap == "FORWARD") | (userCtr.bootstrap=="BACKWARD") | (userCtr.bootstrap=="JOINT"):
-    #     finalPath = speedPath / userCtr.bootstrap
-    # else:
-    #     raise ValueError("Procedure in UserScriptControls not recognized.")
-    # finalPath.mkdir(exist_ok=True)
+    cleanLogFile(logFilePath)
 
     for IC in inputIC:    # Make save paths for .npz files
+        bootName, bootNameYFit = genBootFilesName(IC, bootIC)
 
-        nSamples = bootIC.nSamples
-        if bootIC.runningJackknife: 
-            nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
+        IC.bootSavePath = dataPath / bootName          # works because modeRunning has same strings as procedure
+        IC.bootYFitSavePath = dataPath / bootNameYFit
 
-        # Build Filename based on ic
-        corr = ""
-        if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
-            corr+="_MS"
-        if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
-            corr+="_GC"
-
-        fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
-        bootName = fileName + f"_nsampl_{nSamples}"+".npz"
-        bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
-
-        if bootIC.runningJackknife:
-            IC.bootSavePath = speedPath / IC.modeRunning / bootName          # works because modeRunning has same strings as procedure
-            IC.bootYFitSavePath = speedPath / IC.modeRunning / bootNameYFit
-        else:
-            IC.bootSavePath = speedPath / userCtr.bootstrap / bootName          # works because modeRunning has same strings as procedure
-            IC.bootYFitSavePath = speedPath / userCtr.bootstrap / bootNameYFit
+        IC.logFilePath = logFilePath
+        IC.bootSavePathLog = logString(bootName, IC, yFitIC, userCtr, isYFit=False)
+        IC.bootYFitSavePathLog = logString(bootNameYFit, IC, yFitIC, userCtr, isYFit=True)
     return 
+
+
+def genBootFilesName (IC, bootIC):
+    """Generates save file name for either BACKWARD or FORWARD class"""
+
+    nSamples = bootIC.nSamples
+    if bootIC.runningJackknife: 
+        nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
+
+    # Build Filename based on ic
+    corr = ""
+    if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
+        corr+="_MS"
+    if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
+        corr+="_GC"
+
+    fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"
+    bootName = fileName + f"_nsampl_{nSamples}"+".npz"
+    bootNameYFit = fileName + "_ySpaceFit" + f"_nsampl_{nSamples}"+".npz"
+    return bootName, bootNameYFit
+
+
+def logString(bootDataName, IC, yFitIC, userCtr, isYFit):
+    if isYFit:
+        log = bootDataName+" : "+str(yFitIC.symmetrisationFlag)+" - "+yFitIC.rebinParametersForYSpaceFit+" - "+yFitIC.fitModel
+    else:
+        log = bootDataName+" : "+IC.tofBinning+" - "+str(userCtr.bootstrap)
+    return log
+
 
 def noOfHistsFromTOFBinning(IC):
     start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
+
+def cleanLogFile(logFilePath):
+    folderPath = logFilePath.parent
+    with open(logFilePath, "r") as file:
+        lines = file.readlines()
+    with open(logFilePath, "w") as file:
+        for line in lines:
+            name = line.strip("\n").split(" : ")[0]
+            namePath = folderPath / name
+            if namePath.is_file():
+                file.write(line)

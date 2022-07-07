@@ -55,7 +55,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         raise ValueError("fitInYSpace option not recognized.")
 
 
-    completeBootIC(bootIC, [bckwdIC, fwdIC], userCtr)
+    completeBootIC(bootIC, [bckwdIC, fwdIC], yFitIC, userCtr)
     # If bootstrap is not None, run bootstrap procedure and finish
     if userCtr.bootstrap == None:
         pass
