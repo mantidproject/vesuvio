@@ -83,28 +83,27 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
 
 def checkLogMatch(IC, isYFitFile):
     """Checks if currently selected data file matches stored logs."""
-    if isYFitFile:
-        currentLog = IC.bootYFitSavePathLog
-        currName = currentLog.split(" : ")[0]
-        # Check sample present in log file
-        with open(IC.logFilePath, "r") as logFile:
-            for line in logFile:
-                # Check if name of file is present
-                if line.split(" : ")[0] == currName:
-                    # If yfit results, compare full line
-                    if isYFitFile:
-                        if line == currentLog:
-                            return
-                    # If not yfit resutts, ignore last part for bootstrap type
-                    # This is because when running analysis can have bootstrap=None
-                    else:
-                        curr = currentLog.split(" - ")[:-1]
-                        stored = line.split(" - ")[:-1]
-                        if curr == stored:
-                            return
-                    raise NotFoundErr(IC.bootYFitSavePath.name+" found but corresponding log does not match.") 
-            raise NotFoundErr(IC.bootYFitSavePath.name+" not found in logs file") 
- 
+    currentLog = IC.bootYFitSavePathLog if isYFitFile else IC.bootSavePathLog
+    currName = currentLog.split(" : ")[0]
+    # Check sample present in log file
+    with open(IC.logFilePath, "r") as logFile:
+        for line in logFile:
+            # Check if name of file is present
+            if line.split(" : ")[0] == currName:
+                # If yfit results, compare full line
+                if isYFitFile:
+                    if line == currentLog:
+                        return
+                # If not yfit resutts, ignore last part for bootstrap type
+                # This is because when running analysis can have bootstrap=None
+                else:
+                    curr = currentLog.split(" - ")[:-1]
+                    stored = line.split(" - ")[:-1]
+                    if curr == stored:
+                        return
+                raise NotFoundErr(IC.bootYFitSavePath.name+" found but corresponding log does not match.") 
+        raise NotFoundErr(IC.bootYFitSavePath.name+" not found in logs file") 
+
 
 def readBootData(dataPath):
         bootData = np.load(dataPath)

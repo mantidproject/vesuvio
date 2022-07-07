@@ -223,6 +223,10 @@ def cleanLogFile(logFilePath):
     with open(logFilePath, "w") as file:
         for line in lines:
             name = line.strip("\n").split(" : ")[0]
-            namePath = folderPath / name
-            if namePath.is_file():
-                file.write(line)
+            file.write(line)
+            for path in folderPath.iterdir():
+                folderName = path.name
+
+                # if path.name==name:
+                #     file.write(line)
+
