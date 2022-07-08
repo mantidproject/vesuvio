@@ -124,11 +124,6 @@ class UserScriptControls:
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None #"FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
-    # Perform bootstrap procedure
-    # If set, ignores procedure and runFItInYSpace
-    # bootstrap = None #"JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
-
 class BootstrapInitialConditions:
     runBootstrap = False 
 
