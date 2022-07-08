@@ -1,0 +1,5 @@
+This file contains some information about each data file in the folder:
+
+spec_3-134_iter_0_nsampl_2.npz : 275.,1.,420 - JOINT
+spec_144-182_iter_0_nsampl_2.npz : 110,1,430 - JOINT
+spec_144-182_iter_0_ySpaceFit_nsampl_2.npz : False - -30, 0.5, 30 - SINGLE_GAUSSIAN

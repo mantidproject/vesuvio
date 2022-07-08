@@ -133,7 +133,7 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # If set, ignores procedure and runFItInYSpace
-    bootstrap = None #"JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    bootstrap = "JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapAnalysis:

@@ -169,8 +169,6 @@ def setBootstrapDirs(inputIC: list, bootIC, yFitIC, userCtr):
         with open(logFilePath, "w") as txtFile:
             txtFile.write("This file contains some information about each data file in the folder:\n")
 
-    cleanLogFile(logFilePath)
-
     for IC in inputIC:    # Make save paths for .npz files
         bootName, bootNameYFit = genBootFilesName(IC, bootIC)
 
@@ -216,17 +214,17 @@ def noOfHistsFromTOFBinning(IC):
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
 
-def cleanLogFile(logFilePath):
-    folderPath = logFilePath.parent
-    with open(logFilePath, "r") as file:
-        lines = file.readlines()
-    with open(logFilePath, "w") as file:
-        for line in lines:
-            name = line.strip("\n").split(" : ")[0]
-            file.write(line)
-            for path in folderPath.iterdir():
-                folderName = path.name
+# def cleanLogFile(logFilePath):
+#     folderPath = logFilePath.parent
+#     with open(logFilePath, "r") as file:
+#         lines = file.readlines()
+#     with open(logFilePath, "w") as file:
+#         for line in lines:
+#             name = line.strip("\n").split(" : ")[0]
+#             file.write(line)
+#             for path in folderPath.iterdir():
+#                 folderName = path.name
 
-                # if path.name==name:
-                #     file.write(line)
+#                 # if path.name==name:
+#                 #     file.write(line)
 
