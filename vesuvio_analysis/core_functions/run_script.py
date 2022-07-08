@@ -1,7 +1,7 @@
 
 from vesuvio_analysis.core_functions.ICHelpers import completeICFromInputs, completeBootIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
-from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
+from vesuvio_analysis.core_functions.fit_in_yspace import buildFinalWSNames, fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from mantid.api import mtd
 
@@ -55,21 +55,22 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         raise ValueError("fitInYSpace option not recognized.")
 
 
-    completeBootIC(bootIC, [bckwdIC, fwdIC], yFitIC, userCtr)
     # If bootstrap is not None, run bootstrap procedure and finish
-    if userCtr.bootstrap == None:
-        pass
+    if bootIC.runBootstrap == True:
+        completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC)
+        assert (bootIC.procedure=="FORWARD") | (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"), "Invalid Bootstrap procedure."
+        return runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
 
-    elif userCtr.bootstrap == "BACKWARD":
-        return runBootstrap([bckwdIC], bootIC, yFitIC), None
+        # if bootIC == "BACKWARD":
+        #     return runBootstrap([bckwdIC], bootIC, yFitIC), None
 
-    elif userCtr.bootstrap == "FORWARD":
-        return runBootstrap([fwdIC], bootIC, yFitIC), None
+        # elif userCtr.bootstrap == "FORWARD":
+        #     return runBootstrap([fwdIC], bootIC, yFitIC), None
 
-    elif userCtr.bootstrap == "JOINT":
-        return runBootstrap([bckwdIC, fwdIC], bootIC, yFitIC), None
-    else:
-        raise ValueError("Bootstrap option not recognized.")
+        # elif userCtr.bootstrap == "JOINT":
+        #     return runBootstrap([bckwdIC, fwdIC], bootIC, yFitIC), None
+        # else:
+        #     raise ValueError("Bootstrap option not recognized.")
 
     
     # Default workflow for procedure + fit in y space
@@ -92,14 +93,6 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     
     return res, resYFit   # Return results used only in tests
 
-
-def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
-    wsNames = []
-    for proc, IC in zip(procedures, inputIC):
-        # Format of corrected ws from last iteration
-        name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
-        wsNames.append(name)
-    return wsNames
 
 
 def checkUserClearWS():

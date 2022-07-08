@@ -20,7 +20,7 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
     if not(analysisIC.runAnalysis):
         return
 
-    setBootstrapDirs([bckwdIC, fwdIC], bootIC, yFitIC, userCtr)   # Same function used to store data, to check below if dirs exist
+    setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC)   # Same function used to store data, to check below if dirs exist
 
     for IC in [bckwdIC, fwdIC]:
 

@@ -2,6 +2,7 @@
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 
@@ -116,14 +117,6 @@ class YSpaceFitInitialConditions:
     nGlobalFitGroups = 4             # Number or string "ALL"
     maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
 
-
-class BootstrapInitialConditions:
-    runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
-    nSamples = 2                  # Used if running Bootstrap, otherwise code ignores it
-    skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
-    userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
-
-
 class UserScriptControls:
     # Choose main procedure to run
     procedure = None #"FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -133,7 +126,20 @@ class UserScriptControls:
 
     # Perform bootstrap procedure
     # If set, ignores procedure and runFItInYSpace
-    bootstrap = None #"JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    # bootstrap = None #"JOINT"         # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+
+class BootstrapInitialConditions:
+    runBootstrap = False 
+
+    procedure = "JOINT"
+    fitInYSpace = "FORWARD"
+
+    runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
+    nSamples = 2                  # Used if running Bootstrap, otherwise code ignores it
+    skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
+    userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
+
 
 
 class BootstrapAnalysis:

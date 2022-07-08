@@ -17,7 +17,10 @@ for i in range(len(fwdIC.masses)):
     Load(str(testPath / fileName), OutputWorkspace=wsFinal.name()+"_TOF_Fitted_Profile_"+str(i))
 
 class BootstrapInitialConditions: # Not used, but still need to pass as arg
-    nSamples = 0
+    runBootstrap = False
+    runningJackknife = False
+    procedure = None
+    fitInYSpace = NoneSamples = 0
 
 class UserScriptControls:
     procedure = "FORWARD"   

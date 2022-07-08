@@ -1,3 +1,4 @@
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
@@ -17,7 +18,12 @@ for i in range(len(fwdIC.masses)):
     Load(str(testPath / fileName), OutputWorkspace=wsFinal.name()+"_TOF_Fitted_Profile_"+str(i))
 
 class BootstrapInitialConditions: # Not used, but still need to pass as arg
+    runBootstrap = False
+    runningJackknife = False
+    procedure = None
+    fitInYSpace = None
     nSamples = 0
+    
 
 class UserScriptControls:
     procedure = "FORWARD"   

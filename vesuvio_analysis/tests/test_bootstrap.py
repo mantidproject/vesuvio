@@ -1,3 +1,4 @@
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 import unittest
 import numpy as np
@@ -10,6 +11,11 @@ np.random.seed(1)   # Set seed so that tests match everytime
 
 
 class BootstrapInitialConditions:
+    runBootstrap = True
+
+    procedure = "JOINT"
+    fitInYSpace = "FORWARD"
+
     runningJackknife = False
     nSamples = 3
     skipMSIterations = False
@@ -34,13 +40,17 @@ bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, 
 # Probably because running bootstrap alters the initial conditions of forward scattering
 # Test Joint procedure
 
-bootJointResults = bootRes
+bootBackSamples = bootRes["bckwdScat"].bootSamples
+bootFrontSamples = bootRes["fwdScat"].bootSamples
+bootYFitSamples = bootRes["fwdYFit"].bootSamples
 
-bootSamples = []
-for bootRes in bootJointResults:
-    bootSamples.append(bootRes.bootSamples)
+# bootJointResults = bootRes
 
-bootBackSamples, bootFrontSamples, bootYFitSamples = bootSamples
+# bootSamples = []
+# for bootRes in bootJointResults:
+#     bootSamples.append(bootRes.bootSamples)
+
+# bootBackSamples, bootFrontSamples, bootYFitSamples = bootSamples
 
 oriBootBack = testPath / "stored_boot_back.npz"
 oriBootFront = testPath / "stored_boot_front.npz"

@@ -131,22 +131,22 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     print("\nEmpty workspace stored locally.\n")
     return 
 
-def completeBootIC(bootIC, inputIC, yFitIC, userCtr):
+def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
 
     try:    # Assume it is not running a test if atribute is not found
         reading = bootIC.runningTest
     except AttributeError:
         bootIC.runningTest = False
 
-    setBootstrapDirs(inputIC, bootIC, yFitIC, userCtr)
+    setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC)
     return
 
 
-def setBootstrapDirs(inputIC: list, bootIC, yFitIC, userCtr):
+def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     """Form bootstrap output data paths"""
 
     # Select script name and experiments path
-    sampleName = inputIC[0].scriptName   # Name of sample currently running
+    sampleName = bckwdIC.scriptName   # Name of sample currently running
     experimentsPath = currentPath/".."/".."/"experiments"
 
     # Make bootstrap and jackknife data directories
@@ -169,15 +169,15 @@ def setBootstrapDirs(inputIC: list, bootIC, yFitIC, userCtr):
         with open(logFilePath, "w") as txtFile:
             txtFile.write("This file contains some information about each data file in the folder:\n")
 
-    for IC in inputIC:    # Make save paths for .npz files
+    for IC in [bckwdIC, fwdIC]:    # Make save paths for .npz files
         bootName, bootNameYFit = genBootFilesName(IC, bootIC)
 
         IC.bootSavePath = dataPath / bootName          # works because modeRunning has same strings as procedure
         IC.bootYFitSavePath = dataPath / bootNameYFit
 
         IC.logFilePath = logFilePath
-        IC.bootSavePathLog = logString(bootName, IC, yFitIC, userCtr, isYFit=False)
-        IC.bootYFitSavePathLog = logString(bootNameYFit, IC, yFitIC, userCtr, isYFit=True)
+        IC.bootSavePathLog = logString(bootName, IC, yFitIC, bootIC, isYFit=False)
+        IC.bootYFitSavePathLog = logString(bootNameYFit, IC, yFitIC, bootIC, isYFit=True)
     return 
 
 
@@ -201,11 +201,11 @@ def genBootFilesName (IC, bootIC):
     return bootName, bootNameYFit
 
 
-def logString(bootDataName, IC, yFitIC, userCtr, isYFit):
+def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     if isYFit:
-        log = bootDataName+" : "+str(yFitIC.symmetrisationFlag)+" - "+yFitIC.rebinParametersForYSpaceFit+" - "+yFitIC.fitModel
+        log = bootDataName+" : "+str(bootIC.fitInYSpace)+" - "+str(yFitIC.symmetrisationFlag)+" - "+yFitIC.rebinParametersForYSpaceFit+" - "+yFitIC.fitModel
     else:
-        log = bootDataName+" : "+IC.tofBinning+" - "+str(userCtr.bootstrap)
+        log = bootDataName+" : "+str(bootIC.procedure)+" - "+IC.tofBinning
     return log
 
 

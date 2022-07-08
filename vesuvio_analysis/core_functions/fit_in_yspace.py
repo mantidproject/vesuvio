@@ -13,6 +13,15 @@ import time
 
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
+def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
+    wsNames = []
+    for proc, IC in zip(procedures, inputIC):
+        # Format of corrected ws from last iteration
+        name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
+        wsNames.append(name)
+    return wsNames
+
+
 
 def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 

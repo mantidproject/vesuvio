@@ -9,6 +9,12 @@ testPath = Path(__file__).absolute().parent
 np.random.seed(3)   # Set seed so that tests match everytime
 
 class BootstrapInitialConditions:
+    runBootstrap = True
+
+    procedure = "JOINT"
+    fitInYSpace = None
+
+
     runningJackknife = True
     nSamples = 3   # Overwritten by running Jackknife
     skipMSIterations = False
@@ -26,14 +32,17 @@ userCtr = UserScriptControls
 
 bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
+jackBackSamples = bootRes["bckwdScat"].bootSamples
+jackFrontSamples = bootRes["fwdScat"].bootSamples
 
-jackJointResults = bootRes
 
-jackSamples = []
-for jackRes in jackJointResults:
-    jackSamples.append(jackRes.bootSamples)
+# jackJointResults = bootRes
 
-jackBackSamples, jackFrontSamples = jackSamples
+# jackSamples = []
+# for jackRes in jackJointResults:
+#     jackSamples.append(jackRes.bootSamples)
+
+# jackBackSamples, jackFrontSamples = jackSamples
 
 
 oriJackBack = testPath / "stored_joint_jack_back.npz"

@@ -1,4 +1,5 @@
 
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 import unittest
 import numpy as np
@@ -10,6 +11,9 @@ testPath = Path(__file__).absolute().parent
 
 
 class BootstrapInitialConditions: # Not used, but still need to pass as arg
+    runBootstrap = False
+    procedure = None
+    fitInYSpace = None
     runningJackknife = False
     nSamples = 0
     skipMSIterations = False

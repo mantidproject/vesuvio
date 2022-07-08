@@ -2,6 +2,7 @@
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 
@@ -112,34 +113,39 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "DOUBLE_WELL"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     globalFit = True 
     nGlobalFitGroups = 4   
     maskTOFRange = None 
 
 
+class UserScriptControls:
+    # Choose main procedure to run
+    procedure = None #"JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
+
+    # Choose on which ws to perform the fit in y space
+    fitInYSpace = None #"BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+    # Perform bootstrap procedure
+    # Independent of procedure and runFItInYSpace
+    # bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+
 class BootstrapInitialConditions:
-    runningJackknife = True
-    nSamples = 500
-    skipMSIterations = False
+    runBootstrap = True
+
+    procedure = "JOINT"
+    fitInYSpace = "JOINT"
+
+    runningJackknife = False
+    nSamples = 2
+    skipMSIterations = True
     runningTest = False
     userConfirmation = True
 
 
-class UserScriptControls:
-    # Choose main procedure to run
-    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
-
-    # Choose on which ws to perform the fit in y space
-    fitInYSpace = "BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
-    # Perform bootstrap procedure
-    # Independent of procedure and runFItInYSpace
-    bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
-
 class BootstrapAnalysis:
-    runAnalysis = False
+    runAnalysis = True
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True                 # True discards some unreasonable values of widths and intensities
@@ -147,7 +153,7 @@ class BootstrapAnalysis:
     # Flags below control the plots to show
     plotRawWidthsIntensities = True
     plotMeanWidthsIntensities = True
-    plotMeansEvolution = True
+    plotMeansEvolution = False
     plot2DHists = True
     plotYFitHists = True
 
