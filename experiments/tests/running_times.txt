@@ -1,0 +1,7 @@
+This file contains some information about running times used to estimate Bootstrap run time.
+
+no of MS, no of Spec, Time [s]
+
+1 12 15.54
+1 12 17.13
+1 12 16.69

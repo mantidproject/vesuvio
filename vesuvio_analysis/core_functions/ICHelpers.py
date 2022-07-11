@@ -132,6 +132,11 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     return 
 
 def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
+    # Used even in the case where bootstrap is not running, to store running times
+    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
+
+    if not(bootIC.runBootstrap):
+        return
 
     try:    # Assume it is not running a test if atribute is not found
         reading = bootIC.runningTest
@@ -139,6 +144,7 @@ def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
         bootIC.runningTest = False
 
     setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC)
+
     return
 
 
@@ -207,6 +213,35 @@ def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     else:
         log = bootDataName+" : "+str(bootIC.procedure)+" - "+IC.tofBinning
     return log
+
+
+def storeRunnningTime(t, fwdIC, bckwdIC, userCtr, bootIC):
+    """Used to write run times to txt file."""
+
+    totMS, totNSpec = getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr)
+    
+    line = f"\n{totMS} {totNSpec} {t:.2f}"
+
+    savePath = bootIC.runTimesPath
+
+    if not(savePath.is_file()):
+        with open(savePath, "w") as txtFile:
+            txtFile.write("This file contains some information about running times used to estimate Bootstrap run time.\n\n")
+            txtFile.write("no of MS, no of Spec, Time [s]\n")
+   
+    with open(savePath, "a") as txtFile:
+        txtFile.write(line)
+    return
+
+
+def getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr):
+    totMS = 0
+    totNSpec = 0
+    for mode, IC in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC]):
+        if (userCtr.procedure==mode) | (userCtr.procedure=="JOINT"):
+            totMS += IC.noOfMSIterations
+            totNSpec += (IC.lastSpec - IC.firstSpec + 1)
+    return totMS, totNSpec
 
 
 def noOfHistsFromTOFBinning(IC):

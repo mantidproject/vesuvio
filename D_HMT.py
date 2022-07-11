@@ -64,7 +64,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 0     
+    noOfMSIterations = 4     
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 1    
+    noOfMSIterations = 4   
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -111,9 +111,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = True
+    symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     globalFit = True 
     nGlobalFitGroups = 4   
     maskTOFRange = None 
@@ -126,35 +126,31 @@ class UserScriptControls:
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None #"BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
-    # Perform bootstrap procedure
-    # Independent of procedure and runFItInYSpace
-    # bootstrap = None   # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
 
 class BootstrapInitialConditions:
-    runBootstrap = True
+    runBootstrap = False
 
     procedure = "JOINT"
     fitInYSpace = "JOINT"
 
-    runningJackknife = True
-    nSamples = 2
-    skipMSIterations = True
+    runningJackknife = False
+    nSamples = 649
+    skipMSIterations = False
     runningTest = False
-    userConfirmation = False
+    userConfirmation = True
 
 
 class BootstrapAnalysis:
-    runAnalysis = False 
+    runAnalysis = False
 
     # Choose whether to filter averages as done in original procedure
-    filterAvg = True                 # True discards some unreasonable values of widths and intensities
+    filterAvg = False                 # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
     plotRawWidthsIntensities = True
     plotMeanWidthsIntensities = True
     plotMeansEvolution = False
-    plot2DHists = True
+    plot2DHists = False
     plotYFitHists = True
 
 

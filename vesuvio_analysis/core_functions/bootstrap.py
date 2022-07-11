@@ -1,4 +1,3 @@
-from multiprocessing.sharedctypes import Value
 from scipy import stats
 import numpy as np
 
@@ -6,7 +5,7 @@ from .analysis_functions import arraysFromWS, histToPointData, prepareFitArgs, f
 from .analysis_functions import iterativeFitForDataReduction
 from .fit_in_yspace import fitInYSpaceProcedure
 from .procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, noOfHistsFromTOFBinning
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, getTotNoMSNoSpec, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
@@ -93,6 +92,7 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     # Form each bootstrap workspace and run ncp fit with MS corrections
     for i in range(iStart, iEnd):
         AnalysisDataService.clear()
+        plt.close("all")    # Not sure if previous step clears plt figures, so introduced this step to be safe
 
         sampleInputWS, parentWS = createSampleWS(parentWSNCPSavePaths, i, bootIC)   # Creates ith sample
         formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS, parentWS)  
@@ -115,6 +115,16 @@ def askUserConfirmation(bckwdIC, fwdIC, bootIC):
     
     if not(bootIC.userConfirmation):   # Skip user confirmation 
         return
+
+    # t = np.loadtxt(bootIC.runTimesPath, dtype=str)[1:].astype(float)
+    # t[t[:, 0]==0] = np.nan    # Mask rows with zeros
+
+    # noMS, noSpec = getTotNoMSNoSpec(fwdIC, bckwdIC, bootIC)
+    
+    # meanT = np.nanmean(t[:, -1] * noMS/t[:, 0] * noSpec/t[:, 1])
+
+    # runTime = meanT * bootIC.nSamples  # TODO: This is compeletly wrong
+
 
     tBckwdNoMS = 0.27
     tBckwdPerMS = 2.6
@@ -215,22 +225,6 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
                     bckwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, wsFinal)
                     resultsDict[key+"YFit"] = bckwdYFitRes
 
-
-    # if bootIC.procedure=="BACKWARD":
-    #     wsFinal, bckwdScatRes = runIndependentIterativeProcedure(bckwdIC, clearWS=False)
-    #     resultsDict["bckwdScat"] = bckwdScatRes
-
-    #     if not(bootIC.runningJackknife):
-    #         bckwdYFitRes = fitInYSpaceProcedure(yFitIC, bckwdIC, wsFinal)
-    #         resultsDict["bckwdYFit"] = bckwdYFitRes
-
-    # elif bootIC.procedure=="FORWARD":
-    #     wsFinal, fwdScatRes = runIndependentIterativeProcedure(fwdIC, clearWS=False)
-    #     resultsDict["fwdScat"] = fwdScatRes
-
-    #     if not(bootIC.runningJackknife):
-    #         fwdYFitRes = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
-    #         resultsDict["fwdYFit"] = fwdYFitRes
     
     elif bootIC.procedure=="JOINT":
         ws, bckwdScatRes, fwdScatRes = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
@@ -245,16 +239,6 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
                     wsName = buildFinalWSNames(IC.scriptName, [mode], [IC])[0]  # List, select only element
                     fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
                     resultsDict[key+"YFit"] = fwdYFitRes
-
-            # if (bootIC.fitInYSpace=="FORWARD") | (bootIC.fitInYSpace=="JOINT"):
-            #     wsName = buildFinalWSNames(fwdIC.scriptName, ["FORWARD"], [fwdIC])[0]  # List, select only element
-            #     fwdYFitRes = fitInYSpaceProcedure(yFitIC, fwdIC, mtd[wsName])
-            #     resultsDict["fwdYFit"] = fwdYFitRes
-            
-            # if (bootIC.fitInYSpace=="BACKWARD") | (bootIC.fitInYSpace=="JOINT"):
-            #     wsName = buildFinalWSNames(bckwdIC.scriptName, ["BACKWARD"], [bckwdIC])[0]
-            #     bckwdYFitRes = fitInYSpaceProcedure(yFitIC, bckwdIC, mtd[wsName])
-            #     resultsDict["bckwdYFit"] = bckwdYFitRes
     else:
         raise ValueError("Bootstrap procedure not recognized.")
 
@@ -267,37 +251,16 @@ def selectParentWorkspaces(bckwdIC, fwdIC, bootIC):
     If fast mode, the parent ws is the final ws after MS corrections.
     """
     parentWSnNCPsDict = {}
-
-    # In case of skipping MS, select very last corrected ws
-    # wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"
-
+    
     for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
         if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
-            wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"
+            wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"   # In case of skipping MS, select very last corrected ws
             parentWS = mtd[IC.name+wsIter]
             parentNCP = mtd[parentWS.name()+"_TOF_Fitted_Profiles"]
 
             parentWSnNCPsDict[key+"WS"] = parentWS
             parentWSnNCPsDict[key+"NCP"] = parentNCP
-
-
-    # if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
-    #     wsIter = str(bckwdIC.noOfMSIterations) if bootIC.skipMSIterations else "0"
-    #     parentBckwdWS = mtd[bckwdIC.name+wsIter]
-    #     parentBckwdNCP = mtd[parentBckwdWS.name()+"_TOF_Fitted_Profiles"]
-
-    #     parentWSnNCPsDict["bckwdWS"] = parentBckwdWS
-    #     parentWSnNCPsDict["bckwdNCP"] = parentBckwdNCP
-
-    # if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
-    #     noOfFwdMSIter = fwdIC.noOfMSIterations
-    #     wsIter = str(fwdIC.noOfMSIterations) if bootIC.skipMSIterations else "0"
-    #     parentFwdWS = mtd[fwdIC.name+wsIter]
-    #     parentFwdNCP = mtd[parentFwdWS.name()+"_TOF_Fitted_Profiles"]
-
-    #     parentWSnNCPsDict["fwdWS"] = parentFwdWS
-    #     parentWSnNCPsDict["fwdNCP"] = parentFwdNCP
 
     return parentWSnNCPsDict 
 
@@ -341,22 +304,6 @@ def initializeResults(parentResults: dict, nSamples, corrCoefs):
 
         if key+"YFit" in parentResults:
             bootResultObjs[key+"YFit"] = BootYFitResults(parentResults[key+"YFit"], nSamples)
-
-
-    # for key in parentResults:
-    #     if (key=="bckwdScat") | (key=="fwdScat"):
-    #         bootResultObjs[key] = BootScattResults(parentResults[key], nSamples, corrCoefs[key])
-    #     elif (key=="bckwdYFit") | (key=="fwdYFit"):
-    #         bootResultObjs[key] = BootYFitResults(parentResults[key], nSamples)
-    #     else: raise KeyError("Unrecognized Key in parent results dict")
-            
-    # # Initialize results for scattering, no of iteratons = len(corrCoefs) 
-    # for pResults, corr in zip(parentResults, corrCoefs):
-    #     bootResultObjs.append(BootScattResults(pResults, nSamples, corr))
-    
-    # # Initialize result for y-space fit
-    # if len(parentResults) == len(corrCoefs) + 1:
-    #     bootResultObjs.append(BootYFitResults(parentResults[-1], nSamples))
     return bootResultObjs
 
 

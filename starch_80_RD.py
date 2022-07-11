@@ -95,7 +95,7 @@ class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as
     ])
     constraints = ()
 
-    noOfMSIterations = 0      
+    noOfMSIterations = 2      
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -127,7 +127,7 @@ class UserScriptControls:
 class BootstrapInitialConditions:
     runBootstrap = True
 
-    procedure = "JOINT"
+    procedure = "FORWARD"
     fitInYSpace = "FORWARD"
 
     runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
