@@ -2,12 +2,11 @@ from multiprocessing.sharedctypes import Value
 from scipy import stats
 import numpy as np
 
-from vesuvio_analysis.core_functions.fit_in_yspace import buildFinalWSNames
 from .analysis_functions import arraysFromWS, histToPointData, prepareFitArgs, fitNcpToArray
 from .analysis_functions import iterativeFitForDataReduction
 from .fit_in_yspace import fitInYSpaceProcedure
 from .procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.ICHelpers import noOfHistsFromTOFBinning
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
@@ -204,21 +203,34 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
 
     resultsDict = {}
 
-    if bootIC.procedure=="BACKWARD":
-        wsFinal, bckwdScatRes = runIndependentIterativeProcedure(bckwdIC, clearWS=False)
-        resultsDict["bckwdScat"] = bckwdScatRes
+    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="BACKWARD"):
 
-        if not(bootIC.runningJackknife):
-            bckwdYFitRes = fitInYSpaceProcedure(yFitIC, bckwdIC, wsFinal)
-            resultsDict["bckwdYFit"] = bckwdYFitRes
+        for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
-    elif bootIC.procedure=="FORWARD":
-        wsFinal, fwdScatRes = runIndependentIterativeProcedure(fwdIC, clearWS=False)
-        resultsDict["fwdScat"] = fwdScatRes
+            if bootIC.procedure==mode:
+                wsFinal, bckwdScatRes = runIndependentIterativeProcedure(IC, clearWS=False)
+                resultsDict[key+"Scat"] = bckwdScatRes
 
-        if not(bootIC.runningJackknife):
-            fwdYFitRes = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
-            resultsDict["fwdYFit"] = fwdYFitRes
+                if not(bootIC.runningJackknife):
+                    bckwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, wsFinal)
+                    resultsDict[key+"YFit"] = bckwdYFitRes
+
+
+    # if bootIC.procedure=="BACKWARD":
+    #     wsFinal, bckwdScatRes = runIndependentIterativeProcedure(bckwdIC, clearWS=False)
+    #     resultsDict["bckwdScat"] = bckwdScatRes
+
+    #     if not(bootIC.runningJackknife):
+    #         bckwdYFitRes = fitInYSpaceProcedure(yFitIC, bckwdIC, wsFinal)
+    #         resultsDict["bckwdYFit"] = bckwdYFitRes
+
+    # elif bootIC.procedure=="FORWARD":
+    #     wsFinal, fwdScatRes = runIndependentIterativeProcedure(fwdIC, clearWS=False)
+    #     resultsDict["fwdScat"] = fwdScatRes
+
+    #     if not(bootIC.runningJackknife):
+    #         fwdYFitRes = fitInYSpaceProcedure(yFitIC, fwdIC, wsFinal)
+    #         resultsDict["fwdYFit"] = fwdYFitRes
     
     elif bootIC.procedure=="JOINT":
         ws, bckwdScatRes, fwdScatRes = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
@@ -227,15 +239,22 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
 
         if not(bootIC.runningJackknife):
 
-            if (bootIC.fitInYSpace=="FORWARD") | (bootIC.fitInYSpace=="JOINT"):
-                wsName = buildFinalWSNames(fwdIC.scriptName, ["FORWARD"], [fwdIC])
-                fwdYFitRes = fitInYSpaceProcedure(yFitIC, fwdIC, mtd[wsName])
-                resultsDict["fwdYFit"] = fwdYFitRes
+            for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
+
+                if (bootIC.fitInYSpace==mode) | (bootIC.fitInYSpace=="JOINT"):
+                    wsName = buildFinalWSNames(IC.scriptName, [mode], [IC])[0]  # List, select only element
+                    fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+                    resultsDict[key+"YFit"] = fwdYFitRes
+
+            # if (bootIC.fitInYSpace=="FORWARD") | (bootIC.fitInYSpace=="JOINT"):
+            #     wsName = buildFinalWSNames(fwdIC.scriptName, ["FORWARD"], [fwdIC])[0]  # List, select only element
+            #     fwdYFitRes = fitInYSpaceProcedure(yFitIC, fwdIC, mtd[wsName])
+            #     resultsDict["fwdYFit"] = fwdYFitRes
             
-            if (bootIC.fitInYSpace=="BACKWARD") | (bootIC.fitInYSpace=="JOINT"):
-                wsName = buildFinalWSNames(bckwdIC.scriptName, ["BACKWARD"], [bckwdIC])
-                bckwdYFitRes = fitInYSpaceProcedure(yFitIC, bckwdIC, mtd[wsName])
-                resultsDict["bckwdYFit"] = bckwdYFitRes
+            # if (bootIC.fitInYSpace=="BACKWARD") | (bootIC.fitInYSpace=="JOINT"):
+            #     wsName = buildFinalWSNames(bckwdIC.scriptName, ["BACKWARD"], [bckwdIC])[0]
+            #     bckwdYFitRes = fitInYSpaceProcedure(yFitIC, bckwdIC, mtd[wsName])
+            #     resultsDict["bckwdYFit"] = bckwdYFitRes
     else:
         raise ValueError("Bootstrap procedure not recognized.")
 
@@ -250,21 +269,35 @@ def selectParentWorkspaces(bckwdIC, fwdIC, bootIC):
     parentWSnNCPsDict = {}
 
     # In case of skipping MS, select very last corrected ws
-    wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"
+    # wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"
 
-    if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
-        parentBckwdWS = mtd[bckwdIC.name+wsIter]
-        parentBckwdNCP = mtd[parentBckwdWS.name()+"_TOF_Fitted_Profiles"]
+    for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
-        parentWSnNCPsDict["bckwdWS"] = parentBckwdWS
-        parentWSnNCPsDict["bckwdNCP"] = parentBckwdNCP
+        if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
+            wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"
+            parentWS = mtd[IC.name+wsIter]
+            parentNCP = mtd[parentWS.name()+"_TOF_Fitted_Profiles"]
 
-    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
-        parentFwdWS = mtd[fwdIC.name+wsIter]
-        parentFwdNCP = mtd[parentFwdWS.name()+"_TOF_Fitted_Profiles"]
+            parentWSnNCPsDict[key+"WS"] = parentWS
+            parentWSnNCPsDict[key+"NCP"] = parentNCP
 
-        parentWSnNCPsDict["fwdWS"] = parentFwdWS
-        parentWSnNCPsDict["fwdNCP"] = parentFwdNCP
+
+    # if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
+    #     wsIter = str(bckwdIC.noOfMSIterations) if bootIC.skipMSIterations else "0"
+    #     parentBckwdWS = mtd[bckwdIC.name+wsIter]
+    #     parentBckwdNCP = mtd[parentBckwdWS.name()+"_TOF_Fitted_Profiles"]
+
+    #     parentWSnNCPsDict["bckwdWS"] = parentBckwdWS
+    #     parentWSnNCPsDict["bckwdNCP"] = parentBckwdNCP
+
+    # if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
+    #     noOfFwdMSIter = fwdIC.noOfMSIterations
+    #     wsIter = str(fwdIC.noOfMSIterations) if bootIC.skipMSIterations else "0"
+    #     parentFwdWS = mtd[fwdIC.name+wsIter]
+    #     parentFwdNCP = mtd[parentFwdWS.name()+"_TOF_Fitted_Profiles"]
+
+    #     parentWSnNCPsDict["fwdWS"] = parentFwdWS
+    #     parentWSnNCPsDict["fwdNCP"] = parentFwdNCP
 
     return parentWSnNCPsDict 
 
@@ -301,12 +334,21 @@ def initializeResults(parentResults: dict, nSamples, corrCoefs):
     """
     bootResultObjs = {}
 
-    for key in parentResults:
-        if (key=="bckwdScat") | (key=="fwdScat"):
-            bootResultObjs[key] = BootScattResults(parentResults[key], nSamples, corrCoefs[key])
-        elif (key=="bckwdYFit") | (key=="fwdYFit"):
-            bootResultObjs[key] = BootYFitResults(parentResults[key], nSamples)
-        else: raise KeyError("Unrecognized Key in parent results dict")
+    for key in ["fwd", "bckwd"]:
+
+        if key+"Scat" in parentResults:
+            bootResultObjs[key+"Scat"] = BootScattResults(parentResults[key+"Scat"], nSamples, corrCoefs[key+"Scat"])
+
+        if key+"YFit" in parentResults:
+            bootResultObjs[key+"YFit"] = BootYFitResults(parentResults[key+"YFit"], nSamples)
+
+
+    # for key in parentResults:
+    #     if (key=="bckwdScat") | (key=="fwdScat"):
+    #         bootResultObjs[key] = BootScattResults(parentResults[key], nSamples, corrCoefs[key])
+    #     elif (key=="bckwdYFit") | (key=="fwdYFit"):
+    #         bootResultObjs[key] = BootYFitResults(parentResults[key], nSamples)
+    #     else: raise KeyError("Unrecognized Key in parent results dict")
             
     # # Initialize results for scattering, no of iteratons = len(corrCoefs) 
     # for pResults, corr in zip(parentResults, corrCoefs):
@@ -364,13 +406,25 @@ def storeBootIter(bootResultObjs: dict, j: int, bootIterResults: dict):
     #     bootObj.storeBootIterResults(j, iterRes)
 
 
-def saveBootstrapLogs(bootResultObjs: dict, bckwdIC, fwdIC):
-    for key in bootResultObjs:
-        if (key=="bckwdScat") | (key=="bckwdYFit"):
-            bootResultObjs[key].saveResults(bckwdIC)
-        elif (key=="fwdScat") | (key=="fwdYFit"):
-            bootResultObjs[key].saveResults(fwdIC)
-        else: raise KeyError("Key in results dict not recognized.")
+def saveBootstrapResults(bootResultObjs: dict, bckwdIC, fwdIC):
+    for key, IC in zip(["bckwd", "fwd"], [bckwdIC, fwdIC]):
+        for res in ["Scat", "YFit"]:
+            if key+res in bootResultObjs:
+                bootResultObjs[key+res].saveResults(IC)
+
+
+    #     if (key=="bckwdScat") | (key=="bckwdYFit"):
+    #         bootResultObjs[key].saveResults(bckwdIC)
+    #     elif (key=="fwdScat") | (key=="fwdYFit"):
+    #         bootResultObjs[key].saveResults(fwdIC)
+    #     else: raise KeyError("Key in results dict not recognized.")
+
+    # for key in bootResultObjs:
+    #     if (key=="bckwdScat") | (key=="bckwdYFit"):
+    #         bootResultObjs[key].saveResults(bckwdIC)
+    #     elif (key=="fwdScat") | (key=="fwdYFit"):
+    #         bootResultObjs[key].saveResults(fwdIC)
+    #     else: raise KeyError("Key in results dict not recognized.")
     return
 
 
@@ -381,13 +435,17 @@ def saveBootstrapLogs(bootResultObjs: dict, bckwdIC, fwdIC):
     # bootResultObjs[-1].saveResults(inputIC[-1])   # Account for YFit object
 
 
-def saveBootstrapResults(bootResultObjs: dict, bckwdIC, fwdIC):
-    for key in bootResultObjs:
-        if (key=="bckwdScat") | (key=="bckwdYFit"):
-            bootResultObjs[key].saveLog(bckwdIC)
-        elif (key=="fwdScat") | (key=="fwdYFit"):
-            bootResultObjs[key].saveLog(fwdIC)
-        else: raise KeyError("Key in results dict not recognized.")
+def saveBootstrapLogs(bootResultObjs: dict, bckwdIC, fwdIC):
+    for key, IC in zip(["bckwd", "fwd"], [bckwdIC, fwdIC]):
+        for res in ["Scat", "YFit"]:
+            if key+res in bootResultObjs:
+                bootResultObjs[key+res].saveLog(IC)
+    # for key in bootResultObjs:
+    #     if (key=="bckwdScat") | (key=="bckwdYFit"):
+    #         bootResultObjs[key].saveLog(bckwdIC)
+    #     elif (key=="fwdScat") | (key=="fwdYFit"):
+    #         bootResultObjs[key].saveLog(fwdIC)
+    #     else: raise KeyError("Key in results dict not recognized.")
     return
 # def saveBootstrapLogs(bootResultObjs: list, inputIC: list):
 #     for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
@@ -438,10 +496,10 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
 
     bootInputWS = {}
     parentInputWS = {} 
-    for mode in ["bckwd", "fwd"]:
+    for key in ["bckwd", "fwd"]:
         try:
-            parentWSPath = parentWSNCPSavePaths[mode+"WS"]
-            totNcpWSPath = parentWSNCPSavePaths[mode+"NCP"]
+            parentWSPath = parentWSNCPSavePaths[key+"WS"]
+            totNcpWSPath = parentWSNCPSavePaths[key+"NCP"]
         except KeyError: continue
 
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
@@ -460,9 +518,9 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
 
         assert np.all(wsBoot.extractY()[:, :-1] == bootDataY), "Bootstrap data not being correctly passed onto ws."
 
-        bootInputWS[mode+"WS"] = wsBoot
-        parentInputWS[mode+"WS"] = parentWS
-        parentInputWS[mode+"NCP"] = totNcpWS
+        bootInputWS[key+"WS"] = wsBoot
+        parentInputWS[key+"WS"] = parentWS
+        parentInputWS[key+"NCP"] = totNcpWS
     return bootInputWS, parentInputWS
 
 
@@ -484,10 +542,10 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
 
     jackInputWS = {}
     parentInputWS = {} 
-    for mode in ["bckwd", "fwd"]:
+    for key in ["bckwd", "fwd"]:
         try:
-            parentWSPath = parentWSNCPSavePaths[mode+"WS"]
-            totNcpWSPath = parentWSNCPSavePaths[mode+"NCP"]
+            parentWSPath = parentWSNCPSavePaths[key+"WS"]
+            totNcpWSPath = parentWSNCPSavePaths[key+"NCP"]
         except KeyError: continue
 
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
@@ -509,9 +567,9 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
         assert np.all(wsJack.extractY()[:, :-1] == jackDataY), "Bootstrap data not being correctly passed onto ws."
         assert np.all(wsJack.extractE()[:, :-1] == jackDataE), "Bootstrap data not being correctly passed onto ws."
 
-        jackInputWS[mode+"WS"] = wsJack
-        parentInputWS[mode+"WS"] = parentWS
-        parentInputWS[mode+"NCP"] = totNcpWS
+        jackInputWS[key+"WS"] = wsJack
+        parentInputWS[key+"WS"] = parentWS
+        parentInputWS[key+"NCP"] = totNcpWS
     return jackInputWS, parentInputWS
 
 
@@ -529,25 +587,38 @@ def loadWorkspacesFromPath(*savePaths):
 def formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS:dict, parentWS:dict):
     """Adds atributes to initial conditions to start procedure with sample ws."""
 
-    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
-        fwdIC.runningSampleWS = True
-        fwdIC.runningJackknife = bootIC.runningJackknife
+    for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
-        if bootIC.skipMSIterations: 
-            fwdIC.noOfMSIterations = 0
+        if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
+            IC.runningSampleWS = True
+            IC.runningJackknife = bootIC.runningJackknife
 
-        fwdIC.sampleWS = sampleInputWS["fwdWS"]
-        fwdIC.parentWS = parentWS["fwdWS"]
+            if bootIC.skipMSIterations: 
+                IC.noOfMSIterations = 0
+
+            IC.sampleWS = sampleInputWS[key+"WS"]
+            IC.parentWS = parentWS[key+"WS"]
+
+
+    # if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
+    #     fwdIC.runningSampleWS = True
+    #     fwdIC.runningJackknife = bootIC.runningJackknife
+
+    #     if bootIC.skipMSIterations: 
+    #         fwdIC.noOfMSIterations = 0
+
+    #     fwdIC.sampleWS = sampleInputWS["fwdWS"]
+    #     fwdIC.parentWS = parentWS["fwdWS"]
     
-    if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
-        bckwdIC.runningSampleWS = True
-        bckwdIC.runningJackknife = bootIC.runningJackknife
+    # if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
+    #     bckwdIC.runningSampleWS = True
+    #     bckwdIC.runningJackknife = bootIC.runningJackknife
 
-        if bootIC.skipMSIterations: 
-            bckwdIC.noOfMSIterations = 0
+    #     if bootIC.skipMSIterations: 
+    #         bckwdIC.noOfMSIterations = 0
 
-        bckwdIC.sampleWS = sampleInputWS["bckwdWS"]
-        bckwdIC.parentWS = parentWS["bckwdWS"]
+    #     bckwdIC.sampleWS = sampleInputWS["bckwdWS"]
+    #     bckwdIC.parentWS = parentWS["bckwdWS"]
 
     # for IC, wsSample, parentWSnNCP in zip(inputIC, sampleInputWS, parentWS):
     #     IC.runningSampleWS = True

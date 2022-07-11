@@ -125,7 +125,7 @@ class UserScriptControls:
     fitInYSpace = None #"FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 class BootstrapInitialConditions:
-    runBootstrap = False 
+    runBootstrap = True
 
     procedure = "JOINT"
     fitInYSpace = "FORWARD"

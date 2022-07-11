@@ -1,7 +1,7 @@
 
-from vesuvio_analysis.core_functions.ICHelpers import completeICFromInputs, completeBootIC
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, completeICFromInputs, completeBootIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
-from vesuvio_analysis.core_functions.fit_in_yspace import buildFinalWSNames, fitInYSpaceProcedure
+from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from mantid.api import mtd
 

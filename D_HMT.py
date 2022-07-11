@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 0    
+    noOfMSIterations = 1    
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -137,15 +137,15 @@ class BootstrapInitialConditions:
     procedure = "JOINT"
     fitInYSpace = "JOINT"
 
-    runningJackknife = False
+    runningJackknife = True
     nSamples = 2
     skipMSIterations = True
     runningTest = False
-    userConfirmation = True
+    userConfirmation = False
 
 
 class BootstrapAnalysis:
-    runAnalysis = True
+    runAnalysis = False 
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True                 # True discards some unreasonable values of widths and intensities
@@ -175,4 +175,4 @@ print("\nRunning time: ", end_time-start_time, " seconds")
 
 analysisIC = BootstrapAnalysis
 
-runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC)
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, userCtr)
