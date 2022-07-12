@@ -316,7 +316,8 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     Residuals = dataY - dataYFit
 
     # Create workspace to store best fit curve and errors on the fit
-    createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals)
+    wsMinFit = createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals)
+    saveMinuitPlot(yFitIC, wsMinFit)
 
     # Calculate correlation matrix
     corrMatrix = m.covariance.correlation()
@@ -443,11 +444,23 @@ def selectNonZeros(dataX, dataY, dataE):
 def createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals):
     """Creates workspace similar to the ones created by Mantid Fit."""
 
-    CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
+    wsMinFit = CreateWorkspace(DataX=np.concatenate((dataX, dataX, dataX)), 
                     DataY=np.concatenate((dataY, dataYFit, Residuals)), 
                     DataE=np.concatenate((dataE, dataYSigma, np.zeros(len(dataE)))),
                     NSpec=3,
                     OutputWorkspace=wsYSpaceSym.name()+"_Fitted_Minuit")
+    return wsMinFit
+
+
+def saveMinuitPlot(yFitIC, ws):
+    fig, ax = plt.subplots(subplot_kw={"projection":"mantid"})
+    ax.errorbar(ws, "ko", wkspIndex=0, label="Counts")
+    ax.errorbar(ws, "r-", wkspIndex=1, label="Minuit Fit")
+    ax.legend()
+
+    savePath = yFitIC.figSavePath / "minuit_fit.pdf"
+    plt.savefig(savePath, bbox_inches="tight")
+    return
 
 
 def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):

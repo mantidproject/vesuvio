@@ -153,7 +153,7 @@ def storeRunnningTime(fwdIC, bckwdIC, bootIC):
                 resDict = eval(line)
 
     if len(resDict)<4:
-        ans = input("Did not find necessary information to estimate runtime. Will run a short routine to store an estimate. Press any key to continue.")
+        ans = input("Did not find necessary information to estimate runtime. Will run a short routine to store an estimate. Please wait until this is finished. Press any key to continue.")
         resDict = buildRunTimes(fwdIC, bckwdIC)
 
         with open(savePath, "a") as txtFile:

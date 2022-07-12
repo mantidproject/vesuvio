@@ -1,4 +1,5 @@
 
+from random import sample
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
 import numpy as np
@@ -60,6 +61,9 @@ def completeICFromInputs(IC, scriptName, wsIC):
     IC.runningPreliminary = False
     
     # Set directories for figures
+    figSavePath = experimentsPath / scriptName /"figures" 
+    figSavePath.mkdir(exist_ok=True)
+    IC.figSavePath = figSavePath
     return 
 
 
@@ -149,7 +153,7 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     experimentsPath = currentPath/".."/".."/"experiments"
     
     # Used to store running times required to estimate Bootstrap total run time.
-    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
+    bootIC.runTimesPath = experimentsPath / sampleName / "running_times.txt"
 
     # Make bootstrap and jackknife data directories
     if bootIC.runningJackknife:
@@ -223,3 +227,10 @@ def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
         name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
         wsNames.append(name)
     return wsNames
+
+def completeYFitIC(yFitIC, sampleName):
+    # Set directories for figures
+    figSavePath = experimentsPath / sampleName /  "figures" 
+    figSavePath.mkdir(exist_ok=True)
+    yFitIC.figSavePath = figSavePath
+    return

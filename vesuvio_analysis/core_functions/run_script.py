@@ -1,5 +1,5 @@
 
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, completeICFromInputs, completeBootIC
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, completeICFromInputs, completeBootIC, completeYFitIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
@@ -12,6 +12,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     completeICFromInputs(fwdIC, scriptName, wsFrontIC)
     completeICFromInputs(bckwdIC, scriptName, wsBackIC)
     completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC) 
+    completeYFitIC(yFitIC, scriptName)
     
     checkInputs(userCtr)
 
