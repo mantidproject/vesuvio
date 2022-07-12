@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 0   
+    noOfMSIterations = 1  
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -128,20 +128,20 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = True
+    runBootstrap = False
 
     procedure = "JOINT"
-    fitInYSpace = "JOINT"
+    fitInYSpace = "JOINT" #"FORWARD"
 
     runningJackknife = False
     nSamples = 2 
-    skipMSIterations = False
+    skipMSIterations = True
     runningTest = False
     userConfirmation = True
 
 
 class BootstrapAnalysis:
-    runAnalysis = False
+    runAnalysis = True
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False                 # True discards some unreasonable values of widths and intensities

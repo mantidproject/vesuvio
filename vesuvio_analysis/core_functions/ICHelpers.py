@@ -144,12 +144,12 @@ def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
 def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     """Form bootstrap output data paths"""
 
-    # Used to store running times required to estimate Bootstrap total run time.
-    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
-
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName   # Name of sample currently running
     experimentsPath = currentPath/".."/".."/"experiments"
+    
+    # Used to store running times required to estimate Bootstrap total run time.
+    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
 
     # Make bootstrap and jackknife data directories
     if bootIC.runningJackknife:
