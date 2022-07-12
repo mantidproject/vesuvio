@@ -127,7 +127,7 @@ class UserScriptControls:
 class BootstrapInitialConditions:
     runBootstrap = True
 
-    procedure = "FORWARD"
+    procedure = "JOINT"
     fitInYSpace = "FORWARD"
 
     runningJackknife = False         # Overwrites normal Bootstrap with Jackknife

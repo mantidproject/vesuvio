@@ -1,6 +1,4 @@
 
-from genericpath import exists
-from unittest.loader import VALID_MODULE_NAME
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
 import numpy as np
@@ -215,33 +213,15 @@ def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     return log
 
 
-def storeRunnningTime(t, fwdIC, bckwdIC, userCtr, bootIC):
-    """Used to write run times to txt file."""
 
-    totMS, totNSpec = getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr)
-    
-    line = f"\n{totMS} {totNSpec} {t:.2f}"
-
-    savePath = bootIC.runTimesPath
-
-    if not(savePath.is_file()):
-        with open(savePath, "w") as txtFile:
-            txtFile.write("This file contains some information about running times used to estimate Bootstrap run time.\n\n")
-            txtFile.write("no of MS, no of Spec, Time [s]\n")
-   
-    with open(savePath, "a") as txtFile:
-        txtFile.write(line)
-    return
-
-
-def getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr):
-    totMS = 0
-    totNSpec = 0
-    for mode, IC in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC]):
-        if (userCtr.procedure==mode) | (userCtr.procedure=="JOINT"):
-            totMS += IC.noOfMSIterations
-            totNSpec += (IC.lastSpec - IC.firstSpec + 1)
-    return totMS, totNSpec
+# def getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr):
+#     totMS = 0
+#     totNSpec = 0
+#     for mode, IC in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC]):
+#         if (userCtr.procedure==mode) | (userCtr.procedure=="JOINT"):
+#             totMS += IC.noOfMSIterations
+#             totNSpec += (IC.lastSpec - IC.firstSpec + 1)
+#     return totMS, totNSpec
 
 
 def noOfHistsFromTOFBinning(IC):

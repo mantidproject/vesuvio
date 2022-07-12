@@ -5,7 +5,7 @@ from .analysis_functions import arraysFromWS, histToPointData, prepareFitArgs, f
 from .analysis_functions import iterativeFitForDataReduction
 from .fit_in_yspace import fitInYSpaceProcedure
 from .procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, getTotNoMSNoSpec, noOfHistsFromTOFBinning
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
@@ -109,36 +109,26 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     return bootResults
 
 
-
 def askUserConfirmation(bckwdIC, fwdIC, bootIC):
     """Estimates running time for all samples and asks the user to confirm the run."""
     
     if not(bootIC.userConfirmation):   # Skip user confirmation 
         return
 
-    # t = np.loadtxt(bootIC.runTimesPath, dtype=str)[1:].astype(float)
-    # t[t[:, 0]==0] = np.nan    # Mask rows with zeros
+    tDict = storeRunnningTime(fwdIC, bckwdIC, bootIC)   # Run times file path stores in bootIC
 
-    # noMS, noSpec = getTotNoMSNoSpec(fwdIC, bckwdIC, bootIC)
-    
-    # meanT = np.nanmean(t[:, -1] * noMS/t[:, 0] * noSpec/t[:, 1])
+    # tBackNoMS = 0.27
+    # tBackPerMS = 2.6
+    # tFowNoMS = 0.13
+    # tFowPerMS = 1.2
 
-    # runTime = meanT * bootIC.nSamples  # TODO: This is compeletly wrong
+    runTime = 0
+    if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
+        runTime += calcRunTime(bckwdIC, tDict["tBackNoMS"], tDict["tBackPerMS"], bootIC)
 
+    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
+        runTime += calcRunTime(fwdIC, tDict["tFowNoMS"], tDict["tFowPerMS"], bootIC)
 
-    tBckwdNoMS = 0.27
-    tBckwdPerMS = 2.6
-    tFwdNoMS = 0.13
-    tFwdPerMS = 1.2
-
-    if bootIC.procedure=="BACKWARD":
-        runTime = calcRunTime(bckwdIC, tBckwdNoMS, tBckwdPerMS, bootIC)
-    elif bootIC.procedure=="FORWARD":
-        runTime = calcRunTime(fwdIC, tFwdNoMS, tFwdPerMS, bootIC)
-    elif bootIC.procedure=="JOINT":
-        runTime = calcRunTime(bckwdIC, tBckwdNoMS, tBckwdPerMS, bootIC)
-        runTime += calcRunTime(fwdIC, tFwdNoMS, tFwdPerMS, bootIC)
-    else: raise ValueError ("Bootstrap procedure not recognized. Unable to run Bootstrap.")
 
     print(f"\n\nTime estimates are based on a personal laptop with 4 cores, likely oversestimated.")
     userInput = input(f"\nEstimated time for Bootstrap procedure: {runTime/60:.3f} hours.\nProceed? (y/n): ")
@@ -146,6 +136,51 @@ def askUserConfirmation(bckwdIC, fwdIC, bootIC):
         return
     else:
         raise KeyboardInterrupt ("Bootstrap procedure interrupted.")
+
+
+def storeRunnningTime(fwdIC, bckwdIC, bootIC):
+    """Used to write run times to txt file."""
+
+    savePath = bootIC.runTimesPath
+
+    if not(savePath.is_file()):
+        with open(savePath, "w") as txtFile:
+            txtFile.write("This file stores run times to estimate Bootstrap total run time.")
+            txtFile.write("\nTime in minutes.\n\n")
+    
+    resDict = {}
+    with open(savePath, "r") as txtFile:
+        for line in txtFile:
+            if line[0]=="{":   # If line contains dictionary
+                resDict = eval(line)
+
+    if len(resDict)<4:
+        ans = input("Did not find necessary information to estimate runtime. Will run a short routine to store an estimate. Press any key to continue.")
+        resDict = buildRunTimes(fwdIC, bckwdIC)
+
+        with open(savePath, "a") as txtFile:
+            print(resDict, file=txtFile)
+
+    return resDict
+
+
+def buildRunTimes(fwdIC, bckwdIC):
+    resDict = {}
+    for IC, mode in zip([bckwdIC, fwdIC], ["Back", "Fow"]):
+        oriMS = IC.noOfMSIterations
+        for NIter, key in zip([0, 1], ["NoMS", "PerMS"]):
+            IC.noOfMSIterations = NIter
+            t0 = time.time()
+            runIndependentIterativeProcedure(IC)
+            t1 = time.time()
+            resDict["t"+mode+key] = (t1-t0) / 60
+        # Restore starting value
+        IC.noOfMSIterations = oriMS
+
+        # Correct times of only MS by subtacting time spend on fitting ncps
+        resDict["t"+mode+"PerMS"] -= 2 * resDict["t"+mode+"NoMS"]   
+
+    return resDict
 
 
 def calcRunTime(IC, tNoMS, tPerMS, bootIC):

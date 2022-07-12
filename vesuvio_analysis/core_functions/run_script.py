@@ -1,5 +1,5 @@
 
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, completeICFromInputs, completeBootIC, storeRunnningTime
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, completeICFromInputs, completeBootIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
@@ -84,11 +84,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         return None, resYFit       # To match return below. 
     
     checkUserClearWS()        # Check if user is OK with cleaning all workspaces
-    t0 = time.time()
     res = runProcedure()
-    t1 = time.time()
-
-    storeRunnningTime(t1-t0, fwdIC, bckwdIC, userCtr, bootIC)   # Run times file path stores in bootIC
 
     resYFit = None
     for wsName, IC in zip(wsNames, ICs):

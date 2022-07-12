@@ -64,7 +64,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 4     
+    noOfMSIterations = 0     
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 4   
+    noOfMSIterations = 0   
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -128,13 +128,13 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False
+    runBootstrap = True
 
     procedure = "JOINT"
     fitInYSpace = "JOINT"
 
     runningJackknife = False
-    nSamples = 649
+    nSamples = 2 
     skipMSIterations = False
     runningTest = False
     userConfirmation = True
