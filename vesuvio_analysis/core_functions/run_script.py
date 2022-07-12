@@ -4,7 +4,6 @@ from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
 from mantid.api import mtd
-import time
 
 
 def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC):
@@ -59,18 +58,6 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     if bootIC.runBootstrap == True:
         assert (bootIC.procedure=="FORWARD") | (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"), "Invalid Bootstrap procedure."
         return runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
-
-        # if bootIC == "BACKWARD":
-        #     return runBootstrap([bckwdIC], bootIC, yFitIC), None
-
-        # elif userCtr.bootstrap == "FORWARD":
-        #     return runBootstrap([fwdIC], bootIC, yFitIC), None
-
-        # elif userCtr.bootstrap == "JOINT":
-        #     return runBootstrap([bckwdIC, fwdIC], bootIC, yFitIC), None
-        # else:
-        #     raise ValueError("Bootstrap option not recognized.")
-
     
     # Default workflow for procedure + fit in y space
 
@@ -83,7 +70,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
             resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
         return None, resYFit       # To match return below. 
     
-    checkUserClearWS()        # Check if user is OK with cleaning all workspaces
+    checkUserClearWS()      # Check if user is OK with cleaning all workspaces
     res = runProcedure()
 
     resYFit = None

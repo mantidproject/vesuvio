@@ -117,12 +117,14 @@ class YSpaceFitInitialConditions:
     nGlobalFitGroups = 4             # Number or string "ALL"
     maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
 
+
 class UserScriptControls:
     # Choose main procedure to run
     procedure = None #"FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None #"FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
 
 class BootstrapInitialConditions:
     runBootstrap = True
@@ -134,7 +136,6 @@ class BootstrapInitialConditions:
     nSamples = 2                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
-
 
 
 class BootstrapAnalysis:

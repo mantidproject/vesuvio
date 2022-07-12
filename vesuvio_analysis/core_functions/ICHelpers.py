@@ -59,7 +59,6 @@ def completeICFromInputs(IC, scriptName, wsIC):
     # Default not running preliminary procedure to estimate HToMass0Ratio
     IC.runningPreliminary = False
     
-
     # Set directories for figures
     return 
 
@@ -130,9 +129,6 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     return 
 
 def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
-    # Used even in the case where bootstrap is not running, to store running times
-    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
-
     if not(bootIC.runBootstrap):
         return
 
@@ -142,12 +138,14 @@ def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
         bootIC.runningTest = False
 
     setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC)
-
     return
 
 
 def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     """Form bootstrap output data paths"""
+
+    # Used to store running times required to estimate Bootstrap total run time.
+    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
 
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName   # Name of sample currently running
@@ -213,35 +211,10 @@ def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     return log
 
 
-
-# def getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr):
-#     totMS = 0
-#     totNSpec = 0
-#     for mode, IC in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC]):
-#         if (userCtr.procedure==mode) | (userCtr.procedure=="JOINT"):
-#             totMS += IC.noOfMSIterations
-#             totNSpec += (IC.lastSpec - IC.firstSpec + 1)
-#     return totMS, totNSpec
-
-
 def noOfHistsFromTOFBinning(IC):
     start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
-
-# def cleanLogFile(logFilePath):
-#     folderPath = logFilePath.parent
-#     with open(logFilePath, "r") as file:
-#         lines = file.readlines()
-#     with open(logFilePath, "w") as file:
-#         for line in lines:
-#             name = line.strip("\n").split(" : ")[0]
-#             file.write(line)
-#             for path in folderPath.iterdir():
-#                 folderName = path.name
-
-#                 # if path.name==name:
-#                 #     file.write(line)
 
 def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
     wsNames = []
@@ -250,4 +223,3 @@ def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
         name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
         wsNames.append(name)
     return wsNames
-
