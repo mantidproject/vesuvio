@@ -231,9 +231,13 @@ def chooseNSamples(bootIC, parentWSnNCPs: dict):
 def setICsToDefault(bckwdIC, fwdIC, yFitIC):
     """Disables some features of yspace fit, makes sure the default """
 
+    # Disable Minos
+    if yFitIC.runMinos: yFitIC.runMinos = False
+
     # Disable global fit 
     if yFitIC.globalFit: yFitIC.globalFit = False
-    # Hide plots
+
+    # Don't show plots
     if yFitIC.showPlots: yFitIC.showPlots = False
 
     if bckwdIC.runningSampleWS: bckwdIC.runningSampleWS = False

@@ -1,3 +1,4 @@
+from fileinput import filename
 from inspect import signature
 from multiprocessing.sharedctypes import Value
 from tracemalloc import start
@@ -317,7 +318,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
 
     # Create workspace to store best fit curve and errors on the fit
     wsMinFit = createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals)
-    saveMinuitPlot(yFitIC, wsMinFit)
+    saveMinuitPlot(yFitIC, wsMinFit, m)
 
     # Calculate correlation matrix
     corrMatrix = m.covariance.correlation()
@@ -327,10 +328,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     createCorrelationTableWorkspace(wsYSpaceSym, m.parameters, corrMatrix)
 
     # Run Minos
-    parameters, values, errors, minosAutoErr, minosManErr = runMinos(m, yFitIC, constrFunc)
-    
+    # parameters, values, errors, minosAutoErr, minosManErr = runMinos(m, yFitIC, constrFunc)
+    fitCols = runMinos(m, yFitIC, constrFunc)
+
     # Create workspace with final fitting parameters and their errors
-    createFitParametersTableWorkspace(wsYSpaceSym, parameters, values, errors, minosAutoErr, minosManErr, chi2)
+    createFitParametersTableWorkspace(wsYSpaceSym, *fitCols, chi2)
     return 
 
 
@@ -452,14 +454,24 @@ def createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYS
     return wsMinFit
 
 
-def saveMinuitPlot(yFitIC, ws):
+def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
+
+    leg = ""
+    for p, v, e in zip(mObj.parameters, mObj.values, mObj.errors):
+        leg += f"${p}={v:.2f} \pm {e:.2f}$\n"
+
     fig, ax = plt.subplots(subplot_kw={"projection":"mantid"})
-    ax.errorbar(ws, "ko", wkspIndex=0, label="Counts")
-    ax.errorbar(ws, "r-", wkspIndex=1, label="Minuit Fit")
+    ax.errorbar(wsMinuitFit, "k.", wkspIndex=0, label="Weighted Avg")
+    ax.errorbar(wsMinuitFit, "r-", wkspIndex=1, label=leg)
+    ax.set_xlabel("YSpace")
+    ax.set_ylabel("Counts")
+    ax.set_title("Minuit Fit")
     ax.legend()
 
-    savePath = yFitIC.figSavePath / "minuit_fit.pdf"
+    fileName = wsMinuitFit.name()+".pdf"
+    savePath = yFitIC.figSavePath / fileName
     plt.savefig(savePath, bbox_inches="tight")
+    plt.close(fig)
     return
 
 
@@ -474,11 +486,18 @@ def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):
  
 
 def runMinos(mObj, yFitIC, constrFunc):
+    """Outputs columns to be displayed in a table workspace"""
 
     # Extract info from fit before running any MINOS
     parameters = list(mObj.parameters)
     values = list(mObj.values)
     errors = list(mObj.errors)
+
+    # If minos is set not to run, ouput columns with zeros on minos errors
+    if not(yFitIC.runMinos):
+        minosAutoErr = list(np.zeros((len(parameters), 2)))
+        minosManErr = list(np.zeros((len(parameters), 2)))
+        return parameters, values, errors, minosAutoErr, minosManErr
     
     bestFitVals = {}
     bestFitErrs = {}
@@ -686,7 +705,7 @@ def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, va
     ax.plot(varSpace, fValsMigrad, label="fVals Migrad")
 
     ax.axvspan(lerr+varVal, uerr+varVal, alpha=0.2, color="red", label="Minos error")
-    ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="blue", label="Hessian Std error")
+    ax.axvspan(varVal-varErr, varVal+varErr, alpha=0.2, color="green", label="Hessian Std error")
     
     ax.axvline(varVal, 0.03, 0.97, color="k", ls="--")
     ax.axhline(fValsMin+1, 0.03, 0.97, color="k")

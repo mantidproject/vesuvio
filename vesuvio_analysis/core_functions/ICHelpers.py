@@ -230,6 +230,7 @@ def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
 
 def completeYFitIC(yFitIC, sampleName):
     # Set directories for figures
+
     figSavePath = experimentsPath / sampleName /  "figures" 
     figSavePath.mkdir(exist_ok=True)
     yFitIC.figSavePath = figSavePath
