@@ -396,6 +396,9 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
 
 def plotSumNCPFits(wsDataSum, wsTotNCPSum, wsMNCPSum, IC):
 
+    if IC.runningSampleWS:   # Skip saving figure if running bootstrap
+        return         
+
     lw = 2
 
     fig, ax = plt.subplots(subplot_kw={"projection":"mantid"})

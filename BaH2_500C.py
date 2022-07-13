@@ -121,7 +121,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    fitModel = "DOUBLE_WELL" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     runMinos = True
     globalFit = True
     nGlobalFitGroups = 4       # Number or string "ALL"
@@ -131,20 +131,20 @@ class YSpaceFitInitialConditions:
 
 class UserScriptControls:
     # Choose main procedure to run
-    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = None #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False 
+    runBootstrap = True
 
-    procedure = "JOINT"
+    procedure = "FORWARD"
     fitInYSpace = "FORWARD"   
     
     runningJackknife = False
-    nSamples = 650
+    nSamples = 2
     skipMSIterations = False
     userConfirmation = True
 

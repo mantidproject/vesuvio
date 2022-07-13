@@ -328,8 +328,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     createCorrelationTableWorkspace(wsYSpaceSym, m.parameters, corrMatrix)
 
     # Run Minos
-    # parameters, values, errors, minosAutoErr, minosManErr = runMinos(m, yFitIC, constrFunc)
-    fitCols = runMinos(m, yFitIC, constrFunc)
+    fitCols = runMinos(m, yFitIC, constrFunc, wsYSpaceSym.name())
 
     # Create workspace with final fitting parameters and their errors
     createFitParametersTableWorkspace(wsYSpaceSym, *fitCols, chi2)
@@ -485,7 +484,7 @@ def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):
         tableWS.addRow([p] + list(arr))
  
 
-def runMinos(mObj, yFitIC, constrFunc):
+def runMinos(mObj, yFitIC, constrFunc, wsName):
     """Outputs columns to be displayed in a table workspace"""
 
     # Extract info from fit before running any MINOS
@@ -516,7 +515,7 @@ def runMinos(mObj, yFitIC, constrFunc):
         minosManErr = list(np.zeros(np.array(minosAutoErr).shape))
 
         if yFitIC.showPlots:
-            plotAutoMinos(mObj)
+            plotAutoMinos(mObj, wsName)
 
     else:   # Case with positivity constraint on function, use manual implementation
         merrors, fig = runAndPlotManualMinos(mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots)     # Changes values of minuit obj m, do not use m below this point
@@ -528,7 +527,7 @@ def runMinos(mObj, yFitIC, constrFunc):
         minosAutoErr = list(np.zeros(np.array(minosManErr).shape))
 
         if yFitIC.showPlots:
-            fig.canvas.set_window_title("Manual Implementation MINOS")
+            fig.canvas.set_window_title(wsName+"_Manual_Implementation_MINOS")
             fig.show()
 
     return    parameters, values, errors, minosAutoErr, minosManErr
@@ -663,14 +662,14 @@ def errsFromMinosCurve(varSpace, varVal, fValsScipy, fValsMin, dChi2=1):
     return lerr, uerr
 
 
-def plotAutoMinos(minuitObj):
+def plotAutoMinos(minuitObj, wsName):
     # Set format of subplots
     height = 2
     width = int(np.ceil(len(minuitObj.parameters)/2))
     figsize = (12, 7)
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})
-    fig.canvas.set_window_title("Plot of Automatic Minuit MINOS")
+    fig.canvas.set_window_title(wsName+"_Plot_Automatic_MINOS")
  
     for p, ax in zip(minuitObj.parameters, axs.flat):
         loc, fvals, status = minuitObj.mnprofile(p, bound=2)
@@ -980,7 +979,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     print("\n")
 
     if yFitIC.showPlots:
-        plotGlobalFit(dataX, dataY, dataE, m, totCost)
+        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name())
     
     return np.array(m.values), np.array(m.errors)     # Pass into array to store values in variable
 
@@ -1052,7 +1051,7 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     return costFun
 
 
-def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
+def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
 
     if len(dataY) > 10:    
         print("\nToo many axes to show in figure, skipping the plot ...\n")
@@ -1066,7 +1065,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost):
         tight_layout=True,
         subplot_kw={'projection':'mantid'}
     )
-    fig.canvas.set_window_title("Plot of Global Fit")
+    fig.canvas.set_window_title(wsName+"_Plot_of_Global_Fit")
 
     # Data used in Global Fit
     for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
