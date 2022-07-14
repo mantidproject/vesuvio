@@ -544,14 +544,15 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
     dataYf = dataY[~zerosMask]   
     dataEf = dataE[~zerosMask]   
 
-    if np.all(dataE == 0) | np.all(np.isnan(dataE)):
-        # This condition is currently never satisfied, 
-        # but I am keeping it for the unlikely case of fitting NCP data without errors.
-        # In this case, we can use a statistical weight to make sure 
-        # chi2 is not too small for minimize.optimize().
-        chi2 = (ncpTotal - dataYf)**2 / dataYf**2
-    else:
-        chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
+    # TODO: Remove this comment eventually
+    # if np.all(dataE == 0) | np.all(np.isnan(dataE)):
+    #     # This condition is currently never satisfied, 
+    #     # but I am keeping it for the unlikely case of fitting NCP data without errors.
+    #     # In this case, we can use a statistical weight to make sure 
+    #     # chi2 is not too small for minimize.optimize().
+    #     chi2 = (ncpTotal - dataYf)**2 / dataYf**2
+    # else:
+    chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
     return np.sum(chi2)
 
 

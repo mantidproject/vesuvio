@@ -113,7 +113,7 @@ class YSpaceFitInitialConditions:
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
-    runMinos = False
+    runMinos = True
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
     maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
@@ -141,7 +141,7 @@ class BootstrapInitialConditions:
 
 
 class BootstrapAnalysis:
-    runAnalysis = True      # Controls whether or not analysis is run
+    runAnalysis = False      # Controls whether or not analysis is run
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True      # True discards some unreasonable values of widths and intensities
