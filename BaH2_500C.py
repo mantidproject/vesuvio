@@ -67,7 +67,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 0     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -130,15 +130,16 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    # Choose main procedure to run
-    procedure = None #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    runRoutine = True
 
+    # Choose main procedure to run
+    procedure = "BACKWARD" #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapInitialConditions:
-    runBootstrap = True
+    runBootstrap = False
 
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"   

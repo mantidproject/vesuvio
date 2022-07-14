@@ -1,6 +1,7 @@
 
 from .analysis_functions import iterativeFitForDataReduction, switchFirstTwoAxis
 from mantid.api import AnalysisDataService, mtd
+from mantid.simpleapi import CreateEmptyTableWorkspace
 import numpy as np
 
 
@@ -27,18 +28,18 @@ def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    if isHPresent(fwdIC.masses) and (bckwdIC.HToMassIdxRatio==None):
-        wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
+    # if isHPresent(fwdIC.masses) and (bckwdIC.HToMassIdxRatio==None):
+    #     wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
 
-    else:
-        assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMassIdxRatio==None)), "When H is not present, HToMassIdxRatio has to be set to None"
+    # else:
+    #     assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMassIdxRatio==None)), "When H is not present, HToMassIdxRatio has to be set to None"
         
-        wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
+    wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
     return wsFinal, bckwdScatResults, fwdScatResults
 
 
-def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
+def runPreProcToEstHRatio(bckwdIC, fwdIC):
     """
     Used when H is present and H to first mass ratio is not known.
     Preliminary forward scattering is run to get rough estimate of H to first mass ratio.
@@ -47,6 +48,12 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
 
     assert bckwdIC.runningSampleWS == False, "Preliminary procedure not suitable for Bootstrap."
     fwdIC.runningPreliminary = True
+
+    # Store original no of MS and set MS iterations to zero
+    oriMS = []
+    for IC in [bckwdIC, fwdIC]:
+        oriMS.append(IC.noOfMSIterations)
+        IC.noOfMSIterations = 0
 
     nIter = askUserNoOfIterations()
  
@@ -58,23 +65,44 @@ def runHPresentAndHRatioNotKnown(bckwdIC, fwdIC):
 
         AnalysisDataService.clear()    # Clears all Workspaces
 
+        # Update H ratio
         massIdx, HRatio = calculateHToMassIdxRatio(fwdScatResults)
-
         bckwdIC.HToMassIdxRatio = HRatio
         bckwdIC.massIdx = massIdx
+        HRatios.append(HRatio)
+        massIdxs.append(massIdx)
 
         wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
 
-        HRatios.append(HRatio)
-        massIdxs.append(massIdx)
-        
 
     print(f"\nIdxs of masses for H ratio for each iteration: \n{massIdxs}")
     print(f"\nCorresponding H ratios: \n{HRatios}")
 
     fwdIC.runningPreliminary = False  # Change to default since end of preliminary procedure
-    
-    return wsFinal, bckwdScatResults, fwdScatResults
+
+    # Set original number of MS iterations
+    for IC, ori in zip([bckwdIC, fwdIC], oriMS):
+        IC.noOfMSIterations = ori
+
+    # Update the H ratio with the best estimate, chages bckwdIC outside function
+    massIdx, HRatio = calculateHToMassIdxRatio(fwdScatResults)
+    bckwdIC.HToMassIdxRatio = HRatio
+    bckwdIC.massIdx = massIdx
+    HRatios.append(HRatio)
+    massIdxs.append(massIdx)
+
+    return HRatios, massIdxs
+
+
+def createTableWSHRatios(HRatios, massIdxs):
+    tableWS = CreateEmptyTableWorkspace(OutputWorkspace="H_Ratios_From_Preliminary_Procedure")
+    tableWS.setTitle("H Ratios and Idxs at each iteration")
+    tableWS.addColumn(type="int", name="iter")
+    tableWS.addColumn(type="float", name="H Ratio")
+    tableWS.addColumn(type="int", name="Mass Idx")
+    for i, (hr, hi) in enumerate(zip(HRatios, massIdxs)):
+        tableWS.addRow([i, hr, hi]) 
+    return
 
 
 def askUserNoOfIterations():

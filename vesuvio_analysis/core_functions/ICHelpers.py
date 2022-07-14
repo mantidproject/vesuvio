@@ -220,13 +220,10 @@ def noOfHistsFromTOFBinning(IC):
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
 
-def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
-    wsNames = []
-    for proc, IC in zip(procedures, inputIC):
-        # Format of corrected ws from last iteration
-        name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
-        wsNames.append(name)
-    return wsNames
+def buildFinalWSName(scriptName: str, procedure: str, IC):
+    # Format of corrected ws from last iteration
+    name = scriptName + "_" + procedure + "_" + str(IC.noOfMSIterations)
+    return name 
 
 def completeYFitIC(yFitIC, sampleName):
     # Set directories for figures

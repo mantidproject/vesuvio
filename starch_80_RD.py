@@ -120,9 +120,10 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
+    runRoutine = True
+    
     # Choose main procedure to run
     procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
     # Choose on which ws to perform the fit in y space
     fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 

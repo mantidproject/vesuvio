@@ -23,9 +23,10 @@ class BootstrapInitialConditions: # Not used, but still need to pass as arg
     fitInYSpace = NoneSamples = 0
 
 class UserScriptControls:
+    runRoutine = True
     procedure = "FORWARD"   
     fitInYSpace = "FORWARD"
-    bootstrap = None   
+    # bootstrap = None   
 
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls

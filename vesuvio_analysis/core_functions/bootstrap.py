@@ -3,7 +3,7 @@ import numpy as np
 
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, noOfHistsFromTOFBinning
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
@@ -273,7 +273,7 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
             for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
                 if (bootIC.fitInYSpace==mode) | (bootIC.fitInYSpace=="JOINT"):
-                    wsName = buildFinalWSNames(IC.scriptName, [mode], [IC])[0]  # List, select only element
+                    wsName = buildFinalWSName(IC.scriptName, mode, IC)  
                     fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
                     resultsDict[key+"YFit"] = fwdYFitRes
     else:

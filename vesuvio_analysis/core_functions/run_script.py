@@ -1,8 +1,8 @@
 
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, completeICFromInputs, completeBootIC, completeYFitIC
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, completeICFromInputs, completeBootIC, completeYFitIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure
+from vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, runPreProcToEstHRatio, createTableWSHRatios, isHPresent
 from mantid.api import mtd
 
 
@@ -14,72 +14,60 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC) 
     completeYFitIC(yFitIC, scriptName)
     
-    checkInputs(userCtr)
+    checkInputs(userCtr, bootIC)
 
+    def runProcedure():
+        proc = userCtr.procedure  # Shorthad to make it easier to read
 
-    if userCtr.procedure == None:
-         def runProcedure():
-            return None 
+        if proc==None:
+            return
+        
+        ranPreliminary = False
+        if (proc=="BACKWARD") | (proc=="JOINT"):
+            if isHPresent(fwdIC.masses) & (bckwdIC.HToMassIdxRatio==None):
+                HRatios, massIdxs = runPreProcToEstHRatio(bckwdIC, fwdIC)   # Sets H ratio to bckwdIC automatically
+                ranPreliminary = True
+            assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMassIdxRatio==None)), "When H is not present, HToMassIdxRatio has to be set to None"
 
-    elif userCtr.procedure == "BACKWARD":
-        def runProcedure():
-            return runIndependentIterativeProcedure(bckwdIC)
+        if (proc=="BACKWARD"): res = runIndependentIterativeProcedure(bckwdIC)
+        if (proc=="FORWARD"): res = runIndependentIterativeProcedure(fwdIC)
+        if (proc=="JOINT"): res = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
 
-    elif userCtr.procedure == "FORWARD":
-        def runProcedure():
-            return runIndependentIterativeProcedure(fwdIC)
-    
-    elif userCtr.procedure == "JOINT":
-        def runProcedure():
-            return runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-    else:
-        raise ValueError("Procedure option not recognized.")
+        # If preliminary procedure ran, make TableWS with H ratios values
+        if ranPreliminary: createTableWSHRatios(HRatios, massIdxs)
+        return res
 
-
-    if userCtr.fitInYSpace == None:
-        wsNames = []
-        ICs = []
-
-    elif userCtr.fitInYSpace == "BACKWARD":
-        wsNames = buildFinalWSNames(scriptName, ["BACKWARD"], [bckwdIC])
-        ICs = [bckwdIC]
-
-    elif userCtr.fitInYSpace == "FORWARD":
-        wsNames = buildFinalWSNames(scriptName, ["FORWARD"], [fwdIC])
-        ICs = [fwdIC]
-
-    elif userCtr.fitInYSpace == "JOINT":
-        wsNames = buildFinalWSNames(scriptName, ["BACKWARD", "FORWARD"], [bckwdIC, fwdIC])
-        ICs = [bckwdIC, fwdIC]
-    else:
-        raise ValueError("fitInYSpace option not recognized.")
+    # Names of workspaces to be fitted in y space
+    wsNames = []
+    ICs = []
+    for mode, IC in zip(["BACKWARD", "FORWARD"], [bckwdIC, fwdIC]):
+        if (userCtr.fitInYSpace==mode) | (userCtr.fitInYSpace=="JOINT"):
+            wsNames.append(buildFinalWSName(scriptName, mode, IC))
+            ICs.append(IC)
 
 
     # If bootstrap is not None, run bootstrap procedure and finish
-    if bootIC.runBootstrap == True:
+    if bootIC.runBootstrap:
         assert (bootIC.procedure=="FORWARD") | (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"), "Invalid Bootstrap procedure."
         return runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
     
     # Default workflow for procedure + fit in y space
+    if userCtr.runRoutine:
+        # Check if final ws are loaded:
+        wsInMtd = [ws in mtd for ws in wsNames]     # Bool list
+        if (len(wsInMtd)>0) and all(wsInMtd):       # When wsName is empty list, loop doesn't run
+            for wsName, IC in zip(wsNames, ICs):  
+                resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+            return None, resYFit       # To match return below. 
+        
+        checkUserClearWS()      # Check if user is OK with cleaning all workspaces
+        res = runProcedure()
 
-    # Check if final ws are loaded:
-    wsInMtd = [ws in mtd for ws in wsNames]   # List of bool
-
-    # If final ws are already loaded
-    if (len(wsInMtd)>0) and all(wsInMtd):       # When wsName is empty list, loop doesn't run
-        for wsName, IC in zip(wsNames, ICs):  
+        resYFit = None
+        for wsName, IC in zip(wsNames, ICs):
             resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
-        return None, resYFit       # To match return below. 
-    
-    checkUserClearWS()      # Check if user is OK with cleaning all workspaces
-    res = runProcedure()
-
-    resYFit = None
-    for wsName, IC in zip(wsNames, ICs):
-        resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
-    
-    return res, resYFit   # Return results used only in tests
-
+        
+        return res, resYFit   # Return results used only in tests
 
 
 def checkUserClearWS():
@@ -91,13 +79,20 @@ def checkUserClearWS():
             pass
         else:
             raise KeyboardInterrupt("Run of procedure canceled.")
-
     return
 
 
 
-def checkInputs(userCtr):
+def checkInputs(userCtr, bootIC):
     if (userCtr.procedure=="BACKWARD") | (userCtr.procedure=="FORWARD"):
         if userCtr.fitInYSpace != None:
             assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
-    # TODO: Add some more checks 
+    
+    for flag in [userCtr.procedure, userCtr.fitInYSpace]:
+        assert (flag=="BACKWARD") | (flag=="FORWARD") | (flag=="JOINT") | (flag==None), "Option not recognized."
+
+    if userCtr.runRoutine & bootIC.runBootstrap: 
+        raise ValueError ("""
+            Script is set to run both the main routine and bootstrap.
+            Please select only one of those at a time.
+            """)
