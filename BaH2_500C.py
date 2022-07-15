@@ -133,9 +133,9 @@ class UserScriptControls:
     runRoutine = True
 
     # Choose main procedure to run
-    procedure = "BACKWARD" #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapInitialConditions:

@@ -1,4 +1,5 @@
 
+from matplotlib.afm import CharMetrics
 from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, completeICFromInputs, completeBootIC, completeYFitIC
 from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
@@ -14,7 +15,9 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC) 
     completeYFitIC(yFitIC, scriptName)
     
-    checkInputs(userCtr, bootIC)
+    checkInputs(userCtr)
+    checkInputs(bootIC)
+    assert userCtr.runRoutine != bootIC.runBootstrap, "Main routine and bootstrap both set to run!"
 
     def runProcedure():
         proc = userCtr.procedure  # Shorthad to make it easier to read
@@ -83,17 +86,17 @@ def checkUserClearWS():
 
 
 
-def checkInputs(userCtr, bootIC):
-    
-    for flag in [userCtr.procedure, userCtr.fitInYSpace, bootIC.procedure, bootIC.fitInYSpace]:
-        assert (flag=="BACKWARD") | (flag=="FORWARD") | (flag=="JOINT"), "Option not recognized."
+def checkInputs(crtIC):
 
-    for inIC in [userCtr, bootIC]:
-        if inIC.procedure != "JOINT":
-            assert inIC.procedure == inIC.fitInYSpace
+    try:
+        if ~crtIC.runRoutine:
+            return
+    except AttributeError:
+        if ~crtIC.runBootstrap:
+            return
 
-    if userCtr.runRoutine & bootIC.runBootstrap: 
-        raise ValueError ("""
-            Script is set to run both the main routine and bootstrap.
-            Please select only one of those at a time.
-            """)
+    for flag in [crtIC.procedure, crtIC.fitInYSpace]:
+        assert (flag=="BACKWARD") | (flag=="FORWARD") | (flag=="JOINT") | (flag==None), "Option not recognized."
+
+    if (crtIC.procedure!="JOINT") & (crtIC.fitInYSpace!=None):
+        assert crtIC.procedure == crtIC.fitInYSpace

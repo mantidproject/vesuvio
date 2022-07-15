@@ -16,8 +16,7 @@ def runIndependentIterativeProcedure(IC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
         
-    wsFinal, ncpFitResultsObject = iterativeFitForDataReduction(IC)
-    return wsFinal, ncpFitResultsObject
+    return iterativeFitForDataReduction(IC)
 
 
 def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
@@ -28,15 +27,7 @@ def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    # if isHPresent(fwdIC.masses) and (bckwdIC.HToMassIdxRatio==None):
-    #     wsFinal, bckwdScatResults, fwdScatResults = runHPresentAndHRatioNotKnown(bckwdIC, fwdIC)
-
-    # else:
-    #     assert (isHPresent(fwdIC.masses) != (bckwdIC.HToMassIdxRatio==None)), "When H is not present, HToMassIdxRatio has to be set to None"
-        
-    wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
-
-    return wsFinal, bckwdScatResults, fwdScatResults
+    return runJoint(bckwdIC, fwdIC)
 
 
 def runPreProcToEstHRatio(bckwdIC, fwdIC):

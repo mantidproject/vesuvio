@@ -21,11 +21,11 @@ currResultsPatth = currentPath / "output_npz_for_testing"
 testForward = True 
 if testForward:
     pathToOriginal = oriResultsPatth / "4iter_forward_GB_MS.npz" 
-    pathToOptimized = currResultsPatth / "spec_144-182_iter_4_MS_GC.npz" 
+    pathToOptimized = currResultsPatth / "spec_144-182_iter_3_MS_GC.npz" 
 
 else:
     pathToOriginal = oriResultsPatth / "4iter_backward_MS.npz" 
-    pathToOptimized = currResultsPatth / "spec_3-134_iter_4_MS.npz" 
+    pathToOptimized = currResultsPatth / "spec_3-134_iter_3_MS.npz" 
 
 
 def displayMask(mask, rtol, string):

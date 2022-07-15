@@ -1,6 +1,7 @@
 import time
 import numpy as np
 from pathlib import Path
+from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 from mantid.api import AnalysisDataService
@@ -116,20 +117,19 @@ class YSpaceFitInitialConditions:
     anything = True
 
 
-class BootstrapInitialConditions:
-    anything = True
-
-
 class UserScriptControls:
+    runRoutine = True
+    
     # Choose main procedure to run
     procedure = "BACKWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
-    # Perform bootstrap procedure
-    # Independent of procedure and runFItInYSpace
-    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+class BootstrapInitialConditions:
+    runBootstrap = False
+
 
 start_time = time.time()
 
