@@ -1,2 +1,5 @@
 This file contains some information about each data file in the folder:
 
+
+spec_135-182_iter_0_nsampl_2.npz : FORWARD - 110,1.,430
+spec_135-182_iter_0_ySpaceFit_nsampl_2.npz : None - False - -25, 0.5, 25 - GC_C4_C6

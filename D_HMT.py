@@ -128,13 +128,13 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False
+    runBootstrap = True
 
     procedure = "JOINT"
     fitInYSpace = "JOINT"
 
     runningJackknife = False
-    nSamples = 649
+    nSamples = 600
     skipMSIterations = False
     runningTest = False
     userConfirmation = True
