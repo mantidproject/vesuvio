@@ -23,9 +23,10 @@ class BootstrapInitialConditions:
 
 
 class UserScriptControls:
+    runRoutine = False 
     procedure = "FORWARD"   
     fitInYSpace = None    
-    bootstrap = "JOINT"   
+    # bootstrap = "JOINT"   
 
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls

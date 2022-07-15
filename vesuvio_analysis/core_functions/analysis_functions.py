@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
@@ -20,7 +21,6 @@ def iterativeFitForDataReduction(ic):
     for iteration in range(ic.noOfMSIterations + 1):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
-        SumSpectra(InputWorkspace=wsToBeFitted, OutputWorkspace=wsToBeFitted.name()+"_Sum")
 
         fitNcpToWorkspace(ic, wsToBeFitted)
         
@@ -156,7 +156,7 @@ def createSlabGeometry(ic):
         CreateSampleShape(ic.name, xml_str)
 
 
-def fitNcpToWorkspace(ic, ws):
+def fitNcpToWorkspace(IC, ws):
     """
     Performs the fit of ncp to the workspace.
     Firtly the arrays required for the fit are prepared and then the fit is performed iteratively
@@ -165,15 +165,18 @@ def fitNcpToWorkspace(ic, ws):
     dataYws, dataXws, dataEws = arraysFromWS(ws)   
     dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)      
 
-    resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(ic, dataX)
+    resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(IC, dataX)
     
     print("\nFitting NCP:\n")
 
-    arrFitPars = fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
-    createTableWSForFitPars(ws.name(), ic.noOfMasses, arrFitPars)
+    arrFitPars = fitNcpToArray(IC, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
+    createTableWSForFitPars(ws.name(), IC.noOfMasses, arrFitPars)
     arrBestFitPars = arrFitPars[:, 1:-2]
-    allNcpForEachMass, allNcpTotal = calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
-    createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws, ic)
+    allNcpForEachMass, allNcpTotal = calculateNcpArr(IC, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
+    ncpSumWSs = createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws, IC)
+
+    wsDataSum = SumSpectra(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Sum")
+    plotSumNCPFits(wsDataSum, *ncpSumWSs, IC)
     return
 
 
@@ -373,9 +376,10 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
         DataY=ncpTotalf.flatten(),
         Nspec=len(dataX), 
         OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
-    SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
+    wsTotNCPSum = SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
 
     # Individual ncp workspaces
+    wsMNCPSum = []
     for i, ncp_m in enumerate(ncpForEachMass):
 
         ncp_mf = ncp_m
@@ -385,7 +389,35 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
             DataY=ncp_mf.flatten(), 
             Nspec=len(dataX),
             OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
-        SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
+        wsNCPSum = SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
+        wsMNCPSum.append(wsNCPSum)
+    return wsTotNCPSum, wsMNCPSum
+
+
+def plotSumNCPFits(wsDataSum, wsTotNCPSum, wsMNCPSum, IC):
+
+    if IC.runningSampleWS:   # Skip saving figure if running bootstrap
+        return         
+
+    lw = 2
+
+    fig, ax = plt.subplots(subplot_kw={"projection":"mantid"})
+    ax.errorbar(wsDataSum, "k.", label="Spectra")
+
+    ax.plot(wsTotNCPSum, "r-", label="Total NCP", linewidth=lw)
+    for m, wsNcp in zip(IC.masses, wsMNCPSum):
+        ax.plot(wsNcp, label=f"NCP m={m}", linewidth=lw)
+    
+    ax.set_xlabel("TOF")
+    ax.set_ylabel("Counts")
+    ax.set_title("Sum of NCP fits")
+    ax.legend()
+
+    fileName = wsDataSum.name()+"_NCP_Fits.pdf"
+    savePath = IC.figSavePath / fileName
+    plt.savefig(savePath, bbox_inches="tight")
+    plt.close(fig)
+    return
 
 
 def switchFirstTwoAxis(A):
@@ -512,14 +544,15 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
     dataYf = dataY[~zerosMask]   
     dataEf = dataE[~zerosMask]   
 
-    if np.all(dataE == 0) | np.all(np.isnan(dataE)):
-        # This condition is currently never satisfied, 
-        # but I am keeping it for the unlikely case of fitting NCP data without errors.
-        # In this case, we can use a statistical weight to make sure 
-        # chi2 is not too small for minimize.optimize().
-        chi2 = (ncpTotal - dataYf)**2 / dataYf**2
-    else:
-        chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
+    # TODO: Remove this comment eventually
+    # if np.all(dataE == 0) | np.all(np.isnan(dataE)):
+    #     # This condition is currently never satisfied, 
+    #     # but I am keeping it for the unlikely case of fitting NCP data without errors.
+    #     # In this case, we can use a statistical weight to make sure 
+    #     # chi2 is not too small for minimize.optimize().
+    #     chi2 = (ncpTotal - dataYf)**2 / dataYf**2
+    # else:
+    chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
     return np.sum(chi2)
 
 

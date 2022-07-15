@@ -1,6 +1,5 @@
 
-from genericpath import exists
-from unittest.loader import VALID_MODULE_NAME
+from random import sample
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
 import numpy as np
@@ -61,8 +60,10 @@ def completeICFromInputs(IC, scriptName, wsIC):
     # Default not running preliminary procedure to estimate HToMass0Ratio
     IC.runningPreliminary = False
     
-
     # Set directories for figures
+    figSavePath = experimentsPath / scriptName /"figures" 
+    figSavePath.mkdir(exist_ok=True)
+    IC.figSavePath = figSavePath
     return 
 
 
@@ -132,9 +133,6 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     return 
 
 def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
-    # Used even in the case where bootstrap is not running, to store running times
-    bootIC.runTimesPath = experimentsPath / fwdIC.scriptName / "running_times.txt"
-
     if not(bootIC.runBootstrap):
         return
 
@@ -144,7 +142,6 @@ def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
         bootIC.runningTest = False
 
     setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC)
-
     return
 
 
@@ -154,6 +151,9 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName   # Name of sample currently running
     experimentsPath = currentPath/".."/".."/"experiments"
+    
+    # Used to store running times required to estimate Bootstrap total run time.
+    bootIC.runTimesPath = experimentsPath / sampleName / "running_times.txt"
 
     # Make bootstrap and jackknife data directories
     if bootIC.runningJackknife:
@@ -215,59 +215,20 @@ def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     return log
 
 
-def storeRunnningTime(t, fwdIC, bckwdIC, userCtr, bootIC):
-    """Used to write run times to txt file."""
-
-    totMS, totNSpec = getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr)
-    
-    line = f"\n{totMS} {totNSpec} {t:.2f}"
-
-    savePath = bootIC.runTimesPath
-
-    if not(savePath.is_file()):
-        with open(savePath, "w") as txtFile:
-            txtFile.write("This file contains some information about running times used to estimate Bootstrap run time.\n\n")
-            txtFile.write("no of MS, no of Spec, Time [s]\n")
-   
-    with open(savePath, "a") as txtFile:
-        txtFile.write(line)
-    return
-
-
-def getTotNoMSNoSpec(fwdIC, bckwdIC, userCtr):
-    totMS = 0
-    totNSpec = 0
-    for mode, IC in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC]):
-        if (userCtr.procedure==mode) | (userCtr.procedure=="JOINT"):
-            totMS += IC.noOfMSIterations
-            totNSpec += (IC.lastSpec - IC.firstSpec + 1)
-    return totMS, totNSpec
-
-
 def noOfHistsFromTOFBinning(IC):
     start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
 
-# def cleanLogFile(logFilePath):
-#     folderPath = logFilePath.parent
-#     with open(logFilePath, "r") as file:
-#         lines = file.readlines()
-#     with open(logFilePath, "w") as file:
-#         for line in lines:
-#             name = line.strip("\n").split(" : ")[0]
-#             file.write(line)
-#             for path in folderPath.iterdir():
-#                 folderName = path.name
+def buildFinalWSName(scriptName: str, procedure: str, IC):
+    # Format of corrected ws from last iteration
+    name = scriptName + "_" + procedure + "_" + str(IC.noOfMSIterations)
+    return name 
 
-#                 # if path.name==name:
-#                 #     file.write(line)
+def completeYFitIC(yFitIC, sampleName):
+    # Set directories for figures
 
-def buildFinalWSNames(scriptName: str, procedures: list, inputIC: list):
-    wsNames = []
-    for proc, IC in zip(procedures, inputIC):
-        # Format of corrected ws from last iteration
-        name = scriptName + "_" + proc + "_" + str(IC.noOfMSIterations)
-        wsNames.append(name)
-    return wsNames
-
+    figSavePath = experimentsPath / sampleName /  "figures" 
+    figSavePath.mkdir(exist_ok=True)
+    yFitIC.figSavePath = figSavePath
+    return

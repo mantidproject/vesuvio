@@ -5,3 +5,5 @@ output_npz_for_testing
 !original_inputs/output_npz_for_testing
 
 vesuvio_analysis/core_functions/bootstrap_ws/
+running_times.txt
+figures/

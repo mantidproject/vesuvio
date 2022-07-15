@@ -92,8 +92,8 @@ def checkLogMatch(IC, isYFitFile):
             if line.split(" : ")[0] == currName:
                 if line.strip("\n") == currentLog:
                     return
-                raise NotFoundErr(IC.bootYFitSavePath.name+" found but corresponding log does not match.") 
-        raise NotFoundErr(IC.bootYFitSavePath.name+" not found in logs file") 
+                raise NotFoundErr(currName+" found but corresponding log does not match.") 
+        raise NotFoundErr(currName+" not found in logs file") 
 
 
 def readBootData(dataPath):
@@ -341,7 +341,7 @@ def plotMeansOverNoSamples(ax, bootMeans, normFlag=False):
     sampleSizes = np.linspace(10, nSamples, noOfPoints).astype(int)
 
     sampleMeans = np.zeros((len(bootMeans), len(sampleSizes)))
-    sampleErrors = np.zeros((len(bootMeans), 2, len(sampleSizes)))
+    sampleBounds = np.zeros((len(bootMeans), 2, len(sampleSizes)))
 
     for i, N in enumerate(sampleSizes):
         subSample = bootMeans[:, :N].copy()
@@ -350,26 +350,23 @@ def plotMeansOverNoSamples(ax, bootMeans, normFlag=False):
 
         bounds = np.percentile(subSample, [16, 68+16], axis=1).T   # 1 standard dev
         assert bounds.shape == (len(subSample), 2), f"Wrong shape: {bounds.shape}"
-        errors = bounds - mean[:, np.newaxis]
+        # errors = bounds - mean[:, np.newaxis]
 
         sampleMeans[:, i] = mean
-        sampleErrors[:, :, i] = errors
+        sampleBounds[:, :, i] = bounds
 
     meansFinal = sampleMeans
-    errorsFinal = sampleErrors
+    boundsFinal = sampleBounds
     ylabel = "Means and Errors Values"
     if normFlag:   # Rescale and normalize to last value, so all points are converging to zero
         lastValue = sampleMeans[:, -1][:, np.newaxis]
         meansFinal = (sampleMeans - lastValue) / lastValue * 100   # Percent change to last value
-        errorsFinal = (sampleErrors - lastValue[:, np.newaxis, :]) / lastValue[:, np.newaxis, :] * 100 
+        boundsFinal = (sampleBounds - lastValue[:, np.newaxis, :]) / lastValue[:, np.newaxis, :] * 100 
         ylabel = "Percent Change [%]"
-    # firstValues = sampleMeans[:, 0][:, np.newaxis]
-    # meansFinal = (sampleMeans - firstValues) / firstValues * 100  # %
-    # errorsFinal = sampleErrors / sampleMeans[:, np.newaxis, :] * 100  # %
 
-    for i, (means, errors) in enumerate(zip(meansFinal, errorsFinal)):
+    for i, (means, errors) in enumerate(zip(meansFinal, boundsFinal)):
         ax.plot(sampleSizes, means, label=f"idx {i}")
-        ax.fill_between(sampleSizes, errors[0, :], errors[1, :], alpha=0.1)
+        ax.fill_between(sampleSizes, errors[0, :], errors[1, :], alpha=0.2)
     
     ax.legend()
     ax.set_xlabel("Number of Bootstrap samples")

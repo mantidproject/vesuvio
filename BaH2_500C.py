@@ -67,7 +67,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ()
 
-    noOfMSIterations = 0     #4
+    noOfMSIterations = 1     #4
     firstSpec = 3    #3
     lastSpec = 134   #134
 
@@ -119,32 +119,35 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = False
+    symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "DOUBLE_WELL_ANSIO"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
-    globalFitFlag = True
-    forceManualMinos = False
+    fitModel = "DOUBLE_WELL" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    runMinos = True
+    globalFit = True
     nGlobalFitGroups = 4       # Number or string "ALL"
     maskTOFRange = "157, 163"    # Range for the resonance peak, masks with NCP fit values
 
 
-class BootstrapInitialConditions:
-    runningJackknife = False
-    nSamples = 650
-    skipMSIterations = False
-    userConfirmation = True
-
 
 class UserScriptControls:
+    runRoutine = True
+
     # Choose main procedure to run
-    procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
+    procedure = "BACKWARD" #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = None #"FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
-    # Perform bootstrap procedure
-    # Independent of procedure and runFItInYSpace
-    bootstrap = None  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
+class BootstrapInitialConditions:
+    runBootstrap = False
+
+    procedure = "FORWARD"
+    fitInYSpace = "FORWARD"   
+    
+    runningJackknife = False
+    nSamples = 2
+    skipMSIterations = False
+    userConfirmation = True
 
 
 class BootstrapAnalysis:
@@ -182,4 +185,4 @@ print("\nRunning time: ", end_time-start_time, " seconds")
 
 analysisIC = BootstrapAnalysis
 
-runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC)
+runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, userCtr)

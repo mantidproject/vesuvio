@@ -1,11 +1,9 @@
 from scipy import stats
 import numpy as np
 
-from .analysis_functions import arraysFromWS, histToPointData, prepareFitArgs, fitNcpToArray
-from .analysis_functions import iterativeFitForDataReduction
-from .fit_in_yspace import fitInYSpaceProcedure
-from .procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSNames, getTotNoMSNoSpec, noOfHistsFromTOFBinning
+from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
+from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
+from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from pathlib import Path
@@ -109,36 +107,26 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     return bootResults
 
 
-
 def askUserConfirmation(bckwdIC, fwdIC, bootIC):
     """Estimates running time for all samples and asks the user to confirm the run."""
     
     if not(bootIC.userConfirmation):   # Skip user confirmation 
         return
 
-    # t = np.loadtxt(bootIC.runTimesPath, dtype=str)[1:].astype(float)
-    # t[t[:, 0]==0] = np.nan    # Mask rows with zeros
+    tDict = storeRunnningTime(fwdIC, bckwdIC, bootIC)   # Run times file path stores in bootIC
 
-    # noMS, noSpec = getTotNoMSNoSpec(fwdIC, bckwdIC, bootIC)
-    
-    # meanT = np.nanmean(t[:, -1] * noMS/t[:, 0] * noSpec/t[:, 1])
+    # tBackNoMS = 0.27
+    # tBackPerMS = 2.6
+    # tFowNoMS = 0.13
+    # tFowPerMS = 1.2
 
-    # runTime = meanT * bootIC.nSamples  # TODO: This is compeletly wrong
+    runTime = 0
+    if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
+        runTime += calcRunTime(bckwdIC, tDict["tBackNoMS"], tDict["tBackPerMS"], bootIC)
 
+    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
+        runTime += calcRunTime(fwdIC, tDict["tFowNoMS"], tDict["tFowPerMS"], bootIC)
 
-    tBckwdNoMS = 0.27
-    tBckwdPerMS = 2.6
-    tFwdNoMS = 0.13
-    tFwdPerMS = 1.2
-
-    if bootIC.procedure=="BACKWARD":
-        runTime = calcRunTime(bckwdIC, tBckwdNoMS, tBckwdPerMS, bootIC)
-    elif bootIC.procedure=="FORWARD":
-        runTime = calcRunTime(fwdIC, tFwdNoMS, tFwdPerMS, bootIC)
-    elif bootIC.procedure=="JOINT":
-        runTime = calcRunTime(bckwdIC, tBckwdNoMS, tBckwdPerMS, bootIC)
-        runTime += calcRunTime(fwdIC, tFwdNoMS, tFwdPerMS, bootIC)
-    else: raise ValueError ("Bootstrap procedure not recognized. Unable to run Bootstrap.")
 
     print(f"\n\nTime estimates are based on a personal laptop with 4 cores, likely oversestimated.")
     userInput = input(f"\nEstimated time for Bootstrap procedure: {runTime/60:.3f} hours.\nProceed? (y/n): ")
@@ -146,6 +134,51 @@ def askUserConfirmation(bckwdIC, fwdIC, bootIC):
         return
     else:
         raise KeyboardInterrupt ("Bootstrap procedure interrupted.")
+
+
+def storeRunnningTime(fwdIC, bckwdIC, bootIC):
+    """Used to write run times to txt file."""
+
+    savePath = bootIC.runTimesPath
+
+    if not(savePath.is_file()):
+        with open(savePath, "w") as txtFile:
+            txtFile.write("This file stores run times to estimate Bootstrap total run time.")
+            txtFile.write("\nTime in minutes.\n\n")
+    
+    resDict = {}
+    with open(savePath, "r") as txtFile:
+        for line in txtFile:
+            if line[0]=="{":   # If line contains dictionary
+                resDict = eval(line)
+
+    if len(resDict)<4:
+        ans = input("Did not find necessary information to estimate runtime. Will run a short routine to store an estimate. Please wait until this is finished. Press any key to continue.")
+        resDict = buildRunTimes(fwdIC, bckwdIC)
+
+        with open(savePath, "a") as txtFile:
+            print(resDict, file=txtFile)
+
+    return resDict
+
+
+def buildRunTimes(fwdIC, bckwdIC):
+    resDict = {}
+    for IC, mode in zip([bckwdIC, fwdIC], ["Back", "Fow"]):
+        oriMS = IC.noOfMSIterations
+        for NIter, key in zip([0, 1], ["NoMS", "PerMS"]):
+            IC.noOfMSIterations = NIter
+            t0 = time.time()
+            runIndependentIterativeProcedure(IC)
+            t1 = time.time()
+            resDict["t"+mode+key] = (t1-t0) / 60
+        # Restore starting value
+        IC.noOfMSIterations = oriMS
+
+        # Correct times of only MS by subtacting time spend on fitting ncps
+        resDict["t"+mode+"PerMS"] -= 2 * resDict["t"+mode+"NoMS"]   
+
+    return resDict
 
 
 def calcRunTime(IC, tNoMS, tPerMS, bootIC):
@@ -198,9 +231,13 @@ def chooseNSamples(bootIC, parentWSnNCPs: dict):
 def setICsToDefault(bckwdIC, fwdIC, yFitIC):
     """Disables some features of yspace fit, makes sure the default """
 
+    # Disable Minos
+    if yFitIC.runMinos: yFitIC.runMinos = False
+
     # Disable global fit 
     if yFitIC.globalFit: yFitIC.globalFit = False
-    # Hide plots
+
+    # Don't show plots
     if yFitIC.showPlots: yFitIC.showPlots = False
 
     if bckwdIC.runningSampleWS: bckwdIC.runningSampleWS = False
@@ -236,7 +273,7 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
             for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
                 if (bootIC.fitInYSpace==mode) | (bootIC.fitInYSpace=="JOINT"):
-                    wsName = buildFinalWSNames(IC.scriptName, [mode], [IC])[0]  # List, select only element
+                    wsName = buildFinalWSName(IC.scriptName, mode, IC)  
                     fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
                     resultsDict[key+"YFit"] = fwdYFitRes
     else:
@@ -349,8 +386,6 @@ def storeBootIter(bootResultObjs: dict, j: int, bootIterResults: dict):
     for key in bootResultObjs:
         bootResultObjs[key].storeBootIterResults(j, bootIterResults[key])
     return
-    # for bootObj, iterRes in zip(bootResultObjs, bootIterResults):
-    #     bootObj.storeBootIterResults(j, iterRes)
 
 
 def saveBootstrapResults(bootResultObjs: dict, bckwdIC, fwdIC):
@@ -358,28 +393,7 @@ def saveBootstrapResults(bootResultObjs: dict, bckwdIC, fwdIC):
         for res in ["Scat", "YFit"]:
             if key+res in bootResultObjs:
                 bootResultObjs[key+res].saveResults(IC)
-
-
-    #     if (key=="bckwdScat") | (key=="bckwdYFit"):
-    #         bootResultObjs[key].saveResults(bckwdIC)
-    #     elif (key=="fwdScat") | (key=="fwdYFit"):
-    #         bootResultObjs[key].saveResults(fwdIC)
-    #     else: raise KeyError("Key in results dict not recognized.")
-
-    # for key in bootResultObjs:
-    #     if (key=="bckwdScat") | (key=="bckwdYFit"):
-    #         bootResultObjs[key].saveResults(bckwdIC)
-    #     elif (key=="fwdScat") | (key=="fwdYFit"):
-    #         bootResultObjs[key].saveResults(fwdIC)
-    #     else: raise KeyError("Key in results dict not recognized.")
     return
-
-
-    # # This format is not elegant 
-    # # Assumes any yfit result will be at the end of list
-    # for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
-    #     bootObj.saveResults(IC)
-    # bootResultObjs[-1].saveResults(inputIC[-1])   # Account for YFit object
 
 
 def saveBootstrapLogs(bootResultObjs: dict, bckwdIC, fwdIC):
@@ -387,17 +401,7 @@ def saveBootstrapLogs(bootResultObjs: dict, bckwdIC, fwdIC):
         for res in ["Scat", "YFit"]:
             if key+res in bootResultObjs:
                 bootResultObjs[key+res].saveLog(IC)
-    # for key in bootResultObjs:
-    #     if (key=="bckwdScat") | (key=="bckwdYFit"):
-    #         bootResultObjs[key].saveLog(bckwdIC)
-    #     elif (key=="fwdScat") | (key=="fwdYFit"):
-    #         bootResultObjs[key].saveLog(fwdIC)
-    #     else: raise KeyError("Key in results dict not recognized.")
     return
-# def saveBootstrapLogs(bootResultObjs: list, inputIC: list):
-#     for bootObj, IC in zip(bootResultObjs, inputIC):    # len(inputIC) is at most 2
-#         bootObj.saveLog(IC)
-#     bootResultObjs[-1].saveLog(inputIC[-1])   # Account for YFit object
 
 
 def convertWSToSavePaths(parentWSnNCPs: dict):
@@ -425,14 +429,12 @@ def saveWorkspacesLocally(ws):
     return savePath 
 
 
-
 def createSampleWS(parentWSNCPSavePaths: dict, j: int, bootIC):
 
     if bootIC.runningJackknife:
         return createJackknifeWS(parentWSNCPSavePaths, j)
     else:
         return createBootstrapWS(parentWSNCPSavePaths)
-
 
 
 def createBootstrapWS(parentWSNCPSavePaths:dict):
@@ -545,36 +547,4 @@ def formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS:dict, parentWS:dict):
 
             IC.sampleWS = sampleInputWS[key+"WS"]
             IC.parentWS = parentWS[key+"WS"]
-
-
-    # if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
-    #     fwdIC.runningSampleWS = True
-    #     fwdIC.runningJackknife = bootIC.runningJackknife
-
-    #     if bootIC.skipMSIterations: 
-    #         fwdIC.noOfMSIterations = 0
-
-    #     fwdIC.sampleWS = sampleInputWS["fwdWS"]
-    #     fwdIC.parentWS = parentWS["fwdWS"]
-    
-    # if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
-    #     bckwdIC.runningSampleWS = True
-    #     bckwdIC.runningJackknife = bootIC.runningJackknife
-
-    #     if bootIC.skipMSIterations: 
-    #         bckwdIC.noOfMSIterations = 0
-
-    #     bckwdIC.sampleWS = sampleInputWS["bckwdWS"]
-    #     bckwdIC.parentWS = parentWS["bckwdWS"]
-
-    # for IC, wsSample, parentWSnNCP in zip(inputIC, sampleInputWS, parentWS):
-    #     IC.runningSampleWS = True
-    #     IC.runningJackknife = bootIC.runningJackknife
-
-    #     if bootIC.skipMSIterations:
-    #         IC.noOfMSIterations = 0
-
-    #     IC.sampleWS = wsSample
-    #     IC.parentWS = parentWSnNCP[0]     # Select workspace with parent data
-   
 

@@ -95,7 +95,7 @@ class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as
     ])
     constraints = ()
 
-    noOfMSIterations = 2      
+    noOfMSIterations = 0      
     firstSpec = 144   #144
     lastSpec = 182   #182
 
@@ -113,21 +113,25 @@ class YSpaceFitInitialConditions:
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-30, 0.5, 30"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    runMinos = True
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
     maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
 
-class UserScriptControls:
-    # Choose main procedure to run
-    procedure = None #"FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
+class UserScriptControls:
+    runRoutine = True
+    
+    # Choose main procedure to run
+    procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = None #"FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+
 
 class BootstrapInitialConditions:
-    runBootstrap = True
+    runBootstrap = False 
 
-    procedure = "FORWARD"
+    procedure = "JOINT"
     fitInYSpace = "FORWARD"
 
     runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
@@ -136,9 +140,8 @@ class BootstrapInitialConditions:
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
 
 
-
 class BootstrapAnalysis:
-    runAnalysis = True      # Controls whether or not analysis is run
+    runAnalysis = False      # Controls whether or not analysis is run
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True      # True discards some unreasonable values of widths and intensities
