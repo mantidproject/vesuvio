@@ -84,12 +84,13 @@ def checkUserClearWS():
 
 
 def checkInputs(userCtr, bootIC):
-    if (userCtr.procedure=="BACKWARD") | (userCtr.procedure=="FORWARD"):
-        if userCtr.fitInYSpace != None:
-            assert userCtr.procedure == userCtr.fitInYSpace, "For isolated forward and backward, procedure needs to match fitInYSpace."
     
-    for flag in [userCtr.procedure, userCtr.fitInYSpace]:
-        assert (flag=="BACKWARD") | (flag=="FORWARD") | (flag=="JOINT") | (flag==None), "Option not recognized."
+    for flag in [userCtr.procedure, userCtr.fitInYSpace, bootIC.procedure, bootIC.fitInYSpace]:
+        assert (flag=="BACKWARD") | (flag=="FORWARD") | (flag=="JOINT"), "Option not recognized."
+
+    for inIC in [userCtr, bootIC]:
+        if inIC.procedure != "JOINT":
+            assert inIC.procedure == inIC.fitInYSpace
 
     if userCtr.runRoutine & bootIC.runBootstrap: 
         raise ValueError ("""

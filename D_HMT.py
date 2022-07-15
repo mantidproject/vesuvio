@@ -64,7 +64,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 0     
+    noOfMSIterations = 1     
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 0  
+    noOfMSIterations = 1  
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -111,7 +111,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = True
+    symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     runMinos = True
@@ -121,7 +121,7 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False
 
     # Choose main procedure to run
     procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
@@ -136,8 +136,8 @@ class BootstrapInitialConditions:
     fitInYSpace = "JOINT" #"FORWARD"
 
     runningJackknife = False
-    nSamples = 2 
-    skipMSIterations = True
+    nSamples = 15 
+    skipMSIterations = False
     runningTest = False
     userConfirmation = True
 
@@ -146,13 +146,13 @@ class BootstrapAnalysis:
     runAnalysis = False
 
     # Choose whether to filter averages as done in original procedure
-    filterAvg = False                 # True discards some unreasonable values of widths and intensities
+    filterAvg = True                 # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
-    plotRawWidthsIntensities = True
+    plotRawWidthsIntensities = True 
     plotMeanWidthsIntensities = True
-    plotMeansEvolution = False
-    plot2DHists = False
+    plotMeansEvolution = True 
+    plot2DHists = True 
     plotYFitHists = True
 
 

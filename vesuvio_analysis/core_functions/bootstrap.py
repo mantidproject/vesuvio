@@ -1,18 +1,15 @@
-from scipy import stats
-import numpy as np
-
 from vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
 from vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
 from vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
+from scipy import stats
+import numpy as np
 from pathlib import Path
 import time
 import matplotlib.pyplot as plt
 plt.style.use("ggplot")
 currentPath = Path(__file__).parent.absolute()
-
-# TODO: Warn user to only use one of these procedures isolated and not one after the other
 
 
 def runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
@@ -31,14 +28,11 @@ def checkOutputDirExists(bckwdIC, fwdIC, bootIC):
     if bootIC.runningTest:
         return
 
-    if bootIC.procedure=="BACKWARD":
+    proc = bootIC.procedure
+    if (proc=="BACKWARD") | (proc=="JOINT"):
         checkOutDirIC(bckwdIC)
-    elif bootIC.procedure=="FORWARD":
+    if (proc=="FORWARD") | (proc=="JOINT"):
         checkOutDirIC(fwdIC)
-    elif bootIC.procedure=="JOINT":
-        checkOutDirIC(bckwdIC)
-        checkOutDirIC(fwdIC)
-    else: raise ValueError ("Bootstrap procedure not recognized. Unable to run Bootstrap.")
     return 
 
 
@@ -55,11 +49,13 @@ def checkOutDirIC(IC):
 def JackknifeProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     assert bootIC.procedure != None
 
-    runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)  # Just to alter initial conditions fwdIC
+    # Run original procedure to change fwdIC in JOINT
+    runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC) 
 
-    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="BACKWARD"):
+    proc = bootIC.procedure
+    if (proc=="FORWARD") | (proc=="BACKWARD"):
         return bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
-    elif bootIC.procedure=="JOINT":
+    elif proc=="JOINT":
         bootIC.procedure="BACKWARD"
         bckwdJackRes = bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
         bootIC.procedure="FORWARD"
@@ -83,6 +79,7 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     nSamples = chooseNSamples(bootIC, parentWSnNCPs)
 
     bootResults = initializeResults(parentResults, nSamples, corrCoefs)
+    saveBootstrapLogs(bootResults, bckwdIC, fwdIC)
     parentWSNCPSavePaths = convertWSToSavePaths(parentWSnNCPs)
 
     iStart, iEnd = chooseLoopRange(bootIC, nSamples)
@@ -102,8 +99,6 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
         
         storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
         saveBootstrapResults(bootResults, bckwdIC, fwdIC)
-
-    saveBootstrapLogs(bootResults, bckwdIC, fwdIC)
     return bootResults
 
 
@@ -115,21 +110,15 @@ def askUserConfirmation(bckwdIC, fwdIC, bootIC):
 
     tDict = storeRunnningTime(fwdIC, bckwdIC, bootIC)   # Run times file path stores in bootIC
 
-    # tBackNoMS = 0.27
-    # tBackPerMS = 2.6
-    # tFowNoMS = 0.13
-    # tFowPerMS = 1.2
-
+    proc = bootIC.procedure
     runTime = 0
-    if (bootIC.procedure=="BACKWARD") | (bootIC.procedure=="JOINT"):
+    if (proc=="BACKWARD") | (proc=="JOINT"):
         runTime += calcRunTime(bckwdIC, tDict["tBackNoMS"], tDict["tBackPerMS"], bootIC)
 
-    if (bootIC.procedure=="FORWARD") | (bootIC.procedure=="JOINT"):
+    if (proc=="FORWARD") | (proc=="JOINT"):
         runTime += calcRunTime(fwdIC, tDict["tFowNoMS"], tDict["tFowPerMS"], bootIC)
 
-
-    print(f"\n\nTime estimates are based on a personal laptop with 4 cores, likely oversestimated.")
-    userInput = input(f"\nEstimated time for Bootstrap procedure: {runTime/60:.3f} hours.\nProceed? (y/n): ")
+    userInput = input(f"\n\nEstimated time for Bootstrap procedure: {runTime/60:.1f} hours.\nProceed? (y/n): ")
     if (userInput == "y") or (userInput == "Y"):
         return
     else:

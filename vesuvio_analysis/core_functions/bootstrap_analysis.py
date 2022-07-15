@@ -1,14 +1,12 @@
 
-from email.policy import default
-from fileinput import filename
 from xml.dom import NotFoundErr
+from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
+from vesuvio_analysis.core_functions.ICHelpers import setBootstrapDirs
+from vesuvio_analysis.core_functions.fit_in_yspace import selectModelAndPars
 import numpy as np
 import matplotlib .pyplot as plt
 from pathlib import Path
 from scipy import stats
-from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
-from vesuvio_analysis.core_functions.ICHelpers import setBootstrapDirs
-from vesuvio_analysis.core_functions.fit_in_yspace import selectModelAndPars
 
 currentPath = Path(__file__).parent.absolute() 
 experimentsPath = currentPath / ".." / ".. " / "experiments"
@@ -60,21 +58,7 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
 
         checkLogMatch(IC, isYFitFile=True)
 
-        fitIdx = 0   # 0 for Minuit, 1 for LM
-
-        bootYFitData = np.load(IC.bootYFitSavePath)
-        try:
-            bootYFitVals = bootYFitData["boot_samples"]   
-        except KeyError:
-            bootYFitVals = bootYFitData["boot_vals"]      # To account for some previous samples
-        minuitFitVals = bootYFitVals[:, fitIdx, :-1].T   # Select Minuit values and Discard last value chi2
-        
-        try:
-            parentPopt = bootYFitData["parent_popt"][fitIdx]
-            parentPerr = bootYFitData["parent_perr"][fitIdx]
-            printYFitParentPars(yFitIC, parentPopt, parentPerr)  # TODO: Test this function
-        except KeyError:
-            pass
+        minuitFitVals = readYFitData(IC.bootYFitSavePath, yFitIC)
 
         plotMeansEvolutionYFit(analysisIC, minuitFitVals)
         plotYFitHists(analysisIC, yFitIC, minuitFitVals)
@@ -108,11 +92,45 @@ def readBootData(dataPath):
             corrResiduals = np.array([np.nan]) 
             print("\nCorrelation of coefficients not found!\n")
 
+        failMask = np.all(np.isnan(bootParsRaw), axis=(1, 2))
+        assert failMask.shape == (len(bootParsRaw),), f"Wrong shape of masking: {failMask.shape} != {bootParsRaw.shape} "
+        if np.sum(failMask) > 0:
+            print(f"No of failed samples: {np.sum(failMask)}")
+            bootParsRaw = bootParsRaw[~failMask]
+            nSamples = np.sum(~failMask)
 
+        maskedIdxs = np.where(np.all(np.isnan(bootParsRaw), axis=(0, 2)))
+        print(f"Masked idxs with nans found: {maskedIdxs}")
         print(f"\nData files found:\n{dataPath.name}")
         print(f"\nNumber of samples in the file: {nSamples}")
         assert ~np.all(bootParsRaw[-1] == parentParsRaw), "Error in Jackknife due to last column."
         return bootParsRaw, parentParsRaw, nSamples, corrResiduals
+
+
+def readYFitData(dataPath, yFitIC):
+        """Resulting output has shape(no of pars, no of samples)"""
+
+        fitIdx = 0   # 0 to select Minuit, 1 to select LM
+
+        bootYFitData = np.load(dataPath)
+        try:
+            bootYFitVals = bootYFitData["boot_samples"]   
+        except KeyError:
+            bootYFitVals = bootYFitData["boot_vals"]      # To account for some previous samples
+        minFitVals = bootYFitVals[:, fitIdx, :-1].T   # Select Minuit values and Discard last value chi2
+
+        failMask = np.all(np.isnan(minFitVals), axis=0)
+        if np.sum(failMask) > 0:
+            print(f"\nNo of failed samples: {np.sum(failMask)}") 
+            minFitVals = minFitVals[:, ~failMask]
+
+        try:
+            parentPopt = bootYFitData["parent_popt"][fitIdx]
+            parentPerr = bootYFitData["parent_perr"][fitIdx]
+            printYFitParentPars(yFitIC, parentPopt, parentPerr)  # TODO: Test this function
+        except KeyError:
+            pass
+        return minFitVals
 
 
 def checkResiduals(corrRes):
@@ -389,7 +407,7 @@ def plot2DHists(bootSamples, mode):
     """bootSamples has histogram rows for each parameter"""
 
     plotSize = len(bootSamples)
-    fig, axs = plt.subplots(plotSize, plotSize, figsize=(6, 10), tight_layout=True)
+    fig, axs = plt.subplots(plotSize, plotSize, tight_layout=True)
 
     for i in range(plotSize):
         for j in range(plotSize):
@@ -431,9 +449,12 @@ def plot2DHists(bootSamples, mode):
 def printYFitParentPars(yFitIC, parentPopt, parentPerr):
 
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
+    sig = [p for p in defaultPars]
+    sig = ["y0"] + sig       # Add intercept from outside function parameters
+
 
     print("\nParent parameters of y-sapce fit:\n")
-    for p, m, e in zip(defaultPars, parentPopt, parentPerr):
+    for p, m, e in zip(sig, parentPopt, parentPerr):
         print(f"{p:5s}:  {m:8.3f} +/- {e:8.3f}")
 
 
@@ -449,8 +470,10 @@ def plotYFitHists(analysisIC, yFitIC, yFitHists):
 
     # To label each histogram, extract signature of function used for the fit
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
+    sig = [p for p in defaultPars]
+    sig = ["y0"] + sig       # Add intercept from outside function parameters
 
-    for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, defaultPars)):
+    for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, sig)):
         ax.set_title(f"Fit Parameter: {par}")
         plotHists(ax, hist[np.newaxis, :], disableAvg=True)
     
