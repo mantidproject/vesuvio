@@ -1,0 +1,4 @@
+This file contains some information about each data file in the folder:
+
+spec_3-134_iter_4_MS_nsampl_369.npz : JOINT - 50,1.,420
+spec_135-182_iter_4_MS_GC_nsampl_319.npz : JOINT - 110,1.,430

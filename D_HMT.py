@@ -121,7 +121,7 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False 
 
     # Choose main procedure to run
     procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
@@ -130,13 +130,13 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False
+    runBootstrap = True
 
     procedure = "JOINT"
     fitInYSpace = "JOINT" #"FORWARD"
 
-    runningJackknife = False
-    nSamples = 15 
+    runningJackknife = True
+    nSamples = 2 
     skipMSIterations = False
     runningTest = False
     userConfirmation = True
