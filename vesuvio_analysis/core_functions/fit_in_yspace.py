@@ -26,6 +26,8 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
         wsSubMass = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
+    wsYSpace = rebinOrInterpolate(wsYSpace, IC)
+    
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
     if yFitIC.symmetrisationFlag:
@@ -146,20 +148,40 @@ def convertToYSpace(rebinPars, ws0, mass):
         InputWorkspace=ws0, Mass=mass, 
     OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
         )
-    wsJoY = Rebin(
-        InputWorkspace=wsJoY, Params=rebinPars, 
-        FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
-        )
-    wsQ = Rebin(
-        InputWorkspace=wsQ, Params=rebinPars, 
-        FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
-        )
+    # wsJoY = Rebin(
+    #     InputWorkspace=wsJoY, Params=rebinPars, 
+    #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
+    #     )
+    # wsQ = Rebin(
+    #     InputWorkspace=wsQ, Params=rebinPars, 
+    #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
+    #     )
     
     # If workspace has nans present, normalization will put zeros on the full spectrum
     assert np.any(np.isnan(wsJoY.extractY()))==False, "Nans present before normalization."
     
     normalise_workspace(wsJoY)
     return wsJoY, wsQ
+
+
+def rebinOrInterpolate(ws, rebinPars, IC):
+
+    if IC.interpolateSpec:
+        first, step, last = [int(s) for s in IC.rebinPars.split(",")]
+        xp = np.arange(first, last, step)
+        wsJoY = interpYSpace(ws, xp)
+
+    else:
+        wsJoY = Rebin(
+            InputWorkspace=wsJoY, Params=rebinPars, 
+            FullBinsOnly=True, OutputWorkspace=ws.name()+"_Rebinned"
+            )
+    return wsJoY
+
+
+def interpYSpace(ws, xp):
+    return
+
 
 
 def weightedAvg(wsYSpace):
