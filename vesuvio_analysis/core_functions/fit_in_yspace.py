@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
-from scipy import ndimage, signal
+from scipy import ndimage, signal, interpolate
 from pathlib import Path
 from iminuit import Minuit, cost, util
 from iminuit.util import make_func_code, describe
@@ -26,7 +26,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
         wsSubMass = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
-    wsYSpace = rebinOrInterpolate(wsYSpace, IC)
+    wsYSpace = rebinOrInterpolate(wsYSpace, yFitIC)
     
     wsYSpaceAvg = weightedAvg(wsYSpace)
     
@@ -70,8 +70,14 @@ def maskResonancePeak(yFitIC, ws, ncp):
 
     # Mask dataY with NCP in given TOF region
     mask = (dataX >= start) & (dataX <= end)
-    # dataY[mask] = ncpTotal[mask]
-    dataY[mask] = ncp[mask]
+
+    if yFitIC.maskType=="NCP":
+        dataY[mask] = ncp[mask]
+    elif yFitIC.maskType=="NAN":
+        dataY[mask] = 0
+    else:
+        raise ValueError ("Mask type not recognized.")
+
 
     wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
     for i in range(wsMasked.getNumberHistograms()):
@@ -164,24 +170,90 @@ def convertToYSpace(rebinPars, ws0, mass):
     return wsJoY, wsQ
 
 
-def rebinOrInterpolate(ws, rebinPars, IC):
+def rebinOrInterpolate(ws, yFitIC):
+    rebinPars = yFitIC.rebinParametersForYSpaceFit
 
-    if IC.interpolateSpec:
-        first, step, last = [int(s) for s in IC.rebinPars.split(",")]
+    if yFitIC.interpolateSpec:
+        first, step, last = [float(s) for s in rebinPars.split(",")]
         xp = np.arange(first, last, step)
         wsJoY = interpYSpace(ws, xp)
 
     else:
+        assert ~np.any(np.all(ws.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
         wsJoY = Rebin(
-            InputWorkspace=wsJoY, Params=rebinPars, 
+            InputWorkspace=ws, Params=rebinPars, 
             FullBinsOnly=True, OutputWorkspace=ws.name()+"_Rebinned"
             )
     return wsJoY
 
 
 def interpYSpace(ws, xp):
-    return
 
+    # Check for masked values
+    wsM = convertZerosToNans(ws)
+
+    dataX, dataY, dataE = extractWS(wsM)
+
+    dataXP = np.zeros((len(dataX), len(xp)))
+    dataYP = dataXP.copy()
+    dataEP = dataXP.copy()
+
+    for i, (x, y, e) in enumerate(zip(dataX, dataY, dataE)):
+
+        if x[0] > xp[0]:    # Correct for interpolated range
+            x = np.hstack(([xp[0]], x))
+            y = np.hstack(([np.nan], y))
+            e = np.hstack(([np.nan], e))
+
+        if x[-1] < xp[-1]:    # Correct for interpolated range
+            x = np.hstack((x, [xp[-1]]))
+            y = np.hstack((y, [np.nan]))
+            e = np.hstack((e, [np.nan]))
+
+        yp, ep = interpSpec(xp, x, y, e)
+
+        dataXP[i] = xp
+        dataYP[i] = yp
+        dataEP[i] = ep
+
+    wsInterp = CreateWorkspace(DataX=dataXP.flatten(), DataY=dataYP.flatten(), DataE=dataEP.flatten(), NSpec=len(dataXP), OutputWorkspace=wsM.name()+"_Interp")
+    return wsInterp
+
+
+def interpSpec(xp, x, y, e):
+    f = interpolate.interp1d(x, y)
+    yp = f(xp)
+    # Calculate errors on interpolated values
+    fPlus = interpolate.interp1d(x, y+e)
+    fMinus = interpolate.interp1d(x, y-e)
+    ep = (fPlus(xp) - fMinus(xp)) / 2
+    return yp, ep
+
+
+def convertZerosToNans(ws):
+    dataX, dataY, dataE = extractWS(ws)
+
+    mask = (dataY==0) | (dataE==0)
+    for data in [dataY, dataE]:
+        data[mask] = np.nan
+    
+    wsM = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
+    wsM = passDataIntoWS(dataX, dataY, dataE, wsM)
+    return wsM
+
+
+def extractWS(ws):
+    """Directly exctracts data from workspace into arrays"""
+    return ws.extractX(), ws.extractY(), ws.extractE()
+
+
+def passDataIntoWS(dataX, dataY, dataE, ws):
+    "Modifies ws data to input data"
+    for i in range(ws.getNumberHistograms()):
+        ws.dataX(i)[:] = dataX[i, :]
+        ws.dataY(i)[:] = dataY[i, :]
+        ws.dataE(i)[:] = dataE[i, :]
+    return ws
 
 
 def weightedAvg(wsYSpace):

@@ -119,14 +119,16 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 class YSpaceFitInitialConditions:
     showPlots = True
-    symmetrisationFlag = True
+    symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "DOUBLE_WELL" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
-    runMinos = True
+    runMinos = False
     globalFit = True
     nGlobalFitGroups = 4       # Number or string "ALL"
     maskTOFRange = "157, 163"    # Range for the resonance peak, masks with NCP fit values
-    interpolateSpec = True
+    maskType = "NCP"            # Options: "NCP", "NAN"
+    interpolateSpec = False
+
 
 
 class UserScriptControls:
