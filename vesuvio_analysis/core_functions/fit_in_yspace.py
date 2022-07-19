@@ -177,7 +177,8 @@ def rebinOrInterpolate(ws, yFitIC):
         first, step, last = [float(s) for s in rebinPars.split(",")]
         xp = np.arange(first, last, step)
         wsJoY = interpYSpace(ws, xp)
-
+        # TODO: testing new interpolation
+        wsXInterp = nearestInterp(ws, xp)
     else:
         assert ~np.any(np.all(ws.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
         wsJoY = Rebin(
@@ -255,6 +256,24 @@ def passDataIntoWS(dataX, dataY, dataE, ws):
         ws.dataE(i)[:] = dataE[i, :]
     return ws
 
+
+def nearestInterp(ws, xp):
+    dataX, dataY, dataE = extractWS(ws)
+
+    dataXP = np.zeros(dataX.shape)
+    for i, x in enumerate(dataX):
+        f = interpolate.interp1d(xp, xp, kind="nearest")
+
+        x[x<np.min(xp)] = np.nan
+        x[x>np.max(xp)] = np.nan
+
+        newX = f(x)
+        dataX[i] = newX
+
+    wsXInterp = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_XInterp")
+    wsXInterp = passDataIntoWS(dataX, dataY, dataE, wsXInterp)
+    return wsXInterp
+        
 
 def weightedAvg(wsYSpace):
     """Returns ws with weighted avg of input ws"""

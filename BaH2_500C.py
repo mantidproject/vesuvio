@@ -126,8 +126,8 @@ class YSpaceFitInitialConditions:
     globalFit = True
     nGlobalFitGroups = 4       # Number or string "ALL"
     maskTOFRange = "157, 163"    # Range for the resonance peak, masks with NCP fit values
-    maskType = "NCP"            # Options: "NCP", "NAN"
-    interpolateSpec = False
+    maskType = "NAN"            # Options: "NCP", "NAN"
+    interpolateSpec = True
 
 
 
