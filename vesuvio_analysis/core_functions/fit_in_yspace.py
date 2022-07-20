@@ -177,8 +177,9 @@ def rebinOrInterpolate(ws, yFitIC):
         first, step, last = [float(s) for s in rebinPars.split(",")]
         xp = np.arange(first, last, step)
         wsJoY = interpYSpace(ws, xp)
-        # TODO: testing new interpolation
-        wsXInterp = nearestInterp(ws, xp)
+
+        wsXBins = dataXBining(ws, xp)
+        weightedAvgXBinned(wsXBins, xp)
     else:
         assert ~np.any(np.all(ws.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
         wsJoY = Rebin(
@@ -257,23 +258,60 @@ def passDataIntoWS(dataX, dataY, dataE, ws):
     return ws
 
 
-def nearestInterp(ws, xp):
-    dataX, dataY, dataE = extractWS(ws)
+def dataXBining(ws, xp):
 
+    assert np.min(xp[:-1]-xp[1:]) == np.max(xp[:-1]-xp[1:]), "Bin widths need to be the same."
+    step = xp[1] - xp[0]   # Calculate step from first two numbers
+    # Form bins with xp being the centers
+    bins = np.append(xp, [xp[-1]+step]) - step/2
+
+    dataX, dataY, dataE = extractWS(ws)
     dataXP = np.zeros(dataX.shape)
     for i, x in enumerate(dataX):
-        f = interpolate.interp1d(xp, xp, kind="nearest")
 
-        x[x<np.min(xp)] = np.nan
-        x[x>np.max(xp)] = np.nan
+        # Select only valid range xr
+        mask = (x<np.min(bins)) | (x>np.max(bins))
+        xr = x[~mask]
+        idxs = np.digitize(xr, bins)
+        # Binned valid range
+        newXR = np.array([xp[idx] for idx in idxs-1])
 
-        newX = f(x)
+        # Pad unvalid values with nans
+        newX = x
+        newX[mask] = np.nan
+        newX[~mask] = newXR
         dataX[i] = newX
 
-    wsXInterp = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_XInterp")
-    wsXInterp = passDataIntoWS(dataX, dataY, dataE, wsXInterp)
-    return wsXInterp
-        
+    # Mask zeros with nans 
+    mask = dataY==0
+    dataY[mask] = np.nan
+    dataE[mask] = np.nan
+
+    wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_XBinned")
+    wsXBins = passDataIntoWS(dataX, dataY, dataE, wsXBins)
+    return wsXBins
+
+
+def weightedAvgXBinned(wsXBins, xp):
+    dataX, dataY, dataE = extractWS(wsXBins)
+
+    avgY = np.zeros(len(xp))
+    avgE = np.zeros(len(xp))
+    for i in range(len(xp)):
+        # Perform weighted average over all dataY and dataE values with the same xp[i]
+        # Change shape to column to match weighted average function
+        allY = dataY[dataX==xp[i]][:, np.newaxis]
+        allE = dataE[dataX==xp[i]][:, np.newaxis]
+
+        # Weighted avg over all spectra, several points per spectra
+        meanY, meanE = weightedAvgArr(allY, allE)
+
+        avgY[i] = meanY
+        avgE[i] = meanE
+
+    CreateWorkspace(DataX=xp, DataY=avgY, DataE=avgE, NSpec=1, OutputWorkspace=wsXBins.name()+"_WeightedAvg")
+    return
+
 
 def weightedAvg(wsYSpace):
     """Returns ws with weighted avg of input ws"""
