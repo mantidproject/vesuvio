@@ -26,6 +26,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
         wsSubMass = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
+    wsYSpace = putAllSpecInSameRange(wsYSpace, yFitIC)
     wsYSpaceAvg = reduceToWeightedAverage(wsYSpace, yFitIC)
     
     if yFitIC.symmetrisationFlag:
@@ -172,33 +173,52 @@ def convertToYSpace(rebinPars, ws0, mass):
     normalise_workspace(wsJoY)
     return wsJoY, wsQ
 
+def buildXRangeFromRebinPars(yFitIC):
+    # Range used in case mask is set to NAN
+    first, step, last = [float(s) for s in yFitIC.rebinParametersForYSpaceFit.split(",")]
+    xp = np.arange(first, last, step) + step/2   # Correction to match Mantid range
+    return xp
 
-def reduceToWeightedAverage(wsJoY, yFitIC):
-    rebinPars = yFitIC.rebinParametersForYSpaceFit
+
+def reduceToWeightedAverage(wsJoYR, yFitIC):
     maskProc = yFitIC.maskTypeProcedure
 
-    # Range used in case mask is set to NAN
-    first, step, last = [float(s) for s in rebinPars.split(",")]
-    xp = np.arange(first, last, step)
-
-    if maskProc=="NCP_&_REBIN":
-        assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
-        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, 
-                        OutputWorkspace=wsJoY.name()+"_Rebinned")
+    if (maskProc=="NCP_&_REBIN") | (maskProc=="NAN_&_INTERP"):
         wsYSpaceAvg = weightedAvgCols(wsJoYR)
-    
-    elif maskProc=="NAN_&_INTERP":
-        wsJoYI = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
-        wsYSpaceAvg = weightedAvgCols(wsJoYI)
 
     elif maskProc=="NAN_&_BIN":
-        wsJoYB = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
-        wsYSpaceAvg = weightedAvgXBinned(wsJoYB, xp)
+        xp = buildXRangeFromRebinPars(yFitIC)
+        wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
 
     else:
         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
 
     return wsYSpaceAvg
+
+
+def putAllSpecInSameRange(wsJoY, yFitIC):
+    rebinPars = yFitIC.rebinParametersForYSpaceFit
+    maskProc = yFitIC.maskTypeProcedure
+
+    # Range used in case of interpolation or special binning
+    xp = buildXRangeFromRebinPars(yFitIC)
+
+    if maskProc=="NCP_&_REBIN":
+        assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
+        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, 
+                        OutputWorkspace=wsJoY.name()+"_Rebinned")
+    
+    elif maskProc=="NAN_&_INTERP":
+        wsJoYR = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
+
+    elif maskProc=="NAN_&_BIN":
+        wsJoYR = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
+
+    else:
+        raise ValueError("yFitIC.maskTypeProcedure not recognized.")
+
+    return wsJoYR
+
 
 
 def interpYSpace(ws, xp):
@@ -292,25 +312,37 @@ def dataXBining(ws, xp):
     return wsXBins
 
 
-def weightedAvgXBinned(wsXBins, xp):
+def weightedAvgXBins(wsXBins, xp):
     dataX, dataY, dataE = extractWS(wsXBins)
 
-    avgY = np.zeros(len(xp))
-    avgE = np.zeros(len(xp))
+    meansY, meansE = weightedAvgXBinsArr(dataX, dataY, dataE, xp)
+
+    wsYSpaceAvg = CreateWorkspace(DataX=xp, DataY=meansY, DataE=meansE, NSpec=1, OutputWorkspace=wsXBins.name()+"_WeightedAvg")
+    return wsYSpaceAvg
+
+
+def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
+    meansY = np.zeros(len(xp))
+    meansE = np.zeros(len(xp))
     for i in range(len(xp)):
         # Perform weighted average over all dataY and dataE values with the same xp[i]
         # Change shape to column to match weighted average function
         allY = dataY[dataX==xp[i]][:, np.newaxis]
         allE = dataE[dataX==xp[i]][:, np.newaxis]
+        assert allY.shape==allE.shape, "Selection of points Y and E with same X should be the same."
 
-        # Weighted avg over all spectra, several points per spectra
-        meanY, meanE = weightedAvgArr(allY, allE)
+        if (allY.size==0): 
+            mY, mE = 0, 0  # Mask with zeros
+        elif (allY.size==1):
+            mY, mE = allY[0, 0], allE[0, 0]
+        else:
+            # Weighted avg over all spectra, several points per spectra
+            mY, mE = weightedAvgArr(allY, allE)
 
-        avgY[i] = meanY
-        avgE[i] = meanE
-
-    wsYSpaceAvg = CreateWorkspace(DataX=xp, DataY=avgY, DataE=avgE, NSpec=1, OutputWorkspace=wsXBins.name()+"_WeightedAvg")
-    return wsYSpaceAvg
+        meansY[i] = mY
+        meansE[i] = mE
+    
+    return meansY, meansE
 
 
 def weightedAvgCols(wsYSpace):
@@ -334,6 +366,8 @@ def weightedAvgCols(wsYSpace):
 
 def weightedAvgArr(dataYOri, dataEOri):
     """Weighted average over columns of 2D arrays."""
+    assert dataYOri.shape==dataEOri.shape, "Y and E arrays should have same shape for weighted average."
+    assert len(dataYOri) > 1, "Weighted average needs more than one element to be performed."
 
     dataY = dataYOri.copy()  # Copy arrays not to change original data
     dataE = dataEOri.copy()
@@ -420,6 +454,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
 
     dataX, dataY, dataE = extractFirstSpectra(wsYSpaceSym)
     resX, resY, resE = extractFirstSpectra(wsRes)
+    assert np.all(dataX==resX), "Resolution should operate on the same range as DataX"
 
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
 
@@ -1061,7 +1096,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars)
 
     idxList = groupDetectors(instrPars, yFitIC)
-    dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList)
+    dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC)
 
     if yFitIC.symmetrisationFlag:  
         dataY, dataE = symmetrizeArr(dataY, dataE)
@@ -1412,13 +1447,22 @@ def formIdxList(clusters, nGroups, lenPoints):
 
 # ---------- Weighted Avgs of Groups
 
-def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
+def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
     Performs weighted average on each detector group given by the index list.
     The imput arrays do not include masked spectra.
     """
     assert ~np.any(np.all(dataY==0, axis=1)), f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY==0, axis=1))}"
-    
+
+    if yFitIC.maskTypeProcedure=="NAN_&_BIN":   # Exceptional case
+        return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
+    else:
+        return avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList)
+
+
+def avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList):
+    """Averaging used when JoY workspace is already Rebinned or Interpolated."""
+
     wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(dataY[0])))
 
     for i, idxs in enumerate(idxList):
@@ -1440,7 +1484,27 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList):
         wDataRes[i] = meanRes 
     
     assert ~np.any(np.all(wDataY==0, axis=1)), f"Some avg weights in groups are not being performed:\n{np.argwhere(np.all(wDataY==0, axis=1))}"
+    return wDataX, wDataY, wDataE, wDataRes
 
+
+def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
+    """Performed when mask with NaNs and Bins is turned on"""
+
+    meanX = buildXRangeFromRebinPars(yFitIC) 
+
+    wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(meanX)))
+    for i, idxs in enumerate(idxList):
+        groupX, groupY, groupE, groupRes = extractArrByIdx(dataX, dataY, dataE, dataRes, idxs)
+
+        meanY, meanE = weightedAvgXBinsArr(groupX, groupY, groupE, meanX)
+        
+        meanRes = np.nanmean(groupRes, axis=0)   # Nans are not present but safeguard
+        
+        wDataX[i] = meanX
+        wDataY[i] = meanY
+        wDataE[i] = meanE
+        wDataRes[i] = meanRes 
+    
     return wDataX, wDataY, wDataE, wDataRes
 
 
