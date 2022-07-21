@@ -26,9 +26,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
         wsSubMass = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
-    wsYSpace = rebinOrInterpolate(wsYSpace, yFitIC)
-    
-    wsYSpaceAvg = weightedAvg(wsYSpace)
+    wsYSpaceAvg = reduceToWeightedAverage(wsYSpace, yFitIC)
     
     if yFitIC.symmetrisationFlag:
         wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
@@ -38,7 +36,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     
     printYSpaceFitResults(wsYSpaceAvg.name())
 
-    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name(), wsSubMass.name())
+    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name(), wsYSpaceAvg.name())
     yfitResults.save()
     
     if yFitIC.globalFit:
@@ -62,7 +60,8 @@ def extractNCPFromWorkspaces(wsFinal, ic):
 
 
 def maskResonancePeak(yFitIC, ws, ncp):
-    # ncpTotal = np.sum(ncpForEachMass, axis=1)
+    """Masks a given TOF range on input ws. Currently acting on isolated mass ws."""
+
     start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
     assert start <= end, "Start value for masking needs to be smaller or equal than end."
     dataY = ws.extractY()[:, :-1]
@@ -71,12 +70,16 @@ def maskResonancePeak(yFitIC, ws, ncp):
     # Mask dataY with NCP in given TOF region
     mask = (dataX >= start) & (dataX <= end)
 
-    if yFitIC.maskType=="NCP":
-        dataY[mask] = ncp[mask]
-    elif yFitIC.maskType=="NAN":
-        dataY[mask] = 0
+    flag = yFitIC.maskTypeProcedure
+
+    if flag=="NCP_&_REBIN":
+        dataY[mask] = ncp[mask]   # Replace values by best fit NCP
+
+    elif (flag=="NAN_&_INTERP") | (flag=="NAN_&_BIN"):
+        dataY[mask] = 0    # Zeros are preserved during ConvertToYSpace
+
     else:
-        raise ValueError ("Mask type not recognized.")
+        raise ValueError ("Mask type not recognized, options: 'NCP_&_REBIN', 'NAN_&_INTERP', 'NAN_&_BIN'")
 
 
     wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
@@ -170,31 +173,41 @@ def convertToYSpace(rebinPars, ws0, mass):
     return wsJoY, wsQ
 
 
-def rebinOrInterpolate(ws, yFitIC):
+def reduceToWeightedAverage(wsJoY, yFitIC):
     rebinPars = yFitIC.rebinParametersForYSpaceFit
+    maskProc = yFitIC.maskTypeProcedure
 
-    if yFitIC.interpolateSpec:
-        first, step, last = [float(s) for s in rebinPars.split(",")]
-        xp = np.arange(first, last, step)
-        wsJoY = interpYSpace(ws, xp)
+    # Range used in case mask is set to NAN
+    first, step, last = [float(s) for s in rebinPars.split(",")]
+    xp = np.arange(first, last, step)
 
-        wsXBins = dataXBining(ws, xp)
-        weightedAvgXBinned(wsXBins, xp)
+    if maskProc=="NCP_&_REBIN":
+        assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
+        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, 
+                        OutputWorkspace=wsJoY.name()+"_Rebinned")
+        wsYSpaceAvg = weightedAvgCols(wsJoYR)
+    
+    elif maskProc=="NAN_&_INTERP":
+        wsJoYI = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
+        wsYSpaceAvg = weightedAvgCols(wsJoYI)
+
+    elif maskProc=="NAN_&_BIN":
+        wsJoYB = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
+        wsYSpaceAvg = weightedAvgXBinned(wsJoYB, xp)
+
     else:
-        assert ~np.any(np.all(ws.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
-        wsJoY = Rebin(
-            InputWorkspace=ws, Params=rebinPars, 
-            FullBinsOnly=True, OutputWorkspace=ws.name()+"_Rebinned"
-            )
-    return wsJoY
+        raise ValueError("yFitIC.maskTypeProcedure not recognized.")
+
+    return wsYSpaceAvg
 
 
 def interpYSpace(ws, xp):
+    dataX, dataY, dataE = extractWS(ws)
 
-    # Check for masked values
-    wsM = convertZerosToNans(ws)
-
-    dataX, dataY, dataE = extractWS(wsM)
+    # Change zeros to nans
+    mask = (dataY==0) | (dataE==0)
+    for data in [dataY, dataE]:
+        data[mask] = np.nan
 
     dataXP = np.zeros((len(dataX), len(xp)))
     dataYP = dataXP.copy()
@@ -232,18 +245,6 @@ def interpSpec(xp, x, y, e):
     return yp, ep
 
 
-def convertZerosToNans(ws):
-    dataX, dataY, dataE = extractWS(ws)
-
-    mask = (dataY==0) | (dataE==0)
-    for data in [dataY, dataE]:
-        data[mask] = np.nan
-    
-    wsM = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
-    wsM = passDataIntoWS(dataX, dataY, dataE, wsM)
-    return wsM
-
-
 def extractWS(ws):
     """Directly exctracts data from workspace into arrays"""
     return ws.extractX(), ws.extractY(), ws.extractE()
@@ -266,15 +267,14 @@ def dataXBining(ws, xp):
     bins = np.append(xp, [xp[-1]+step]) - step/2
 
     dataX, dataY, dataE = extractWS(ws)
-    dataXP = np.zeros(dataX.shape)
     for i, x in enumerate(dataX):
 
         # Select only valid range xr
         mask = (x<np.min(bins)) | (x>np.max(bins))
         xr = x[~mask]
+
         idxs = np.digitize(xr, bins)
-        # Binned valid range
-        newXR = np.array([xp[idx] for idx in idxs-1])
+        newXR = np.array([xp[idx] for idx in idxs-1])  # Bin idx 1 refers to first bin ie idx 0 of centers
 
         # Pad unvalid values with nans
         newX = x
@@ -309,29 +309,31 @@ def weightedAvgXBinned(wsXBins, xp):
         avgY[i] = meanY
         avgE[i] = meanE
 
-    CreateWorkspace(DataX=xp, DataY=avgY, DataE=avgE, NSpec=1, OutputWorkspace=wsXBins.name()+"_WeightedAvg")
-    return
+    wsYSpaceAvg = CreateWorkspace(DataX=xp, DataY=avgY, DataE=avgE, NSpec=1, OutputWorkspace=wsXBins.name()+"_WeightedAvg")
+    return wsYSpaceAvg
 
 
-def weightedAvg(wsYSpace):
+def weightedAvgCols(wsYSpace):
     """Returns ws with weighted avg of input ws"""
     
-    dataY = wsYSpace.extractY()
-    dataE = wsYSpace.extractE()
+    dataX, dataY, dataE = extractWS(wsYSpace)
+    # dataY = wsYSpace.extractY()
+    # dataE = wsYSpace.extractE()
 
     meanY, meanE = weightedAvgArr(dataY, dataE)
 
-    tempWs = SumSpectra(wsYSpace)
-    newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_Weighted_Avg")
-    newWs.dataY(0)[:] = meanY
-    newWs.dataE(0)[:] = meanE
-    DeleteWorkspace(tempWs)
+    wsYSpaceAvg = CreateWorkspace(DataX=dataX[0, :], DataY=meanY, DataE=meanE, NSpec=1, OutputWorkspace=wsYSpace.name()+"_WeightedAvg")
+    # tempWs = SumSpectra(wsYSpace)
+    # newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_Weighted_Avg")
+    # newWs.dataY(0)[:] = meanY
+    # newWs.dataE(0)[:] = meanE
+    # DeleteWorkspace(tempWs)
 
-    return newWs
+    return wsYSpaceAvg
 
 
 def weightedAvgArr(dataYOri, dataEOri):
-    """Weighted average over 2D arrays."""
+    """Weighted average over columns of 2D arrays."""
 
     dataY = dataYOri.copy()  # Copy arrays not to change original data
     dataE = dataEOri.copy()
@@ -360,17 +362,19 @@ def symmetrizeWs(avgYSpace):
     """Symmetrizes workspace after weighted average,
        Needs to have symmetric binning"""
 
-    dataX = avgYSpace.extractX()
-    dataY = avgYSpace.extractY()
-    dataE = avgYSpace.extractE()
+    # dataX = avgYSpace.extractX()
+    # dataY = avgYSpace.extractY()
+    # dataE = avgYSpace.extractE()
+    dataX, dataY, dataE = extractWS(avgYSpace)
 
     dataYSym, dataESym = symmetrizeArr(dataY, dataE)
 
-    Sym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_Symmetrised")
-    for i in range(Sym.getNumberHistograms()):
-        Sym.dataY(i)[:] = dataYSym[i]
-        Sym.dataE(i)[:] = dataESym[i] 
-    return Sym
+    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_Symmetrised")
+    wsSym = passDataIntoWS(dataX, dataYSym, dataESym, wsSym)
+    # for i in range(Sym.getNumberHistograms()):
+    #     Sym.dataY(i)[:] = dataYSym[i]
+    #     Sym.dataE(i)[:] = dataESym[i] 
+    return wsSym
 
 
 def symmetrizeArr(dataYOri, dataEOri):
@@ -586,7 +590,7 @@ def selectModelAndPars(modelFlag):
 
 
 def selectNonZeros(dataX, dataY, dataE):
-    nonZeros = (dataE!=0) & (dataE!=np.nan) & (dataE!=np.inf)  # Invalid values should have errors=0, but cover other invalid cases as well
+    nonZeros = (dataE!=0) & (dataE!=np.nan) & (dataE!=np.inf) & (dataY!=np.nan)  # Invalid values should have errors=0, but cover other invalid cases as well
     dataXNZ = dataX[nonZeros]
     dataYNZ = dataY[nonZeros]
     dataENZ = dataE[nonZeros]   
@@ -981,15 +985,18 @@ def printYSpaceFitResults(wsJoYName):
 
 class ResultsYFitObject:
 
-    def __init__(self, ic, yFitIC, wsFinalName, wsSubMassName):
+    def __init__(self, ic, yFitIC, wsFinalName, wsYSpaceAvgName):
         # Extract most relevant information from ws
         wsFinal = mtd[wsFinalName]
-        wsMass0 = mtd[wsSubMassName]
-        if yFitIC.symmetrisationFlag:
-            wsJoYAvg = mtd[wsSubMassName + "_JoY_Weighted_Avg_Symmetrised"]
-        else:
-            wsJoYAvg = mtd[wsSubMassName + "_JoY_Weighted_Avg"]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
+
+        wsJoYAvg = mtd[wsYSpaceAvgName]
+        wsSubMassName = wsYSpaceAvgName.split("_JoY_WeightedAvg")[0]
+        wsMass0 = mtd[wsSubMassName]
+        # if yFitIC.symmetrisationFlag:
+        #     wsJoYAvg = mtd[wsSubMassName + "_JoY_WeightedAvg_Symmetrised"]
+        # else:
+        #     wsJoYAvg = mtd[wsSubMassName + "_JoY_WeightedAvg"]
 
         self.finalRawDataY = wsFinal.extractY()
         self.finalRawDataE = wsFinal.extractE()
@@ -1193,7 +1200,7 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     convolvedModel.func_code = make_func_code(costSig)
 
     # Select only valid data, i.e. when error is not 0 or nan or inf
-    nonZeros= (yerr!=0) & (yerr!=np.nan) & (yerr!=np.inf)  
+    nonZeros= (yerr!=0) & (yerr!=np.nan) & (yerr!=np.inf) & (y!=np.nan)
     xNZ = x[nonZeros]
     yNZ = y[nonZeros]
     yerrNZ = yerr[nonZeros]

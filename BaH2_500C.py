@@ -124,10 +124,10 @@ class YSpaceFitInitialConditions:
     fitModel = "DOUBLE_WELL" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     runMinos = False
     globalFit = True
-    nGlobalFitGroups = 4       # Number or string "ALL"
+    nGlobalFitGroups = 4         # Number or string "ALL"
     maskTOFRange = "157, 163"    # Range for the resonance peak, masks with NCP fit values
-    maskType = "NAN"            # Options: "NCP", "NAN"
-    interpolateSpec = True
+    maskTypeProcedure = "NCP_&_REBIN"     # Options: "NCP_&_REBIN", "NAN_&_INTERP", "NAN_&_BIN"
+    # interpolateSpec = True
 
 
 
