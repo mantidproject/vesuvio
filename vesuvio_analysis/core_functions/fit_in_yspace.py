@@ -170,7 +170,7 @@ def convertToYSpace(rebinPars, ws0, mass):
     # If workspace has nans present, normalization will put zeros on the full spectrum
     assert np.any(np.isnan(wsJoY.extractY()))==False, "Nans present before normalization."
     
-    normalise_workspace(wsJoY)
+    # normalise_workspace(wsJoY)
     return wsJoY, wsQ
 
 def buildXRangeFromRebinPars(yFitIC):
@@ -180,33 +180,24 @@ def buildXRangeFromRebinPars(yFitIC):
     return xp
 
 
-def reduceToWeightedAverage(wsJoYR, yFitIC):
-    maskProc = yFitIC.maskTypeProcedure
-
-    if (maskProc=="NCP_&_REBIN") | (maskProc=="NAN_&_INTERP"):
-        wsYSpaceAvg = weightedAvgCols(wsJoYR)
-
-    elif maskProc=="NAN_&_BIN":
-        xp = buildXRangeFromRebinPars(yFitIC)
-        wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
-
-    else:
-        raise ValueError("yFitIC.maskTypeProcedure not recognized.")
-
-    return wsYSpaceAvg
-
 
 def putAllSpecInSameRange(wsJoY, yFitIC):
     rebinPars = yFitIC.rebinParametersForYSpaceFit
-    maskProc = yFitIC.maskTypeProcedure
 
+    # In case where no masking is present, use Mantid Rebin
+    if yFitIC.maskTOFRange==None:
+        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
+        # normalise_workspace(wsJoYR)
+        return wsJoYR
+
+    # Else use one of the three available procedures
+    maskProc = yFitIC.maskTypeProcedure
     # Range used in case of interpolation or special binning
     xp = buildXRangeFromRebinPars(yFitIC)
 
     if maskProc=="NCP_&_REBIN":
         assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
-        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, 
-                        OutputWorkspace=wsJoY.name()+"_Rebinned")
+        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
     
     elif maskProc=="NAN_&_INTERP":
         wsJoYR = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
@@ -217,6 +208,7 @@ def putAllSpecInSameRange(wsJoY, yFitIC):
     else:
         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
 
+    # normalise_workspace(wsJoYR)
     return wsJoYR
 
 
@@ -318,6 +310,29 @@ def dataXBining(ws, xp):
     wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_XBinned")
     wsXBins = passDataIntoWS(dataX, dataY, dataE, wsXBins)
     return wsXBins
+
+
+def reduceToWeightedAverage(wsJoYR, yFitIC):
+
+    if yFitIC.maskTOFRange==None: 
+        wsYSpaceAvg = weightedAvgCols(wsJoYR)
+        normalise_workspace(wsYSpaceAvg)
+        return wsYSpaceAvg
+
+    maskProc = yFitIC.maskTypeProcedure
+
+    if (maskProc=="NCP_&_REBIN") | (maskProc=="NAN_&_INTERP"):
+        wsYSpaceAvg = weightedAvgCols(wsJoYR)
+
+    elif maskProc=="NAN_&_BIN":
+        xp = buildXRangeFromRebinPars(yFitIC)
+        wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
+
+    else:
+        raise ValueError("yFitIC.maskTypeProcedure not recognized.")
+
+    normalise_workspace(wsYSpaceAvg)
+    return wsYSpaceAvg
 
 
 def weightedAvgXBins(wsXBins, xp):
@@ -1039,8 +1054,9 @@ class ResultsYFitObject:
         wsFinal = mtd[wsFinalName]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
 
+        # TODO: Issue here with extractng workspace
         wsJoYAvg = mtd[wsYSpaceAvgName]
-        wsSubMassName = wsYSpaceAvgName.split("_JoY_WeightedAvg")[0]
+        wsSubMassName = wsYSpaceAvgName.split("_JoY_")[0]
         wsMass0 = mtd[wsSubMassName]
         # if yFitIC.symmetrisationFlag:
         #     wsJoYAvg = mtd[wsSubMassName + "_JoY_WeightedAvg_Symmetrised"]
@@ -1468,10 +1484,11 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
     assert ~np.any(np.all(dataY==0, axis=1)), f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY==0, axis=1))}"
 
-    if (yFitIC.maskTOFRange!=None) & (yFitIC.maskTypeProcedure=="NAN_&_BIN"):   # Exceptional case
-        return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
-    else:
-        return avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList)
+    if (yFitIC.maskTOFRange!=None): 
+        if (yFitIC.maskTypeProcedure=="NAN_&_BIN"):   # Exceptional case
+            return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
+    
+    return avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList)
 
 
 def avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList):

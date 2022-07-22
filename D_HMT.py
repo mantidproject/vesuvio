@@ -64,7 +64,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 4     
+    noOfMSIterations = 0     
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 4  
+    noOfMSIterations = 0  
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -115,22 +115,23 @@ class YSpaceFitInitialConditions:
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
     runMinos = True
-    globalFit = True 
+    globalFit = False 
     nGlobalFitGroups = 4   
     maskTOFRange = None 
+    maskTypeProcedure = None
 
 
 class UserScriptControls:
-    runRoutine = False 
+    runRoutine = True 
 
     # Choose main procedure to run
-    procedure = "JOINT"   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = "FORWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "JOINT"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapInitialConditions:
-    runBootstrap = True
+    runBootstrap = False
 
     procedure = "JOINT"
     fitInYSpace = "JOINT" #"FORWARD"

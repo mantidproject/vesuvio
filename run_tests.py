@@ -6,10 +6,10 @@ import unittest
 loader = unittest.TestLoader()
 suite  = unittest.TestSuite()
 
-# Import modules to be tested
-import vesuvio_analysis.tests.test_analysis as analysis
-# Add tests to the test suite
-suite.addTests(loader.loadTestsFromModule(analysis))
+# # Import modules to be tested
+# import vesuvio_analysis.tests.test_analysis as analysis
+# # Add tests to the test suite
+# suite.addTests(loader.loadTestsFromModule(analysis))
 
 import vesuvio_analysis.tests.test_yspace_fit as yspacefit
 suite.addTests(loader.loadTestsFromModule(yspacefit))
