@@ -198,17 +198,19 @@ def putAllSpecInSameRange(wsJoY, yFitIC):
     if maskProc=="NCP_&_REBIN":
         assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
         wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
+        normalise_workspace(wsJoYR)
     
     elif maskProc=="NAN_&_INTERP":
         wsJoYR = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
+        normalise_workspace(wsJoYR)
 
     elif maskProc=="NAN_&_BIN":
         wsJoYR = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
+        # In this case, wsJoYR is not yet reduced for suitable normalisation, so do that after averaging.
 
     else:
         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
 
-    # normalise_workspace(wsJoYR)
     return wsJoYR
 
 
@@ -316,7 +318,7 @@ def reduceToWeightedAverage(wsJoYR, yFitIC):
 
     if yFitIC.maskTOFRange==None: 
         wsYSpaceAvg = weightedAvgCols(wsJoYR)
-        normalise_workspace(wsYSpaceAvg)
+        # normalise_workspace(wsYSpaceAvg)
         return wsYSpaceAvg
 
     maskProc = yFitIC.maskTypeProcedure
@@ -327,11 +329,11 @@ def reduceToWeightedAverage(wsJoYR, yFitIC):
     elif maskProc=="NAN_&_BIN":
         xp = buildXRangeFromRebinPars(yFitIC)
         wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
+        normalise_workspace(wsYSpaceAvg)
 
     else:
         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
 
-    normalise_workspace(wsYSpaceAvg)
     return wsYSpaceAvg
 
 
