@@ -224,11 +224,12 @@ def putAllSpecInSameRange(wsJoY, yFitIC):
 def interpYSpace(ws, xp):
     dataX, dataY, dataE = extractWS(ws)
 
-    # Change zeros to nans
+    # Change zeros to nans, to make sure they are ignored during interpolation
     mask = (dataY==0) | (dataE==0)
     for data in [dataY, dataE]:
         data[mask] = np.nan
 
+    # New interpolated dimensions    
     dataXP = np.zeros((len(dataX), len(xp)))
     dataYP = dataXP.copy()
     dataEP = dataXP.copy()
@@ -251,7 +252,13 @@ def interpYSpace(ws, xp):
         dataYP[i] = yp
         dataEP[i] = ep
 
-    wsInterp = CreateWorkspace(DataX=dataXP.flatten(), DataY=dataYP.flatten(), DataE=dataEP.flatten(), NSpec=len(dataXP), OutputWorkspace=wsM.name()+"_Interp")
+    # # Change NaNs to zeros to match masking of Rebin()
+    # assert np.all((dataYP==np.nan)==(dataEP==np.nan)), "Masked values with nans should be the same on dataY and dataE."
+    # nanMask = dataYP==np.nan
+    # dataYP[nanMask] = 0
+    # dataEP[nanMask] = 0
+
+    wsInterp = CreateWorkspace(DataX=dataXP.flatten(), DataY=dataYP.flatten(), DataE=dataEP.flatten(), NSpec=len(dataXP), OutputWorkspace=ws.name()+"_Interp")
     return wsInterp
 
 
@@ -367,7 +374,11 @@ def weightedAvgCols(wsYSpace):
 
 def weightedAvgArr(dataYOri, dataEOri):
     """Weighted average over columns of 2D arrays."""
+
+    # Run some tests
     assert dataYOri.shape==dataEOri.shape, "Y and E arrays should have same shape for weighted average."
+    assert np.all((dataYOri==0)==(dataEOri==0)), "Masked zeros should match in DataY and DataE."
+    assert np.all(np.isnan(dataYOri)==np.isnan(dataEOri)), "Masked nans should match in DataY and DataE."
     assert len(dataYOri) > 1, "Weighted average needs more than one element to be performed."
 
     dataY = dataYOri.copy()  # Copy arrays not to change original data
@@ -388,8 +399,8 @@ def weightedAvgArr(dataYOri, dataEOri):
     meanE[nanInfMask] = 0
 
     # Test that columns of zeros are left unchanged
-    np.testing.assert_allclose((np.sum(dataYOri, axis=0)==0), (meanY==0)), "Collumns of zeros are not being ignored."
-    np.testing.assert_allclose((np.sum(dataEOri, axis=0)==0), (meanE==0)), "Collumns of zeros are not being ignored."
+    assert np.all((meanY==0)==(meanE==0)), "Weighted avg output should have masks in the same DataY and DataE."
+    assert np.all((np.all(dataYOri==0, axis=0) | np.all(np.isnan(dataYOri), axis=0)) == (meanY==0)), "Masked cols should be ignored."
     
     return meanY, meanE
 
@@ -593,7 +604,7 @@ def selectModelAndPars(modelFlag):
             return JBest
 
         defaultPars = {"A":1, "d":1, "R":1, "sig1":3, "sig2":5}  # TODO: Starting parameters and bounds?
-        sharedPars = ["sig1", "sig2"]           
+        sharedPars = ["d", "R", "sig1", "sig2"]      # Only varying parameter is amplitude A     
 
     elif modelFlag=="DOUBLE_WELL_ANSIO":
         # Ansiotropic case
@@ -946,8 +957,6 @@ def oddPointsRes(x, res):
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     print('\nFitting on the sum of spectra in the West domain ...\n')     
     for minimizer in ['Levenberg-Marquardt','Simplex']:
-        outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
-        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
         
         if yFitIC.fitModel=="SINGLE_GAUSSIAN":
             function=f"""composite=Convolution,FixResolution=true,NumDeriv=true;
@@ -982,6 +991,9 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
         elif (yFitIC.fitModel=="DOUBLE_WELL") | (yFitIC.fitModel=="DOUBLE_WELL_ANSIO"):
             return
         else: raise ValueError("fitmodel not recognized.")
+
+        outputName = wsYSpaceSym.name()+"_Fitted_"+minimizer
+        CloneWorkspace(InputWorkspace = wsYSpaceSym, OutputWorkspace = outputName)
 
         Fit(
             Function=function, 
@@ -1122,9 +1134,9 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     for i in range(len(dataY)):     # Set limits for unshared parameters
         m.limits["A"+str(i)] = (0, np.inf)   
 
-        if yFitIC.fitModel=="DOUBLE_WELL":
-            m.limits["d"+str(i)] = (0, np.inf)
-            m.limits["R"+str(i)] = (0, np.inf) 
+    if yFitIC.fitModel=="DOUBLE_WELL":  
+        m.limits["d"] = (0, np.inf)     # Shared parameters
+        m.limits["R"] = (0, np.inf) 
 
     t0 = time.time()
     if yFitIC.fitModel=="SINGLE_GAUSSIAN":
@@ -1456,7 +1468,7 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
     assert ~np.any(np.all(dataY==0, axis=1)), f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY==0, axis=1))}"
 
-    if yFitIC.maskTypeProcedure=="NAN_&_BIN":   # Exceptional case
+    if (yFitIC.maskTOFRange!=None) & (yFitIC.maskTypeProcedure=="NAN_&_BIN"):   # Exceptional case
         return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
     else:
         return avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList)
