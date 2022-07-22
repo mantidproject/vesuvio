@@ -287,6 +287,7 @@ def dataXBining(ws, xp):
     bins = np.append(xp, [xp[-1]+step]) - step/2
 
     dataX, dataY, dataE = extractWS(ws)
+    # Loop below changes only the values of DataX
     for i, x in enumerate(dataX):
 
         # Select only valid range xr
@@ -300,7 +301,7 @@ def dataXBining(ws, xp):
         newX = x
         newX[mask] = np.nan
         newX[~mask] = newXR
-        dataX[i] = newX
+        dataX[i] = newX       # Update DataX
 
     # Mask zeros with nans 
     mask = dataY==0
@@ -331,13 +332,13 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
         allE = dataE[dataX==xp[i]][:, np.newaxis]
         assert allY.shape==allE.shape, "Selection of points Y and E with same X should be the same."
 
-        if (allY.size==0): 
+        if (allY.size==0):   # If no points were found for a given abcissae
             mY, mE = 0, 0  # Mask with zeros
-        elif (allY.size==1):
+        elif (allY.size==1):   # If one point was found, set to that point
             mY, mE = allY[0, 0], allE[0, 0]
         else:
-            # Weighted avg over all spectra, several points per spectra
-            mY, mE = weightedAvgArr(allY, allE)
+            # Weighted avg over all spectra and several points per spectra
+            mY, mE = weightedAvgArr(allY, allE)    # Outputs masks with zeros
 
         meansY[i] = mY
         meansE[i] = mE
@@ -373,6 +374,7 @@ def weightedAvgArr(dataYOri, dataEOri):
     dataE = dataEOri.copy()
 
     # Ignore invalid data by changing zeros to nans
+    # If data is already masked with nans, it remains unaltered
     zerosMask = dataE==0
     dataY[zerosMask] = np.nan  
     dataE[zerosMask] = np.nan
@@ -1490,7 +1492,8 @@ def avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList):
 def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """Performed when mask with NaNs and Bins is turned on"""
 
-    meanX = buildXRangeFromRebinPars(yFitIC) 
+    # Build range to average over
+    meanX = buildXRangeFromRebinPars(yFitIC)  
 
     wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(meanX)))
     for i, idxs in enumerate(idxList):
