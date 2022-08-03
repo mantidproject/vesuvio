@@ -22,12 +22,15 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsFinal)
 
     wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
-    if yFitIC.maskTOFRange != None:     # Mask resonance peak
-        wsSubMass, wsInt = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
+    
+    wsYSpaceAvg = ySpaceReduction(wsSubMass, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :])
+    
+    # if yFitIC.maskTOFRange != None:     # Mask resonance peak
+    #     wsSubMass, wsInt = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
-    wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
-    wsYSpace = putAllSpecInSameRange(wsYSpace, yFitIC, wsInt)
-    wsYSpaceAvg = reduceToWeightedAverage(wsYSpace, yFitIC)
+    # wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
+    # wsYSpace = putAllSpecInSameRange(wsYSpace, yFitIC, wsInt)
+    # wsYSpaceAvg = reduceToWeightedAverage(wsYSpace, yFitIC)
     
     if yFitIC.symmetrisationFlag:
         wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
@@ -60,7 +63,50 @@ def extractNCPFromWorkspaces(wsFinal, ic):
     return ncpForEachMass
 
 
-def maskResonancePeak(yFitIC, ws, ncp):
+def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
+    
+    rebinPars = yFitIC.rebinParametersForYSpaceFit
+
+    if yFitIC.maskTypeProcedure==None:
+        wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
+        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
+        wsJoYAvg = weightedAvgCols(wsJoYN)
+        return wsJoYAvg
+
+    elif yFitIC.maskTypeProcedure=="NCP":
+        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=True)
+        wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
+        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
+        wsJoYAvg = weightedAvgCols(wsJoYN)
+        return wsJoYAvg
+
+    elif yFitIC.maskTypeProcedure=="NaN":
+        # Build special workspace to store accumulated points
+        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=False)
+        wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
+        xp = buildXRangeFromRebinPars(yFitIC)
+        wsJoYB = dataXBining(wsJoY, xp)
+
+        # Need normalisation values from NCP masked workspace
+        wsJoYNCP = maskResonancePeak(wsJoY, ncp, yFitIC, maskWithNCP=True)
+        wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
+
+        # Normalize spectra of specieal workspace
+        wsJoYN = Divide(wsJoYB, wsJoYInt, OutputWorkspace="_Normalised")
+        wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
+        return wsJoYAvg
+    
+    else: raise ValueError("MaskTypeProcedure  not recognized.")
+
+
+def rebinAndNorm(wsJoY, rebinPars):
+    wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
+    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
+    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name()+"_Normalised")
+    return wsJoYNorm, wsJoYInt
+
+
+def maskResonancePeak(ws, ncp, yFitIC, maskWithNCP):
     """Masks a given TOF range on input ws. Currently acting on isolated mass ws."""
 
     start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
@@ -71,36 +117,29 @@ def maskResonancePeak(yFitIC, ws, ncp):
     # Mask dataY with NCP in given TOF region
     mask = (dataX >= start) & (dataX <= end)
 
-    flag = yFitIC.maskTypeProcedure
-
-    if flag=="NCP_&_REBIN":
+    if maskWithNCP:
         dataY[mask] = ncp[mask]   # Replace values by best fit NCP
-
-    elif (flag=="NAN_&_INTERP") | (flag=="NAN_&_BIN"):
-        dataY[mask] = 0    # Zeros are preserved during ConvertToYSpace
-
     else:
-        raise ValueError ("Mask type not recognized, options: 'NCP_&_REBIN', 'NAN_&_INTERP', 'NAN_&_BIN'")
-
+        dataY[mask] = 0    # Zeros are preserved during ConvertToYSpace
 
     wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
     for i in range(wsMasked.getNumberHistograms()):
         wsMasked.dataY(i)[:-1] = dataY[i, :]
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
 
-    #########
-    # Add ws with NCP masked to get norm parameters
-    dataY[mask] = ncp[mask]
-    wsNCPMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_NCP_Masked")
-    for i in range(wsMasked.getNumberHistograms()):
-        wsNCPMasked.dataY(i)[:-1] = dataY[i, :]
-    # Do everything here for now
-    wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsNCPMasked, 1.0079)
-    wsJoYR = Rebin( InputWorkspace=wsYSpace, Params=yFitIC.rebinParametersForYSpaceFit, FullBinsOnly=True, OutputWorkspace=wsYSpace.name()+"_Rebinned")
-    wsInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
+    # #########
+    # # Add ws with NCP masked to get norm parameters
+    # dataY[mask] = ncp[mask]
+    # wsNCPMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_NCP_Masked")
+    # for i in range(wsMasked.getNumberHistograms()):
+    #     wsNCPMasked.dataY(i)[:-1] = dataY[i, :]
+    # # Do everything here for now
+    # wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsNCPMasked, 1.0079)
+    # wsJoYR = Rebin( InputWorkspace=wsYSpace, Params=yFitIC.rebinParametersForYSpaceFit, FullBinsOnly=True, OutputWorkspace=wsYSpace.name()+"_Rebinned")
+    # wsInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
 
-    # wsInt = Integration(wsNCPMasked, OutputWorkspace=wsNCPMasked.name()+"_Integrated")
-    return wsMasked, wsInt
+    # # wsInt = Integration(wsNCPMasked, OutputWorkspace=wsNCPMasked.name()+"_Integrated")
+    return wsMasked   #, wsInt
     
 
 def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
@@ -166,25 +205,25 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def convertToYSpace(rebinPars, ws0, mass):
-    wsJoY, wsQ = ConvertToYSpace(
-        InputWorkspace=ws0, Mass=mass, 
-    OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
-        )
-    # wsJoY = Rebin(
-    #     InputWorkspace=wsJoY, Params=rebinPars, 
-    #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
-    #     )
-    # wsQ = Rebin(
-    #     InputWorkspace=wsQ, Params=rebinPars, 
-    #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
-    #     )
+# def convertToYSpace(rebinPars, ws0, mass):
+#     wsJoY, wsQ = ConvertToYSpace(
+#         InputWorkspace=ws0, Mass=mass, 
+#     OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
+#         )
+#     # wsJoY = Rebin(
+#     #     InputWorkspace=wsJoY, Params=rebinPars, 
+#     #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
+#     #     )
+#     # wsQ = Rebin(
+#     #     InputWorkspace=wsQ, Params=rebinPars, 
+#     #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
+#     #     )
     
-    # If workspace has nans present, normalization will put zeros on the full spectrum
-    assert np.any(np.isnan(wsJoY.extractY()))==False, "Nans present before normalization."
+#     # If workspace has nans present, normalization will put zeros on the full spectrum
+#     assert np.any(np.isnan(wsJoY.extractY()))==False, "Nans present before normalization."
     
-    # normalise_workspace(wsJoY)
-    return wsJoY, wsQ
+#     # normalise_workspace(wsJoY)
+#     return wsJoY, wsQ
 
 def buildXRangeFromRebinPars(yFitIC):
     # Range used in case mask is set to NAN
@@ -194,91 +233,91 @@ def buildXRangeFromRebinPars(yFitIC):
 
 
 
-def putAllSpecInSameRange(wsJoY, yFitIC, wsInt):
-    rebinPars = yFitIC.rebinParametersForYSpaceFit
+# def putAllSpecInSameRange(wsJoY, yFitIC, wsInt):
+#     rebinPars = yFitIC.rebinParametersForYSpaceFit
 
-    # In case where no masking is present, use Mantid Rebin
-    if yFitIC.maskTOFRange==None:
-        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
-        # normalise_workspace(wsJoYR)
-        return wsJoYR
+#     # In case where no masking is present, use Mantid Rebin
+#     if yFitIC.maskTOFRange==None:
+#         wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
+#         # normalise_workspace(wsJoYR)
+#         return wsJoYR
 
-    # Else use one of the three available procedures
-    maskProc = yFitIC.maskTypeProcedure
-    # Range used in case of interpolation or special binning
-    xp = buildXRangeFromRebinPars(yFitIC)
+#     # Else use one of the three available procedures
+#     maskProc = yFitIC.maskTypeProcedure
+#     # Range used in case of interpolation or special binning
+#     xp = buildXRangeFromRebinPars(yFitIC)
 
-    if maskProc=="NCP_&_REBIN":
-        # Replacement of values using NCP Fit alreayd happened
-        assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
-        wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
-        normalise_workspace(wsJoYR)
+#     if maskProc=="NCP_&_REBIN":
+#         # Replacement of values using NCP Fit alreayd happened
+#         assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
+#         wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
+#         normalise_workspace(wsJoYR)
     
-    elif maskProc=="NAN_&_INTERP":
-        wsJoYR = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
-        normalise_workspace(wsJoYR)
+#     # elif maskProc=="NAN_&_INTERP":
+#     #     wsJoYR = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
+#     #     normalise_workspace(wsJoYR)
 
-    elif maskProc=="NAN_&_BIN":
-        wsJoYB = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
-        wsJoYR = Divide(wsJoYB, wsInt, OutputWorkspace=wsJoYB.name()+"_Norm")
-        # In this case, wsJoYR is not yet reduced for suitable normalisation, so do that after averaging.
+#     elif maskProc=="NAN_&_BIN":
+#         wsJoYB = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
+#         wsJoYR = Divide(wsJoYB, wsInt, OutputWorkspace=wsJoYB.name()+"_Norm")
+#         # In this case, wsJoYR is not yet reduced for suitable normalisation, so do that after averaging.
 
-    else:
-        raise ValueError("yFitIC.maskTypeProcedure not recognized.")
+#     else:
+#         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
 
-    return wsJoYR
-
-
-
-def interpYSpace(ws, xp):
-    dataX, dataY, dataE = extractWS(ws)
-
-    # Change zeros to nans, to make sure they are ignored during interpolation
-    mask = (dataY==0) | (dataE==0)
-    for data in [dataY, dataE]:
-        data[mask] = np.nan
-
-    # New interpolated dimensions    
-    dataXP = np.zeros((len(dataX), len(xp)))
-    dataYP = dataXP.copy()
-    dataEP = dataXP.copy()
-
-    for i, (x, y, e) in enumerate(zip(dataX, dataY, dataE)):
-
-        if x[0] > xp[0]:    # Correct for interpolated range
-            x = np.hstack(([xp[0]], x))
-            y = np.hstack(([np.nan], y))
-            e = np.hstack(([np.nan], e))
-
-        if x[-1] < xp[-1]:    # Correct for interpolated range
-            x = np.hstack((x, [xp[-1]]))
-            y = np.hstack((y, [np.nan]))
-            e = np.hstack((e, [np.nan]))
-
-        yp, ep = interpSpec(xp, x, y, e)
-
-        dataXP[i] = xp
-        dataYP[i] = yp
-        dataEP[i] = ep
-
-    # # Change NaNs to zeros to match masking of Rebin()
-    # assert np.all((dataYP==np.nan)==(dataEP==np.nan)), "Masked values with nans should be the same on dataY and dataE."
-    # nanMask = dataYP==np.nan
-    # dataYP[nanMask] = 0
-    # dataEP[nanMask] = 0
-
-    wsInterp = CreateWorkspace(DataX=dataXP.flatten(), DataY=dataYP.flatten(), DataE=dataEP.flatten(), NSpec=len(dataXP), OutputWorkspace=ws.name()+"_Interp")
-    return wsInterp
+#     return wsJoYR
 
 
-def interpSpec(xp, x, y, e):
-    f = interpolate.interp1d(x, y)
-    yp = f(xp)
-    # Calculate errors on interpolated values
-    fPlus = interpolate.interp1d(x, y+e)
-    fMinus = interpolate.interp1d(x, y-e)
-    ep = (fPlus(xp) - fMinus(xp)) / 2
-    return yp, ep
+
+# def interpYSpace(ws, xp):
+#     dataX, dataY, dataE = extractWS(ws)
+
+#     # Change zeros to nans, to make sure they are ignored during interpolation
+#     mask = (dataY==0) | (dataE==0)
+#     for data in [dataY, dataE]:
+#         data[mask] = np.nan
+
+#     # New interpolated dimensions    
+#     dataXP = np.zeros((len(dataX), len(xp)))
+#     dataYP = dataXP.copy()
+#     dataEP = dataXP.copy()
+
+#     for i, (x, y, e) in enumerate(zip(dataX, dataY, dataE)):
+
+#         if x[0] > xp[0]:    # Correct for interpolated range
+#             x = np.hstack(([xp[0]], x))
+#             y = np.hstack(([np.nan], y))
+#             e = np.hstack(([np.nan], e))
+
+#         if x[-1] < xp[-1]:    # Correct for interpolated range
+#             x = np.hstack((x, [xp[-1]]))
+#             y = np.hstack((y, [np.nan]))
+#             e = np.hstack((e, [np.nan]))
+
+#         yp, ep = interpSpec(xp, x, y, e)
+
+#         dataXP[i] = xp
+#         dataYP[i] = yp
+#         dataEP[i] = ep
+
+#     # # Change NaNs to zeros to match masking of Rebin()
+#     # assert np.all((dataYP==np.nan)==(dataEP==np.nan)), "Masked values with nans should be the same on dataY and dataE."
+#     # nanMask = dataYP==np.nan
+#     # dataYP[nanMask] = 0
+#     # dataEP[nanMask] = 0
+
+#     wsInterp = CreateWorkspace(DataX=dataXP.flatten(), DataY=dataYP.flatten(), DataE=dataEP.flatten(), NSpec=len(dataXP), OutputWorkspace=ws.name()+"_Interp")
+#     return wsInterp
+
+
+# def interpSpec(xp, x, y, e):
+#     f = interpolate.interp1d(x, y)
+#     yp = f(xp)
+#     # Calculate errors on interpolated values
+#     fPlus = interpolate.interp1d(x, y+e)
+#     fMinus = interpolate.interp1d(x, y-e)
+#     ep = (fPlus(xp) - fMinus(xp)) / 2
+#     return yp, ep
 
 
 def extractWS(ws):
@@ -329,27 +368,27 @@ def dataXBining(ws, xp):
     return wsXBins
 
 
-def reduceToWeightedAverage(wsJoYR, yFitIC):
+# def reduceToWeightedAverage(wsJoYR, yFitIC):
 
-    if yFitIC.maskTOFRange==None: 
-        wsYSpaceAvg = weightedAvgCols(wsJoYR)
-        # normalise_workspace(wsYSpaceAvg)
-        return wsYSpaceAvg
+#     if yFitIC.maskTOFRange==None: 
+#         wsYSpaceAvg = weightedAvgCols(wsJoYR)
+#         # normalise_workspace(wsYSpaceAvg)
+#         return wsYSpaceAvg
 
-    maskProc = yFitIC.maskTypeProcedure
+#     maskProc = yFitIC.maskTypeProcedure
 
-    if (maskProc=="NCP_&_REBIN") | (maskProc=="NAN_&_INTERP"):
-        wsYSpaceAvg = weightedAvgCols(wsJoYR)
+#     if (maskProc=="NCP_&_REBIN") | (maskProc=="NAN_&_INTERP"):
+#         wsYSpaceAvg = weightedAvgCols(wsJoYR)
 
-    elif maskProc=="NAN_&_BIN":
-        xp = buildXRangeFromRebinPars(yFitIC)
-        wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
-        normalise_workspace(wsYSpaceAvg)
+#     elif maskProc=="NAN_&_BIN":
+#         xp = buildXRangeFromRebinPars(yFitIC)
+#         wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
+#         normalise_workspace(wsYSpaceAvg)
 
-    else:
-        raise ValueError("yFitIC.maskTypeProcedure not recognized.")
+#     else:
+#         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
 
-    return wsYSpaceAvg
+#     return wsYSpaceAvg
 
 
 def weightedAvgXBins(wsXBins, xp):
