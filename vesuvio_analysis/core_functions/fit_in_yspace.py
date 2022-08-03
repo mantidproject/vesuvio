@@ -23,10 +23,10 @@ def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
 
     wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
     if yFitIC.maskTOFRange != None:     # Mask resonance peak
-        wsSubMass = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
+        wsSubMass, wsInt = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
 
     wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
-    wsYSpace = putAllSpecInSameRange(wsYSpace, yFitIC)
+    wsYSpace = putAllSpecInSameRange(wsYSpace, yFitIC, wsInt)
     wsYSpaceAvg = reduceToWeightedAverage(wsYSpace, yFitIC)
     
     if yFitIC.symmetrisationFlag:
@@ -87,7 +87,20 @@ def maskResonancePeak(yFitIC, ws, ncp):
     for i in range(wsMasked.getNumberHistograms()):
         wsMasked.dataY(i)[:-1] = dataY[i, :]
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
-    return wsMasked
+
+    #########
+    # Add ws with NCP masked to get norm parameters
+    dataY[mask] = ncp[mask]
+    wsNCPMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_NCP_Masked")
+    for i in range(wsMasked.getNumberHistograms()):
+        wsNCPMasked.dataY(i)[:-1] = dataY[i, :]
+    # Do everything here for now
+    wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsNCPMasked, 1.0079)
+    wsJoYR = Rebin( InputWorkspace=wsYSpace, Params=yFitIC.rebinParametersForYSpaceFit, FullBinsOnly=True, OutputWorkspace=wsYSpace.name()+"_Rebinned")
+    wsInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
+
+    # wsInt = Integration(wsNCPMasked, OutputWorkspace=wsNCPMasked.name()+"_Integrated")
+    return wsMasked, wsInt
     
 
 def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
@@ -181,7 +194,7 @@ def buildXRangeFromRebinPars(yFitIC):
 
 
 
-def putAllSpecInSameRange(wsJoY, yFitIC):
+def putAllSpecInSameRange(wsJoY, yFitIC, wsInt):
     rebinPars = yFitIC.rebinParametersForYSpaceFit
 
     # In case where no masking is present, use Mantid Rebin
@@ -196,6 +209,7 @@ def putAllSpecInSameRange(wsJoY, yFitIC):
     xp = buildXRangeFromRebinPars(yFitIC)
 
     if maskProc=="NCP_&_REBIN":
+        # Replacement of values using NCP Fit alreayd happened
         assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
         wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
         normalise_workspace(wsJoYR)
@@ -205,7 +219,8 @@ def putAllSpecInSameRange(wsJoY, yFitIC):
         normalise_workspace(wsJoYR)
 
     elif maskProc=="NAN_&_BIN":
-        wsJoYR = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
+        wsJoYB = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
+        wsJoYR = Divide(wsJoYB, wsInt, OutputWorkspace=wsJoYB.name()+"_Norm")
         # In this case, wsJoYR is not yet reduced for suitable normalisation, so do that after averaging.
 
     else:
