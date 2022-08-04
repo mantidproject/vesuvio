@@ -121,12 +121,12 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = False
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "DOUBLE_WELL" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
-    runMinos = False
-    globalFit = False
+    fitModel = "DOUBLE_WELL_ANSIO" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    runMinos = True
+    globalFit = True
     nGlobalFitGroups = 4         # Number or string "ALL"
-    maskTOFRange = "157, 163"    # Range for the resonance peak, masks with NCP fit values
-    maskTypeProcedure = "NCP_&_REBIN" #"NAN_&_BIN"     # Options: "NCP_&_REBIN", "NAN_&_INTERP", "NAN_&_BIN"
+    maskTypeProcedure =  "NAN"    # Options: 'NCP', 'NAN', None 
+    maskTOFRange = "157, 163"     # TOF Range for the resonance peak
 
 
 

@@ -118,7 +118,7 @@ class YSpaceFitInitialConditions:
     runMinos = True
     globalFit = None 
     nGlobalFitGroups = 4
-    maskTOFRange = None
+    maskTypeProcedure = None
 
 # userControls and bootIC defined in corresponding test scripts
 

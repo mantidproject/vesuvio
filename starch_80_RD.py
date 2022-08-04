@@ -116,7 +116,8 @@ class YSpaceFitInitialConditions:
     runMinos = True
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
-    maskTOFRange = None              # Option to mask TOF range with NCP fit on resonance peak
+    maskTypeProcedure = None         # Options: 'NCP', 'NAN', None
+    maskTOFRange = None              # TOF Range for the resonance peak
 
 
 class UserScriptControls:

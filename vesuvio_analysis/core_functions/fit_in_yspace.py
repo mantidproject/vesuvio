@@ -1,12 +1,8 @@
-from fileinput import filename
-from inspect import signature
-from multiprocessing.sharedctypes import Value
-from tracemalloc import start
 import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
-from scipy import ndimage, signal, interpolate
+from scipy import  signal
 from pathlib import Path
 from iminuit import Minuit, cost, util
 from iminuit.util import make_func_code, describe
@@ -15,36 +11,29 @@ import time
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
+def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
 
-def fitInYSpaceProcedure(yFitIC, IC, wsFinal):
+    ncpForEachMass = extractNCPFromWorkspaces(wsTOF, IC)
+    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
 
-    ncpForEachMass = extractNCPFromWorkspaces(wsFinal, IC)
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsFinal)
-
-    wsSubMass = subtractAllMassesExceptFirst(IC, wsFinal, ncpForEachMass)
+    wsTOFMass0 = subtractAllMassesExceptFirst(IC, wsTOF, ncpForEachMass)
     
-    wsYSpaceAvg = ySpaceReduction(wsSubMass, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :])
-    
-    # if yFitIC.maskTOFRange != None:     # Mask resonance peak
-    #     wsSubMass, wsInt = maskResonancePeak(yFitIC, wsSubMass, ncpForEachMass[:, 0, :])  # Mask with ncp from first mass
-
-    # wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsSubMass, IC.masses[0]) 
-    # wsYSpace = putAllSpecInSameRange(wsYSpace, yFitIC, wsInt)
-    # wsYSpaceAvg = reduceToWeightedAverage(wsYSpace, yFitIC)
+    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :])
     
     if yFitIC.symmetrisationFlag:
-        wsYSpaceAvg = symmetrizeWs(wsYSpaceAvg)
+        wsJoYAvg = symmetrizeWs(wsJoYAvg)
 
-    fitProfileMinuit(yFitIC, wsYSpaceAvg, wsResSum)
-    fitProfileMantidFit(yFitIC, wsYSpaceAvg, wsResSum)
+    fitProfileMinuit(yFitIC, wsJoYAvg, wsResSum)
+    fitProfileMantidFit(yFitIC, wsJoYAvg, wsResSum)
     
-    printYSpaceFitResults(wsYSpaceAvg.name())
+    printYSpaceFitResults(wsJoYAvg.name())
 
-    yfitResults = ResultsYFitObject(IC, yFitIC, wsFinal.name(), wsYSpaceAvg.name())
+    yfitResults = ResultsYFitObject(IC, yFitIC, wsTOF.name(), wsJoYAvg.name())
     yfitResults.save()
     
     if yFitIC.globalFit:
-        runGlobalFit(wsYSpace, wsRes, IC, yFitIC) 
+        runGlobalFit(wsJoY, wsRes, IC, yFitIC) 
+        
     return yfitResults
 
 
@@ -62,85 +51,6 @@ def extractNCPFromWorkspaces(wsFinal, ic):
     print(f"\nExtracted NCP profiles from workspaces.\n")
     return ncpForEachMass
 
-
-def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
-    
-    rebinPars = yFitIC.rebinParametersForYSpaceFit
-
-    if yFitIC.maskTypeProcedure==None:
-        wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
-        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
-        wsJoYAvg = weightedAvgCols(wsJoYN)
-        return wsJoYAvg
-
-    elif yFitIC.maskTypeProcedure=="NCP":
-        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=True)
-        wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
-        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
-        wsJoYAvg = weightedAvgCols(wsJoYN)
-        return wsJoYAvg
-
-    elif yFitIC.maskTypeProcedure=="NaN":
-        # Build special workspace to store accumulated points
-        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=False)
-        wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
-        xp = buildXRangeFromRebinPars(yFitIC)
-        wsJoYB = dataXBining(wsJoY, xp)
-
-        # Need normalisation values from NCP masked workspace
-        wsJoYNCP = maskResonancePeak(wsJoY, ncp, yFitIC, maskWithNCP=True)
-        wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
-
-        # Normalize spectra of specieal workspace
-        wsJoYN = Divide(wsJoYB, wsJoYInt, OutputWorkspace="_Normalised")
-        wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
-        return wsJoYAvg
-    
-    else: raise ValueError("MaskTypeProcedure  not recognized.")
-
-
-def rebinAndNorm(wsJoY, rebinPars):
-    wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
-    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
-    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name()+"_Normalised")
-    return wsJoYNorm, wsJoYInt
-
-
-def maskResonancePeak(ws, ncp, yFitIC, maskWithNCP):
-    """Masks a given TOF range on input ws. Currently acting on isolated mass ws."""
-
-    start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
-    assert start <= end, "Start value for masking needs to be smaller or equal than end."
-    dataY = ws.extractY()[:, :-1]
-    dataX = ws.extractX()[:, :-1]
-
-    # Mask dataY with NCP in given TOF region
-    mask = (dataX >= start) & (dataX <= end)
-
-    if maskWithNCP:
-        dataY[mask] = ncp[mask]   # Replace values by best fit NCP
-    else:
-        dataY[mask] = 0    # Zeros are preserved during ConvertToYSpace
-
-    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
-    for i in range(wsMasked.getNumberHistograms()):
-        wsMasked.dataY(i)[:-1] = dataY[i, :]
-    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
-
-    # #########
-    # # Add ws with NCP masked to get norm parameters
-    # dataY[mask] = ncp[mask]
-    # wsNCPMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_NCP_Masked")
-    # for i in range(wsMasked.getNumberHistograms()):
-    #     wsNCPMasked.dataY(i)[:-1] = dataY[i, :]
-    # # Do everything here for now
-    # wsYSpace, wsQ = convertToYSpace(yFitIC.rebinParametersForYSpaceFit, wsNCPMasked, 1.0079)
-    # wsJoYR = Rebin( InputWorkspace=wsYSpace, Params=yFitIC.rebinParametersForYSpaceFit, FullBinsOnly=True, OutputWorkspace=wsYSpace.name()+"_Rebinned")
-    # wsInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
-
-    # # wsInt = Integration(wsNCPMasked, OutputWorkspace=wsNCPMasked.name()+"_Integrated")
-    return wsMasked   #, wsInt
-    
 
 def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
     mass = IC.masses[0]
@@ -162,16 +72,13 @@ def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
     DeleteWorkspace("tmp")
     return wsResSum, mtd[resName]
 
-    
-def normalise_workspace(ws_name):
-    tmp_norm = Integration(ws_name)
-    Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
-    DeleteWorkspace("tmp_norm")
-
 
 def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
-    """Input: workspace from last iteration, ncpTotal for each mass
-       Output: workspace with all the ncpTotal subtracted except for the first mass"""
+    """
+    Isolates TOF data from first mass only.
+    Input: ws containing TOF values, NCP for all mass profiles.
+    Output: ws with all profiles except first subtracted.
+    """
 
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
     # Select all masses other than the first one
@@ -181,6 +88,7 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
 
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Mass0")
     for j in range(wsSubMass.getNumberHistograms()):
+        
         if wsSubMass.spectrumInfo().isMasked(j):
             continue
 
@@ -205,25 +113,84 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-# def convertToYSpace(rebinPars, ws0, mass):
-#     wsJoY, wsQ = ConvertToYSpace(
-#         InputWorkspace=ws0, Mass=mass, 
-#     OutputWorkspace=ws0.name()+"_JoY", QWorkspace=ws0.name()+"_Q"
-#         )
-#     # wsJoY = Rebin(
-#     #     InputWorkspace=wsJoY, Params=rebinPars, 
-#     #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_JoY"
-#     #     )
-#     # wsQ = Rebin(
-#     #     InputWorkspace=wsQ, Params=rebinPars, 
-#     #     FullBinsOnly=True, OutputWorkspace=ws0.name()+"_Q"
-#     #     )
+def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
+    """Seperate procedures depending on masking specified."""
     
-#     # If workspace has nans present, normalization will put zeros on the full spectrum
-#     assert np.any(np.isnan(wsJoY.extractY()))==False, "Nans present before normalization."
+    rebinPars = yFitIC.rebinParametersForYSpaceFit
+
+    # Default procedure where no TOF values are masked
+    if yFitIC.maskTypeProcedure==None:
+        wsJoY = convertToYSpace(wsTOF, mass0)
+        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
+        wsJoYAvg = weightedAvgCols(wsJoYN)
+        return wsJoYN, wsJoYAvg
+
+    elif yFitIC.maskTypeProcedure=="NCP":   # Same as above but with additional masking in TOF space
+        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=True)
+        wsJoY = convertToYSpace(wsTOF, mass0)
+        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
+        wsJoYAvg = weightedAvgCols(wsJoYN)
+        return wsJoYN, wsJoYAvg
+
+    elif yFitIC.maskTypeProcedure=="NAN":
+        # Build special workspace to store accumulated points
+        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=False)
+        wsJoY = convertToYSpace(wsTOF, mass0)
+        xp = buildXRangeFromRebinPars(yFitIC)
+        wsJoYB = dataXBining(wsJoY, xp)      # Unusual ws with several dataY points per each dataX point
+
+        # Need normalisation values from NCP masked workspace
+        wsTOFNCP= maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=True)
+        wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
+        wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
+
+        # Normalize spectra of specieal workspace
+        wsJoYN = Divide(wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name()+"_Normalised")
+        wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
+        return wsJoYN, wsJoYAvg
     
-#     # normalise_workspace(wsJoY)
-#     return wsJoY, wsQ
+    else: raise ValueError("MaskTypeProcedure  not recognized.")
+
+
+def convertToYSpace(wsTOF, mass0):
+    wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name()+"_JoY")
+    return wsJoY
+
+
+def rebinAndNorm(wsJoY, rebinPars):
+    wsJoYR = Rebin(InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
+    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
+    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name()+"_Normalised")
+    return wsJoYNorm, wsJoYInt
+
+
+def maskResonancePeak(ws, ncp, yFitIC, maskWithNCP):
+    """
+    Masks a given TOF range on input ws. 
+    Either masks using NCP fit provided or with zeros.
+    """
+
+    # Range of masking
+    start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
+    assert start <= end, "Start value for masking needs to be smaller or equal than end."
+
+    dataY = ws.extractY()[:, :-1]
+    dataX = ws.extractX()[:, :-1]
+
+    # Mask dataY with NCP in given TOF region
+    mask = (dataX >= start) & (dataX <= end)
+
+    if maskWithNCP:
+        dataY[mask] = ncp[mask]   # Replace values by best fit NCP
+    else:
+        dataY[mask] = 0    # Zeros are preserved during ConvertToYSpace
+
+    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
+    for i in range(wsMasked.getNumberHistograms()):
+        wsMasked.dataY(i)[:-1] = dataY[i, :]
+    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
+    return wsMasked  
+
 
 def buildXRangeFromRebinPars(yFitIC):
     # Range used in case mask is set to NAN
@@ -232,109 +199,12 @@ def buildXRangeFromRebinPars(yFitIC):
     return xp
 
 
-
-# def putAllSpecInSameRange(wsJoY, yFitIC, wsInt):
-#     rebinPars = yFitIC.rebinParametersForYSpaceFit
-
-#     # In case where no masking is present, use Mantid Rebin
-#     if yFitIC.maskTOFRange==None:
-#         wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
-#         # normalise_workspace(wsJoYR)
-#         return wsJoYR
-
-#     # Else use one of the three available procedures
-#     maskProc = yFitIC.maskTypeProcedure
-#     # Range used in case of interpolation or special binning
-#     xp = buildXRangeFromRebinPars(yFitIC)
-
-#     if maskProc=="NCP_&_REBIN":
-#         # Replacement of values using NCP Fit alreayd happened
-#         assert ~np.any(np.all(wsJoY.extractY()==0), axis=0), "Rebin cannot operate on JoY ws with masked values."
-#         wsJoYR = Rebin( InputWorkspace=wsJoY, Params=rebinPars, FullBinsOnly=True, OutputWorkspace=wsJoY.name()+"_Rebinned")
-#         normalise_workspace(wsJoYR)
-    
-#     # elif maskProc=="NAN_&_INTERP":
-#     #     wsJoYR = interpYSpace(wsJoY, xp)   # Interpolates onto range xp
-#     #     normalise_workspace(wsJoYR)
-
-#     elif maskProc=="NAN_&_BIN":
-#         wsJoYB = dataXBining(wsJoY, xp)    # xp range is used as centers of bins
-#         wsJoYR = Divide(wsJoYB, wsInt, OutputWorkspace=wsJoYB.name()+"_Norm")
-#         # In this case, wsJoYR is not yet reduced for suitable normalisation, so do that after averaging.
-
-#     else:
-#         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
-
-#     return wsJoYR
-
-
-
-# def interpYSpace(ws, xp):
-#     dataX, dataY, dataE = extractWS(ws)
-
-#     # Change zeros to nans, to make sure they are ignored during interpolation
-#     mask = (dataY==0) | (dataE==0)
-#     for data in [dataY, dataE]:
-#         data[mask] = np.nan
-
-#     # New interpolated dimensions    
-#     dataXP = np.zeros((len(dataX), len(xp)))
-#     dataYP = dataXP.copy()
-#     dataEP = dataXP.copy()
-
-#     for i, (x, y, e) in enumerate(zip(dataX, dataY, dataE)):
-
-#         if x[0] > xp[0]:    # Correct for interpolated range
-#             x = np.hstack(([xp[0]], x))
-#             y = np.hstack(([np.nan], y))
-#             e = np.hstack(([np.nan], e))
-
-#         if x[-1] < xp[-1]:    # Correct for interpolated range
-#             x = np.hstack((x, [xp[-1]]))
-#             y = np.hstack((y, [np.nan]))
-#             e = np.hstack((e, [np.nan]))
-
-#         yp, ep = interpSpec(xp, x, y, e)
-
-#         dataXP[i] = xp
-#         dataYP[i] = yp
-#         dataEP[i] = ep
-
-#     # # Change NaNs to zeros to match masking of Rebin()
-#     # assert np.all((dataYP==np.nan)==(dataEP==np.nan)), "Masked values with nans should be the same on dataY and dataE."
-#     # nanMask = dataYP==np.nan
-#     # dataYP[nanMask] = 0
-#     # dataEP[nanMask] = 0
-
-#     wsInterp = CreateWorkspace(DataX=dataXP.flatten(), DataY=dataYP.flatten(), DataE=dataEP.flatten(), NSpec=len(dataXP), OutputWorkspace=ws.name()+"_Interp")
-#     return wsInterp
-
-
-# def interpSpec(xp, x, y, e):
-#     f = interpolate.interp1d(x, y)
-#     yp = f(xp)
-#     # Calculate errors on interpolated values
-#     fPlus = interpolate.interp1d(x, y+e)
-#     fMinus = interpolate.interp1d(x, y-e)
-#     ep = (fPlus(xp) - fMinus(xp)) / 2
-#     return yp, ep
-
-
-def extractWS(ws):
-    """Directly exctracts data from workspace into arrays"""
-    return ws.extractX(), ws.extractY(), ws.extractE()
-
-
-def passDataIntoWS(dataX, dataY, dataE, ws):
-    "Modifies ws data to input data"
-    for i in range(ws.getNumberHistograms()):
-        ws.dataX(i)[:] = dataX[i, :]
-        ws.dataY(i)[:] = dataY[i, :]
-        ws.dataE(i)[:] = dataE[i, :]
-    return ws
-
-
 def dataXBining(ws, xp):
+    """
+    Changes dataX of a workspace to values in range of bin centers xp.
+    Same as shifting dataY values to closest bin center.
+    Output ws has several dataY values per dataX point.
+    """
 
     assert np.min(xp[:-1]-xp[1:]) == np.max(xp[:-1]-xp[1:]), "Bin widths need to be the same."
     step = xp[1] - xp[0]   # Calculate step from first two numbers
@@ -352,13 +222,13 @@ def dataXBining(ws, xp):
         idxs = np.digitize(xr, bins)
         newXR = np.array([xp[idx] for idx in idxs-1])  # Bin idx 1 refers to first bin ie idx 0 of centers
 
-        # Pad unvalid values with nans
+        # Pad invalid values with nans
         newX = x
-        newX[mask] = np.nan
+        newX[mask] = np.nan    # Cannot use 0 as to not be confused with a dataX value
         newX[~mask] = newXR
         dataX[i] = newX       # Update DataX
 
-    # Mask zeros with nans 
+    # Mask zeros with nans to be consistent in this ws
     mask = dataY==0
     dataY[mask] = np.nan
     dataE[mask] = np.nan
@@ -368,30 +238,8 @@ def dataXBining(ws, xp):
     return wsXBins
 
 
-# def reduceToWeightedAverage(wsJoYR, yFitIC):
-
-#     if yFitIC.maskTOFRange==None: 
-#         wsYSpaceAvg = weightedAvgCols(wsJoYR)
-#         # normalise_workspace(wsYSpaceAvg)
-#         return wsYSpaceAvg
-
-#     maskProc = yFitIC.maskTypeProcedure
-
-#     if (maskProc=="NCP_&_REBIN") | (maskProc=="NAN_&_INTERP"):
-#         wsYSpaceAvg = weightedAvgCols(wsJoYR)
-
-#     elif maskProc=="NAN_&_BIN":
-#         xp = buildXRangeFromRebinPars(yFitIC)
-#         wsYSpaceAvg = weightedAvgXBins(wsJoYR, xp)
-#         normalise_workspace(wsYSpaceAvg)
-
-#     else:
-#         raise ValueError("yFitIC.maskTypeProcedure not recognized.")
-
-#     return wsYSpaceAvg
-
-
 def weightedAvgXBins(wsXBins, xp):
+    """Weighted average on ws where dataY points are grouped per dataX bin centers."""
     dataX, dataY, dataE = extractWS(wsXBins)
 
     meansY, meansE = weightedAvgXBinsArr(dataX, dataY, dataE, xp)
@@ -401,6 +249,13 @@ def weightedAvgXBins(wsXBins, xp):
 
 
 def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
+    """
+    Weighted Average on arrays where several dataY points correspond to a single dataX point.
+    xp is the range over which to perform the average.
+    dataX points can only take values in xp.
+    Ignores any zero or NaN value.
+    """
+
     meansY = np.zeros(len(xp))
     meansE = np.zeros(len(xp))
     for i in range(len(xp)):
@@ -412,10 +267,13 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
 
         if (allY.size==0):   # If no points were found for a given abcissae
             mY, mE = 0, 0  # Mask with zeros
+
         elif (allY.size==1):   # If one point was found, set to that point
             mY, mE = allY[0, 0], allE[0, 0]
+
         else:
             # Weighted avg over all spectra and several points per spectra
+            # Pass data as columns
             mY, mE = weightedAvgArr(allY, allE)    # Outputs masks with zeros
 
         meansY[i] = mY
@@ -425,26 +283,18 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
 
 
 def weightedAvgCols(wsYSpace):
-    """Returns ws with weighted avg of input ws"""
-    
+    """Returns ws with weighted avg of columns of input ws"""
     dataX, dataY, dataE = extractWS(wsYSpace)
-    # dataY = wsYSpace.extractY()
-    # dataE = wsYSpace.extractE()
-
     meanY, meanE = weightedAvgArr(dataY, dataE)
-
     wsYSpaceAvg = CreateWorkspace(DataX=dataX[0, :], DataY=meanY, DataE=meanE, NSpec=1, OutputWorkspace=wsYSpace.name()+"_WeightedAvg")
-    # tempWs = SumSpectra(wsYSpace)
-    # newWs = CloneWorkspace(tempWs, OutputWorkspace=wsYSpace.name()+"_Weighted_Avg")
-    # newWs.dataY(0)[:] = meanY
-    # newWs.dataE(0)[:] = meanE
-    # DeleteWorkspace(tempWs)
-
     return wsYSpaceAvg
 
 
 def weightedAvgArr(dataYOri, dataEOri):
-    """Weighted average over columns of 2D arrays."""
+    """
+    Weighted average over columns of 2D arrays.
+    Ignores any zero or NaN value.
+    """
 
     # Run some tests
     assert dataYOri.shape==dataEOri.shape, "Y and E arrays should have same shape for weighted average."
@@ -476,22 +326,38 @@ def weightedAvgArr(dataYOri, dataEOri):
     return meanY, meanE
 
 
+def normalise_workspace(ws_name):
+    """Updates workspace with the normalised version."""
+    tmp_norm = Integration(ws_name)
+    Divide(LHSWorkspace=ws_name,RHSWorkspace=tmp_norm,OutputWorkspace=ws_name)
+    DeleteWorkspace("tmp_norm")
+
+
+def extractWS(ws):
+    """Directly exctracts data from workspace into arrays"""
+    return ws.extractX(), ws.extractY(), ws.extractE()
+
+
+def passDataIntoWS(dataX, dataY, dataE, ws):
+    "Modifies ws data to input data"
+    for i in range(ws.getNumberHistograms()):
+        ws.dataX(i)[:] = dataX[i, :]
+        ws.dataY(i)[:] = dataY[i, :]
+        ws.dataE(i)[:] = dataE[i, :]
+    return ws
+
+
 def symmetrizeWs(avgYSpace):
-    """Symmetrizes workspace after weighted average,
-       Needs to have symmetric binning"""
+    """
+    Symmetrizes workspace after weighted average.
+    Needs to have symmetric binning.
+    """
 
-    # dataX = avgYSpace.extractX()
-    # dataY = avgYSpace.extractY()
-    # dataE = avgYSpace.extractE()
     dataX, dataY, dataE = extractWS(avgYSpace)
-
     dataYSym, dataESym = symmetrizeArr(dataY, dataE)
 
     wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_Symmetrised")
     wsSym = passDataIntoWS(dataX, dataYSym, dataESym, wsSym)
-    # for i in range(Sym.getNumberHistograms()):
-    #     Sym.dataY(i)[:] = dataYSym[i]
-    #     Sym.dataE(i)[:] = dataESym[i] 
     return wsSym
 
 
@@ -509,14 +375,12 @@ def symmetrizeArr(dataYOri, dataEOri):
     # Change values of yerr to leave cut-offs unchanged during symmetrisation
     dataE[cutOffMask] = np.full(np.sum(cutOffMask), np.inf)
 
-
     yFlip = np.flip(dataY, axis=1)
     eFlip = np.flip(dataE, axis=1)
 
     # Inverse variance weighting
     dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
     dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
-
 
     # Deal with effects from previously changing dataE=np.inf
     nanInfMask = dataESym==np.inf
@@ -617,7 +481,11 @@ def extractFirstSpectra(ws):
 
 
 def selectModelAndPars(modelFlag):
-    """Selects the function to fit, the starting parameters of that function and the shared parameters in global fit."""
+    """
+    Selects the function to fit. 
+    Specifies the starting parameters of that function as default parameters.
+    The sshared parameters are used in the global fit.
+    """
 
     if modelFlag == "SINGLE_GAUSSIAN":
         def model(x, A, x0, sigma):
@@ -728,6 +596,7 @@ def createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYS
 
 
 def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
+    """Saves figure with Minuit Fit."""
 
     leg = ""
     for p, v, e in zip(mObj.parameters, mObj.values, mObj.errors):
@@ -884,7 +753,7 @@ def runMinosForPar(minuitObj, constrFunc, var:str, bound:int, ax, bestFitVals, b
 
 
 def resetMinuit(minuitObj, bestFitVals, bestFitErrs):
-    # Set Minuit parameters to best fit values and errors
+    """Sets Minuit parameters to best fit values and errors."""
     for p in bestFitVals:
         minuitObj.values[p] = bestFitVals[p]
         minuitObj.errors[p] = bestFitErrs[p]
@@ -892,6 +761,7 @@ def resetMinuit(minuitObj, bestFitVals, bestFitErrs):
 
 
 def buildVarRange(bound, varVal, varErr):
+    """Range of points over which cost function is evaluated."""
     # Create variable space more dense near the minima using a quadratic density
     limit = (bound*varErr)**(1/2)     # Square root is corrected below
     varSpace = np.linspace(-limit, limit, 30)
@@ -1110,14 +980,9 @@ class ResultsYFitObject:
         wsFinal = mtd[wsFinalName]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
 
-        # TODO: Issue here with extractng workspace
         wsJoYAvg = mtd[wsYSpaceAvgName]
         wsSubMassName = wsYSpaceAvgName.split("_JoY_")[0]
         wsMass0 = mtd[wsSubMassName]
-        # if yFitIC.symmetrisationFlag:
-        #     wsJoYAvg = mtd[wsSubMassName + "_JoY_WeightedAvg_Symmetrised"]
-        # else:
-        #     wsJoYAvg = mtd[wsSubMassName + "_JoY_WeightedAvg"]
 
         self.finalRawDataY = wsFinal.extractY()
         self.finalRawDataE = wsFinal.extractE()
@@ -1412,6 +1277,7 @@ def groupDetectors(ipData, yFitIC):
 
 
 def checkNGroupsValid(yFitIC, ipData):
+    """Checks number of groups selected for global fit is valid."""
 
     nSpectra = len(ipData)  # Number of spectra in the workspace
 
@@ -1425,6 +1291,7 @@ def checkNGroupsValid(yFitIC, ipData):
 
 
 def plotDetsAndInitialCenters(L1, theta, centers):
+    """Used in debugging."""
     fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})  
     fig.canvas.set_window_title("Starting centroids for groupings")
     ax.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
@@ -1438,6 +1305,8 @@ def plotDetsAndInitialCenters(L1, theta, centers):
 
 
 def plotFinalGroups(ax, ipData, idxList):
+    """Plot of groupings of detectors."""
+
     for i, idxs in enumerate(idxList):
         L1 = ipData[idxs, -1]
         theta = ipData[idxs, 2]
@@ -1540,21 +1409,26 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
     assert ~np.any(np.all(dataY==0, axis=1)), f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY==0, axis=1))}"
 
-    if (yFitIC.maskTOFRange!=None): 
-        if (yFitIC.maskTypeProcedure=="NAN_&_BIN"):   # Exceptional case
-            return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
+    if (yFitIC.maskTypeProcedure=="NAN"): 
+        return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
     
+    # Use Default for unmasked or NCP masked
     return avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList)
 
 
 def avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList):
-    """Averaging used when JoY workspace is already Rebinned or Interpolated."""
+    """
+    Averaging used when JoY workspace is already Rebinned and Normalised.
+    Selects groups of detectors and performs the weighted average for each group.
+    Returns arrays with the group averages.
+    """
 
     wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(dataY[0])))
 
     for i, idxs in enumerate(idxList):
         groupX, groupY, groupE, groupRes = extractArrByIdx(dataX, dataY, dataE, dataRes, idxs)
-        
+        assert len(groupY) > 0, "Group with zero detectors found, invalid."
+
         if len(groupY) == 1:   # Cannot use weight avg in single spec, wrong results
             meanY, meanE = groupY, groupE
             meanRes = groupRes
@@ -1565,17 +1439,20 @@ def avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList):
 
         assert np.all(groupX[0] == np.mean(groupX, axis=0)), "X values should not change with groups"
         
-        wDataX[i] = groupX[0]
-        wDataY[i] = meanY
-        wDataE[i] = meanE
-        wDataRes[i] = meanRes 
+        for wsData, mean in zip([wDataX, wDataY, wDataE, wDataRes], [groupX[0], meanY, meanE, meanRes]):
+            wsData[i] = mean
     
     assert ~np.any(np.all(wDataY==0, axis=1)), f"Some avg weights in groups are not being performed:\n{np.argwhere(np.all(wDataY==0, axis=1))}"
     return wDataX, wDataY, wDataE, wDataRes
 
 
 def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
-    """Performed when mask with NaNs and Bins is turned on"""
+    """
+    Performed only when mask with NaNs and Bins is turned on.
+    Selection of groups is done as usual.
+    Weighted average uses altered function to account for the unique format.
+    Several dataY points correspond to each dataX point.
+    """
 
     # Build range to average over
     meanX = buildXRangeFromRebinPars(yFitIC)  
@@ -1588,10 +1465,8 @@ def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
         
         meanRes = np.nanmean(groupRes, axis=0)   # Nans are not present but safeguard
         
-        wDataX[i] = meanX
-        wDataY[i] = meanY
-        wDataE[i] = meanE
-        wDataRes[i] = meanRes 
+        for wsData, mean in zip([wDataX, wDataY, wDataE, wDataRes], [meanX, meanY, meanE, meanRes]):
+            wsData[i] = mean
     
     return wDataX, wDataY, wDataE, wDataRes
 
