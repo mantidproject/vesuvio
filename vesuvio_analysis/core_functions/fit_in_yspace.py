@@ -527,7 +527,7 @@ def selectModelAndPars(modelFlag):
     elif modelFlag=="DOUBLE_WELL":
         def model(x, A, d, R, sig1, sig2):
             h = 2.04
-            theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
+            theta = np.linspace(0, np.pi, 300)[:, np.newaxis]   # 300 points seem like a good estimate for ~10 examples
             y = x[np.newaxis, :]
 
             sigTH = np.sqrt( sig1**2*np.cos(theta)**2 + sig2**2*np.sin(theta)**2 )
@@ -802,6 +802,9 @@ def errsFromMinosCurve(varSpace, varVal, fValsScipy, fValsMin, dChi2=1):
         lerr, uerr = 0., 0.   
     else:
         lerr, uerr = varSpaceDense[idxErr].flatten() - varVal
+
+        if lerr*uerr >= 0:     # Case where we get either two positive or two negative errors, ill defined profile
+            lerr, uerr = 0, 0
  
     return lerr, uerr
 
