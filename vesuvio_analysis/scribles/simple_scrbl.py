@@ -1,5 +1,5 @@
 import numpy as np
 
-A = np.array([])[:, np.newaxis]
+A = np.inf
 
-print(A.size)
+print (10 < A)

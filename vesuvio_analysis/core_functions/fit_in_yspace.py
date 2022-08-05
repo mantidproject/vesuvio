@@ -1091,7 +1091,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
 
         def constr(*pars):
             """
-            Constraint for positivity of Global Gram Carlier.
+            Constraint for positivity of non Gaussian function.
             Input: All parameters defined in global cost function.
             x is the range for each individual cost fun, defined outside function.
             Builds array with all constraints from individual functions.
@@ -1158,85 +1158,6 @@ def takeOutMaskedSpectra(dataX, dataY, dataE, dataRes, instrPars):
     instrPars = instrPars[~zerosRowMask]
     return dataX, dataY, dataE, dataRes, instrPars 
 
-
-def minuitInitialParameters(defaultPars, sharedPars, nSpec):
-    """Buids dictionary to initialize Minuit with starting global+local parameters"""
-    
-    initPars = {}
-    # Populate with initial shared parameters
-    for sp in sharedPars:
-        initPars[sp] = defaultPars[sp]
-    # Add initial unshared parameters
-    unsharedPars = [key for key in defaultPars if key not in sharedPars]
-    for up in unsharedPars:
-        for i in range(nSpec):
-            initPars[up+str(i)] = defaultPars[up]
-    return initPars
-
-
-def calcCostFun(model, i, x, y, yerr, res, sharedPars):
-    "Returns cost function for one spectrum i to be summed to total cost function"
-   
-    xDelta, resDense = oddPointsRes(x, res)
-    def convolvedModel(xrange, y0, *pars):
-        """Performs convolution first on high density grid and interpolates to desired x range"""
-        return y0 + signal.convolve(model(xrange, *pars), resDense, mode="same") * xDelta
-
-    signature = describe(model)[:]
-    signature[1:1] = ["y0"]
-
-    costSig = [key if key in sharedPars else key+str(i) for key in signature]
-    convolvedModel.func_code = make_func_code(costSig)
-
-    # Select only valid data, i.e. when error is not 0 or nan or inf
-    nonZeros= (yerr!=0) & (yerr!=np.nan) & (yerr!=np.inf) & (y!=np.nan)
-    xNZ = x[nonZeros]
-    yNZ = y[nonZeros]
-    yerrNZ = yerr[nonZeros]
-
-    costFun = cost.LeastSquares(xNZ, yNZ, yerrNZ, convolvedModel)
-    return costFun
-
-
-def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
-
-    if len(dataY) > 10:    
-        print("\nToo many axes to show in figure, skipping the plot ...\n")
-        return
-
-    rows = 2
-    fig, axs = plt.subplots(
-        rows, 
-        int(np.ceil(len(dataY)/rows)),
-        figsize=(15, 8), 
-        tight_layout=True,
-        subplot_kw={'projection':'mantid'}
-    )
-    fig.canvas.set_window_title(wsName+"_Plot_of_Global_Fit")
-
-    # Data used in Global Fit
-    for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
-        ax.errorbar(x, y, yerr, fmt="k.", label=f"Data Group {i}") 
-
-    # Global Fit 
-    for x, costFun, ax in zip(dataX, totCost, axs.flat):
-        signature = describe(costFun)
-
-        values = mObj.values[signature]
-        errors = mObj.errors[signature]
-
-        yfit = costFun.model(x, *values)
-
-        # Build a decent legend
-        leg = []
-        for p, v, e in zip(signature, values, errors):
-            leg.append(f"${p} = {v:.3f} \pm {e:.3f}$")
-
-        ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
-        ax.legend()
-    fig.show()
-    return
-
 # ------- Groupings 
 
 def groupDetectors(ipData, yFitIC):
@@ -1253,7 +1174,7 @@ def groupDetectors(ipData, yFitIC):
     L1 = ipData[:, -1].copy()
     theta = ipData[:, 2].copy()  
 
-    # Normalize  ranges to similar values
+    # Normalize  ranges to similar values, needed for clustering
     L1 /= np.sum(L1)       
     theta /= np.sum(theta)
 
@@ -1268,8 +1189,8 @@ def groupDetectors(ipData, yFitIC):
     if False:    # Set to True to investigate problems with groupings
         plotDetsAndInitialCenters(L1, theta, centers)
 
-    clusters, n = kMeansClustering(points, centers)
-    idxList = formIdxList(clusters, n, len(L1))
+    clusters = kMeansClustering(points, centers)
+    idxList = formIdxList(clusters)
 
     if yFitIC.showPlots:
         fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})  
@@ -1291,6 +1212,89 @@ def checkNGroupsValid(yFitIC, ipData):
         assert yFitIC.nGlobalFitGroups<=nSpectra, "Number of global groups needs to be less or equal to the no of unmasked spectra."
         assert yFitIC.nGlobalFitGroups>0, "NUmber of global groups needs to be bigger than zero"
     return 
+
+
+def kMeansClustering(points, centers):
+    """
+    Algorithm used to form groups of detectors.
+    Works best for spherical groups with similar scaling on x and y axis.
+    Fails in some rare cases, solution is to try a different number of groups.
+    Returns clusters in the form a int i assigned to each detector. 
+    Detectors with the same i assigned belong to the same group.
+    """
+
+    prevCenters = centers   # Starting centers
+    while  True:
+        clusters = closestCenter(points, prevCenters)
+        centers = calculateCenters(points, clusters)
+
+        if np.all(centers == prevCenters):
+            break
+
+        assert np.isfinite(centers).all(), f"Invalid centers found:\n{centers}\nTry a different number for the groupings."
+
+        prevCenters = centers
+
+    clusters = closestCenter(points, centers)
+    return clusters
+
+
+def closestCenter(points, centers):
+    """
+    Checks each point and assigns it to closest center.
+    Each center is represented by an int i.
+    Returns clusters with corresponding centers.
+    """
+
+    clusters = np.zeros(len(points))
+    for p in range(len(points)):   # Iterate over each point
+        
+        distMin = np.inf    # To be replaced in first iteration
+        
+        for i in range(len(centers)):  # Assign closest center to point
+
+            dist = pairDistance(points[p], centers[i])
+
+            if dist < distMin:
+                distMin = dist
+                closeCenter = i
+
+        clusters[p] = closeCenter
+    return clusters
+
+
+def pairDistance(p1, p2):
+    "Calculates the distance between two points."
+    return np.sqrt(np.sum(np.square(p1-p2)))
+
+
+def calculateCenters(points, clusters):
+    """Calculates centers for the given clusters"""
+
+    nGroups = len(np.unique(clusters))
+
+    centers = np.zeros((nGroups, 2))
+    for i in range(nGroups):
+        centers[i, :] = np.mean(points[clusters==i, :], axis=0)  # If cluster i is not present, returns nan
+    return centers
+
+
+def formIdxList(clusters):
+    """Converts information of clusters into a list of indexes."""
+
+    idxList = []
+    for i in np.unique(clusters):
+        idxs = np.argwhere(clusters==i).flatten()
+        idxList.append(list(idxs))
+
+    # Print groupings information
+    print("\nGroups formed successfully:\n")
+    groupLen = np.array([len(group) for group in idxList])
+    unique, counts = np.unique(groupLen, return_counts=True)
+    for length, no in zip(unique, counts):
+        print(f"{no} groups with {length} detectors.")
+
+    return idxList
 
 
 def plotDetsAndInitialCenters(L1, theta, centers):
@@ -1324,86 +1328,7 @@ def plotFinalGroups(ax, ipData, idxList):
     ax.legend()
     return
 
-
-def kMeansClustering(points, centers):
-    """
-    Algorithm used to form groups of detectors.
-    Works best for spherical groups with similar scaling on x and y axis.
-    Fails in some rare cases, solution is to try a different number of groups.
-    """
-
-    prevCenters = centers
-    while  True:
-        clusters, nGroups = closestCenter(points, prevCenters)
-        centers = calculateCenters(points, clusters, nGroups)
-
-        if np.all(centers == prevCenters):
-            break
-
-        assert np.isfinite(centers).all(), f"Invalid centers found:\n{centers}\nTry a different number for the groupings."
-
-        prevCenters = centers
-    clusters, n = closestCenter(points, centers)
-    return clusters, n
-
-
-def closestCenter(points, centers):
-    """Checks eahc point and assigns it to closest center."""
-
-    clusters = np.zeros(len(points))
-    for p in range(len(points)):
-
-        minCenter = 0
-        minDist = pairDistance(points[p], centers[0])
-        for i in range(1, len(centers)): 
-
-            dist = pairDistance(points[p], centers[i])
-
-            if dist < minDist:
-                minDist = dist
-                minCenter = i
-        clusters[p] = minCenter
-    return clusters, len(centers)
-
-
-def pairDistance(p1, p2):
-    "Calculates the distance between two points."
-    return np.sqrt(np.sum(np.square(p1-p2)))
-
-
-def calculateCenters(points, clusters, nGroups):
-    """Calculates centers for the given clusters"""
-
-    centers = np.zeros((nGroups, 2))
-    for i in range(nGroups):
-        centers[i] = np.mean(points[clusters==i, :], axis=0)  # If cluster i is not present, returns nan
-    return centers
-
-
-def formIdxList(clusters, nGroups, lenPoints):
-    """Converts information of clusters into a list of indexes."""
-
-    idxList = []
-    for i in range(nGroups):
-        idxs = np.argwhere(clusters==i).flatten()
-        idxList.append(list(idxs))
-
-    print("\nGroups formed successfully:\n")
-    groupLen = np.array([len(group) for group in idxList])
-    unique, counts = np.unique(groupLen, return_counts=True)
-    for length, no in zip(unique, counts):
-        print(f"{no} groups with {length} detectors.")
-
-    # Check that idexes are not repeated and not missing
-    flatList = []
-    for group in idxList:
-        for elem in group:
-            flatList.append(elem)
-    assert np.all(np.sort(np.array(flatList))==np.arange(lenPoints)), "Groupings did not work!"
-    
-    return idxList
-
-# ---------- Weighted Avgs of Groups
+# --------- Weighted Avg of detectors
 
 def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
@@ -1489,3 +1414,81 @@ def extractArrByIdx(dataX, dataY, dataE, dataRes, idxs):
     groupRes = dataRes[idxs, :]
     return groupX, groupY, groupE, groupRes
 
+
+def calcCostFun(model, i, x, y, yerr, res, sharedPars):
+    "Returns cost function for one spectrum i to be summed to total cost function"
+   
+    xDelta, resDense = oddPointsRes(x, res)
+    def convolvedModel(xrange, y0, *pars):
+        """Performs convolution first on high density grid and interpolates to desired x range"""
+        return y0 + signal.convolve(model(xrange, *pars), resDense, mode="same") * xDelta
+
+    signature = describe(model)[:]
+    signature[1:1] = ["y0"]
+
+    costSig = [key if key in sharedPars else key+str(i) for key in signature]
+    convolvedModel.func_code = make_func_code(costSig)
+
+    # Select only valid data, i.e. when error is not 0 or nan or inf
+    nonZeros= (yerr!=0) & (yerr!=np.nan) & (yerr!=np.inf) & (y!=np.nan)
+    xNZ = x[nonZeros]
+    yNZ = y[nonZeros]
+    yerrNZ = yerr[nonZeros]
+
+    costFun = cost.LeastSquares(xNZ, yNZ, yerrNZ, convolvedModel)
+    return costFun
+
+
+def minuitInitialParameters(defaultPars, sharedPars, nSpec):
+    """Buids dictionary to initialize Minuit with starting global+local parameters"""
+    
+    initPars = {}
+    # Populate with initial shared parameters
+    for sp in sharedPars:
+        initPars[sp] = defaultPars[sp]
+    # Add initial unshared parameters
+    unsharedPars = [key for key in defaultPars if key not in sharedPars]
+    for up in unsharedPars:
+        for i in range(nSpec):
+            initPars[up+str(i)] = defaultPars[up]
+    return initPars
+
+
+def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
+
+    if len(dataY) > 10:    
+        print("\nToo many axes to show in figure, skipping the plot ...\n")
+        return
+
+    rows = 2
+    fig, axs = plt.subplots(
+        rows, 
+        int(np.ceil(len(dataY)/rows)),
+        figsize=(15, 8), 
+        tight_layout=True,
+        subplot_kw={'projection':'mantid'}
+    )
+    fig.canvas.set_window_title(wsName+"_Plot_of_Global_Fit")
+
+    # Data used in Global Fit
+    for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
+        ax.errorbar(x, y, yerr, fmt="k.", label=f"Data Group {i}") 
+
+    # Global Fit 
+    for x, costFun, ax in zip(dataX, totCost, axs.flat):
+        signature = describe(costFun)
+
+        values = mObj.values[signature]
+        errors = mObj.errors[signature]
+
+        yfit = costFun.model(x, *values)
+
+        # Build a decent legend
+        leg = []
+        for p, v, e in zip(signature, values, errors):
+            leg.append(f"${p} = {v:.3f} \pm {e:.3f}$")
+
+        ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
+        ax.legend()
+    fig.show()
+    return
