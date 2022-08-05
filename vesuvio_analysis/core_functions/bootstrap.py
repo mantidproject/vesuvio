@@ -281,7 +281,9 @@ def selectParentWorkspaces(bckwdIC, fwdIC, bootIC):
     for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
         if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
+
             wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"   # In case of skipping MS, select very last corrected ws
+            
             parentWS = mtd[IC.name+wsIter]
             parentNCP = mtd[parentWS.name()+"_TOF_Fitted_Profiles"]
 
