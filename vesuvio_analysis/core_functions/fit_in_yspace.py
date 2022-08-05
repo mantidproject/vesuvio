@@ -1225,8 +1225,8 @@ def kMeansClustering(points, centers):
 
     prevCenters = centers   # Starting centers
     while  True:
-        clusters = closestCenter(points, prevCenters)
-        centers = calculateCenters(points, clusters)
+        clusters = closestCenter(points, prevCenters)   # Form groups by assigning points to their closest center
+        centers = calculateCenters(points, clusters)    # Recalculate centers of new groups
 
         if np.all(centers == prevCenters):
             break
@@ -1255,7 +1255,7 @@ def closestCenter(points, centers):
 
             dist = pairDistance(points[p], centers[i])
 
-            if dist < distMin:
+            if dist < distMin:      # Store minimum found
                 distMin = dist
                 closeCenter = i
 
@@ -1280,7 +1280,7 @@ def calculateCenters(points, clusters):
 
 
 def formIdxList(clusters):
-    """Converts information of clusters into a list of indexes."""
+    """Converts assignment of clusters into a list of indexes."""
 
     idxList = []
     for i in np.unique(clusters):
