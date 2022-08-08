@@ -83,8 +83,12 @@ def checkLogMatch(IC, isYFitFile):
 def readBootData(dataPath):
         bootData = np.load(dataPath)
 
+        # Select fitting parameters of ncp
+        # Discard first column of spectrum number
+        # Discard last two columns of number of iterations and chi2
         bootParsRaw = bootData["boot_samples"][:, :, 1:-2]
         parentParsRaw = bootData["parent_result"][:, 1:-2]
+
         nSamples = len(bootParsRaw)
         try:
             corrResiduals = bootData["corr_residuals"]

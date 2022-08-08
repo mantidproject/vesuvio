@@ -64,7 +64,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 0     
+    noOfMSIterations = 4     
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -96,7 +96,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
     
-    noOfMSIterations = 0  
+    noOfMSIterations = 4  
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -122,7 +122,7 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = True 
+    runRoutine = False 
 
     # Choose main procedure to run
     procedure = "FORWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
@@ -137,17 +137,17 @@ class BootstrapInitialConditions:
     fitInYSpace = "JOINT" #"FORWARD"
 
     runningJackknife = True
-    nSamples = 2 
+    nSamples = 600 
     skipMSIterations = False
     runningTest = False
     userConfirmation = True
 
 
 class BootstrapAnalysis:
-    runAnalysis = False
+    runAnalysis = True
 
     # Choose whether to filter averages as done in original procedure
-    filterAvg = True                 # True discards some unreasonable values of widths and intensities
+    filterAvg = False                 # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
     plotRawWidthsIntensities = True 

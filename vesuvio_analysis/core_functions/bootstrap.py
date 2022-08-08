@@ -82,7 +82,7 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     AnalysisDataService.clear()
  
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
-    corrCoefs = autoCorrResiduals(parentWSnNCPs)   # TODO: Introduce some check here for the autocorrelation of residuals
+    corrCoefs = autoCorrResiduals(parentWSnNCPs)
 
     nSamples = chooseNSamples(bootIC, parentWSnNCPs)
 
