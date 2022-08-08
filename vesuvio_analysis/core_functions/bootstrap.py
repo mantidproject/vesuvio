@@ -49,17 +49,23 @@ def checkOutDirIC(IC):
 def JackknifeProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     assert bootIC.procedure != None
 
-    # Run original procedure to change fwdIC in JOINT
-    runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC) 
-
     proc = bootIC.procedure
     if (proc=="FORWARD") | (proc=="BACKWARD"):
         return bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
-    elif proc=="JOINT":
+
+    elif proc=="JOINT":  # Do the Jackknife procedure separately
+        
+        # Run original procedure to change fwdIC from running backward
+        runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC) 
+
         bootIC.procedure="BACKWARD"
+        bootIC.fitInYSpace="BACKWARD"
         bckwdJackRes = bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
+
         bootIC.procedure="FORWARD"
+        bootIC.fitInYSpace="FORWARD"
         fwdJackRes = bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
+
         return {**bckwdJackRes, **fwdJackRes}    # For consistency
     else: raise ValueError ("Bootstrap procedure not recognized.")
 
@@ -71,6 +77,8 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     Chooses fast or slow (correct) version of bootstrap depending on flag set in bootIC.
     Performs either independent or joint procedure depending of len(inputIC).
     """
+    if bootIC.runningJackknife: assert bootIC.procedure!='JOINT', "'JOINT' mode should not have reached Jackknife here."
+
     AnalysisDataService.clear()
  
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
@@ -247,24 +255,24 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
                 wsFinal, bckwdScatRes = runIndependentIterativeProcedure(IC, clearWS=False)
                 resultsDict[key+"Scat"] = bckwdScatRes
 
-                if not(bootIC.runningJackknife):
-                    bckwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, wsFinal)
-                    resultsDict[key+"YFit"] = bckwdYFitRes
+                if bootIC.runningJackknife: yFitIC.maskTypeProcedure = 'NAN'  # Enable NAN averaging in y-space fit
+
+                bckwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, wsFinal)
+                resultsDict[key+"YFit"] = bckwdYFitRes
 
     
     elif bootIC.procedure=="JOINT":
+
         ws, bckwdScatRes, fwdScatRes = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
         resultsDict["bckwdScat"] = bckwdScatRes
         resultsDict["fwdScat"] = fwdScatRes
 
-        if not(bootIC.runningJackknife):
+        for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
-            for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
-
-                if (bootIC.fitInYSpace==mode) | (bootIC.fitInYSpace=="JOINT"):
-                    wsName = buildFinalWSName(IC.scriptName, mode, IC)  
-                    fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
-                    resultsDict[key+"YFit"] = fwdYFitRes
+            if (bootIC.fitInYSpace==mode) | (bootIC.fitInYSpace=="JOINT"):
+                wsName = buildFinalWSName(IC.scriptName, mode, IC)  
+                fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+                resultsDict[key+"YFit"] = fwdYFitRes
     else:
         raise ValueError("Bootstrap procedure not recognized.")
 
@@ -497,8 +505,8 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
         jackDataE = dataE.copy()
 
         jackDataY[:, j] = 0   # Masks j collumn with zeros
-        jackDataE[:, j] = 0   # The fit fails if these errors are accidentally used
-
+        # DataE is not masked intentionally, to preserve errors that are used in the normalization of averaged NaN profile
+        
         wsJack = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Jackknife")
         for i, (yRow, eRow) in enumerate(zip(jackDataY, jackDataE)):
             wsJack.dataY(i)[:-1] = yRow     # Last column will be ignored in ncp fit anyway

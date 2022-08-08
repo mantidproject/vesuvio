@@ -53,20 +53,12 @@ def iterativeFitForDataReduction(ic):
 
 
 def maskColumnWithZeros(maskedWSName, wsToBeMaskedName):
-
-    maskedWS = mtd[maskedWSName]
+    zeroCol = np.all(mtd[maskedWSName].extractY()==0, axis=0)
     wsToBeMasked = mtd[wsToBeMaskedName]
-
-    dataY = maskedWS.extractY()
-    dataE = maskedWS.extractE()
-
-    zeroCol = np.all(dataE==0, axis=0)
-    assert np.all(zeroCol == np.all(dataY==0, axis=0)), "Jackknife column needs to be masked in dataY and dataE"
-
     for i in range(wsToBeMasked.getNumberHistograms()):
         wsToBeMasked.dataY(i)[zeroCol] = 0
-        wsToBeMasked.dataE(i)[zeroCol] = 0
-
+    return
+    
 
 def createTableInitialParameters(ic):
     print("\nRUNNING ", ic.modeRunning, " SCATTERING.\n")
@@ -189,7 +181,10 @@ def arraysFromWS(ws):
 
 
 def histToPointData(dataY, dataX, dataE):
-    """Output: middle points of dataX hists"""
+    """
+    Output: middle points of dataX hists
+    Removed scaling by bin widths present in original script.
+    """
 
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
@@ -538,8 +533,8 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
 
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
-    # Additional treatement for jackknife
-    zerosMask = dataE==0     # Zero errors means point is to be ignored
+    # Ignore any zero values (eg. in Jackknife)
+    zerosMask = (dataY==0) | (dataE==0)     
     ncpTotal = ncpTotal[~zerosMask]
     dataYf = dataY[~zerosMask]   
     dataEf = dataE[~zerosMask]   

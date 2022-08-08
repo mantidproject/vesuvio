@@ -17,7 +17,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
     
     checkInputs(userCtr)
     checkInputs(bootIC)
-    assert userCtr.runRoutine != bootIC.runBootstrap, "Main routine and bootstrap both set to run!"
+    assert not(userCtr.runRoutine & bootIC.runBootstrap), "Main routine and bootstrap both set to run!"
 
     def runProcedure():
         proc = userCtr.procedure  # Shorthad to make it easier to read

@@ -1,3 +1,4 @@
+from dataclasses import replace
 import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
@@ -93,16 +94,18 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
             continue
 
         # Due to different sizes, last value of original ws remains untouched
-        binWidths = wsSubMass.dataX(j)[1:] - wsSubMass.dataX(j)[:-1]
-        wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] * binWidths
+        wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] 
 
      # Mask spectra again, to be seen as masked from Mantid's perspective
     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
 
     SumSpectra(InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name()+"_Sum")
 
-    if np.any(np.isnan(wsSubMass.extractY())):
-        raise ValueError("The workspace for the isolated first mass countains NaNs in non-masked spectra, might cause problems!")
+    # Ignore any masked columns from initial ws
+    mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
+    dataX, dataY, dataE = extractWS(wsSubMass)
+    dataY[:, mask] = 0
+    passDataIntoWS(dataX, dataY, dataE, wsSubMass)
     return wsSubMass
 
 
@@ -126,7 +129,8 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
         return wsJoYN, wsJoYAvg
 
     elif yFitIC.maskTypeProcedure=="NCP":   # Same as above but with additional masking in TOF space
-        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=True)
+        wsTOF = maskBinsWithZeros(wsTOF, yFitIC)
+        wsTOF = replaceZerosWithNCP(wsTOF, ncp)
         wsJoY = convertToYSpace(wsTOF, mass0)
         wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
         wsJoYAvg = weightedAvgCols(wsJoYN)
@@ -134,14 +138,15 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
 
     elif yFitIC.maskTypeProcedure=="NAN":
         # Build special workspace to store accumulated points
-        wsTOF = maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=False)
+        wsTOF = maskBinsWithZeros(wsTOF, yFitIC)
         wsJoY = convertToYSpace(wsTOF, mass0)
         xp = buildXRangeFromRebinPars(yFitIC)
         wsJoYB = dataXBining(wsJoY, xp)      # Unusual ws with several dataY points per each dataX point
 
         # Need normalisation values from NCP masked workspace
-        wsTOFNCP= maskResonancePeak(wsTOF, ncp, yFitIC, maskWithNCP=True)
+        wsTOFNCP = replaceZerosWithNCP(wsTOF, ncp)
         wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
+
         wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
 
         # Normalize spectra of specieal workspace
@@ -164,30 +169,41 @@ def rebinAndNorm(wsJoY, rebinPars):
     return wsJoYNorm, wsJoYInt
 
 
-def maskResonancePeak(ws, ncp, yFitIC, maskWithNCP):
+def maskBinsWithZeros(ws, yFitIC):
     """
-    Masks a given TOF range on input ws. 
-    Either masks using NCP fit provided or with zeros.
+    Masks a given TOF range on ws with zeros on dataY.
+    Leaves errors dataE unchanged.
+    Used to mask resonance peaks.
     """
 
-    # Range of masking
+    if yFitIC.maskTOFRange==None:     # Option to skip any masking
+        return ws
+
     start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
     assert start <= end, "Start value for masking needs to be smaller or equal than end."
-
-    dataY = ws.extractY()[:, :-1]
-    dataX = ws.extractX()[:, :-1]
-
-    # Mask dataY with NCP in given TOF region
+    dataX, dataY, dataE = extractWS(ws)
+    # Mask dataY with in given TOF region
     mask = (dataX >= start) & (dataX <= end)
 
-    if maskWithNCP:
-        dataY[mask] = ncp[mask]   # Replace values by best fit NCP
-    else:
-        dataY[mask] = 0    # Zeros are preserved during ConvertToYSpace
+    dataY[mask] = 0
 
-    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_Masked")
-    for i in range(wsMasked.getNumberHistograms()):
-        wsMasked.dataY(i)[:-1] = dataY[i, :]
+    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_ZeroMasked")
+    passDataIntoWS(dataX, dataY, dataE, wsMasked)
+    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
+    return wsMasked  
+
+
+def replaceZerosWithNCP(ws, ncp):
+    """
+    Replaces columns of bins with zeros on dataY with NCP provided.
+    """
+    dataX, dataY, dataE = extractWS(ws)
+    mask = np.all(dataY==0, axis=0)    # Masked Cols 
+
+    dataY[:, mask] = ncp[:, mask[:-1]]   # -1 from the last column correction
+
+    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_NCPMasked")
+    passDataIntoWS(dataX, dataY, dataE, wsMasked)
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
     return wsMasked  
 
@@ -307,7 +323,7 @@ def weightedAvgArr(dataYOri, dataEOri):
 
     # Ignore invalid data by changing zeros to nans
     # If data is already masked with nans, it remains unaltered
-    zerosMask = dataE==0 | dataY==0
+    zerosMask = (dataE==0) | (dataY==0)
     dataY[zerosMask] = np.nan  
     dataE[zerosMask] = np.nan
 

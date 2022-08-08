@@ -125,13 +125,13 @@ class YSpaceFitInitialConditions:
     runMinos = True
     globalFit = True
     nGlobalFitGroups = 4         # Number or string "ALL"
-    maskTypeProcedure =  "NCP"    # Options: 'NCP', 'NAN', None 
-    maskTOFRange = "157, 163"     # TOF Range for the resonance peak
+    maskTypeProcedure = None # "NCP"    # Options: 'NCP', 'NAN', None 
+    maskTOFRange = None #"157, 163"     # TOF Range for the resonance peak
 
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False
 
     # Choose main procedure to run
     procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -145,22 +145,23 @@ class BootstrapInitialConditions:
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"   
     
-    runningJackknife = False
+    runningJackknife = True
     nSamples = 2
     skipMSIterations = False
     userConfirmation = True
+    runningTest = True
 
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = False 
+    runAnalysis = True 
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False       # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
-    plotRawWidthsIntensities = True
-    plotMeanWidthsIntensities = False
+    plotRawWidthsIntensities = False
+    plotMeanWidthsIntensities = True
     plotMeansEvolution = False
     plot2DHists = False
     plotYFitHists = True
