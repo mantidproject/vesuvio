@@ -307,7 +307,7 @@ def weightedAvgArr(dataYOri, dataEOri):
 
     # Ignore invalid data by changing zeros to nans
     # If data is already masked with nans, it remains unaltered
-    zerosMask = dataE==0
+    zerosMask = dataE==0 | dataY==0
     dataY[zerosMask] = np.nan  
     dataE[zerosMask] = np.nan
 
