@@ -122,12 +122,12 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = False 
+    runRoutine = True
 
     # Choose main procedure to run
-    procedure = "FORWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
+    procedure = "BACKWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "BACKWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 class BootstrapInitialConditions:
@@ -136,7 +136,7 @@ class BootstrapInitialConditions:
     procedure = "JOINT"
     fitInYSpace = "JOINT" #"FORWARD"
 
-    runningJackknife = True
+    runningJackknife = False
     nSamples = 600 
     skipMSIterations = False
     runningTest = False
@@ -144,16 +144,16 @@ class BootstrapInitialConditions:
 
 
 class BootstrapAnalysis:
-    runAnalysis = True
+    runAnalysis = False
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False                 # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
-    plotRawWidthsIntensities = True 
+    plotRawWidthsIntensities = False 
     plotMeanWidthsIntensities = True
-    plotMeansEvolution = True 
-    plot2DHists = True 
+    plotMeansEvolution = False 
+    plot2DHists = True
     plotYFitHists = True
 
 

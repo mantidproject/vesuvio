@@ -121,7 +121,7 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = False
+    runRoutine = True
     
     # Choose main procedure to run
     procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -136,22 +136,22 @@ class BootstrapInitialConditions:
     fitInYSpace = "FORWARD"
 
     runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
-    nSamples = 650                  # Used if running Bootstrap, otherwise code ignores it
+    nSamples = 2500                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
 
 
 class BootstrapAnalysis:
-    runAnalysis = True      # Controls whether or not analysis is run
+    runAnalysis = False      # Controls whether or not analysis is run
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True      # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
-    plotRawWidthsIntensities = True
+    plotRawWidthsIntensities = False
     plotMeanWidthsIntensities = True
     plotMeansEvolution = False
-    plot2DHists = False 
+    plot2DHists = False
     plotYFitHists = True
 
 
