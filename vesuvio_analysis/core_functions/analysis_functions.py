@@ -154,8 +154,11 @@ def fitNcpToWorkspace(IC, ws):
     Firtly the arrays required for the fit are prepared and then the fit is performed iteratively
     on a spectrum by spectrum basis.
     """
-    dataYws, dataXws, dataEws = arraysFromWS(ws)   
-    dataY, dataX, dataE = histToPointData(dataYws, dataXws, dataEws)      
+    
+    dataX, dataY, dataE = extractWS(ws)
+    if IC.runHistData:     # Converts point data from workspaces to histogram data
+        dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)      
+
 
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(IC, dataX)
     
@@ -172,18 +175,17 @@ def fitNcpToWorkspace(IC, ws):
     return
 
 
-def arraysFromWS(ws):
-    """Output: dataY, dataX and dataE as arrays"""
-    dataY = ws.extractY()
-    dataE = ws.extractE()
-    dataX = ws.extractX()
-    return dataY, dataX, dataE
+def extractWS(ws):
+    """Directly exctracts data from workspace into arrays"""
+    return ws.extractX(), ws.extractY(), ws.extractE()
 
 
 def histToPointData(dataY, dataX, dataE):
     """
-    Output: middle points of dataX hists
-    Removed scaling by bin widths present in original script.
+    Used only when comparing with original results.
+    Sets each dataY point to the center of bins.
+    Last column of data is removed.
+    Removed original scaling by bin widths
     """
 
     histWidths = dataX[:, 1:] - dataX[:, :-1]
@@ -359,34 +361,33 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
 
     # Use ws dataX to match with histogram data
-    dataX = ws.extractX()[:, :-1]
-
+    dataX = ws.extractX()[:, :ncpTotal.shape[1]]  # Make dataX match ncp shape automatically
     assert ncpTotal.shape == dataX.shape, "DataX and DataY in ws need to be the same shape."
 
-    # Total ncp workspace
-    ncpTotalf = ncpTotal
-
-    ncpTotWs = CreateWorkspace(
-        DataX=dataX.flatten(), 
-        DataY=ncpTotalf.flatten(),
-        Nspec=len(dataX), 
-        OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles")
-    wsTotNCPSum = SumSpectra(InputWorkspace=ncpTotWs, OutputWorkspace=ncpTotWs.name()+"_Sum" )
+    ncpTotWS = createWS(dataX, ncpTotal, np.zeros(dataX.shape), ws.name()+"_TOF_Fitted_Profiles")
+    MaskDetectors(Workspace=ncpTotWS, WorkspaceIndexList=ic.maskedDetectorIdx)
+    wsTotNCPSum = SumSpectra(InputWorkspace=ncpTotWS, OutputWorkspace=ncpTotWS.name()+"_Sum" )
 
     # Individual ncp workspaces
     wsMNCPSum = []
     for i, ncp_m in enumerate(ncpForEachMass):
-
-        ncp_mf = ncp_m
-
-        ncpMWs = CreateWorkspace(
-            DataX=dataX.flatten(), 
-            DataY=ncp_mf.flatten(), 
-            Nspec=len(dataX),
-            OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_"+str(i))
-        wsNCPSum = SumSpectra(InputWorkspace=ncpMWs, OutputWorkspace=ncpMWs.name()+"_Sum" )
+        ncpMWS = createWS(dataX, ncp_m, np.zeros(dataX.shape), ws.name()+"_TOF_Fitted_Profile_"+str(i))
+        MaskDetectors(Workspace=ncpMWS, WorkspaceIndexList=ic.maskedDetectorIdx)
+        wsNCPSum = SumSpectra(InputWorkspace=ncpMWS, OutputWorkspace=ncpMWS.name()+"_Sum" )
         wsMNCPSum.append(wsNCPSum)
+        
     return wsTotNCPSum, wsMNCPSum
+
+
+def createWS(dataX, dataY, dataE, wsName):
+    ws = CreateWorkspace(
+        DataX=dataX.flatten(),
+        DataY=dataY.flatten(),
+        DataE=dataE.flatten(),
+        Nspec=len(dataY),
+        OutputWorkspace=wsName
+    )
+    return ws
 
 
 def plotSumNCPFits(wsDataSum, wsTotNCPSum, wsMNCPSum, IC):

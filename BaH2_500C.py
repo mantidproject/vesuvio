@@ -140,21 +140,21 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False
+    runBootstrap = True
 
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"   
     
-    runningJackknife = True
+    runningJackknife = False
     nSamples = 2
     skipMSIterations = False
     userConfirmation = True
-    runningTest = True
+    runningTest = False
 
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = True 
+    runAnalysis = False 
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False       # True discards some unreasonable values of widths and intensities

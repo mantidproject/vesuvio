@@ -36,7 +36,7 @@ def completeICFromInputs(IC, scriptName, wsIC):
     
     # When attribute InstrParsPath is not present, set it equal to path from wsIC
     try:    
-        reading = IC.InstrParsPath    # If present, leave it unaltered
+        r = IC.InstrParsPath    # If present, leave it unaltered
     except AttributeError:
         IC.InstrParsPath = wsIC.ipfile
 
@@ -64,6 +64,13 @@ def completeICFromInputs(IC, scriptName, wsIC):
     figSavePath = experimentsPath / scriptName /"figures" 
     figSavePath.mkdir(exist_ok=True)
     IC.figSavePath = figSavePath
+
+    # Create default of not running original version with histogram data
+    try:
+        t = IC.runHistData
+    except AttributeError:
+        IC.runHistData = False
+
     return 
 
 

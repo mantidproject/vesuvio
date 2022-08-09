@@ -95,7 +95,7 @@ class ForwardInitialConditions(GeneralInitialConditions):    # Same structure as
     ])
     constraints = ()
 
-    noOfMSIterations = 4      
+    noOfMSIterations = 0      
     firstSpec = 144   #144
     lastSpec = 182   #182
 

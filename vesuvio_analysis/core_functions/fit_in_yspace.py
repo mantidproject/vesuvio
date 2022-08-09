@@ -46,8 +46,13 @@ def extractNCPFromWorkspaces(wsFinal, ic):
         ncpToAppend = mtd[wsFinal.name()+"_TOF_Fitted_Profile_" + str(i)].extractY()[np.newaxis, :, :]
         ncpForEachMass = np.append(ncpForEachMass, ncpToAppend, axis=0)    
 
-    assert ncpForEachMass.shape == (ic.noOfMasses, wsFinal.getNumberHistograms(), wsFinal.blocksize()-1), "Extracted NCP not in correct shape."
-    
+    # Ensure shape of ncp matches data
+    shape = ncpForEachMass.shape
+    assert shape[0] == ic.noOfMasses
+    assert shape[1] == wsFinal.getNumberHistograms()
+    # Final dimension can be missing last col or not
+    assert ((shape[2]==wsFinal.blocksize()) | (shape[2]==wsFinal.blocksize()-1))
+
     ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)  # Organizes ncp by spectra
     print(f"\nExtracted NCP profiles from workspaces.\n")
     return ncpForEachMass
@@ -87,25 +92,36 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
     # Sum the ncpTotal for remaining masses
     ncpTotalExceptFirst = np.sum(ncpForEachMassExceptFirst, axis=0)
 
+    dataX, dataY, dataE = extractWS(ws)
+
+    # Adjust for last column missing or not
+    dataY[:, :ncpTotalExceptFirst.shape[1]] -= ncpTotalExceptFirst
+
+    # Ignore any masked bins (columns) from initial ws
+    mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
+    dataY[:, mask] = 0
+
+
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Mass0")
-    for j in range(wsSubMass.getNumberHistograms()):
+    passDataIntoWS(dataX, dataY, dataE, wsSubMass)
+    
+    # for j in range(wsSubMass.getNumberHistograms()):
         
-        if wsSubMass.spectrumInfo().isMasked(j):
-            continue
+    #     if wsSubMass.spectrumInfo().isMasked(j):
+    #         continue
 
-        # Due to different sizes, last value of original ws remains untouched
-        wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] 
+    #     # Due to different sizes, last value of original ws remains untouched
+    #     wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] 
 
-     # Mask spectra again, to be seen as masked from Mantid's perspective
     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
 
     SumSpectra(InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name()+"_Sum")
 
-    # Ignore any masked columns from initial ws
-    mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
-    dataX, dataY, dataE = extractWS(wsSubMass)
-    dataY[:, mask] = 0
-    passDataIntoWS(dataX, dataY, dataE, wsSubMass)
+    # # Ignore any masked columns from initial ws
+    # mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
+    # dataX, dataY, dataE = extractWS(wsSubMass)
+    # dataY[:, mask] = 0
+    # passDataIntoWS(dataX, dataY, dataE, wsSubMass)
     return wsSubMass
 
 
@@ -200,7 +216,7 @@ def replaceZerosWithNCP(ws, ncp):
     dataX, dataY, dataE = extractWS(ws)
     mask = np.all(dataY==0, axis=0)    # Masked Cols 
 
-    dataY[:, mask] = ncp[:, mask[:-1]]   # -1 from the last column correction
+    dataY[:, mask] = ncp[:, mask[:ncp.shape[1]]]   # mask of ncp adjusted for last col present or not
 
     wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_NCPMasked")
     passDataIntoWS(dataX, dataY, dataE, wsMasked)

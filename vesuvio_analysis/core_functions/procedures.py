@@ -122,7 +122,6 @@ def calculateHToMassIdxRatio(fwdScatResults):
     HRatio = fwdMeanIntensityRatios[0] / fwdIntensitiesNoH[massIdx]
 
     return massIdx, HRatio
-    # return fwdMeanIntensityRatios[0] / fwdMeanIntensityRatios[1]
 
 
 def runJoint(bckwdIC, fwdIC):

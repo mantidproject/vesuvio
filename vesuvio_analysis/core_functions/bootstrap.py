@@ -218,10 +218,10 @@ def chooseNSamples(bootIC, parentWSnNCPs: dict):
     nSamples = bootIC.nSamples
     if bootIC.runningJackknife:
         assert len(parentWSnNCPs) == 2, "Running Jackknife, supports only one IC at a time."
-        if bootIC.procedure=="FORWARD": key = "fwdWS"
-        elif bootIC.procedure=="BACKWARD": key = "bckwdWS"
+        if bootIC.procedure=="FORWARD": key = "fwdNCP"
+        elif bootIC.procedure=="BACKWARD": key = "bckwdNCP"
 
-        nSamples = parentWSnNCPs[key].blocksize()-1   # -1 becuase last column is ignored during procedure
+        nSamples = parentWSnNCPs[key].blocksize()   # Number of cols from ncp workspace, accounts for missing last col or not
     return nSamples
 
 
@@ -313,8 +313,8 @@ def autoCorrResiduals(parentWSnNCP: dict):
             parentNCP = parentWSnNCP[mode+"NCP"]
         except KeyError: continue
 
-        dataY = parentWS.extractY()[:, :-1]
         totNcp = parentNCP.extractY()[:, :]     
+        dataY = parentWS.extractY()[:, :totNcp.shape[1]]    # Missing last column or not
         residuals = dataY - totNcp 
 
         lag = 1     # For lag-plot of self-correlation
@@ -452,8 +452,8 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
 
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
-        dataY = parentWS.extractY()[:, :-1]
         totNcp = totNcpWS.extractY()[:, :]     
+        dataY = parentWS.extractY()[:, :totNcp.shape[1]]    # Missing last col or not
 
         residuals = dataY - totNcp
 
@@ -462,9 +462,9 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
 
         wsBoot = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Bootstrap")
         for i, row in enumerate(bootDataY):
-            wsBoot.dataY(i)[:-1] = row     # Last column will be ignored in ncp fit anyway
+            wsBoot.dataY(i)[:len(row)] = row     # Last column will be ignored or not
 
-        assert np.all(wsBoot.extractY()[:, :-1] == bootDataY), "Bootstrap data not being correctly passed onto ws."
+        assert ~np.all(wsBoot.extractY() == parentWS.extractY()), "Bootstrap data not being correctly passed onto ws."
 
         bootInputWS[key+"WS"] = wsBoot
         parentInputWS[key+"WS"] = parentWS
@@ -498,8 +498,8 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
 
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
-        dataY = parentWS.extractY()[:, :-1]
-        dataE = parentWS.extractE()[:, :-1]
+        dataY = parentWS.extractY()
+        dataE = parentWS.extractE()
 
         jackDataY = dataY.copy()
         jackDataE = dataE.copy()
@@ -509,11 +509,11 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
         
         wsJack = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Jackknife")
         for i, (yRow, eRow) in enumerate(zip(jackDataY, jackDataE)):
-            wsJack.dataY(i)[:-1] = yRow     # Last column will be ignored in ncp fit anyway
-            wsJack.dataE(i)[:-1] = eRow
+            wsJack.dataY(i)[:] = yRow     # Last column will be ignored in ncp fit anyway
+            wsJack.dataE(i)[:] = eRow
 
-        assert np.all(wsJack.extractY()[:, :-1] == jackDataY), "Bootstrap data not being correctly passed onto ws."
-        assert np.all(wsJack.extractE()[:, :-1] == jackDataE), "Bootstrap data not being correctly passed onto ws."
+        assert np.all(wsJack.extractY() == jackDataY), "Bootstrap data not being correctly passed onto ws."
+        assert np.all(wsJack.extractE() == jackDataE), "Bootstrap data not being correctly passed onto ws."
 
         jackInputWS[key+"WS"] = wsJack
         parentInputWS[key+"WS"] = parentWS
