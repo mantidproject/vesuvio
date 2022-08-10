@@ -71,6 +71,12 @@ def completeICFromInputs(IC, scriptName, wsIC):
     except AttributeError:
         IC.runHistData = False
 
+    # Norm voigt except when comparing with tests
+    try:
+        d = IC.normVoigt
+    except AttributeError:
+        IC.normVoigt = True
+
     return 
 
 

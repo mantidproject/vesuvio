@@ -74,8 +74,9 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # # Parameters of workspaces in input_ws
     tofBinning='275.,1.,420'                    # Binning of ToF spectra
 
-    # Only when running tests
+    # Only when running tests, to match original script
     runHistData = True
+    normVoigt = False
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -114,6 +115,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     # Only when running tests
     runHistData = True
+    normVoigt = False
     
 
 class YSpaceFitInitialConditions:

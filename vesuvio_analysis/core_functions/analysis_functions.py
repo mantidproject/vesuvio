@@ -557,7 +557,7 @@ def calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, ki
         )
     totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)                 
     
-    JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes)  
+    JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes, ic)  
     
     FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
     
@@ -677,16 +677,16 @@ def loadConstants():
     return mN, Ef, en_to_vel, vf, hbar
 
 
-def pseudoVoigt(x, sigma, gamma):
+def pseudoVoigt(x, sigma, gamma, IC):
     """Convolution between Gaussian with std sigma and Lorentzian with HWHM gamma"""
     fg, fl = 2.*sigma*np.sqrt(2.*np.log(2.)), 2.*gamma
     f = 0.5346 * fl + np.sqrt(0.2166*fl**2 + fg**2)
     eta = 1.36603 * fl/f - 0.47719 * (fl/f)**2 + 0.11116 * (fl/f)**3
     sigma_v, gamma_v = f/(2.*np.sqrt(2.*np.log(2.))), f / 2.
     pseudo_voigt = eta * lorentizian(x, gamma_v) + (1.-eta) * gaussian(x, sigma_v)
-    # TODO: Check again to normalize
-    # norm = np.sum(pseudo_voigt)*(x[1]-x[0])
-    return pseudo_voigt  # /np.abs(norm)
+    
+    norm = np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if IC.normVoigt else 1
+    return pseudo_voigt / norm
 
 
 def gaussian(x, sigma):
