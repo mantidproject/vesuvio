@@ -1,4 +1,5 @@
 
+from os import execv
 from xml.dom import NotFoundErr
 from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
 from vesuvio_analysis.core_functions.ICHelpers import setBootstrapDirs
@@ -36,6 +37,12 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
         bootPars = bootParsRaw.copy()      # By default do not filter means, copy to avoid accidental changes
         if analysisIC.filterAvg:
             bootPars = filteredBootMeans(bootParsRaw.copy(), IC)
+            try:
+                print("\nCompare filtered parameters with parent:\n")
+                checkBootSamplesVSParent(bootPars, parentParsRaw, IC)    # Prints comparison
+            except AssertionError:
+                print("\nUnable to calculate new means of filtered parameters.\n")
+            
         
         # Plots histograms of all spectra for a given width or intensity
         plotRawWidthsAndIntensities(analysisIC, IC, bootPars, parentParsRaw)

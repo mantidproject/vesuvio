@@ -112,7 +112,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
+    fitModel = "ANSIO_GAUSSIAN"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'ANSIO_GAUSSIAN'
     runMinos = True
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"

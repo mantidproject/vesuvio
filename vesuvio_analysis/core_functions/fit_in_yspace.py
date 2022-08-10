@@ -561,7 +561,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A":1, "d":1, "R":1, "sig1":3, "sig2":5}  # TODO: Starting parameters and bounds?
         sharedPars = ["d", "R", "sig1", "sig2"]      # Only varying parameter is amplitude A     
 
-    elif modelFlag=="DOUBLE_WELL_ANSIO":
+    elif modelFlag=="ANSIO_GAUSSIAN":
         # Ansiotropic case
         def model(x, A, sig1, sig2):
             h = 2.04
@@ -948,7 +948,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
-        elif (yFitIC.fitModel=="DOUBLE_WELL") | (yFitIC.fitModel=="DOUBLE_WELL_ANSIO"):
+        elif (yFitIC.fitModel=="DOUBLE_WELL") | (yFitIC.fitModel=="ANSIO_GAUSSIAN"):
             return
         else: raise ValueError("fitmodel not recognized.")
 
