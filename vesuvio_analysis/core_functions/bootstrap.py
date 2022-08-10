@@ -237,8 +237,15 @@ def setICsToDefault(bckwdIC, fwdIC, yFitIC):
     # Don't show plots
     if yFitIC.showPlots: yFitIC.showPlots = False
 
+    # Bootstraping residulas destroys resonance peaks
+    # Set masking to None
+    if (yFitIC.maskTypeProcedure!=None): yFitIC.maskTypeProcedure = None
+    if (yFitIC.maskTOFRange!=None): yFitIC.maskTOFRange = None
+
     if bckwdIC.runningSampleWS: bckwdIC.runningSampleWS = False
     if fwdIC.runningSampleWS: fwdIC.runningSampleWS = False
+
+
     return
 
 

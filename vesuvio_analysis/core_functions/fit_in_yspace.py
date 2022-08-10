@@ -101,27 +101,10 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
     mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
     dataY[:, mask] = 0
 
-
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Mass0")
     passDataIntoWS(dataX, dataY, dataE, wsSubMass)
-    
-    # for j in range(wsSubMass.getNumberHistograms()):
-        
-    #     if wsSubMass.spectrumInfo().isMasked(j):
-    #         continue
-
-    #     # Due to different sizes, last value of original ws remains untouched
-    #     wsSubMass.dataY(j)[:-1] -= ncpTotalExceptFirst[j] 
-
     MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)  
-
     SumSpectra(InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name()+"_Sum")
-
-    # # Ignore any masked columns from initial ws
-    # mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
-    # dataX, dataY, dataE = extractWS(wsSubMass)
-    # dataY[:, mask] = 0
-    # passDataIntoWS(dataX, dataY, dataE, wsSubMass)
     return wsSubMass
 
 
@@ -260,10 +243,8 @@ def dataXBining(ws, xp):
         newX[~mask] = newXR
         dataX[i] = newX       # Update DataX
 
-    # Mask zeros with nans to be consistent in this ws
-    mask = dataY==0
-    dataY[mask] = np.nan
-    dataE[mask] = np.nan
+    # Mask DataE values in same places as DataY values 
+    dataE[dataY==0] = 0
 
     wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_XBinned")
     wsXBins = passDataIntoWS(dataX, dataY, dataE, wsXBins)
@@ -293,20 +274,23 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
     for i in range(len(xp)):
         # Perform weighted average over all dataY and dataE values with the same xp[i]
         # Change shape to column to match weighted average function
-        allY = dataY[dataX==xp[i]][:, np.newaxis]
-        allE = dataE[dataX==xp[i]][:, np.newaxis]
-        assert allY.shape==allE.shape, "Selection of points Y and E with same X should be the same."
+        pointMask = dataX==xp[i]
+        allY = dataY[pointMask][:, np.newaxis]
+        allE = dataE[pointMask][:, np.newaxis]
 
-        if (allY.size==0):   # If no points were found for a given abcissae
+        if (np.sum(pointMask)==0):   # If no points were found for a given abcissae
             mY, mE = 0, 0  # Mask with zeros
-
-        elif (allY.size==1):   # If one point was found, set to that point
-            mY, mE = allY[0, 0], allE[0, 0]
+        
+        elif (np.sum(pointMask)==1):   # If one point was found, set to that point
+            mY, mE = allY.flatten(), allE.flatten()
 
         else:
             # Weighted avg over all spectra and several points per spectra
-            # Pass data as columns
-            mY, mE = weightedAvgArr(allY, allE)    # Outputs masks with zeros
+            mY, mE = weightedAvgArr(allY, allE)    # Outputs masked values as zeros
+        
+        # DataY and DataE should never reach NaN, but safeguard in case they do
+        if (mE==np.nan) | (mY==np.nan):  
+            mY, mE = 0, 0
 
         meansY[i] = mY
         meansE[i] = mE
@@ -346,8 +330,8 @@ def weightedAvgArr(dataYOri, dataEOri):
     meanY = np.nansum(dataY/np.square(dataE), axis=0) / np.nansum(1/np.square(dataE), axis=0)
     meanE = np.sqrt(1 / np.nansum(1/np.square(dataE), axis=0))
 
-    # Change invalid data back to original format with zeros
-    nanInfMask = meanE==np.inf
+    # Change invalid data back to original masking format with zeros
+    nanInfMask = (meanE==np.inf) | (meanE==np.nan) | (meanY==np.nan)
     meanY[nanInfMask] = 0
     meanE[nanInfMask] = 0
 
@@ -415,7 +399,7 @@ def symmetrizeArr(dataYOri, dataEOri):
     dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
 
     # Deal with effects from previously changing dataE=np.inf
-    nanInfMask = dataESym==np.inf
+    nanInfMask = (dataESym==np.inf) | (dataESym==np.nan) | (dataYSym==np.nan)
     dataYSym[nanInfMask] = 0
     dataESym[nanInfMask] = 0
 
