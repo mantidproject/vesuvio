@@ -97,13 +97,14 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
         AnalysisDataService.clear()
         plt.close("all")    # Not sure if previous step clears plt figures, so introduced this step to be safe
 
-        sampleInputWS, parentWS = createSampleWS(parentWSNCPSavePaths, i, bootIC)   # Creates ith sample
-        formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS, parentWS)  
+        try:
+            sampleInputWS, parentWS = createSampleWS(parentWSNCPSavePaths, i, bootIC)   # Creates ith sample
+        except JackMaskCol: continue    # If Jackknife column already masked, skip to next column
 
+        formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS, parentWS)  
         # try:
         iterResults = runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC)   # Conversion to YSpace with masked column
-        # except RuntimeError:    # TODO: Think about the errors to except
-        #     continue     # If due to a very unlikely random sample the procedure fails, skip to next iteration
+        # except AssertionError: continue     # If the procedure fails, skip to next iteration
         
         storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
         saveBootstrapResults(bootResults, bckwdIC, fwdIC)
@@ -237,15 +238,8 @@ def setICsToDefault(bckwdIC, fwdIC, yFitIC):
     # Don't show plots
     if yFitIC.showPlots: yFitIC.showPlots = False
 
-    # Bootstraping residulas destroys resonance peaks
-    # Set masking to None
-    if (yFitIC.maskTypeProcedure!=None): yFitIC.maskTypeProcedure = None
-    if (yFitIC.maskTOFRange!=None): yFitIC.maskTOFRange = None
-
     if bckwdIC.runningSampleWS: bckwdIC.runningSampleWS = False
     if fwdIC.runningSampleWS: fwdIC.runningSampleWS = False
-
-
     return
 
 
@@ -462,13 +456,22 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
         totNcp = totNcpWS.extractY()[:, :]     
         dataY = parentWS.extractY()[:, :totNcp.shape[1]]    # Missing last col or not
 
-        residuals = dataY - totNcp
+        # Take only residuals from non masked columns
+        maskCols = np.all(dataY==0, axis=0)
+        dataY, totNcp = dataY[:, ~maskCols], totNcp[:, ~maskCols]
 
+        # Resample residuals
+        residuals = dataY - totNcp
         bootRes = bootstrapResidualsSample(residuals)
         bootDataY = totNcp + bootRes
 
+        # Add masked columns as in parent workspace
+        fullBootDataY = np.zeros((len(bootDataY), len(maskCols)))
+        fullBootDataY[:, ~maskCols] = bootDataY     # Set non-masked values
+
+        # Pass dataY onto workspace
         wsBoot = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Bootstrap")
-        for i, row in enumerate(bootDataY):
+        for i, row in enumerate(fullBootDataY):
             wsBoot.dataY(i)[:len(row)] = row     # Last column will be ignored or not
 
         assert ~np.all(wsBoot.extractY() == parentWS.extractY()), "Bootstrap data not being correctly passed onto ws."
@@ -497,7 +500,10 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
 
     jackInputWS = {}
     parentInputWS = {} 
-    for key in ["bckwd", "fwd"]:
+    # Jackknife does not have 'JOINT' option
+    # Careful with this step if in future Jackknife allows for 'JOINT' internally
+    assert len(parentWSNCPSavePaths)==2, "Jackknife can only allow either forward or backward at a time."
+    for key in ["bckwd", "fwd"]:    # Only one iteration is selected at a time
         try:
             parentWSPath = parentWSNCPSavePaths[key+"WS"]
             totNcpWSPath = parentWSNCPSavePaths[key+"NCP"]
@@ -506,26 +512,33 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
         dataY = parentWS.extractY()
-        dataE = parentWS.extractE()
 
         jackDataY = dataY.copy()
-        jackDataE = dataE.copy()
+
+        # Skip Jackknife procedure on columns that are already masked
+        if np.all(jackDataY[:, j]==0): raise JackMaskCol
 
         jackDataY[:, j] = 0   # Masks j collumn with zeros
         # DataE is not masked intentionally, to preserve errors that are used in the normalization of averaged NaN profile
         
         wsJack = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Jackknife")
-        for i, (yRow, eRow) in enumerate(zip(jackDataY, jackDataE)):
+        for i, yRow in enumerate(jackDataY):
             wsJack.dataY(i)[:] = yRow     # Last column will be ignored in ncp fit anyway
-            wsJack.dataE(i)[:] = eRow
 
         assert np.all(wsJack.extractY() == jackDataY), "Bootstrap data not being correctly passed onto ws."
-        assert np.all(wsJack.extractE() == jackDataE), "Bootstrap data not being correctly passed onto ws."
 
         jackInputWS[key+"WS"] = wsJack
         parentInputWS[key+"WS"] = parentWS
         parentInputWS[key+"NCP"] = totNcpWS
     return jackInputWS, parentInputWS
+
+
+class JackMaskCol(Exception):
+    """
+    Custom exception used only to flag and skip a Jackknife iteration
+    for a column that is already masked.
+    """
+    pass
 
 
 def loadWorkspacesFromPath(*savePaths):

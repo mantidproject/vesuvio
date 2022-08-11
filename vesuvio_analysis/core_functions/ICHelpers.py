@@ -222,9 +222,15 @@ def genBootFilesName (IC, bootIC):
 
 def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     if isYFit:
-        log = bootDataName+" : "+str(bootIC.fitInYSpace)+" - "+str(yFitIC.symmetrisationFlag)+" - "+yFitIC.rebinParametersForYSpaceFit+" - "+yFitIC.fitModel
+        log = (bootDataName+" : "+str(bootIC.fitInYSpace)+
+        " | "+str(yFitIC.symmetrisationFlag)+
+        " | "+yFitIC.rebinParametersForYSpaceFit+
+        " | "+yFitIC.fitModel+
+        " | "+str(yFitIC.maskTypeProcedure))
     else:
-        log = bootDataName+" : "+str(bootIC.procedure)+" - "+IC.tofBinning
+        log = (bootDataName+" : "+str(bootIC.procedure)+
+        " | "+IC.tofBinning+
+        " | "+str(IC.maskTOFRange))
     return log
 
 

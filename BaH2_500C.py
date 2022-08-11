@@ -115,8 +115,8 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([171, 172, 173, 174])
 
-    tofBinning = "110,1.,420"                 # Binning of ToF spectra
-    maskTOFRange = "157, 163"     # TOF Range for the resonance peak
+    tofBinning = "100, 50, 400"  #"110,1.,420"                 # Binning of ToF spectra
+    maskTOFRange = "150, 200"     # TOF Range for the resonance peak
 
 
 class YSpaceFitInitialConditions:
@@ -124,15 +124,15 @@ class YSpaceFitInitialConditions:
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN" #"DOUBLE_WELL"   # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'DOUBLE_WELL_ANSIO'
-    runMinos = True
-    globalFit = True
+    runMinos = False
+    globalFit = False
     nGlobalFitGroups = 4         # Number or string "ALL"
-    maskTypeProcedure ="NCP" # "NCP"    # Options: 'NCP', 'NAN', None    
+    maskTypeProcedure = "NAN" #"NAN" # "NCP"    # Options: 'NCP', 'NAN', None    
 
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False
 
     # Choose main procedure to run
     procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -146,8 +146,8 @@ class BootstrapInitialConditions:
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"   
     
-    runningJackknife = False
-    nSamples = 2
+    runningJackknife = True
+    nSamples = 1
     skipMSIterations = True
     userConfirmation = True
     runningTest = False
@@ -155,7 +155,7 @@ class BootstrapInitialConditions:
 
 class BootstrapAnalysis:
     # Flag below controls whether or not analysis is run
-    runAnalysis = False
+    runAnalysis = True
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = False       # True discards some unreasonable values of widths and intensities

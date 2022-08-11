@@ -106,7 +106,8 @@ def readBootData(dataPath):
         failMask = np.all(np.isnan(bootParsRaw), axis=(1, 2))
         assert failMask.shape == (len(bootParsRaw),), f"Wrong shape of masking: {failMask.shape} != {bootParsRaw.shape} "
         if np.sum(failMask) > 0:
-            print(f"No of failed samples: {np.sum(failMask)}")
+            print(f"\nNo of failed samples: {np.sum(failMask)}")
+            print("\nUsing only good replicas ...\n")
             bootParsRaw = bootParsRaw[~failMask]
             nSamples = np.sum(~failMask)
 
@@ -133,6 +134,7 @@ def readYFitData(dataPath, yFitIC):
         failMask = np.all(np.isnan(minFitVals), axis=0)
         if np.sum(failMask) > 0:
             print(f"\nNo of failed samples: {np.sum(failMask)}") 
+            print("\nUsing only good replicas ...\n")
             minFitVals = minFitVals[:, ~failMask]
 
         try:

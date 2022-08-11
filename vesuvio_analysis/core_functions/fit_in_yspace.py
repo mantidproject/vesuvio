@@ -287,7 +287,7 @@ def weightedAvgArr(dataYOri, dataEOri):
 
     # Run some tests
     assert dataYOri.shape==dataEOri.shape, "Y and E arrays should have same shape for weighted average."
-    assert np.all((dataYOri==0)==(dataEOri==0)), "Masked zeros should match in DataY and DataE."
+    assert np.all((dataYOri==0)==(dataEOri==0)), f"Masked zeros should match in DataY and DataE: {np.argwhere((dataYOri==0)!=(dataEOri==0))}"
     assert np.all(np.isnan(dataYOri)==np.isnan(dataEOri)), "Masked nans should match in DataY and DataE."
     assert len(dataYOri) > 1, "Weighted average needs more than one element to be performed."
 
