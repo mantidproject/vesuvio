@@ -75,6 +75,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
     tofBinning='50,1.,420'           
+    maskTOFRange = None        # TOF Range for the resonance peak
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -107,6 +108,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([180])
 
     tofBinning="110,1.,430"         
+    maskTOFRange = None        # TOF Range for the resonance peak
  
 
 class YSpaceFitInitialConditions:
@@ -118,7 +120,6 @@ class YSpaceFitInitialConditions:
     globalFit = False 
     nGlobalFitGroups = 4   
     maskTypeProcedure = None   # Options: 'NCP', 'NAN', None
-    maskTOFRange = None        # TOF Range for the resonance peak
 
 
 class UserScriptControls:

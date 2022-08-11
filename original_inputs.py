@@ -79,6 +79,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
     # # Parameters of workspaces in input_ws
     tofBinning='275.,1.,420'                    # Binning of ToF spectra
+    maskTOFRange = None
     
     # Original data uses histogram data instead of point data
     runHistData = True
@@ -114,6 +115,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([173, 174, 179])
 
     tofBinning="110,1,430"                 # Binning of ToF spectra
+    maskTOFRange = None
   
     # Original data uses histogram data instead of point data
     runHistData = True

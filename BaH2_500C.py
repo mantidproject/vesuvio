@@ -79,6 +79,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
     # # Parameters of workspaces in input_ws
     tofBinning="110,1.,420"                    # Binning of ToF spectra
+    maskTOFRange = None     # TOF Range for the resonance peak
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -115,6 +116,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([171, 172, 173, 174])
 
     tofBinning = "110,1.,420"                 # Binning of ToF spectra
+    maskTOFRange = "157, 163"     # TOF Range for the resonance peak
 
 
 class YSpaceFitInitialConditions:
@@ -125,8 +127,7 @@ class YSpaceFitInitialConditions:
     runMinos = True
     globalFit = True
     nGlobalFitGroups = 4         # Number or string "ALL"
-    maskTypeProcedure = "NAN" # "NCP"    # Options: 'NCP', 'NAN', None 
-    maskTOFRange = "157, 163"     # TOF Range for the resonance peak
+    maskTypeProcedure ="NCP" # "NCP"    # Options: 'NCP', 'NAN', None    
 
 
 

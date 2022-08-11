@@ -3,6 +3,8 @@ import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
 
+from .fit_in_yspace import passDataIntoWS
+
 # Format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=100, threshold=sys.maxsize)
 
@@ -123,13 +125,37 @@ def cropAndMaskWorkspace(ic, ws):
     lastIdx = ic.lastSpec - wsFirstSpec
     
     newWsName = ws.name().split("uncroped")[0]  # Retrieve original name
-    cropedWs = CropWorkspace(
+    wsCrop = CropWorkspace(
         InputWorkspace=ws, 
         StartWorkspaceIndex=initialIdx, EndWorkspaceIndex=lastIdx, 
         OutputWorkspace=newWsName
         )
-    MaskDetectors(Workspace=cropedWs, WorkspaceIndexList=ic.maskedDetectorIdx)
-    return cropedWs
+
+    maskBinsWithZeros(wsCrop, ic)    # Used to mask resonance peaks
+
+    MaskDetectors(Workspace=wsCrop, WorkspaceIndexList=ic.maskedDetectorIdx)
+    return wsCrop
+
+
+def maskBinsWithZeros(ws, IC):
+    """
+    Masks a given TOF range on ws with zeros on dataY.
+    Leaves errors dataE unchanged, as they are used by later treatments.
+    Used to mask resonance peaks.
+    """
+
+    if IC.maskTOFRange==None:     # Masked TOF bins not found, skip
+        return
+
+    dataX, dataY, dataE = extractWS(ws)
+    start, end = [int(s) for s in IC.maskTOFRange.split(",")]
+    assert start <= end, "Start value for masking needs to be smaller or equal than end."
+    mask = (dataX >= start) & (dataX <= end)    # TOF region to mask
+
+    dataY[mask] = 0     
+
+    passDataIntoWS(dataX, dataY, dataE, ws)
+    return 
 
 
 def createSlabGeometry(ic):

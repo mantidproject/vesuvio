@@ -119,41 +119,38 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
     """Seperate procedures depending on masking specified."""
     
     rebinPars = yFitIC.rebinParametersForYSpaceFit
-
-    # Default procedure where no TOF values are masked
-    if yFitIC.maskTypeProcedure==None:
-        wsJoY = convertToYSpace(wsTOF, mass0)
-        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
-        wsJoYAvg = weightedAvgCols(wsJoYN)
-        return wsJoYN, wsJoYAvg
-
-    elif yFitIC.maskTypeProcedure=="NCP":   # Same as above but with additional masking in TOF space
-        wsTOF = maskBinsWithZeros(wsTOF, yFitIC)
-        wsTOF = replaceZerosWithNCP(wsTOF, ncp)
-        wsJoY = convertToYSpace(wsTOF, mass0)
-        wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
-        wsJoYAvg = weightedAvgCols(wsJoYN)
-        return wsJoYN, wsJoYAvg
-
-    elif yFitIC.maskTypeProcedure=="NAN":
-        # Build special workspace to store accumulated points
-        wsTOF = maskBinsWithZeros(wsTOF, yFitIC)
-        wsJoY = convertToYSpace(wsTOF, mass0)
-        xp = buildXRangeFromRebinPars(yFitIC)
-        wsJoYB = dataXBining(wsJoY, xp)      # Unusual ws with several dataY points per each dataX point
-
-        # Need normalisation values from NCP masked workspace
-        wsTOFNCP = replaceZerosWithNCP(wsTOF, ncp)
-        wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
-
-        wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
-
-        # Normalize spectra of specieal workspace
-        wsJoYN = Divide(wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name()+"_Normalised")
-        wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
-        return wsJoYN, wsJoYAvg
     
-    else: raise ValueError("MaskTypeProcedure  not recognized.")
+    if np.any(np.all(wsTOF.extractY()==0, axis=0)):  # Masked columns present
+        
+        if yFitIC.maskTypeProcedure=="NAN":
+            # Build special workspace to store accumulated points
+            wsJoY = convertToYSpace(wsTOF, mass0)
+            xp = buildXRangeFromRebinPars(yFitIC)
+            wsJoYB = dataXBining(wsJoY, xp)      # Unusual ws with several dataY points per each dataX point
+
+            # Need normalisation values from NCP masked workspace
+            wsTOFNCP = replaceZerosWithNCP(wsTOF, ncp)
+            wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
+            wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
+
+            # Normalize spectra of specieal workspace
+            wsJoYN = Divide(wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name()+"_Normalised")
+            wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
+            return wsJoYN, wsJoYAvg
+        
+        elif yFitIC.maskTypeProcedure=="NCP":
+            wsTOF = replaceZerosWithNCP(wsTOF, ncp)
+
+        else:
+            raise ValueError("""
+            Masked TOF bins were found but no valid procedure in y-space fit was selected.
+            Options: 'NAN', 'NCP'
+            """)
+
+    wsJoY = convertToYSpace(wsTOF, mass0)
+    wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
+    wsJoYAvg = weightedAvgCols(wsJoYN)
+    return wsJoYN, wsJoYAvg
 
 
 def convertToYSpace(wsTOF, mass0):
@@ -166,30 +163,6 @@ def rebinAndNorm(wsJoY, rebinPars):
     wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name()+"_Integrated")
     wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name()+"_Normalised")
     return wsJoYNorm, wsJoYInt
-
-
-def maskBinsWithZeros(ws, yFitIC):
-    """
-    Masks a given TOF range on ws with zeros on dataY.
-    Leaves errors dataE unchanged.
-    Used to mask resonance peaks.
-    """
-
-    if yFitIC.maskTOFRange==None:     # Option to skip any masking
-        return ws
-
-    start, end = [int(s) for s in yFitIC.maskTOFRange.split(",")]
-    assert start <= end, "Start value for masking needs to be smaller or equal than end."
-    dataX, dataY, dataE = extractWS(ws)
-    # Mask dataY with in given TOF region
-    mask = (dataX >= start) & (dataX <= end)
-
-    dataY[mask] = 0
-
-    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name()+"_ZeroMasked")
-    passDataIntoWS(dataX, dataY, dataE, wsMasked)
-    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name()+"_Sum")
-    return wsMasked  
 
 
 def replaceZerosWithNCP(ws, ncp):

@@ -73,6 +73,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
     # # Parameters of workspaces in input_ws
     tofBinning='275.,1.,420'                    # Binning of ToF spectra
+    maskTOFRange = None
 
     # Only when running tests, to match original script
     runHistData = True
@@ -112,6 +113,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([173, 174, 179])
 
     tofBinning="110,1.,430"                 # Binning of ToF spectra
+    maskTOFRange = None
 
     # Only when running tests
     runHistData = True
@@ -127,7 +129,6 @@ class YSpaceFitInitialConditions:
     globalFit = None 
     nGlobalFitGroups = 4
     maskTypeProcedure = None
-    maskTOFRange = None
 
 # userControls and bootIC defined in corresponding test scripts
 
