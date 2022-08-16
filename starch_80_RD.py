@@ -118,11 +118,11 @@ class YSpaceFitInitialConditions:
     runMinos = True
     globalFit = True                 # Performs global fit with Minuit by default
     nGlobalFitGroups = 4             # Number or string "ALL"
-    maskTypeProcedure = None         # Options: 'NCP', 'NAN', None
+    maskTypeProcedure = "NAN"         # Options: 'NCP', 'NAN', None
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False
     
     # Choose main procedure to run
     procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -131,13 +131,13 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False 
+    runBootstrap = True 
 
-    procedure = "JOINT"
+    procedure = "FORWARD"
     fitInYSpace = "FORWARD"
 
-    runningJackknife = False         # Overwrites normal Bootstrap with Jackknife
-    nSamples = 2500                  # Used if running Bootstrap, otherwise code ignores it
+    bootstrapType = "BOOT_GAUSS_ERRS"         # Overwrites normal Bootstrap with Jackknife
+    nSamples = 1                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
 

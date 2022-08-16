@@ -41,3 +41,12 @@ class MyErr (Exception):
 
 try: raise MyErr
 except MyErr: print("\n\nexcepted!")
+
+
+print("\n\n", np.nanmean(np.array([np.nan, 1, np.nan])))
+
+D = np.arange(25).reshape((5, 5))
+E = np.arange(25).reshape((5, 5)) 
+
+F = np.stack((D, E))
+print(np.nanmean(F, axis=0))

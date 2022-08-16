@@ -45,7 +45,7 @@ def iterativeFitForDataReduction(ic):
 
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
 
-        if ic.runningSampleWS and ic.runningJackknife:
+        if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):
             maskColumnWithZeros(ic.name, ic.name+str(iteration+1))
 
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations)]
@@ -168,7 +168,7 @@ def createSlabGeometry(ic):
         + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
         + "</cuboid>"
 
-    if ic.runningSampleWS and ic.runningJackknife:
+    if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):
         CreateSampleShape(ic.parentWS, xml_str)
     else:
         CreateSampleShape(ic.name, xml_str)
@@ -560,14 +560,16 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
 
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
-    # Ignore any zero values (eg. in Jackknife)
-    zerosMask = (dataY==0) | (dataE==0)     
+    # Ignore any masked values from Jackknife or masked range
+    zerosMask = (dataY==0)    
     ncpTotal = ncpTotal[~zerosMask]
     dataYf = dataY[~zerosMask]   
     dataEf = dataE[~zerosMask]   
 
-    chi2 =  (ncpTotal - dataYf)**2 / dataEf**2    
-    return np.sum(chi2)
+    if np.all(dataE==0):   # When errors not present
+        return np.sum((ncpTotal - dataYf)**2) #/ dataYf**2)   # Statistical weight
+
+    return np.sum((ncpTotal - dataYf)**2 / dataEf**2)
 
 
 def calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
@@ -755,7 +757,7 @@ def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
     print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
             sampleProperties, "\n")
     
-    if ic.runningSampleWS and ic.runningJackknife:    # MS correction does not work when one column is zero, the best we can do is use parent WS
+    if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):    # MS correction does not work when one column is zero, the best we can do is use parent WS
         return createMulScatWorkspaces(ic, ic.parentWS.name(), sampleProperties)
     else:
         return createMulScatWorkspaces(ic, ic.name, sampleProperties)
@@ -827,7 +829,7 @@ def createMulScatWorkspaces(ic, wsName, sampleProperties):
 def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios):
     """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
-    if ic.runningSampleWS and ic.runningJackknife:
+    if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):
         inputWS = ic.parentWS.name()
     else:
         inputWS = ic.name

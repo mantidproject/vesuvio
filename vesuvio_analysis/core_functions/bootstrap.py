@@ -14,14 +14,21 @@ currentPath = Path(__file__).parent.absolute()
 
 def runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
+    checkValidInput(bootIC)
+
     checkOutputDirExists(bckwdIC, fwdIC, bootIC)            # Checks to see if those directories exits already
     askUserConfirmation(bckwdIC, fwdIC, bootIC)
     AnalysisDataService.clear()
 
-    if bootIC.runningJackknife:
+    if bootIC.bootstrapType=="JACKKNIFE":
         return JackknifeProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
     
     return bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
+
+
+def checkValidInput(bootIC):
+    boot = bootIC.bootstrapType
+    assert (boot=="JACKKNIFE") | (boot=="BOOT_GAUSS_ERRS") | (boot=="BOOT_RESIDUALS")
 
 
 def checkOutputDirExists(bckwdIC, fwdIC, bootIC):
@@ -77,7 +84,7 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     Chooses fast or slow (correct) version of bootstrap depending on flag set in bootIC.
     Performs either independent or joint procedure depending of len(inputIC).
     """
-    if bootIC.runningJackknife: assert bootIC.procedure!='JOINT', "'JOINT' mode should not have reached Jackknife here."
+    if bootIC.bootstrapType=="JACKKNIFE": assert bootIC.procedure!='JOINT', "'JOINT' mode should not have reached Jackknife here."
 
     AnalysisDataService.clear()
  
@@ -186,7 +193,7 @@ def calcRunTime(IC, tNoMS, tPerMS, bootIC):
         timePerSample = tNoMS + (IC.noOfMSIterations) * (tNoMS+tPerMS)
 
     nSamples = bootIC.nSamples 
-    if bootIC.runningJackknife:
+    if bootIC.bootstrapType=="JACKKNIFE":
         nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
 
     return  nSamples * timePerSample
@@ -195,7 +202,7 @@ def calcRunTime(IC, tNoMS, tPerMS, bootIC):
 def chooseLoopRange(bootIC, nSamples):
     iStart = 0
     iEnd = nSamples
-    if bootIC.runningJackknife and bootIC.runningTest:
+    if bootIC.bootstrapType=="JACKKNIFE" and bootIC.runningTest:
         iStart = int(nSamples/2)
         iEnd = iStart + 3   
     return iStart, iEnd
@@ -217,7 +224,7 @@ def chooseNSamples(bootIC, parentWSnNCPs: dict):
     If Jackknife is running, no of samples is the number of bins in the workspace."""
 
     nSamples = bootIC.nSamples
-    if bootIC.runningJackknife:
+    if bootIC.bootstrapType=="JACKKNIFE":
         assert len(parentWSnNCPs) == 2, "Running Jackknife, supports only one IC at a time."
         if bootIC.procedure=="FORWARD": key = "fwdNCP"
         elif bootIC.procedure=="BACKWARD": key = "bckwdNCP"
@@ -256,7 +263,7 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
                 wsFinal, bckwdScatRes = runIndependentIterativeProcedure(IC, clearWS=False)
                 resultsDict[key+"Scat"] = bckwdScatRes
 
-                if bootIC.runningJackknife: yFitIC.maskTypeProcedure = 'NAN'  # Enable NAN averaging in y-space fit
+                if bootIC.bootstrapType=="JACKKNIFE": yFitIC.maskTypeProcedure = 'NAN'  # Enable NAN averaging in y-space fit
 
                 bckwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, wsFinal)
                 resultsDict[key+"YFit"] = bckwdYFitRes
@@ -431,13 +438,16 @@ def saveWorkspacesLocally(ws):
 
 def createSampleWS(parentWSNCPSavePaths: dict, j: int, bootIC):
 
-    if bootIC.runningJackknife:
+    boot = bootIC.bootstrapType
+    if boot=="JACKKNIFE":
         return createJackknifeWS(parentWSNCPSavePaths, j)
-    else:
+    elif boot=="BOOT_RESIDUALS":
         return createBootstrapWS(parentWSNCPSavePaths)
+    elif boot=="BOOT_GAUSS_ERRS":
+        return createBootstrapWS(parentWSNCPSavePaths, drawGauss=True)
 
 
-def createBootstrapWS(parentWSNCPSavePaths:dict):
+def createBootstrapWS(parentWSNCPSavePaths:dict, drawGauss=False):
     """
     Creates bootstrap ws replica.
     Inputs: Experimental (parent) workspace and corresponding NCP total fit
@@ -455,15 +465,20 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
 
         totNcp = totNcpWS.extractY()[:, :]     
         dataY = parentWS.extractY()[:, :totNcp.shape[1]]    # Missing last col or not
+        dataE = parentWS.extractE()[:, :totNcp.shape[1]]
 
-        # Take only residuals from non masked columns
+        # Filter out masked columns
         maskCols = np.all(dataY==0, axis=0)
-        dataY, totNcp = dataY[:, ~maskCols], totNcp[:, ~maskCols]
+        dataY, totNcp, dataE = dataY[:, ~maskCols], totNcp[:, ~maskCols], dataE[:, ~maskCols]
 
-        # Resample residuals
-        residuals = dataY - totNcp
-        bootRes = bootstrapResidualsSample(residuals)
-        bootDataY = totNcp + bootRes
+        # Draw DataY from Gaussian distribution
+        if drawGauss:
+            bootDataY = np.random.normal(dataY, dataE)  # Mean at dataY, width dataE
+
+        else:   # Resample residuals
+            residuals = dataY - totNcp
+            bootRes = bootstrapResidualsSample(residuals)
+            bootDataY = totNcp + bootRes
 
         # Add masked columns as in parent workspace
         fullBootDataY = np.zeros((len(bootDataY), len(maskCols)))
@@ -473,6 +488,8 @@ def createBootstrapWS(parentWSNCPSavePaths:dict):
         wsBoot = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Bootstrap")
         for i, row in enumerate(fullBootDataY):
             wsBoot.dataY(i)[:len(row)] = row     # Last column will be ignored or not
+            if drawGauss:
+                wsBoot.dataE(i)[:] = np.zeros(wsBoot.readE(i).size)
 
         assert ~np.all(wsBoot.extractY() == parentWS.extractY()), "Bootstrap data not being correctly passed onto ws."
 
@@ -559,7 +576,7 @@ def formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS:dict, parentWS:dict):
 
         if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
             IC.runningSampleWS = True
-            IC.runningJackknife = bootIC.runningJackknife
+            IC.bootstrapType = bootIC.bootstrapType
 
             if bootIC.skipMSIterations: 
                 IC.noOfMSIterations = 0

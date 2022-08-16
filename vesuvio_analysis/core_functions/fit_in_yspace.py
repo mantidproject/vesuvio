@@ -98,7 +98,7 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
     dataY[:, :ncpTotalExceptFirst.shape[1]] -= ncpTotalExceptFirst
 
     # Ignore any masked bins (columns) from initial ws
-    mask = np.all(ws.extractY()==0, axis=0) | np.all(ws.extractE()==0, axis=0)
+    mask = np.all(ws.extractY()==0, axis=0)
     dataY[:, mask] = 0
 
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Mass0")
@@ -259,7 +259,11 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
 
         else:
             # Weighted avg over all spectra and several points per spectra
-            mY, mE = weightedAvgArr(allY, allE)    # Outputs masked values as zeros
+            if np.all(dataE==0):      # Case of bootstrap replica with no errors
+                mY = avgArr(allY)
+                mE = 0
+            else:
+                mY, mE = weightedAvgArr(allY, allE)    # Outputs masked values as zeros
         
         # DataY and DataE should never reach NaN, but safeguard in case they do
         if (mE==np.nan) | (mY==np.nan):  
@@ -274,29 +278,50 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
 def weightedAvgCols(wsYSpace):
     """Returns ws with weighted avg of columns of input ws"""
     dataX, dataY, dataE = extractWS(wsYSpace)
-    meanY, meanE = weightedAvgArr(dataY, dataE)
+    if np.all(dataE==0):      # Bootstrap case where errors are not used
+        meanY = avgArr(dataY)
+        meanE = np.zeros(meanY.shape)
+    else:
+        meanY, meanE = weightedAvgArr(dataY, dataE)
     wsYSpaceAvg = CreateWorkspace(DataX=dataX[0, :], DataY=meanY, DataE=meanE, NSpec=1, OutputWorkspace=wsYSpace.name()+"_WeightedAvg")
     return wsYSpaceAvg
 
 
-def weightedAvgArr(dataYOri, dataEOri):
+def avgArr(dataYO):
+    """
+    Average over columns of 2D dataY.
+    Ignores any zero values as being masked.
+    """
+
+    assert len(dataYO)>1, "Averaging needs more than one element."
+
+    dataY = dataYO.copy()
+    dataY[dataY==0] = np.nan
+    meanY = np.nanmean(dataY, axis=0)
+    meanY[meanY==np.nan] = 0
+
+    assert np.all(np.all(dataYO==0, axis=0)==(meanY==0)), "Columns of zeros should give zero."
+    return meanY
+
+
+def weightedAvgArr(dataYO, dataEO):
     """
     Weighted average over columns of 2D arrays.
     Ignores any zero or NaN value.
     """
 
     # Run some tests
-    assert dataYOri.shape==dataEOri.shape, "Y and E arrays should have same shape for weighted average."
-    assert np.all((dataYOri==0)==(dataEOri==0)), f"Masked zeros should match in DataY and DataE: {np.argwhere((dataYOri==0)!=(dataEOri==0))}"
-    assert np.all(np.isnan(dataYOri)==np.isnan(dataEOri)), "Masked nans should match in DataY and DataE."
-    assert len(dataYOri) > 1, "Weighted average needs more than one element to be performed."
+    assert dataYO.shape==dataEO.shape, "Y and E arrays should have same shape for weighted average."
+    assert np.all((dataYO==0)==(dataEO==0)), f"Masked zeros should match in DataY and DataE: {np.argwhere((dataYO==0)!=(dataEO==0))}"
+    assert np.all(np.isnan(dataYO)==np.isnan(dataEO)), "Masked nans should match in DataY and DataE."
+    assert len(dataYO) > 1, "Weighted average needs more than one element to be performed."
 
-    dataY = dataYOri.copy()  # Copy arrays not to change original data
-    dataE = dataEOri.copy()
+    dataY = dataYO.copy()  # Copy arrays not to change original data
+    dataE = dataEO.copy()
 
     # Ignore invalid data by changing zeros to nans
     # If data is already masked with nans, it remains unaltered
-    zerosMask = (dataE==0) | (dataY==0)
+    zerosMask = (dataY==0)
     dataY[zerosMask] = np.nan  
     dataE[zerosMask] = np.nan
 
@@ -310,7 +335,7 @@ def weightedAvgArr(dataYOri, dataEOri):
 
     # Test that columns of zeros are left unchanged
     assert np.all((meanY==0)==(meanE==0)), "Weighted avg output should have masks in the same DataY and DataE."
-    assert np.all((np.all(dataYOri==0, axis=0) | np.all(np.isnan(dataYOri), axis=0)) == (meanY==0)), "Masked cols should be ignored."
+    assert np.all((np.all(dataYO==0, axis=0) | np.all(np.isnan(dataYO), axis=0)) == (meanY==0)), "Masked cols should be ignored."
     
     return meanY, meanE
 
@@ -343,22 +368,46 @@ def symmetrizeWs(avgYSpace):
     """
 
     dataX, dataY, dataE = extractWS(avgYSpace)
-    dataYSym, dataESym = symmetrizeArr(dataY, dataE)
+    
+    if np.all(dataE==0):
+        dataYS = symArr(dataY)
+        dataES = np.zeros(dataYS.shape)
+    else:
+        dataYS, dataES = weightedSymArr(dataY, dataE)
 
     wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name()+"_Symmetrised")
-    wsSym = passDataIntoWS(dataX, dataYSym, dataESym, wsSym)
+    wsSym = passDataIntoWS(dataX, dataYS, dataES, wsSym)
     return wsSym
 
 
-def symmetrizeArr(dataYOri, dataEOri):
+def symArr(dataYO):
+
+    assert len(dataYO.shape) == 2, "Symmetrization is written for 2D arrays."
+    dataY = dataYO.copy()  # Copy arrays not to risk changing original data
+    coMask = dataY==0
+    dataY[coMask] = np.nan
+
+    yFlip = np.flip(dataY, axis=1)
+
+    dataYS = np.nanmean(np.stack((dataY, yFlip)), axis=0)  # Normal avg between two numbers, cut-offs get ignored
+
+    dataYS[dataYS==np.nan] = 0
+    np.testing.assert_array_equal(dataYS, np.flip(dataYS, axis=1)), f"Symmetrisation failed in {np.argwhere(dataYS!=np.flip(dataYS))}"
+    np.testing.assert_allclose(dataYS[coMask], np.flip(dataYO, axis=1)[coMask])
+    return dataYS
+
+
+def weightedSymArr(dataYO, dataEO):
     """
     Performs Inverse variance weighting between two oposite points.
     When one of the points is a cut-off and the other is a valid point, 
     the final value will be the valid point.
     """
-    assert len(dataYOri.shape) == 2, "Symmetrization is written for 2D arrays."
-    dataY = dataYOri.copy()  # Copy arrays not to risk changing original data
-    dataE = dataEOri.copy()
+    assert len(dataYO.shape) == 2, "Symmetrization is written for 2D arrays."
+    assert np.all((dataYO==0)==(dataEO==0)), "Masked values should have zeros on both dataY and dataE."
+    
+    dataY = dataYO.copy()  # Copy arrays not to risk changing original data
+    dataE = dataEO.copy()
 
     cutOffMask = dataE==0
     # Change values of yerr to leave cut-offs unchanged during symmetrisation
@@ -368,23 +417,23 @@ def symmetrizeArr(dataYOri, dataEOri):
     eFlip = np.flip(dataE, axis=1)
 
     # Inverse variance weighting
-    dataYSym = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
-    dataESym = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
+    dataYS = (dataY/dataE**2 + yFlip/eFlip**2) / (1/dataE**2 + 1/eFlip**2)
+    dataES = 1 / np.sqrt(1/dataE**2 + 1/eFlip**2)
 
     # Deal with effects from previously changing dataE=np.inf
-    nanInfMask = (dataESym==np.inf) | (dataESym==np.nan) | (dataYSym==np.nan)
-    dataYSym[nanInfMask] = 0
-    dataESym[nanInfMask] = 0
+    nanInfMask = (dataES==np.inf) | (dataES==np.nan) | (dataYS==np.nan)
+    dataYS[nanInfMask] = 0
+    dataES[nanInfMask] = 0
 
     # Test that arrays are symmetrised
-    np.testing.assert_array_equal(dataYSym, np.flip(dataYSym, axis=1)), f"Symmetrisation failed in {np.argwhere(dataYSym!=np.flip(dataYSym))}"
-    np.testing.assert_array_equal(dataESym, np.flip(dataESym, axis=1)), f"Symmetrisation failed in {np.argwhere(dataESym!=np.flip(dataESym))}"
+    np.testing.assert_array_equal(dataYS, np.flip(dataYS, axis=1)), f"Symmetrisation failed in {np.argwhere(dataYS!=np.flip(dataYS))}"
+    np.testing.assert_array_equal(dataES, np.flip(dataES, axis=1)), f"Symmetrisation failed in {np.argwhere(dataES!=np.flip(dataES))}"
 
     # Test that cut-offs were not included in the symmetrisation
-    np.testing.assert_allclose(dataYSym[cutOffMask], np.flip(dataYOri, axis=1)[cutOffMask])
-    np.testing.assert_allclose(dataESym[cutOffMask], np.flip(dataEOri, axis=1)[cutOffMask])
+    np.testing.assert_allclose(dataYS[cutOffMask], np.flip(dataYO, axis=1)[cutOffMask])
+    np.testing.assert_allclose(dataES[cutOffMask], np.flip(dataEO, axis=1)[cutOffMask])
 
-    return dataYSym, dataESym
+    return dataYS, dataES
 
 
 def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
@@ -409,7 +458,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     dataXNZ, dataYNZ, dataENZ = selectNonZeros(dataX, dataY, dataE)
 
     # Fit with Minuit
-    costFun = cost.LeastSquares(dataXNZ, dataYNZ, dataENZ, convolvedModel)
+    if np.all(dataE==0):   # Choose fitting without weights
+        costFun = MyLeastSquares(dataXNZ, dataYNZ, convolvedModel)
+    else:
+        costFun = cost.LeastSquares(dataXNZ, dataYNZ, dataENZ, convolvedModel)
+    
     m = Minuit(costFun, **defaultPars)
 
     m.limits["A"] = (0, None)
@@ -566,11 +619,39 @@ def selectModelAndPars(modelFlag):
 
 
 def selectNonZeros(dataX, dataY, dataE):
-    nonZeros = (dataE!=0) & (dataE!=np.nan) & (dataE!=np.inf) & (dataY!=np.nan)  # Invalid values should have errors=0, but cover other invalid cases as well
-    dataXNZ = dataX[nonZeros]
-    dataYNZ = dataY[nonZeros]
-    dataENZ = dataE[nonZeros]   
+    """
+    Selects non zero points.
+    Uses zeros in dataY becasue dataE can be all zeros in one of the bootstrap types.
+    """
+    zeroMask = dataY==0  
+
+    dataXNZ = dataX[~zeroMask]
+    dataYNZ = dataY[~zeroMask]
+    dataENZ = dataE[~zeroMask]   
     return dataXNZ, dataYNZ, dataENZ 
+
+
+class MyLeastSquares:  
+    """
+    Generic least-squares cost function without error.
+    This structure is required for high compatibility with Minuit. 
+    """
+
+    errordef = Minuit.LEAST_SQUARES # for Minuit to compute errors correctly
+    
+    def __init__(self, x, y, model):
+        self.model = model  # model predicts y for given x
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
+        self.func_code = make_func_code(describe(model)[1:])
+
+    def __call__(self, *par):  # we accept a variable number of model parameters
+        ym = self.model(self.x, *par)
+        return np.sum((self.y - ym) ** 2)
+
+    @property
+    def ndata(self):
+        return len(self.x)
 
 
 def createFitResultsWorkspace(wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals):
@@ -1042,7 +1123,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC)
 
     if yFitIC.symmetrisationFlag:  
-        dataY, dataE = symmetrizeArr(dataY, dataE)
+        dataY, dataE = weightedSymArr(dataY, dataE)
 
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)   
     

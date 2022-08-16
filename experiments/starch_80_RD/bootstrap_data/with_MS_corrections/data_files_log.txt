@@ -5,3 +5,8 @@ spec_144-182_iter_0_nsampl_2.npz : JOINT - 110,1,430
 spec_144-182_iter_0_ySpaceFit_nsampl_2.npz : FORWARD - False - -30, 0.5, 30 - SINGLE_GAUSSIAN
 spec_3-134_iter_4_MS_nsampl_650.npz : JOINT - 275.,1.,420
 spec_3-134_iter_4_MS_nsampl_2500.npz : JOINT - 275.,1.,420
+
+spec_144-182_iter_0_nsampl_1.npz : FORWARD | 110,1,430 | None
+spec_144-182_iter_0_ySpaceFit_nsampl_1.npz : FORWARD | True | -25, 0.5, 25 | ANSIO_GAUSSIAN | None
+spec_144-182_iter_0_nsampl_1.npz : FORWARD | 110,1,430 | None
+spec_144-182_iter_0_ySpaceFit_nsampl_1.npz : FORWARD | True | -25, 0.5, 25 | ANSIO_GAUSSIAN | NAN

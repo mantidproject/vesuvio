@@ -169,7 +169,7 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     bootIC.runTimesPath = experimentsPath / sampleName / "running_times.txt"
 
     # Make bootstrap and jackknife data directories
-    if bootIC.runningJackknife:
+    if bootIC.bootstrapType=="JACKKNIFE":
         bootPath = experimentsPath / sampleName / "jackknife_data"
     else:
         bootPath = experimentsPath / sampleName / "bootstrap_data"
@@ -204,7 +204,7 @@ def genBootFilesName (IC, bootIC):
     """Generates save file name for either BACKWARD or FORWARD class"""
 
     nSamples = bootIC.nSamples
-    if bootIC.runningJackknife: 
+    if bootIC.bootstrapType=="JACKKNIFE": 
         nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
 
     # Build Filename based on ic
