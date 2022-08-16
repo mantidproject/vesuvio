@@ -122,10 +122,10 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False
     
     # Choose main procedure to run
-    procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    procedure = "JOINT"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
     # Choose on which ws to perform the fit in y space
     fitInYSpace = None #"FORWARD"    # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
@@ -133,17 +133,17 @@ class UserScriptControls:
 class BootstrapInitialConditions:
     runBootstrap = False
 
-    procedure = "FORWARD"
-    fitInYSpace = "FORWARD"
+    procedure = "BACKWARD"
+    fitInYSpace = None #"FORWARD"
 
     bootstrapType = "BOOT_RESIDUALS"  # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS" 
-    nSamples = 1                  # Used if running Bootstrap, otherwise code ignores it
+    nSamples = 650                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future
 
 
 class BootstrapAnalysis:
-    runAnalysis = False      # Controls whether or not analysis is run
+    runAnalysis = True      # Controls whether or not analysis is run
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True      # True discards some unreasonable values of widths and intensities
