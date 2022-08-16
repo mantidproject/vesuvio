@@ -46,7 +46,7 @@ def iterativeFitForDataReduction(ic):
             wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
 
-        remaskCols(ic.name, "tmpNameWS")    # Masks cols in the same place as in ic.name
+        remaskValues(ic.name, "tmpNameWS")    # Masks cols in the same place as in ic.name
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
     
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations)]
@@ -55,14 +55,20 @@ def iterativeFitForDataReduction(ic):
     return wsFinal, fittingResults
 
 
-def remaskCols(wsName, wsToMaskName):
+def remaskValues(wsName, wsToMaskName):
+    """
+    Uses the ws before the MS correction to look for masked columns or dataE 
+    and implement the same masked values after the correction.
+    """
     ws = mtd[wsName]
-    dataY = ws.extractY()
+    dataX, dataY, dataE = extractWS(ws)
     mask = np.all(dataY==0, axis=0)
 
     wsM = mtd[wsToMaskName]
     dataXM, dataYM, dataEM = extractWS(wsM)
     dataYM[:, mask] = 0
+    if np.all(dataE==0): dataEM = np.zeros(dataEM.shape)
+    
     passDataIntoWS(dataXM, dataYM, dataEM, wsM)
     return
 

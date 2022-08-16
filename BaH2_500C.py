@@ -107,7 +107,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     noOfMSIterations = 1   #4
     firstSpec = 135   #135
-    lastSpec = 145   #182
+    lastSpec = 147   #182
 
     # Boolean Flags to control script
     MSCorrectionFlag = True
@@ -132,7 +132,7 @@ class YSpaceFitInitialConditions:
 
 
 class UserScriptControls:
-    runRoutine = True
+    runRoutine = False
 
     # Choose main procedure to run
     procedure = "FORWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
@@ -141,14 +141,14 @@ class UserScriptControls:
 
 
 class BootstrapInitialConditions:
-    runBootstrap = False
+    runBootstrap = True
 
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"   
     
     bootstrapType = "BOOT_GAUSS_ERRS"    # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS"
     nSamples = 1
-    skipMSIterations = True
+    skipMSIterations = False
     userConfirmation = True
     runningTest = False
 
