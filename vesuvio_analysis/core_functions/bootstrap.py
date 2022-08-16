@@ -577,7 +577,6 @@ def formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS:dict, parentWS:dict):
 
         if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
             IC.runningSampleWS = True
-            IC.bootstrapType = bootIC.bootstrapType
 
             if bootIC.skipMSIterations: 
                 IC.noOfMSIterations = 0

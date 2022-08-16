@@ -3,7 +3,7 @@ import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
 
-from .fit_in_yspace import passDataIntoWS
+from .fit_in_yspace import passDataIntoWS, replaceZerosWithNCP
 
 # Format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=100, threshold=sys.maxsize)
@@ -24,43 +24,48 @@ def iterativeFitForDataReduction(ic):
         # Workspace from previous iteration
         wsToBeFitted = mtd[ic.name+str(iteration)]
 
-        fitNcpToWorkspace(ic, wsToBeFitted)
+        ncpTotal = fitNcpToWorkspace(ic, wsToBeFitted)
         
         mWidths, stdWidths, mIntRatios, stdIntRatios = extractMeans(wsToBeFitted.name(), ic)
         createMeansAndStdTableWS(wsToBeFitted.name(), ic, mWidths, stdWidths, mIntRatios, stdIntRatios)
    
         # When last iteration, skip MS and GC
-        if iteration == ic.noOfMSIterations:
-          break 
+        if iteration == ic.noOfMSIterations: break 
+
+        # Replace zero columns (bins) with ncp total fit
+        # If ws has no zero column, then remains unchanged
+        if iteration == 0: wsNCPM = replaceZerosWithNCP(mtd[ic.name], ncpTotal)
 
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
         if ic.MSCorrectionFlag:
-            wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios)
+            wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs")
 
         if ic.GammaCorrectionFlag:  
-            wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios)
+            wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
 
+        remaskCols(ic.name, "tmpNameWS")    # Masks cols in the same place as in ic.name
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
-
-        if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):
-            maskColumnWithZeros(ic.name, ic.name+str(iteration+1))
-
+    
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations)]
     fittingResults = resultsObject(ic)
     fittingResults.save()
     return wsFinal, fittingResults
 
 
-def maskColumnWithZeros(maskedWSName, wsToBeMaskedName):
-    zeroCol = np.all(mtd[maskedWSName].extractY()==0, axis=0)
-    wsToBeMasked = mtd[wsToBeMaskedName]
-    for i in range(wsToBeMasked.getNumberHistograms()):
-        wsToBeMasked.dataY(i)[zeroCol] = 0
+def remaskCols(wsName, wsToMaskName):
+    ws = mtd[wsName]
+    dataY = ws.extractY()
+    mask = np.all(dataY==0, axis=0)
+
+    wsM = mtd[wsToMaskName]
+    dataXM, dataYM, dataEM = extractWS(wsM)
+    dataYM[:, mask] = 0
+    passDataIntoWS(dataXM, dataYM, dataEM, wsM)
     return
-    
+
 
 def createTableInitialParameters(ic):
     print("\nRUNNING ", ic.modeRunning, " SCATTERING.\n")
@@ -158,22 +163,6 @@ def maskBinsWithZeros(ws, IC):
     return 
 
 
-def createSlabGeometry(ic):
-    half_height, half_width, half_thick = 0.5*ic.vertical_width, 0.5*ic.horizontal_width, 0.5*ic.thickness
-    xml_str = \
-        " <cuboid id=\"sample-shape\"> " \
-        + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
-        + "<left-front-top-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, half_height, half_thick) \
-        + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
-        + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
-        + "</cuboid>"
-
-    if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):
-        CreateSampleShape(ic.parentWS, xml_str)
-    else:
-        CreateSampleShape(ic.name, xml_str)
-
-
 def fitNcpToWorkspace(IC, ws):
     """
     Performs the fit of ncp to the workspace.
@@ -193,12 +182,12 @@ def fitNcpToWorkspace(IC, ws):
     arrFitPars = fitNcpToArray(IC, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
     createTableWSForFitPars(ws.name(), IC.noOfMasses, arrFitPars)
     arrBestFitPars = arrFitPars[:, 1:-2]
-    allNcpForEachMass, allNcpTotal = calculateNcpArr(IC, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
-    ncpSumWSs = createNcpWorkspaces(allNcpForEachMass, allNcpTotal, ws, IC)
+    ncpForEachMass, ncpTotal = calculateNcpArr(IC, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
+    ncpSumWSs = createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, IC)
 
     wsDataSum = SumSpectra(InputWorkspace=ws, OutputWorkspace=ws.name()+"_Sum")
     plotSumNCPFits(wsDataSum, *ncpSumWSs, IC)
-    return
+    return ncpTotal
 
 
 def extractWS(ws):
@@ -560,14 +549,14 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
 
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
-    # Ignore any masked values from Jackknife or masked range
+    # Ignore any masked values from Jackknife or masked tof range
     zerosMask = (dataY==0)    
     ncpTotal = ncpTotal[~zerosMask]
     dataYf = dataY[~zerosMask]   
     dataEf = dataE[~zerosMask]   
 
     if np.all(dataE==0):   # When errors not present
-        return np.sum((ncpTotal - dataYf)**2) #/ dataYf**2)   # Statistical weight
+        return np.sum((ncpTotal - dataYf)**2)   
 
     return np.sum((ncpTotal - dataYf)**2 / dataEf**2)
 
@@ -748,19 +737,29 @@ def numericalThirdDerivative(x, fun):
     return derivative
 
 
-def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios):
+def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios, wsNCPM):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
 
-    createSlabGeometry(ic)    # Sample properties for MS correction 
+    createSlabGeometry(ic, wsNCPM)    # Sample properties for MS correction 
 
     sampleProperties = calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios)
     print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
             sampleProperties, "\n")
     
-    if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):    # MS correction does not work when one column is zero, the best we can do is use parent WS
-        return createMulScatWorkspaces(ic, ic.parentWS.name(), sampleProperties)
-    else:
-        return createMulScatWorkspaces(ic, ic.name, sampleProperties)
+    return createMulScatWorkspaces(ic, wsNCPM, sampleProperties)
+
+
+def createSlabGeometry(ic, wsNCPM):
+    half_height, half_width, half_thick = 0.5*ic.vertical_width, 0.5*ic.horizontal_width, 0.5*ic.thickness
+    xml_str = \
+        " <cuboid id=\"sample-shape\"> " \
+        + "<left-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, half_thick) \
+        + "<left-front-top-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, half_height, half_thick) \
+        + "<left-back-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (half_width, -half_height, -half_thick) \
+        + "<right-front-bottom-point x=\"%f\" y=\"%f\" z=\"%f\" /> " % (-half_width, -half_height, half_thick) \
+        + "</cuboid>"
+
+    CreateSampleShape(wsNCPM, xml_str)
 
 
 def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
@@ -785,7 +784,7 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
     return sampleProperties
 
 
-def createMulScatWorkspaces(ic, wsName, sampleProperties):
+def createMulScatWorkspaces(ic, ws, sampleProperties):
     """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
 
     print("\nEvaluating the Multiple Scattering Correction...\n")
@@ -799,7 +798,7 @@ def createMulScatWorkspaces(ic, wsName, sampleProperties):
         )
 
     _TotScattering, _MulScattering = VesuvioCalculateMS(
-        wsName, 
+        ws, 
         NoOfMasses=len(MS_masses), 
         SampleDensity=dens.cell(9, 1),
         AtomicProperties=sampleProperties, 
@@ -808,31 +807,25 @@ def createMulScatWorkspaces(ic, wsName, sampleProperties):
         NumEventsPerRun=int(ic.number_of_events)
         )
 
-    data_normalisation = Integration(wsName)
+    data_normalisation = Integration(ws)
     simulation_normalisation = Integration("_TotScattering")
     for workspace in ("_MulScattering", "_TotScattering"):
-        Divide(LHSWorkspace=workspace, RHSWorkspace=simulation_normalisation, 
-               OutputWorkspace=workspace)
-        Multiply(LHSWorkspace=workspace, RHSWorkspace=data_normalisation, 
-                 OutputWorkspace=workspace)
-        RenameWorkspace(InputWorkspace=workspace,
-                        OutputWorkspace=str(wsName)+workspace)
-        SumSpectra(wsName+workspace, OutputWorkspace=wsName+workspace+"_Sum")
+        Divide(LHSWorkspace=workspace, RHSWorkspace=simulation_normalisation, OutputWorkspace=workspace)
+        Multiply(LHSWorkspace=workspace, RHSWorkspace=data_normalisation, OutputWorkspace=workspace)
+        RenameWorkspace(InputWorkspace=workspace, OutputWorkspace=ws.name()+workspace)
+        SumSpectra(ws.name()+workspace, OutputWorkspace=ws.name()+workspace+"_Sum")
         
     DeleteWorkspaces(
         [data_normalisation, simulation_normalisation, trans, dens]
         )
     # The only remaining workspaces are the _MulScattering and _TotScattering
-    return mtd[wsName+"_MulScattering"]
+    return mtd[ws.name()+"_MulScattering"]
 
 
-def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios):
+def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios, wsNCPM):
     """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
-    if ic.runningSampleWS and (ic.bootstrapType=="JACKKNIFE"):
-        inputWS = ic.parentWS.name()
-    else:
-        inputWS = ic.name
+    inputWS = wsNCPM.name()
 
     # I do not know why, but setting these instrument parameters is required
     SetInstrumentParameter(inputWS, ParameterName='hwhm_lorentz', 

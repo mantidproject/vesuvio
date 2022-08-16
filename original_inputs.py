@@ -83,6 +83,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     
     # Original data uses histogram data instead of point data
     runHistData = True
+    normVoigt = False
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
@@ -119,6 +120,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
   
     # Original data uses histogram data instead of point data
     runHistData = True
+    normVoigt = False
 
 
 class YSpaceFitInitialConditions:
