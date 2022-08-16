@@ -14,8 +14,7 @@ class BootstrapInitialConditions:
     procedure = "JOINT"
     fitInYSpace = None
 
-
-    runningJackknife = True
+    bootstrapType = "JACKKNIFE"
     nSamples = 3   # Overwritten by running Jackknife
     skipMSIterations = False
     runningTest = True

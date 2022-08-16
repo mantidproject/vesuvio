@@ -137,7 +137,7 @@ class BootstrapInitialConditions:
     procedure = "JOINT"
     fitInYSpace = "JOINT" #"FORWARD"
 
-    runningJackknife = False
+    bootstrapType = "BOOT_RESIDUALS"  # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS" 
     nSamples = 600 
     skipMSIterations = False
     runningTest = False

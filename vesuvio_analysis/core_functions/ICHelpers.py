@@ -186,7 +186,7 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     logFilePath = dataPath / "data_files_log.txt"
     if not(logFilePath.is_file()):
         with open(logFilePath, "w") as txtFile:
-            txtFile.write("This file contains some information about each data file in the folder:\n")
+            txtFile.write(header_string())
 
     for IC in [bckwdIC, fwdIC]:    # Make save paths for .npz files
         bootName, bootNameYFit = genBootFilesName(IC, bootIC)
@@ -220,15 +220,24 @@ def genBootFilesName (IC, bootIC):
     return bootName, bootNameYFit
 
 
+def header_string():
+    return """
+    This file contains some information about each data file in the folder.
+    ncp data file: boot type | procedure | tof binning | masked tof range.
+    yspace fit data file: boot type | procedure | symmetrisation | rebin pars | fit model | mask type
+    """
+
 def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     if isYFit:
-        log = (bootDataName+" : "+str(bootIC.fitInYSpace)+
+        log = (bootDataName+" : "+bootIC.bootstrapType+
+        " | "+str(bootIC.fitInYSpace)+
         " | "+str(yFitIC.symmetrisationFlag)+
         " | "+yFitIC.rebinParametersForYSpaceFit+
         " | "+yFitIC.fitModel+
         " | "+str(yFitIC.maskTypeProcedure))
     else:
-        log = (bootDataName+" : "+str(bootIC.procedure)+
+        log = (bootDataName+" : "+bootIC.bootstrapType+
+        " | "+str(bootIC.procedure)+
         " | "+IC.tofBinning+
         " | "+str(IC.maskTOFRange))
     return log

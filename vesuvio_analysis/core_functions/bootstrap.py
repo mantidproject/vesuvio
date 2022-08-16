@@ -28,7 +28,8 @@ def runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
 def checkValidInput(bootIC):
     boot = bootIC.bootstrapType
-    assert (boot=="JACKKNIFE") | (boot=="BOOT_GAUSS_ERRS") | (boot=="BOOT_RESIDUALS")
+    assert (boot=="JACKKNIFE") | (boot=="BOOT_GAUSS_ERRS") | (boot=="BOOT_RESIDUALS"), \
+        "bootstrapType not recognized. Options: 'JACKKNIFE', 'BOOT_GAUSS_ERRS', 'BOOT_RESIDUALS'"
 
 
 def checkOutputDirExists(bckwdIC, fwdIC, bootIC):
@@ -475,7 +476,7 @@ def createBootstrapWS(parentWSNCPSavePaths:dict, drawGauss=False):
         if drawGauss:
             bootDataY = np.random.normal(dataY, dataE)  # Mean at dataY, width dataE
 
-        else:   # Resample residuals
+        else:   # Default, resample residuals
             residuals = dataY - totNcp
             bootRes = bootstrapResidualsSample(residuals)
             bootDataY = totNcp + bootRes

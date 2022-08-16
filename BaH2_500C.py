@@ -116,7 +116,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     maskedSpecAllNo = np.array([171, 172, 173, 174])
 
     tofBinning = "110,1.,420"                 # Binning of ToF spectra
-    maskTOFRange ="156, 163"     # TOF Range for the resonance peak
+    maskTOFRange ="150, 163"     # TOF Range for the resonance peak
 
 
 class YSpaceFitInitialConditions:
@@ -127,7 +127,7 @@ class YSpaceFitInitialConditions:
     runMinos = False
     globalFit = False
     nGlobalFitGroups = 4         # Number or string "ALL"
-    maskTypeProcedure = "NCP" #"NAN" # "NCP"    # Options: 'NCP', 'NAN', None    
+    maskTypeProcedure = "NAN" #"NAN" # "NCP"    # Options: 'NCP', 'NAN', None    
 
 
 
@@ -146,7 +146,7 @@ class BootstrapInitialConditions:
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"   
     
-    bootstrapType = "BOOT_GAUSS_ERRS"
+    bootstrapType = "BOOT_GAUSS_ERRS"    # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS"
     nSamples = 1
     skipMSIterations = True
     userConfirmation = True
@@ -161,7 +161,7 @@ class BootstrapAnalysis:
     filterAvg = False       # True discards some unreasonable values of widths and intensities
     
     # Flags below control the plots to show
-    plotRawWidthsIntensities = False
+    plotRawWidthsIntensities = True
     plotMeanWidthsIntensities = True
     plotMeansEvolution = False
     plot2DHists = False

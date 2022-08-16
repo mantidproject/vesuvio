@@ -12,20 +12,11 @@ testPath = Path(__file__).absolute().parent
 
 class BootstrapInitialConditions: # Not used, but still need to pass as arg
     runBootstrap = False
-    # procedure = None
-    # fitInYSpace = None
-    # runningJackknife = False
-    # nSamples = 0
-    # skipMSIterations = False
-    # runningTest = True
-    # userConfirmation = True
-
 
 class UserScriptControls:
     runRoutine = True
     procedure = "FORWARD"   
     fitInYSpace = None    
-    # bootstrap = None   
 
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls

@@ -483,7 +483,7 @@ def plotYFitHists(analysisIC, yFitIC, yFitHists):
 
     # To label each histogram, extract signature of function used for the fit
     model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
-    sig = [p for p in defaultPars]
+    sig = [p for p in defaultPars]   # Assumes defaultPars in same order as signature of the function
     sig = ["y0"] + sig       # Add intercept from outside function parameters
 
     for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, sig)):

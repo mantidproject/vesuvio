@@ -19,17 +19,13 @@ for i in range(len(fwdIC.masses)):
 
 class BootstrapInitialConditions: # Not used, but still need to pass as arg
     runBootstrap = False
-    # runningJackknife = False
-    # procedure = None
-    # fitInYSpace = None
-    # nSamples = 0
-    
+
 
 class UserScriptControls:
     runRoutine = True
     procedure = "FORWARD"   
     fitInYSpace = "FORWARD"
-    # bootstrap = None   
+
 
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls

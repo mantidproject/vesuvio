@@ -136,7 +136,7 @@ class BootstrapInitialConditions:
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"
 
-    bootstrapType = "BOOT_GAUSS_ERRS"         # Overwrites normal Bootstrap with Jackknife
+    bootstrapType = "BOOT_RESIDUALS"  # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS" 
     nSamples = 1                  # Used if running Bootstrap, otherwise code ignores it
     skipMSIterations = False        # Each replica runs with no MS or Gamma corrections
     userConfirmation = True         # Asks user to confirm procedure, will probably be deleted in the future

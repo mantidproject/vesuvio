@@ -241,9 +241,9 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
     dataX points can only take values in xp.
     Ignores any zero or NaN value.
     """
-
     meansY = np.zeros(len(xp))
     meansE = np.zeros(len(xp))
+
     for i in range(len(xp)):
         # Perform weighted average over all dataY and dataE values with the same xp[i]
         # Change shape to column to match weighted average function
@@ -251,17 +251,20 @@ def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
         allY = dataY[pointMask][:, np.newaxis]
         allE = dataE[pointMask][:, np.newaxis]
 
-        if (np.sum(pointMask)==0):   # If no points were found for a given abcissae
-            mY, mE = 0, 0  # Mask with zeros
+        # If no points were found for a given abcissae
+        if (np.sum(pointMask)==0):   mY, mE = 0, 0  # Mask with zeros
         
-        elif (np.sum(pointMask)==1):   # If one point was found, set to that point
-            mY, mE = allY.flatten(), allE.flatten()
+        # If one point was found, set to that point
+        elif (np.sum(pointMask)==1):  mY, mE = allY.flatten(), allE.flatten()
 
+        # Weighted avg over all spectra and several points per spectra
         else:
-            # Weighted avg over all spectra and several points per spectra
-            if np.all(dataE==0):      # Case of bootstrap replica with no errors
+            # Case of bootstrap replica with no errors
+            if np.all(dataE==0):      
                 mY = avgArr(allY)
                 mE = 0
+
+            # Default for most cases
             else:
                 mY, mE = weightedAvgArr(allY, allE)    # Outputs masked values as zeros
         
@@ -381,6 +384,11 @@ def symmetrizeWs(avgYSpace):
 
 
 def symArr(dataYO):
+    """
+    Performs averaging between two oposite points.
+    Takes only one 2D array.
+    Any zero gets assigned the oposite value.
+    """
 
     assert len(dataYO.shape) == 2, "Symmetrization is written for 2D arrays."
     dataY = dataYO.copy()  # Copy arrays not to risk changing original data
@@ -409,7 +417,7 @@ def weightedSymArr(dataYO, dataEO):
     dataY = dataYO.copy()  # Copy arrays not to risk changing original data
     dataE = dataEO.copy()
 
-    cutOffMask = dataE==0
+    cutOffMask = dataY==0
     # Change values of yerr to leave cut-offs unchanged during symmetrisation
     dataE[cutOffMask] = np.full(np.sum(cutOffMask), np.inf)
 
@@ -526,14 +534,15 @@ def selectModelAndPars(modelFlag):
     """
     Selects the function to fit. 
     Specifies the starting parameters of that function as default parameters.
-    The sshared parameters are used in the global fit.
+    The shared parameters are used in the global fit.
+    The defaultPars should be in the same order as the signature of the function
     """
 
     if modelFlag == "SINGLE_GAUSSIAN":
         def model(x, A, x0, sigma):
             return  A / (2*np.pi)**0.5 / sigma * np.exp(-(x-x0)**2/2/sigma**2)
 
-        defaultPars = {"y0":0, "A":1, "x0":0, "sigma":5}
+        defaultPars = {"A":1, "x0":0, "sigma":5}
         sharedPars = ["sigma"]    # Used only in Global fit
 
     elif (modelFlag=="GC_C4_C6"):
