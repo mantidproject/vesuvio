@@ -4,7 +4,6 @@ other versions give fail.
 """
 
 import unittest
-# Import modules to be tested
 
 # Initialize the test suite
 loader = unittest.TestLoader()
