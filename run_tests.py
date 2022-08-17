@@ -1,5 +1,9 @@
-import unittest
+"""
+The tests below only pass in Mantid version 6.2, 
+other versions give fail.
+"""
 
+import unittest
 # Import modules to be tested
 
 # Initialize the test suite

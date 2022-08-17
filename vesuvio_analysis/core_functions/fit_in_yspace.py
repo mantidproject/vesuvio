@@ -7,6 +7,7 @@ from scipy import  signal
 from pathlib import Path
 from iminuit import Minuit, cost, util
 from iminuit.util import make_func_code, describe
+import jacobi
 import time
 
 repoPath = Path(__file__).absolute().parent  # Path to the repository
@@ -499,7 +500,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
 
     # Best fit and confidence band
     # Calculated for the whole range of dataX, including where zero
-    dataYFit, dataYCov = util.propagate(lambda pars: convolvedModel(dataX, *pars), m.values, m.covariance)
+    dataYFit, dataYCov = jacobi.propagate(lambda pars: convolvedModel(dataX, *pars), m.values, m.covariance)
     dataYSigma = np.sqrt(np.diag(dataYCov))
     dataYSigma *= chi2        # Weight the confidence band
     Residuals = dataY - dataYFit
