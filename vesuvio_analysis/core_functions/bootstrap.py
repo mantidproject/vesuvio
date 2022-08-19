@@ -110,9 +110,9 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
         except JackMaskCol: continue    # If Jackknife column already masked, skip to next column
 
         formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS, parentWS)  
-        # try:
-        iterResults = runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC)   # Conversion to YSpace with masked column
-        # except AssertionError: continue     # If the procedure fails, skip to next iteration
+        try:
+            iterResults = runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC)   # Conversion to YSpace with masked column
+        except AssertionError: continue     # If the procedure fails, skip to next iteration
         
         storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
         saveBootstrapResults(bootResults, bckwdIC, fwdIC)
