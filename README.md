@@ -21,5 +21,3 @@ How to use for a new sample:
     5. Bootstrap option is still under development, but any data from running bootstrap is stored under experiments/sample/bootstrap_data/ or experiments/sample/jackknife_data
 
     6. Analysis of bootstrap data works only with stored data in directories mentioned in point 5, it does not run any bootstrap
-
-Add line to test git workflow.
