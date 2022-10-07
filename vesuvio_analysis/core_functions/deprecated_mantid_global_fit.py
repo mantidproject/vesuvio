@@ -1,13 +1,14 @@
 import numpy as np
 from mantid.simpleapi import *
 
+
 def fitGlobalMantidFit(wsJoY, wsQ, wsRes, minimizer, yFitIC, wsFirstMass):
     """Uses original Mantid procedure to perform global fit on groups with 8 detectors"""
-    
+
     replaceNansWithZeros(wsJoY)
-    wsGlobal = artificialErrorsInUnphysicalBins(wsJoY)
-    wsQInv = createOneOverQWs(wsQ)
-    avgWidths = mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirstMass)
+    artificialErrorsInUnphysicalBins(wsJoY)
+    createOneOverQWs(wsQ)
+    mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirstMass)
 
 
 def replaceNansWithZeros(ws):
@@ -20,8 +21,9 @@ def artificialErrorsInUnphysicalBins(wsJoY):
     wsGlobal = CloneWorkspace(InputWorkspace=wsJoY, OutputWorkspace=wsJoY.name()+'_Global')
     for j in range(wsGlobal.getNumberHistograms()):
         wsGlobal.dataE(j)[wsGlobal.dataE(j)[:]==0] = 0.1
-    
-    assert np.any(np.isnan(wsGlobal.extractE())) == False, "Nan present in input workspace need to be replaced by zeros."
+
+    assert np.any(np.isnan(wsGlobal.extractE())) is False, "Nan present in input workspace need to be replaced by " \
+                                                           "zeros."
 
     return wsGlobal
 
@@ -35,7 +37,7 @@ def createOneOverQWs(wsQ):
         ZeroIdxs = np.argwhere(wsInvQ.dataY(j)[:]==0)   # Indxs of zero elements
         if ZeroIdxs.size != 0:     # When zeros are present
             wsInvQ.dataY(j)[ZeroIdxs[0] - 1] = 0       # Put a zero before the first zero
-    
+
     return wsInvQ
 
 
@@ -51,7 +53,8 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirst
             A*exp( -(x-x0)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5,
             A=1.,x0=0.,Sigma=6.0,  ties=();
                 (
-                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
+                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},
+                ties=(Scaling=1,Shift=0,XScaling=1);
                 name=UserFunction,Formula=
                 Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
                 *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
@@ -68,18 +71,20 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirst
             *(1+c4/32*(16*((x-x0)/sqrt(2.)/Sigma)^4-48*((x-x0)/sqrt(2.)/Sigma)^2+12)),
             A=1.,x0=0.,Sigma=6.0, c4=0, ties=();
                 (
-                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},ties=(Scaling=1,Shift=0,XScaling=1);
+                composite=ProductFunction,NumDeriv=false;name=TabulatedFunction,Workspace={2},WorkspaceIndex={0},
+                ties=(Scaling=1,Shift=0,XScaling=1);
                 name=UserFunction,Formula=
                 Sigma*1.4142/12.*exp( -(x)^2/2/Sigma^2)/(2*3.1415*Sigma^2)^0.5
                 *((8*((x)/sqrt(2.)/Sigma)^3-12*((x)/sqrt(2.)/Sigma))),
                 Sigma=6.0);ties=()
                 )
-            )""" 
+            )"""
     else:
-        raise ValueError(f"{yFitIC.fitModel} not supported for Global Mantid fit. Supported options: 'SINGLE_GAUSSIAN', 'GC_C4_C6'")
+        raise ValueError(f"{yFitIC.fitModel} not supported for Global Mantid fit. Supported options: 'SINGLE_GAUSSIAN',"
+                         f"'GC_C4_C6'")
 
     print('\nGlobal fit in the West domain over 8 mixed banks\n')
-    widths = []  
+    widths = []
     for bank in range(8):
         dets=[bank, bank+8, bank+16, bank+24]
 
@@ -120,14 +125,14 @@ def mantidGlobalFitProcedure(wsGlobal, wsQInv, wsRes, minimizer, yFitIC, wsFirst
 
         # Unpack dictionary as arguments
         Fit(multifit_func, Minimizer=minimizer_string, Output=wsFirstMass.name()+f'_Joy_Mixed_Banks_Bank_{str(bank)}_fit', **datasets)
-        
+
         # Select ws with fit results
         ws=mtd[wsFirstMass.name()+f'_Joy_Mixed_Banks_Bank_{str(bank)}_fit_Parameters']
         print(f"Bank: {str(bank)} -- sigma={ws.cell(2,1)} +/- {ws.cell(2,2)}")
         widths.append(ws.cell(2,1))
 
         DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_NormalisedCovarianceMatrix')
-        DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_Workspaces') 
+        DeleteWorkspace(wsFirstMass.name()+'_Joy_Mixed_Banks_Bank_'+str(bank)+'_fit_Workspaces')
 
     print('\nAverage hydrogen standard deviation: ',np.mean(widths),' +/- ', np.std(widths))
     return widths

@@ -22,7 +22,7 @@ def runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC):
 
     if bootIC.bootstrapType=="JACKKNIFE":
         return JackknifeProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
-    
+
     return bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
 
 
@@ -41,30 +41,30 @@ def checkOutputDirExists(bckwdIC, fwdIC, bootIC):
         checkOutDirIC(bckwdIC)
     if (proc=="FORWARD") | (proc=="JOINT"):
         checkOutDirIC(fwdIC)
-    return 
+    return
 
 
 def checkOutDirIC(IC):
     if IC.bootSavePath.is_file() or IC.bootYFitSavePath.is_file():
-        print(f"\nOutput data files were detected:" \
-            f"\n{IC.bootSavePath.name}\n{IC.bootYFitSavePath.name}" \
-            f"\nAborting Run of Bootstrap to prevent overwriting data." \
-            f"\nTo avoid this issue you can change the number of samples to run.")
+        print(f"\nOutput data files were detected:"
+              f"\n{IC.bootSavePath.name}\n{IC.bootYFitSavePath.name}"
+              f"\nAborting Run of Bootstrap to prevent overwriting data."
+              f"\nTo avoid this issue you can change the number of samples to run.")
         raise ValueError("Output data directories already exist. Aborted Bootstrap.")
     return
 
 
 def JackknifeProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
-    assert bootIC.procedure != None
+    assert bootIC.procedure is not None
 
     proc = bootIC.procedure
     if (proc=="FORWARD") | (proc=="BACKWARD"):
         return bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
 
     elif proc=="JOINT":  # Do the Jackknife procedure separately
-        
+
         # Run original procedure to change fwdIC from running backward
-        runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC) 
+        runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
 
         bootIC.procedure="BACKWARD"
         bootIC.fitInYSpace="BACKWARD"
@@ -75,7 +75,8 @@ def JackknifeProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
         fwdJackRes = bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC)
 
         return {**bckwdJackRes, **fwdJackRes}    # For consistency
-    else: raise ValueError ("Bootstrap procedure not recognized.")
+    else:
+        raise ValueError ("Bootstrap procedure not recognized.")
 
 
 def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
@@ -85,10 +86,11 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
     Chooses fast or slow (correct) version of bootstrap depending on flag set in bootIC.
     Performs either independent or joint procedure depending of len(inputIC).
     """
-    if bootIC.bootstrapType=="JACKKNIFE": assert bootIC.procedure!='JOINT', "'JOINT' mode should not have reached Jackknife here."
+    if bootIC.bootstrapType=="JACKKNIFE":
+        assert bootIC.procedure!='JOINT', "'JOINT' mode should not have reached Jackknife here."
 
     AnalysisDataService.clear()
- 
+
     parentResults, parentWSnNCPs = runOriginalBeforeBootstrap(bckwdIC, fwdIC, bootIC, yFitIC)
     corrCoefs = autoCorrResiduals(parentWSnNCPs)
 
@@ -107,13 +109,15 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
 
         try:
             sampleInputWS, parentWS = createSampleWS(parentWSNCPSavePaths, i, bootIC)   # Creates ith sample
-        except JackMaskCol: continue    # If Jackknife column already masked, skip to next column
+        except JackMaskCol:
+            continue    # If Jackknife column already masked, skip to next column
 
-        formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS, parentWS)  
+        formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS, parentWS)
         try:
             iterResults = runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC)   # Conversion to YSpace with masked column
-        except AssertionError: continue     # If the procedure fails, skip to next iteration
-        
+        except AssertionError:
+            continue     # If the procedure fails, skip to next iteration
+
         storeBootIter(bootResults, i, iterResults)   # Stores results for each iteration
         saveBootstrapResults(bootResults, bckwdIC, fwdIC)
     return bootResults
@@ -121,8 +125,8 @@ def bootstrapProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
 
 def askUserConfirmation(bckwdIC, fwdIC, bootIC):
     """Estimates running time for all samples and asks the user to confirm the run."""
-    
-    if not(bootIC.userConfirmation):   # Skip user confirmation 
+
+    if not(bootIC.userConfirmation):   # Skip user confirmation
         return
 
     tDict = storeRunnningTime(fwdIC, bckwdIC, bootIC)   # Run times file path stores in bootIC
@@ -151,7 +155,7 @@ def storeRunnningTime(fwdIC, bckwdIC, bootIC):
         with open(savePath, "w") as txtFile:
             txtFile.write("This file stores run times to estimate Bootstrap total run time.")
             txtFile.write("\nTime in minutes.\n\n")
-    
+
     resDict = {}
     with open(savePath, "r") as txtFile:
         for line in txtFile:
@@ -159,7 +163,8 @@ def storeRunnningTime(fwdIC, bckwdIC, bootIC):
                 resDict = eval(line)
 
     if len(resDict)<4:
-        ans = input("Did not find necessary information to estimate runtime. Will run a short routine to store an estimate. Please wait until this is finished. Press any key to continue.")
+        # ans = input("Did not find necessary information to estimate runtime. Will run a short routine to store an
+        # estimate. Please wait until this is finished. Press any key to continue.")
         resDict = buildRunTimes(fwdIC, bckwdIC)
 
         with open(savePath, "a") as txtFile:
@@ -182,7 +187,7 @@ def buildRunTimes(fwdIC, bckwdIC):
         IC.noOfMSIterations = oriMS
 
         # Correct times of only MS by subtacting time spend on fitting ncps
-        resDict["t"+mode+"PerMS"] -= 2 * resDict["t"+mode+"NoMS"]   
+        resDict["t"+mode+"PerMS"] -= 2 * resDict["t"+mode+"NoMS"]
 
     return resDict
 
@@ -193,19 +198,19 @@ def calcRunTime(IC, tNoMS, tPerMS, bootIC):
     else:
         timePerSample = tNoMS + (IC.noOfMSIterations) * (tNoMS+tPerMS)
 
-    nSamples = bootIC.nSamples 
+    nSamples = bootIC.nSamples
     if bootIC.bootstrapType=="JACKKNIFE":
         nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
 
     return  nSamples * timePerSample
-    
+
 
 def chooseLoopRange(bootIC, nSamples):
     iStart = 0
     iEnd = nSamples
     if bootIC.bootstrapType=="JACKKNIFE" and bootIC.runningTest:
         iStart = int(nSamples/2)
-        iEnd = iStart + 3   
+        iEnd = iStart + 3
     return iStart, iEnd
 
 
@@ -227,8 +232,10 @@ def chooseNSamples(bootIC, parentWSnNCPs: dict):
     nSamples = bootIC.nSamples
     if bootIC.bootstrapType=="JACKKNIFE":
         assert len(parentWSnNCPs) == 2, "Running Jackknife, supports only one IC at a time."
-        if bootIC.procedure=="FORWARD": key = "fwdNCP"
-        elif bootIC.procedure=="BACKWARD": key = "bckwdNCP"
+        if bootIC.procedure=="FORWARD":
+            key = "fwdNCP"
+        elif bootIC.procedure=="BACKWARD":
+            key = "bckwdNCP"
 
         nSamples = parentWSnNCPs[key].blocksize()   # Number of cols from ncp workspace, accounts for missing last col or not
     return nSamples
@@ -238,16 +245,21 @@ def setICsToDefault(bckwdIC, fwdIC, yFitIC):
     """Disables some features of yspace fit, makes sure the default """
 
     # Disable Minos
-    if yFitIC.runMinos: yFitIC.runMinos = False
+    if yFitIC.runMinos:
+        yFitIC.runMinos = False
 
-    # Disable global fit 
-    if yFitIC.globalFit: yFitIC.globalFit = False
+    # Disable global fit
+    if yFitIC.globalFit:
+        yFitIC.globalFit = False
 
     # Don't show plots
-    if yFitIC.showPlots: yFitIC.showPlots = False
+    if yFitIC.showPlots:
+        yFitIC.showPlots = False
 
-    if bckwdIC.runningSampleWS: bckwdIC.runningSampleWS = False
-    if fwdIC.runningSampleWS: fwdIC.runningSampleWS = False
+    if bckwdIC.runningSampleWS:
+        bckwdIC.runningSampleWS = False
+    if fwdIC.runningSampleWS:
+        fwdIC.runningSampleWS = False
     return
 
 
@@ -264,12 +276,12 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
                 wsFinal, bckwdScatRes = runIndependentIterativeProcedure(IC, clearWS=False)
                 resultsDict[key+"Scat"] = bckwdScatRes
 
-                if bootIC.bootstrapType=="JACKKNIFE": yFitIC.maskTypeProcedure = 'NAN'  # Enable NAN averaging in y-space fit
+                if bootIC.bootstrapType=="JACKKNIFE":
+                    yFitIC.maskTypeProcedure = 'NAN'  # Enable NAN averaging in y-space fit
 
                 bckwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, wsFinal)
                 resultsDict[key+"YFit"] = bckwdYFitRes
 
-    
     elif bootIC.procedure=="JOINT":
 
         ws, bckwdScatRes, fwdScatRes = runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=False)
@@ -279,7 +291,7 @@ def runMainProcedure(bckwdIC, fwdIC, bootIC, yFitIC):
         for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
             if (bootIC.fitInYSpace==mode) | (bootIC.fitInYSpace=="JOINT"):
-                wsName = buildFinalWSName(IC.scriptName, mode, IC)  
+                wsName = buildFinalWSName(IC.scriptName, mode, IC)
                 fwdYFitRes = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
                 resultsDict[key+"YFit"] = fwdYFitRes
     else:
@@ -294,20 +306,20 @@ def selectParentWorkspaces(bckwdIC, fwdIC, bootIC):
     If fast mode, the parent ws is the final ws after MS corrections.
     """
     parentWSnNCPsDict = {}
-    
+
     for mode, IC, key in zip(["FORWARD", "BACKWARD"], [fwdIC, bckwdIC], ["fwd", "bckwd"]):
 
         if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
 
             wsIter = str(IC.noOfMSIterations) if bootIC.skipMSIterations else "0"   # In case of skipping MS, select very last corrected ws
-            
+
             parentWS = mtd[IC.name+wsIter]
             parentNCP = mtd[parentWS.name()+"_TOF_Fitted_Profiles"]
 
             parentWSnNCPsDict[key+"WS"] = parentWS
             parentWSnNCPsDict[key+"NCP"] = parentNCP
 
-    return parentWSnNCPsDict 
+    return parentWSnNCPsDict
 
 
 def autoCorrResiduals(parentWSnNCP: dict):
@@ -320,20 +332,21 @@ def autoCorrResiduals(parentWSnNCP: dict):
         try:    # Look for workspaces in dictionary, skip if not present
             parentWS = parentWSnNCP[mode+"WS"]
             parentNCP = parentWSnNCP[mode+"NCP"]
-        except KeyError: continue
+        except KeyError:
+            continue
 
-        totNcp = parentNCP.extractY()[:, :]     
+        totNcp = parentNCP.extractY()[:, :]
         dataY = parentWS.extractY()[:, :totNcp.shape[1]]    # Missing last column or not
-        residuals = dataY - totNcp 
+        residuals = dataY - totNcp
 
         lag = 1     # For lag-plot of self-correlation
         corr = np.zeros((len(residuals), 2))
         for i, rowRes in enumerate(residuals):
-            corr[i] = stats.pearsonr(rowRes[:-lag], rowRes[lag:]) 
+            corr[i] = stats.pearsonr(rowRes[:-lag], rowRes[lag:])
 
         corrCoefs[mode+"Scat"] = corr
     return corrCoefs
-    
+
 
 def initializeResults(parentResults: dict, nSamples, corrCoefs):
     """
@@ -361,10 +374,10 @@ class BootScattResults:
 
     def storeBootIterResults(self, j, bootResult):
         self.bootSamples[j] = bootResult.all_spec_best_par_chi_nit[-1]
-    
+
     def saveResults(self, IC):
         np.savez(IC.bootSavePath, boot_samples=self.bootSamples,
-             parent_result=self.parentResult, corr_residuals=self.corrResiduals)
+                 parent_result=self.parentResult, corr_residuals=self.corrResiduals)
 
     def saveLog(self, IC):
         with open(IC.logFilePath, "a") as logFile:
@@ -380,10 +393,10 @@ class BootYFitResults:
 
     def storeBootIterResults(self, j, bootResult):
         self.bootSamples[j] = bootResult.popt
-    
+
     def saveResults(self, IC):
         np.savez(IC.bootYFitSavePath, boot_samples=self.bootSamples,
-             parent_popt=self.parentPopt, parent_perr=self.parentPerr)    
+                 parent_popt=self.parentPopt, parent_perr=self.parentPerr)
 
     def saveLog(self, IC):
         with open(IC.logFilePath, "a") as logFile:
@@ -430,11 +443,11 @@ def saveWorkspacesLocally(ws):
 
     if "Profiles" in keys:
         saveName += "_NCP"
-    
+
     saveName += ".nxs"
     savePath = currentPath / "bootstrap_ws" / saveName
     SaveNexus(ws, str(savePath))
-    return savePath 
+    return savePath
 
 
 def createSampleWS(parentWSNCPSavePaths: dict, j: int, bootIC):
@@ -455,16 +468,17 @@ def createBootstrapWS(parentWSNCPSavePaths:dict, drawGauss=False):
     """
 
     bootInputWS = {}
-    parentInputWS = {} 
+    parentInputWS = {}
     for key in ["bckwd", "fwd"]:
         try:
             parentWSPath = parentWSNCPSavePaths[key+"WS"]
             totNcpWSPath = parentWSNCPSavePaths[key+"NCP"]
-        except KeyError: continue
+        except KeyError:
+            continue
 
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
-        totNcp = totNcpWS.extractY()[:, :]     
+        totNcp = totNcpWS.extractY()[:, :]
         dataY = parentWS.extractY()[:, :totNcp.shape[1]]    # Missing last col or not
         dataE = parentWS.extractE()[:, :totNcp.shape[1]]
 
@@ -517,7 +531,7 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
     """
 
     jackInputWS = {}
-    parentInputWS = {} 
+    parentInputWS = {}
     # Jackknife does not have 'JOINT' option
     # Careful with this step if in future Jackknife allows for 'JOINT' internally
     assert len(parentWSNCPSavePaths)==2, "Jackknife can only allow either forward or backward at a time."
@@ -525,7 +539,8 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
         try:
             parentWSPath = parentWSNCPSavePaths[key+"WS"]
             totNcpWSPath = parentWSNCPSavePaths[key+"NCP"]
-        except KeyError: continue
+        except KeyError:
+            continue
 
         parentWS, totNcpWS = loadWorkspacesFromPath(parentWSPath, totNcpWSPath)
 
@@ -534,11 +549,12 @@ def createJackknifeWS(parentWSNCPSavePaths: list, j: int):
         jackDataY = dataY.copy()
 
         # Skip Jackknife procedure on columns that are already masked
-        if np.all(jackDataY[:, j]==0): raise JackMaskCol
+        if np.all(jackDataY[:, j]==0):
+            raise JackMaskCol
 
         jackDataY[:, j] = 0   # Masks j collumn with zeros
         # DataE is not masked intentionally, to preserve errors that are used in the normalization of averaged NaN profile
-        
+
         wsJack = CloneWorkspace(parentWS, OutputWorkspace=parentWS.name()+"_Jackknife")
         for i, yRow in enumerate(jackDataY):
             wsJack.dataY(i)[:] = yRow     # Last column will be ignored in ncp fit anyway
@@ -578,9 +594,8 @@ def formSampleIC(bckwdIC, fwdIC, bootIC, sampleInputWS:dict, parentWS:dict):
         if (bootIC.procedure==mode) | (bootIC.procedure=="JOINT"):
             IC.runningSampleWS = True
 
-            if bootIC.skipMSIterations: 
+            if bootIC.skipMSIterations:
                 IC.noOfMSIterations = 0
 
             IC.sampleWS = sampleInputWS[key+"WS"]
             IC.parentWS = parentWS[key+"WS"]
-

@@ -1,9 +1,8 @@
-from ..core_functions.ICHelpers import completeICFromInputs
 import numpy as np
 from pathlib import Path
 
 ipFilesPath = Path(__file__).absolute().parent.parent / "ip_files"
-ipFilePath = ipFilesPath / "ip2018_3.par"  
+ipFilePath = ipFilesPath / "ip2018_3.par"
 
 
 class LoadVesuvioBackParameters:
@@ -11,11 +10,11 @@ class LoadVesuvioBackParameters:
     empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
     spectra='3-134'                          # Spectra to be analysed
     mode='DoubleDifference'
-    ipfile=str(ipFilesPath / "ip2019.par")   
+    ipfile=str(ipFilesPath / "ip2019.par")
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       
-    scaleRaw = 1 
+    scaleEmpty = 1
+    scaleRaw = 1
 
 
 class LoadVesuvioFrontParameters:
@@ -23,16 +22,16 @@ class LoadVesuvioFrontParameters:
     empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
     spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
-    ipfile=str(ipFilesPath / "ip2018_3.par") 
+    ipfile=str(ipFilesPath / "ip2018_3.par")
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1
-    scaleRaw = 1 
+    scaleRaw = 1
 
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
-    
+
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5
     # Sample slab parameters
@@ -40,7 +39,7 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+    InstrParsPath = ipFilesPath / "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
     massIdx = 0   # Idx of mass to take the ratio with
@@ -48,11 +47,11 @@ class BackwardInitialConditions(GeneralInitialConditions):
     masses = np.array([12, 16, 27])
     # noOfMasses = len(masses)
 
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers   
-            1, 12, 0.,    
-            1, 12, 0.,   
-            1, 12.5, 0.    
+    initPars = np.array([
+        # Intensities, NCP widths, NCP centers
+        1, 12, 0.,
+        1, 12, 0.,
+        1, 12.5, 0.
         ])
     bounds = np.array([
             [0, np.nan], [8, 16], [-3, 1],
@@ -84,15 +83,15 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     InstrParsPath = ipFilePath
 
-    masses = np.array([1.0079, 12, 16, 27]) 
+    masses = np.array([1.0079, 12, 16, 27])
     # noOfMasses = len(masses)
 
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers  
-        1, 4.7, 0, 
-        1, 12.71, 0.,    
-        1, 8.76, 0.,   
-        1, 13.897, 0.    
+    initPars = np.array([
+        # Intensities, NCP widths, NCP centers
+        1, 4.7, 0,
+        1, 12.71, 0.,
+        1, 8.76, 0.,
+        1, 13.897, 0.
     ])
     bounds = np.array([
         [0, np.nan], [3, 6], [-3, 1],
@@ -118,19 +117,20 @@ class ForwardInitialConditions(GeneralInitialConditions):
     # Only when running tests
     runHistData = True
     normVoigt = False
-    
+
 
 class YSpaceFitInitialConditions:
     showPlots = False
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-20, 0.5, 20"    # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"      
+    fitModel = "SINGLE_GAUSSIAN"
     runMinos = True
-    globalFit = None 
+    globalFit = None
     nGlobalFitGroups = 4
     maskTypeProcedure = None
 
 # userControls and bootIC defined in corresponding test scripts
+
 
 wsFrontIC = LoadVesuvioFrontParameters
 wsBackIC = LoadVesuvioBackParameters     # THIS WAS SET TO FRONT

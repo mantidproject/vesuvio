@@ -12,7 +12,7 @@ np.set_printoptions(suppress=True, precision=4, linewidth=100, threshold=sys.max
 def iterativeFitForDataReduction(ic):
     createTableInitialParameters(ic)
 
-    initialWs = loadRawAndEmptyWsFromUserPath(ic)  # Do this before alternative bootstrap to extract name()   
+    initialWs = loadRawAndEmptyWsFromUserPath(ic)  # Do this before alternative bootstrap to extract name()
 
     if ic.runningSampleWS:
         initialWs = RenameWorkspace(InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name())
@@ -25,16 +25,18 @@ def iterativeFitForDataReduction(ic):
         wsToBeFitted = mtd[ic.name+str(iteration)]
 
         ncpTotal = fitNcpToWorkspace(ic, wsToBeFitted)
-        
+
         mWidths, stdWidths, mIntRatios, stdIntRatios = extractMeans(wsToBeFitted.name(), ic)
         createMeansAndStdTableWS(wsToBeFitted.name(), ic, mWidths, stdWidths, mIntRatios, stdIntRatios)
-   
+
         # When last iteration, skip MS and GC
-        if iteration == ic.noOfMSIterations: break 
+        if iteration == ic.noOfMSIterations:
+            break
 
         # Replace zero columns (bins) with ncp total fit
         # If ws has no zero column, then remains unchanged
-        if iteration == 0: wsNCPM = replaceZerosWithNCP(mtd[ic.name], ncpTotal)
+        if iteration == 0:
+            wsNCPM = replaceZerosWithNCP(mtd[ic.name], ncpTotal)
 
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
@@ -42,13 +44,13 @@ def iterativeFitForDataReduction(ic):
             wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs")
 
-        if ic.GammaCorrectionFlag:  
+        if ic.GammaCorrectionFlag:
             wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
 
         remaskValues(ic.name, "tmpNameWS")    # Masks cols in the same place as in ic.name
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
-    
+
     wsFinal = mtd[ic.name+str(ic.noOfMSIterations)]
     fittingResults = resultsObject(ic)
     fittingResults.save()
@@ -57,7 +59,7 @@ def iterativeFitForDataReduction(ic):
 
 def remaskValues(wsName, wsToMaskName):
     """
-    Uses the ws before the MS correction to look for masked columns or dataE 
+    Uses the ws before the MS correction to look for masked columns or dataE
     and implement the same masked values after the correction.
     """
     ws = mtd[wsName]
@@ -67,8 +69,9 @@ def remaskValues(wsName, wsToMaskName):
     wsM = mtd[wsToMaskName]
     dataXM, dataYM, dataEM = extractWS(wsM)
     dataYM[:, mask] = 0
-    if np.all(dataE==0): dataEM = np.zeros(dataEM.shape)
-    
+    if np.all(dataE==0):
+        dataEM = np.zeros(dataEM.shape)
+
     passDataIntoWS(dataXM, dataYM, dataEM, wsM)
     return
 
@@ -88,13 +91,14 @@ def createTableInitialParameters(ic):
     meansTableWS.addColumn(type='str', name="Bounds Centers")
 
     print("\nCreated Table with Initial Parameters:")
-    for m, iw, bw, ii, bi, inc, bc in zip(ic.masses.astype(float), ic.initPars[1::3], ic.bounds[1::3], ic.initPars[0::3], ic.bounds[0::3], ic.initPars[2::3], ic.bounds[2::3]):
+    for m, iw, bw, ii, bi, inc, bc in zip(ic.masses.astype(
+            float), ic.initPars[1::3], ic.bounds[1::3], ic.initPars[0::3], ic.bounds[0::3], ic.initPars[2::3], ic.bounds[2::3]):
         meansTableWS.addRow([m, iw, str(bw), ii, str(bi), inc, str(bc)])
         print("\nMass: ", m)
         print(f"{'Initial Intensity:':>20s} {ii:<8.3f} Bounds: {bi}")
         print(f"{'Initial Width:':>20s} {iw:<8.3f} Bounds: {bw}")
         print(f"{'Initial Center:':>20s} {inc:<8.3f} Bounds: {bc}")
-    print("\n")    
+    print("\n")
 
 
 def loadRawAndEmptyWsFromUserPath(ic):
@@ -104,9 +108,9 @@ def loadRawAndEmptyWsFromUserPath(ic):
     Rebin(InputWorkspace=ic.name+'raw', Params=ic.tofBinning,
           OutputWorkspace=ic.name+'raw')
 
-    assert (type(ic.scaleRaw)==float) | (type(ic.scaleRaw)==int), "Scaling factor of raw ws needs to be float or int."
+    assert (isinstance(ic.scaleRaw, float)) | (isinstance(ic.scaleRaw, int)), "Scaling factor of raw ws needs to be float or int."
     Scale(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw', Factor=str(ic.scaleRaw))
- 
+
     SumSpectra(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+'raw'+'_sum')
     wsToBeFitted = CloneWorkspace(InputWorkspace=ic.name+'raw', OutputWorkspace=ic.name+"uncroped_unmasked")
 
@@ -114,15 +118,15 @@ def loadRawAndEmptyWsFromUserPath(ic):
     if ic.subEmptyFromRaw:
         Load(Filename=str(ic.userWsEmptyPath), OutputWorkspace=ic.name+"empty")
         Rebin(InputWorkspace=ic.name+'empty', Params=ic.tofBinning,
-            OutputWorkspace=ic.name+'empty')
+              OutputWorkspace=ic.name+'empty')
 
-        assert (type(ic.scaleEmpty)==float) | (type(ic.scaleEmpty)==int), "Scaling factor of empty ws needs to be float or int"
+        assert (isinstance(ic.scaleEmpty, float)) | (isinstance(ic.scaleEmpty, int)), "Scaling factor of empty ws needs to be float or int"
         Scale(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty', Factor=str(ic.scaleEmpty))
 
         SumSpectra(InputWorkspace=ic.name+'empty', OutputWorkspace=ic.name+'empty'+'_sum')
-        
+
         wsToBeFitted = Minus(LHSWorkspace=ic.name+'raw', RHSWorkspace=ic.name+'empty',
-                            OutputWorkspace=ic.name+"uncroped_unmasked")
+                             OutputWorkspace=ic.name+"uncroped_unmasked")
     return wsToBeFitted
 
 
@@ -131,14 +135,14 @@ def cropAndMaskWorkspace(ic, ws):
     # Read initial Spectrum number
     wsFirstSpec = ws.getSpectrumNumbers()[0]
     assert ic.firstSpec >= wsFirstSpec, "Can't crop workspace, firstSpec < first spectrum in workspace."
-    
+
     initialIdx = ic.firstSpec - wsFirstSpec
     lastIdx = ic.lastSpec - wsFirstSpec
-    
+
     newWsName = ws.name().split("uncroped")[0]  # Retrieve original name
     wsCrop = CropWorkspace(
-        InputWorkspace=ws, 
-        StartWorkspaceIndex=initialIdx, EndWorkspaceIndex=lastIdx, 
+        InputWorkspace=ws,
+        StartWorkspaceIndex=initialIdx, EndWorkspaceIndex=lastIdx,
         OutputWorkspace=newWsName
         )
 
@@ -155,7 +159,7 @@ def maskBinsWithZeros(ws, IC):
     Used to mask resonance peaks.
     """
 
-    if IC.maskTOFRange==None:     # Masked TOF bins not found, skip
+    if IC.maskTOFRange is None:     # Masked TOF bins not found, skip
         return
 
     dataX, dataY, dataE = extractWS(ws)
@@ -163,10 +167,10 @@ def maskBinsWithZeros(ws, IC):
     assert start <= end, "Start value for masking needs to be smaller or equal than end."
     mask = (dataX >= start) & (dataX <= end)    # TOF region to mask
 
-    dataY[mask] = 0     
+    dataY[mask] = 0
 
     passDataIntoWS(dataX, dataY, dataE, ws)
-    return 
+    return
 
 
 def fitNcpToWorkspace(IC, ws):
@@ -175,14 +179,13 @@ def fitNcpToWorkspace(IC, ws):
     Firtly the arrays required for the fit are prepared and then the fit is performed iteratively
     on a spectrum by spectrum basis.
     """
-    
+
     dataX, dataY, dataE = extractWS(ws)
     if IC.runHistData:     # Converts point data from workspaces to histogram data
-        dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)      
-
+        dataY, dataX, dataE = histToPointData(dataY, dataX, dataE)
 
     resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = prepareFitArgs(IC, dataX)
-    
+
     print("\nFitting NCP:\n")
 
     arrFitPars = fitNcpToArray(IC, dataY, dataE, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass)
@@ -211,21 +214,21 @@ def histToPointData(dataY, dataX, dataE):
 
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     assert np.min(histWidths) == np.max(histWidths), "Histogram widhts need to be the same length"
-    
+
     dataYp = dataY[:, :-1]
-    dataEp = dataE[:, :-1] 
-    dataXp = dataX[:, :-1] + histWidths[0, 0]/2 
+    dataEp = dataE[:, :-1]
+    dataXp = dataX[:, :-1] + histWidths[0, 0]/2
     return dataYp, dataXp, dataEp
 
 
 def prepareFitArgs(ic, dataX):
-    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)       
-    resolutionPars = loadResolutionPars(instrPars)                                   
+    instrPars = loadInstrParsFileIntoArray(ic.InstrParsPath, ic.firstSpec, ic.lastSpec)
+    resolutionPars = loadResolutionPars(instrPars)
 
-    v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)   
+    v0, E0, delta_E, delta_Q = calculateKinematicsArrays(dataX, instrPars)
     kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
-    ySpacesForEachMass = convertDataXToYSpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)        
-    
+    ySpacesForEachMass = convertDataXToYSpacesForEachMass(dataX, ic.masses, delta_Q, delta_E)
+
     kinematicArrays = reshapeArrayPerSpectrum(kinematicArrays)
     ySpacesForEachMass = reshapeArrayPerSpectrum(ySpacesForEachMass)
     return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
@@ -245,7 +248,7 @@ def loadInstrParsFileIntoArray(InstrParsPath, firstSpec, lastSpec):
 def loadResolutionPars(instrPars):
     """Resolution of parameters to propagate into TOF resolution
        Output: matrix with each parameter in each column"""
-    spectrums = instrPars[:, 0] 
+    spectrums = instrPars[:, 0]
     L = len(spectrums)
     # For spec no below 135, back scattering detectors, mode is double difference
     # For spec no 135 or above, front scattering detectors, mode is single difference
@@ -255,21 +258,21 @@ def loadResolutionPars(instrPars):
     dTheta = np.repeat(0.016, L)   #rad
     dL0 = np.repeat(0.021, L)      #meters
     dL1 = np.repeat(0.023, L)      #meters
-    
-    resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose() 
-    return resolutionPars 
+
+    resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()
+    return resolutionPars
 
 
-def calculateKinematicsArrays(dataX, instrPars):          
-    """Kinematics quantities calculated from TOF data"""   
+def calculateKinematicsArrays(dataX, instrPars):
+    """Kinematics quantities calculated from TOF data"""
 
-    mN, Ef, en_to_vel, vf, hbar = loadConstants()    
+    mN, Ef, en_to_vel, vf, hbar = loadConstants()
     det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)     #each is of len(dataX)
     t_us = dataX - T0                                           #T0 is electronic delay due to instruments
     v0 = vf * L0 / ( vf * t_us - L1 )
     E0 =  np.square( v0 / en_to_vel )            #en_to_vel is a factor used to easily change velocity to energy and vice-versa
-    
-    delta_E = E0 - Ef  
+
+    delta_E = E0 - Ef
     delta_Q2 = 2. * mN / hbar**2 * ( E0 + Ef - 2. * np.sqrt(E0*Ef) * np.cos(angle/180.*np.pi) )
     delta_Q = np.sqrt( delta_Q2 )
     return v0, E0, delta_E, delta_Q              #shape(no of spectrums, no of bins)
@@ -284,18 +287,18 @@ def reshapeArrayPerSpectrum(A):
 
 
 def convertDataXToYSpacesForEachMass(dataX, masses, delta_Q, delta_E):
-    "Calculates y spaces from TOF data, each row corresponds to one mass" 
-    
+    "Calculates y spaces from TOF data, each row corresponds to one mass"
+
     # Prepare arrays to broadcast
     dataX = dataX[np.newaxis, :, :]
     delta_Q = delta_Q[np.newaxis, :, :]
-    delta_E = delta_E[np.newaxis, :, :]  
+    delta_E = delta_E[np.newaxis, :, :]
 
     mN, Ef, en_to_vel, vf, hbar = loadConstants()
     masses = masses.reshape(masses.size, 1, 1)
 
-    energyRecoil = np.square( hbar * delta_Q ) / 2. / masses              
-    ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling  
+    energyRecoil = np.square( hbar * delta_Q ) / 2. / masses
+    ySpacesForEachMass = masses / hbar**2 /delta_Q * (delta_E - energyRecoil)    #y-scaling
     return ySpacesForEachMass
 
 
@@ -313,7 +316,7 @@ def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, 
             instrPars[i],
             kinematicArrays[i],
             ic
-            ) 
+            )
 
         arrFitPars[i] = specFitPars
 
@@ -321,7 +324,7 @@ def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, 
             print("Skipped spectra.")
         else:
             print(f"Fitted spectra {int(specFitPars[0]):3}")
-    
+
     assert ~np.all(arrFitPars==0), "Either Fits are all zero or assignment of fitting not working"
     return arrFitPars
 
@@ -339,7 +342,7 @@ def createTableWSForFitPars(wsName, noOfMasses, arrFitPars):
 
     for row in arrFitPars:    # Pass array onto table ws
         tableWS.addRow(row)
-    return 
+    return
 
 
 def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass):
@@ -350,17 +353,17 @@ def calculateNcpArr(ic, arrBestFitPars, resolutionPars, instrPars, kinematicArra
 
         ncpForEachMass = calculateNcpRow(
             arrBestFitPars[i],
-            ySpacesForEachMass[i], 
-            resolutionPars[i], 
-            instrPars[i], 
+            ySpacesForEachMass[i],
+            resolutionPars[i],
+            instrPars[i],
             kinematicArrays[i],
             ic
             )
-            
+
         allNcpForEachMass.append(ncpForEachMass)
 
     allNcpForEachMass = np.array(allNcpForEachMass)
-    allNcpTotal = np.sum(allNcpForEachMass, axis=1)        
+    allNcpTotal = np.sum(allNcpForEachMass, axis=1)
     return allNcpForEachMass, allNcpTotal
 
 
@@ -368,10 +371,10 @@ def calculateNcpRow(initPars, ySpacesForEachMass, resolutionPars, instrPars, kin
     """input: all row shape
        output: row shape with the ncpTotal for each mass"""
 
-    if np.all(initPars==0):  
-        return np.zeros(ySpacesForEachMass.shape) 
-    
-    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)        
+    if np.all(initPars==0):
+        return np.zeros(ySpacesForEachMass.shape)
+
+    ncpForEachMass, ncpTotal = calculateNcpSpec(ic, initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
     return ncpForEachMass
 
 
@@ -396,7 +399,7 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
         MaskDetectors(Workspace=ncpMWS, WorkspaceIndexList=ic.maskedDetectorIdx)
         wsNCPSum = SumSpectra(InputWorkspace=ncpMWS, OutputWorkspace=ncpMWS.name()+"_Sum" )
         wsMNCPSum.append(wsNCPSum)
-        
+
     return wsTotNCPSum, wsMNCPSum
 
 
@@ -414,7 +417,7 @@ def createWS(dataX, dataY, dataE, wsName):
 def plotSumNCPFits(wsDataSum, wsTotNCPSum, wsMNCPSum, IC):
 
     if IC.runningSampleWS:   # Skip saving figure if running bootstrap
-        return         
+        return
 
     lw = 2
 
@@ -424,7 +427,7 @@ def plotSumNCPFits(wsDataSum, wsTotNCPSum, wsMNCPSum, IC):
     ax.plot(wsTotNCPSum, "r-", label="Total NCP", linewidth=lw)
     for m, wsNcp in zip(IC.masses, wsMNCPSum):
         ax.plot(wsNcp, label=f"NCP m={m}", linewidth=lw)
-    
+
     ax.set_xlabel("TOF")
     ax.set_ylabel("Counts")
     ax.set_title("Sum of NCP fits")
@@ -442,6 +445,7 @@ def switchFirstTwoAxis(A):
     rearranges matrices per spectrum for iteration of main fitting procedure
     """
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
+
 
 def extractMeans(wsName, IC):
     """Extract widths and intensities from tableWorkspace"""
@@ -473,14 +477,14 @@ def createMeansAndStdTableWS(wsName, IC, meanWidths, stdWidths, meanIntensityRat
         meansTableWS.addRow([m, mw, stdw, mi, stdi])
         print(f"{m:5.2f}  {mw:10.5f} \u00B1 {stdw:7.5f}  {mi:10.5f} \u00B1 {stdi:7.5f}")
     print("\n")
-    return 
+    return
 
 
 def calculateMeansAndStds(widthsIn, intensitiesIn, IC):
 
     betterWidths, betterIntensities = filterWidthsAndIntensities(widthsIn, intensitiesIn, IC)
-    
-    meanWidths = np.nanmean(betterWidths, axis=1)  
+
+    meanWidths = np.nanmean(betterWidths, axis=1)
     stdWidths = np.nanstd(betterWidths, axis=1)
 
     meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
@@ -499,47 +503,49 @@ def filterWidthsAndIntensities(widthsIn, intensitiesIn, IC):
     widths[:, zeroSpecs] = np.nan
     intensities[:, zeroSpecs] = np.nan
 
-    meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]  
+    meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]
 
     widthDeviation = np.abs(widths - meanWidths)
-    stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]  
+    stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]
 
     # Put nan in places where width deviation is bigger than std
     filterMask = widthDeviation > stdWidths
     betterWidths = np.where(filterMask, np.nan, widths)
-    
+
     maskedIntensities = np.where(filterMask, np.nan, intensities)
-    betterIntensities = maskedIntensities / np.sum(maskedIntensities, axis=0)   # Not nansum()      
-    
+    betterIntensities = maskedIntensities / np.sum(maskedIntensities, axis=0)   # Not nansum()
+
     # When trying to estimate HToMassIdxRatio and normalization fails, skip normalization
     if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
-        assert IC.noOfMSIterations == 0, "Calculation of mean intensities failed, cannot proceed with MS correction. Try to run again with noOfMSIterations=0."
-        betterIntensities = maskedIntensities 
+        assert IC.noOfMSIterations == 0, "Calculation of mean intensities failed, cannot proceed with MS correction." \
+                                         "Try to run again with noOfMSIterations=0."
+        betterIntensities = maskedIntensities
     else:
         pass
-  
+
     assert np.all(meanWidths!=np.nan), "At least one mean of widths is nan!"
     assert np.sum(filterMask) >= 1, "No widths survive filtering condition"
     assert not(np.all(np.isnan(betterWidths))), "All filtered widths are nan"
     assert not(np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
     assert np.nanmax(betterWidths) != np.nanmin(betterWidths), f"All fitered widths have the same value: {np.nanmin(betterWidths)}"
-    assert np.nanmax(betterIntensities) != np.nanmin(betterIntensities), f"All fitered widths have the same value: {np.nanmin(betterIntensities)}"
-   
+    assert np.nanmax(betterIntensities) != np.nanmin(
+        betterIntensities), f"All fitered widths have the same value: {np.nanmin(betterIntensities)}"
+
     return betterWidths, betterIntensities
 
 
 def fitNcpToSingleSpec(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic):
     """Fits the NCP and returns the best fit parameters for one spectrum"""
 
-    if np.all(dataY == 0) : 
-        return np.zeros(len(ic.initPars)+3)  
+    if np.all(dataY == 0) :
+        return np.zeros(len(ic.initPars)+3)
 
     result = optimize.minimize(
-        errorFunction, 
-        ic.initPars, 
+        errorFunction,
+        ic.initPars,
         args=(dataY, dataE, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays, ic),
-        method='SLSQP', 
-        bounds = ic.bounds, 
+        method='SLSQP',
+        bounds = ic.bounds,
         constraints=ic.constraints
         )
 
@@ -556,35 +562,35 @@ def errorFunction(pars, dataY, dataE, ySpacesForEachMass, resolutionPars, instrP
     ncpForEachMass, ncpTotal = calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays)
 
     # Ignore any masked values from Jackknife or masked tof range
-    zerosMask = (dataY==0)    
+    zerosMask = (dataY==0)
     ncpTotal = ncpTotal[~zerosMask]
-    dataYf = dataY[~zerosMask]   
-    dataEf = dataE[~zerosMask]   
+    dataYf = dataY[~zerosMask]
+    dataEf = dataE[~zerosMask]
 
     if np.all(dataE==0):   # When errors not present
-        return np.sum((ncpTotal - dataYf)**2)   
+        return np.sum((ncpTotal - dataYf)**2)
 
     return np.sum((ncpTotal - dataYf)**2 / dataEf**2)
 
 
-def calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):    
+def calculateNcpSpec(ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays):
     """Creates a synthetic C(t) to be fitted to TOF values of a single spectrum, from J(y) and resolution functions
        Shapes: datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n),
        where n is no of bins"""
-    
-    masses, intensities, widths, centers = prepareArraysFromPars(ic, pars) 
+
+    masses, intensities, widths, centers = prepareArraysFromPars(ic, pars)
     v0, E0, deltaE, deltaQ = kinematicArrays
-    
+
     gaussRes, lorzRes = caculateResolutionForEachMass(
         masses, ySpacesForEachMass, centers, resolutionPars, instrPars, kinematicArrays
         )
-    totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)                 
-    
-    JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes, ic)  
-    
-    FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72 
-    
-    ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ   
+    totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
+
+    JOfY = pseudoVoigt(ySpacesForEachMass - centers, totalGaussWidth, lorzRes, ic)
+
+    FSE =  - numericalThirdDerivative(ySpacesForEachMass, JOfY) * widths**4 / deltaQ * 0.72
+
+    ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0**(-0.92) * masses / deltaQ
     ncpTotal = np.sum(ncpForEachMass, axis=0)
     return ncpForEachMass, ncpTotal
 
@@ -593,19 +599,19 @@ def prepareArraysFromPars(ic, initPars):
     """Extracts the intensities, widths and centers from the fitting parameters
         Reshapes all of the arrays to collumns, for the calculation of the ncp,"""
 
-    masses = ic.masses[:, np.newaxis]    
+    masses = ic.masses[:, np.newaxis]
     intensities = initPars[::3].reshape(masses.shape)
     widths = initPars[1::3].reshape(masses.shape)
-    centers = initPars[2::3].reshape(masses.shape)  
-    return masses, intensities, widths, centers 
+    centers = initPars[2::3].reshape(masses.shape)
+    return masses, intensities, widths, centers
 
 
-def caculateResolutionForEachMass(masses, ySpacesForEachMass, centers, resolutionPars, instrPars, kinematicArrays):    
+def caculateResolutionForEachMass(masses, ySpacesForEachMass, centers, resolutionPars, instrPars, kinematicArrays):
     """Calculates the gaussian and lorentzian resolution
     output: two column vectors, each row corresponds to each mass"""
-    
+
     v0, E0, delta_E, delta_Q = kinematicsAtYCenters(ySpacesForEachMass, centers, kinematicArrays)
-    
+
     gaussianResWidth = calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars)
     lorentzianResWidth = calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars)
     return gaussianResWidth, lorentzianResWidth
@@ -659,8 +665,8 @@ def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, ins
     dQdL0 = 2.*E0 / L0
     dQdTheta = 2. * np.sqrt(E0 * Ef) * np.sin(angle)
 
-    dQ2 = dQdE1**2*dE1**2 + (dQdTOF**2*dTOF**2 + dQdL1**2*dL1**2 + dQdL0 **
-                             2*dL0**2)*np.abs(Ef/E0*np.cos(angle)-1) + dQdTheta**2*dTheta**2
+    dQ2 = dQdE1**2*dE1**2 + (dQdTOF**2*dTOF**2 + dQdL1**2*dL1**2 + dQdL0
+                             ** 2*dL0**2)*np.abs(Ef/E0*np.cos(angle)-1) + dQdTheta**2*dTheta**2
     dQ2 *= (mN / hbar**2 / delta_Q)**2
 
     # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
@@ -670,7 +676,7 @@ def calcGaussianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, ins
 
 def calcLorentzianResolution(masses, v0, E0, delta_E, delta_Q, resolutionPars, instrPars):
     assert masses.shape == (masses.size, 1), "The shape of the masses array needs to be a collumn!"
-        
+
     det, plick, angle, T0, L0, L1 = instrPars
     dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = resolutionPars
     mN, Ef, en_to_vel, vf, hbar = loadConstants()
@@ -707,7 +713,7 @@ def pseudoVoigt(x, sigma, gamma, IC):
     eta = 1.36603 * fl/f - 0.47719 * (fl/f)**2 + 0.11116 * (fl/f)**3
     sigma_v, gamma_v = f/(2.*np.sqrt(2.*np.log(2.))), f / 2.
     pseudo_voigt = eta * lorentizian(x, gamma_v) + (1.-eta) * gaussian(x, sigma_v)
-    
+
     norm = np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if IC.normVoigt else 1
     return pseudo_voigt / norm
 
@@ -746,12 +752,12 @@ def numericalThirdDerivative(x, fun):
 def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios, wsNCPM):
     """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
 
-    createSlabGeometry(ic, wsNCPM)    # Sample properties for MS correction 
+    createSlabGeometry(ic, wsNCPM)    # Sample properties for MS correction
 
     sampleProperties = calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios)
-    print("\nThe sample properties for Multiple Scattering correction are:\n\n", 
-            sampleProperties, "\n")
-    
+    print("\nThe sample properties for Multiple Scattering correction are:\n\n",
+          sampleProperties, "\n")
+
     return createMulScatWorkspaces(ic, wsNCPM, sampleProperties)
 
 
@@ -773,7 +779,7 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
 
     # If Backsscattering mode and H is present in the sample, add H to MS properties
     if (ic.modeRunning == "BACKWARD"):
-        if (ic.HToMassIdxRatio != None):  # If H is present, ratio is a number
+        if (ic.HToMassIdxRatio is not None):  # If H is present, ratio is a number
             masses = np.append(masses, 1.0079)
             meanWidths = np.append(meanWidths, 5.0)
 
@@ -785,7 +791,7 @@ def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
     MSProperties[::3] = masses
     MSProperties[1::3] = meanIntensityRatios
     MSProperties[2::3] = meanWidths
-    sampleProperties = list(MSProperties)   
+    sampleProperties = list(MSProperties)
 
     return sampleProperties
 
@@ -804,10 +810,10 @@ def createMulScatWorkspaces(ic, ws, sampleProperties):
         )
 
     _TotScattering, _MulScattering = VesuvioCalculateMS(
-        ws, 
-        NoOfMasses=len(MS_masses), 
+        ws,
+        NoOfMasses=len(MS_masses),
         SampleDensity=dens.cell(9, 1),
-        AtomicProperties=sampleProperties, 
+        AtomicProperties=sampleProperties,
         BeamRadius=2.5,
         NumScatters=ic.multiple_scattering_order,
         NumEventsPerRun=int(ic.number_of_events)
@@ -820,7 +826,7 @@ def createMulScatWorkspaces(ic, ws, sampleProperties):
         Multiply(LHSWorkspace=workspace, RHSWorkspace=data_normalisation, OutputWorkspace=workspace)
         RenameWorkspace(InputWorkspace=workspace, OutputWorkspace=ws.name()+workspace)
         SumSpectra(ws.name()+workspace, OutputWorkspace=ws.name()+workspace+"_Sum")
-        
+
     DeleteWorkspaces(
         [data_normalisation, simulation_normalisation, trans, dens]
         )
@@ -834,18 +840,18 @@ def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios, wsNC
     inputWS = wsNCPM.name()
 
     # I do not know why, but setting these instrument parameters is required
-    SetInstrumentParameter(inputWS, ParameterName='hwhm_lorentz', 
-                            ParameterType='Number', Value='24.0')
-    SetInstrumentParameter(inputWS, ParameterName='sigma_gauss', 
-                            ParameterType='Number', Value='73.0')
+    SetInstrumentParameter(inputWS, ParameterName='hwhm_lorentz',
+                           ParameterType='Number', Value='24.0')
+    SetInstrumentParameter(inputWS, ParameterName='sigma_gauss',
+                           ParameterType='Number', Value='73.0')
 
     profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
 
     background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
-    
+
     RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS+"_Gamma_Background")
-    Scale(InputWorkspace = inputWS+"_Gamma_Background", OutputWorkspace = inputWS+"_Gamma_Background", 
-        Factor=0.9, Operation="Multiply")
+    Scale(InputWorkspace = inputWS+"_Gamma_Background", OutputWorkspace = inputWS+"_Gamma_Background",
+          Factor=0.9, Operation="Multiply")
     DeleteWorkspace(corrected)
     return mtd[inputWS+"_Gamma_Background"]
 
@@ -858,12 +864,13 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
                     + str(mass) + ",Width=" + str(width)  \
                     + ",Intensity=" + str(intensity) + ';'
     print("\n The sample properties for Gamma Correction are:\n",
-            profiles)
+          profiles)
     return profiles
 
 
 class resultsObject:
     """Used to collect results from workspaces and store them in .npz files for testing."""
+
     def __init__(self, ic):
 
         allIterNcp = []
@@ -893,8 +900,8 @@ class resultsObject:
                 for key in fitParTable.keys():
                     bestFitPars.append(fitParTable.column(key))
                 allBestPar.append(np.array(bestFitPars).T)
-                
-                # Extract individual ncp 
+
+                # Extract individual ncp
                 allNCP = []
                 i = 0
                 while True:   # By default, looks for all ncp ws until it breaks
@@ -906,14 +913,14 @@ class resultsObject:
                         break
                 allNCP = switchFirstTwoAxis(np.array(allNCP))
                 allIterNcp.append(allNCP)
-                
+
                 # Extract Mean and Std Widths, Intensities
                 meansTable = mtd[wsIterName + "_Mean_Widths_And_Intensities"]
                 allMeanWidhts.append(meansTable.column("Mean Widths"))
                 allStdWidths.append(meansTable.column("Std Widths"))
                 allMeanIntensities.append(meansTable.column("Mean Intensities"))
-                allStdIntensities.append(meansTable.column("Std Intensities"))  
-                
+                allStdIntensities.append(meansTable.column("Std Intensities"))
+
                 j+=1
             except KeyError:
                 break
@@ -934,7 +941,6 @@ class resultsObject:
         self.noOfMasses = ic.noOfMasses
         self.resultsSavePath = ic.resultsSavePath
 
-
     def save(self):
         """Saves all of the arrays stored in this object"""
 
@@ -954,5 +960,3 @@ class resultsObject:
                  all_std_intensities=self.all_std_intensities,
                  all_tot_ncp=self.all_tot_ncp,
                  all_ncp_for_each_mass=self.all_ncp_for_each_mass)
-
-           

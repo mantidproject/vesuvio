@@ -1,5 +1,3 @@
-
-from os import execv
 from xml.dom import NotFoundErr
 from vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
 from vesuvio_analysis.core_functions.ICHelpers import setBootstrapDirs
@@ -9,9 +7,9 @@ import matplotlib .pyplot as plt
 from pathlib import Path
 from scipy import stats
 
-currentPath = Path(__file__).parent.absolute() 
+currentPath = Path(__file__).parent.absolute()
 experimentsPath = currentPath / ".." / ".. " / "experiments"
-IPFilesPath = currentPath / ".." / "ip_files" 
+IPFilesPath = currentPath / ".." / "ip_files"
 
 
 def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, userCtr):
@@ -27,7 +25,7 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
             print("Bootstrap data files not found, unable to run analysis!")
             print(f"{IC.bootSavePath.name}")
             continue    # If main results are not present, assume ysapce results are also missing
-        
+
         checkLogMatch(IC, isYFitFile=False)
 
         bootParsRaw, parentParsRaw, nSamples, corrResiduals = readBootData(IC.bootSavePath)
@@ -42,12 +40,11 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
                 checkBootSamplesVSParent(bootPars, parentParsRaw, IC)    # Prints comparison
             except AssertionError:
                 print("\nUnable to calculate new means of filtered parameters.\n")
-            
-        
+
         # Plots histograms of all spectra for a given width or intensity
         plotRawWidthsAndIntensities(analysisIC, IC, bootPars, parentParsRaw)
-        
-        # Calculate bootstrap histograms for mean widths and intensities 
+
+        # Calculate bootstrap histograms for mean widths and intensities
         meanWidths, meanIntensities = calculateMeanWidthsIntensities(bootPars, IC, nSamples)
 
         # If filer is on, check that it matches original procedure
@@ -56,7 +53,6 @@ def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, use
         plotMeanWidthsAndIntensities(analysisIC, IC, meanWidths, meanIntensities, parentParsRaw)
         plotMeansEvolution(analysisIC, meanWidths, meanIntensities)
         plot2DHistsWidthsAndIntensities(analysisIC, meanWidths, meanIntensities)
-
 
         if not(IC.bootYFitSavePath.is_file()):
             print("Bootstrap data file for y-space fit not found, unable to run analysis!")
@@ -83,73 +79,73 @@ def checkLogMatch(IC, isYFitFile):
             if line.split(" : ")[0] == currName:
                 if line.strip("\n") == currentLog:
                     return
-                raise NotFoundErr(currName+" found but corresponding log does not match.") 
-        raise NotFoundErr(currName+" not found in logs file") 
+                raise NotFoundErr(currName+" found but corresponding log does not match.")
+        raise NotFoundErr(currName+" not found in logs file")
 
 
 def readBootData(dataPath):
-        bootData = np.load(dataPath)
+    bootData = np.load(dataPath)
 
-        # Select fitting parameters of ncp
-        # Discard first column of spectrum number
-        # Discard last two columns of number of iterations and chi2
-        bootParsRaw = bootData["boot_samples"][:, :, 1:-2]
-        parentParsRaw = bootData["parent_result"][:, 1:-2]
+    # Select fitting parameters of ncp
+    # Discard first column of spectrum number
+    # Discard last two columns of number of iterations and chi2
+    bootParsRaw = bootData["boot_samples"][:, :, 1:-2]
+    parentParsRaw = bootData["parent_result"][:, 1:-2]
 
-        nSamples = len(bootParsRaw)
-        try:
-            corrResiduals = bootData["corr_residuals"]
-        except KeyError:
-            corrResiduals = np.array([np.nan]) 
-            print("\nCorrelation of coefficients not found!\n")
+    nSamples = len(bootParsRaw)
+    try:
+        corrResiduals = bootData["corr_residuals"]
+    except KeyError:
+        corrResiduals = np.array([np.nan])
+        print("\nCorrelation of coefficients not found!\n")
 
-        failMask = np.all(np.isnan(bootParsRaw), axis=(1, 2))
-        assert failMask.shape == (len(bootParsRaw),), f"Wrong shape of masking: {failMask.shape} != {bootParsRaw.shape} "
-        if np.sum(failMask) > 0:
-            print(f"\nNo of failed samples: {np.sum(failMask)}")
-            print("\nUsing only good replicas ...\n")
-            bootParsRaw = bootParsRaw[~failMask]
-            nSamples = np.sum(~failMask)
+    failMask = np.all(np.isnan(bootParsRaw), axis=(1, 2))
+    assert failMask.shape == (len(bootParsRaw),), f"Wrong shape of masking: {failMask.shape} != {bootParsRaw.shape} "
+    if np.sum(failMask) > 0:
+        print(f"\nNo of failed samples: {np.sum(failMask)}")
+        print("\nUsing only good replicas ...\n")
+        bootParsRaw = bootParsRaw[~failMask]
+        nSamples = np.sum(~failMask)
 
-        maskedIdxs = np.where(np.all(np.isnan(bootParsRaw), axis=(0, 2)))
-        print(f"Masked idxs with nans found: {maskedIdxs}")
-        print(f"\nData files found:\n{dataPath.name}")
-        print(f"\nNumber of samples in the file: {nSamples}")
-        assert ~np.all(bootParsRaw[-1] == parentParsRaw), "Error in Jackknife due to last column."
-        return bootParsRaw, parentParsRaw, nSamples, corrResiduals
+    maskedIdxs = np.where(np.all(np.isnan(bootParsRaw), axis=(0, 2)))
+    print(f"Masked idxs with nans found: {maskedIdxs}")
+    print(f"\nData files found:\n{dataPath.name}")
+    print(f"\nNumber of samples in the file: {nSamples}")
+    assert ~np.all(bootParsRaw[-1] == parentParsRaw), "Error in Jackknife due to last column."
+    return bootParsRaw, parentParsRaw, nSamples, corrResiduals
 
 
 def readYFitData(dataPath, yFitIC):
-        """Resulting output has shape(no of pars, no of samples)"""
+    """Resulting output has shape(no of pars, no of samples)"""
 
-        fitIdx = 0   # 0 to select Minuit, 1 to select LM
+    fitIdx = 0   # 0 to select Minuit, 1 to select LM
 
-        bootYFitData = np.load(dataPath)
-        try:
-            bootYFitVals = bootYFitData["boot_samples"]   
-        except KeyError:
-            bootYFitVals = bootYFitData["boot_vals"]      # To account for some previous samples
-        minFitVals = bootYFitVals[:, fitIdx, :-1].T   # Select Minuit values and Discard last value chi2
+    bootYFitData = np.load(dataPath)
+    try:
+        bootYFitVals = bootYFitData["boot_samples"]
+    except KeyError:
+        bootYFitVals = bootYFitData["boot_vals"]      # To account for some previous samples
+    minFitVals = bootYFitVals[:, fitIdx, :-1].T   # Select Minuit values and Discard last value chi2
 
-        failMask = np.all(np.isnan(minFitVals), axis=0)
-        if np.sum(failMask) > 0:
-            print(f"\nNo of failed samples: {np.sum(failMask)}") 
-            print("\nUsing only good replicas ...\n")
-            minFitVals = minFitVals[:, ~failMask]
+    failMask = np.all(np.isnan(minFitVals), axis=0)
+    if np.sum(failMask) > 0:
+        print(f"\nNo of failed samples: {np.sum(failMask)}")
+        print("\nUsing only good replicas ...\n")
+        minFitVals = minFitVals[:, ~failMask]
 
-        try:
-            parentPopt = bootYFitData["parent_popt"][fitIdx]
-            parentPerr = bootYFitData["parent_perr"][fitIdx]
-            printYFitParentPars(yFitIC, parentPopt, parentPerr)  # TODO: Test this function
-        except KeyError:
-            pass
-        return minFitVals
+    try:
+        parentPopt = bootYFitData["parent_popt"][fitIdx]
+        parentPerr = bootYFitData["parent_perr"][fitIdx]
+        printYFitParentPars(yFitIC, parentPopt, parentPerr)  # TODO: Test this function
+    except KeyError:
+        pass
+    return minFitVals
 
 
 def checkResiduals(corrRes):
     if np.all(np.isnan(corrRes)):
         return
-    
+
     corrCoef = corrRes[:, 0]
     nCorrelated = np.sum(corrCoef>0.5)
     print(f"\nNumber of spectra with pearson r > 0.5: {nCorrelated}")
@@ -158,7 +154,7 @@ def checkResiduals(corrRes):
 
 def checkBootSamplesVSParent(bestPars, parentPars, IC):
     """
-    For an unbiased estimator, the mean of the bootstrap samples will converge to 
+    For an unbiased estimator, the mean of the bootstrap samples will converge to
     the mean of the experimental sample (here called parent).
     """
 
@@ -174,7 +170,7 @@ def checkBootSamplesVSParent(bestPars, parentPars, IC):
     parentIntensities = parentPars[:, 0::3]
 
     avgWidthsP, stdWidthsP, avgIntP, stdIntP = calculateMeansAndStds(parentWidths.T, parentIntensities.T, IC)
-  
+
     print("\nComparing Bootstrap means with parent means:\n")
     printResults(avgWidths, stdWidths, "Boot Widths")
     printResults(avgWidthsP, stdWidthsP, "Parent Widths")
@@ -198,10 +194,10 @@ def filteredBootMeans(bestPars, IC):  # Pass IC just to check flag for prelimina
     # Perform the filter
     for i, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
         filteredWidths, filteredIntensities = filterWidthsAndIntensities(widths.T, intensities.T, IC)
-        
+
         bootWidths[i] = filteredWidths.T
         bootIntensities[i] = filteredIntensities.T
-    
+
     # Convert back to format of bootstrap samples
     filteredBestPars = bestPars.copy()
     filteredBestPars[:, :, 1::3] = bootWidths
@@ -230,7 +226,7 @@ def plotRawWidthsAndIntensities(analysisIC, IC, bootPars, parentPars):
             idxSamples = selectRawSamplesPerIdx(bootPars, j)
             plotHists(axs[axIdx, i], idxSamples, disableCI=True, disableLeg=True)
             axs[axIdx, i].axvline(parentMeans[i], 0.75, 0.97, color="b", ls="-", alpha=0.4)
-            
+
     plt.show()
     return
 
@@ -246,20 +242,20 @@ def extractParentMeans(parentPars, IC):
 
 def calcMeansWithOriginalProc(bestPars, IC):
     """Performs the means and std on each bootstrap sample according to original procedure"""
-    
+
     bootWidths = bestPars[:, :, 1::3]
     bootIntensities = bestPars[:, :, 0::3]
 
     bootMeanW = np.zeros((len(bootWidths[0,0,:]), len(bootWidths)))
-    bootStdW = np.zeros(bootMeanW.shape)
+    # bootStdW = np.zeros(bootMeanW.shape)
     bootMeanI = np.zeros(bootMeanW.shape)
-    bootStdI = np.zeros(bootMeanW.shape)
+    # bootStdI = np.zeros(bootMeanW.shape)
 
     for j, (widths, intensities) in enumerate(zip(bootWidths, bootIntensities)):
 
         meanW, stdW, meanI, stdI = calculateMeansAndStds(widths.T, intensities.T, IC)
 
-        bootMeanW[:, j] = meanW       # Interested only in the means 
+        bootMeanW[:, j] = meanW       # Interested only in the means
         bootMeanI[:, j] = meanI
 
     return bootMeanW, bootMeanI
@@ -271,7 +267,7 @@ def calculateMeanWidthsIntensities(bootPars, IC, nSamples):
     Returns means with size equal to the number of Boot samples.
     """
 
-    # Calculate bootstrap histograms for mean widths and intensities 
+    # Calculate bootstrap histograms for mean widths and intensities
     meanWidths = np.zeros((len(IC.masses), nSamples))
     for i, j in enumerate(range(1, 3*len(IC.masses), 3)):
         idxSamples = selectRawSamplesPerIdx(bootPars, j)
@@ -280,23 +276,23 @@ def calculateMeanWidthsIntensities(bootPars, IC, nSamples):
     meanIntensities = np.zeros((len(IC.masses), nSamples))
     for i, j in enumerate(range(0, 3*len(IC.masses), 3)):
         idxSamples = selectRawSamplesPerIdx(bootPars, j)
-        meanIntensities[i, :] = np.nanmean(idxSamples, axis=0)   
+        meanIntensities[i, :] = np.nanmean(idxSamples, axis=0)
 
     return meanWidths, meanIntensities
 
 
 def checkMeansProcedure(analysisIC, IC, meanWidths, meanIntensities, bootParsRaw):
     """Checks that filtering and averaging of Bootstrap samples follows the original procedure"""
-    
+
     if not(analysisIC.filterAvg):     # When filtering not present, no comparison available
         return
-    
+
     else:         # Check that treatment of data matches original
         meanWOri, meanIOri = calcMeansWithOriginalProc(bootParsRaw, IC)
         np.testing.assert_array_almost_equal(meanWOri, meanWidths)
         np.testing.assert_array_almost_equal(meanIOri, meanIntensities)
         return
-       
+
 
 def plotMeanWidthsAndIntensities(analysisIC, IC, meanWidths, meanIntensities, parentParsRaw):
     """
@@ -307,7 +303,6 @@ def plotMeanWidthsAndIntensities(analysisIC, IC, meanWidths, meanIntensities, pa
         return
 
     parentWidths, parentIntensities = extractParentMeans(parentParsRaw, IC)
-
 
     print("\n\n Test passed! Mean Widths match!")
 
@@ -326,7 +321,7 @@ def plotMeanWidthsAndIntensities(analysisIC, IC, meanWidths, meanIntensities, pa
 
 def plotMeansEvolution(IC, meanWidths, meanIntensities):
     """Shows how results of Bootstrap change depending on number of bootstrap samples"""
-    
+
     if not(IC.plotMeansEvolution):
         return
 
@@ -347,12 +342,11 @@ def plotMeansEvolution(IC, meanWidths, meanIntensities):
     return
 
 
-    
 def plotMeansEvolutionYFit(analysisIC, minuitFitVals):
 
     if not(analysisIC.plotMeansEvolution):
         return
-    
+
     fig, ax = plt.subplots(2, 1)
     ax[0].set_title("Evolution of y-space fit parameters")
     plotMeansOverNoSamples(ax[0], minuitFitVals)
@@ -392,13 +386,13 @@ def plotMeansOverNoSamples(ax, bootMeans, normFlag=False):
     if normFlag:   # Rescale and normalize to last value, so all points are converging to zero
         lastValue = sampleMeans[:, -1][:, np.newaxis]
         meansFinal = (sampleMeans - lastValue) / lastValue * 100   # Percent change to last value
-        boundsFinal = (sampleBounds - lastValue[:, np.newaxis, :]) / lastValue[:, np.newaxis, :] * 100 
+        boundsFinal = (sampleBounds - lastValue[:, np.newaxis, :]) / lastValue[:, np.newaxis, :] * 100
         ylabel = "Percent Change [%]"
 
     for i, (means, errors) in enumerate(zip(meansFinal, boundsFinal)):
         ax.plot(sampleSizes, means, label=f"idx {i}")
         ax.fill_between(sampleSizes, errors[0, :], errors[1, :], alpha=0.2)
-    
+
     ax.legend()
     ax.set_xlabel("Number of Bootstrap samples")
     ax.set_ylabel(ylabel)
@@ -410,9 +404,9 @@ def plot2DHistsWidthsAndIntensities(IC, meanWidths, meanIntensities):
         return
 
     assert meanWidths.shape == meanIntensities.shape, "Widths and Intensities need to be the same shape."
-    
-    plot2DHists(meanWidths, "Widths")    
-    plot2DHists(meanIntensities, "Intensities")   
+
+    plot2DHists(meanWidths, "Widths")
+    plot2DHists(meanIntensities, "Intensities")
     return
 
 
@@ -424,7 +418,7 @@ def plot2DHists(bootSamples, mode):
 
     for i in range(plotSize):
         for j in range(plotSize):
-            
+
             # axs[i, j].axis("off")
 
             if j>i:
@@ -440,9 +434,9 @@ def plot2DHists(bootSamples, mode):
 
             else:
                 axs[i, j].hist2d(bootSamples[j], bootSamples[i])
-                
+
             if j==0:
-                axs[i, j].set_ylabel(f"idx {i}")  
+                axs[i, j].set_ylabel(f"idx {i}")
             else:
                 axs[i, j].get_yaxis().set_ticks([])
 
@@ -450,10 +444,9 @@ def plot2DHists(bootSamples, mode):
                 axs[i, j].set_xlabel(f"idx{j}")
             else:
                 axs[i, j].get_xaxis().set_ticks([])
-            
+
             axs[i, j].set_title(f"r = {stats.pearsonr(bootSamples[i], bootSamples[j])[0]:.3f}")
 
-    
     fig.suptitle(f"1D and 2D Histograms of {mode}")
 
     plt.show()
@@ -465,11 +458,9 @@ def printYFitParentPars(yFitIC, parentPopt, parentPerr):
     sig = [p for p in defaultPars]
     sig = ["y0"] + sig       # Add intercept from outside function parameters
 
-
     print("\nParent parameters of y-sapce fit:\n")
     for p, m, e in zip(sig, parentPopt, parentPerr):
         print(f"{p:5s}:  {m:8.3f} +/- {e:8.3f}")
-
 
 
 def plotYFitHists(analysisIC, yFitIC, yFitHists):
@@ -489,7 +480,7 @@ def plotYFitHists(analysisIC, yFitIC, yFitHists):
     for i, (ax, hist, par) in enumerate(zip(axs.flatten(), yFitHists, sig)):
         ax.set_title(f"Fit Parameter: {par}")
         plotHists(ax, hist[np.newaxis, :], disableAvg=True)
-    
+
     # Hide plots not in use:
     for ax in axs.flat:
         if not ax.lines:   # If empty list
@@ -503,7 +494,7 @@ def plot2DHistsYFit(analysisIC, minuitFitVals):
 
     if not(analysisIC.plot2DHists):
         return
-    
+
     plot2DHists(minuitFitVals, "Y-space Fit parameters")
     return
 
@@ -516,7 +507,7 @@ def plotHists(ax, samples, disableCI=False, disableLeg=False, disableAvg=False):
 
         if np.all(bootHist==0) or np.all(np.isnan(bootHist)):
             continue
-        
+
         mean = np.nanmean(bootHist)
         bounds = np.percentile(bootHist, [16, 68+16])   # 1 std: 68%, 2 std: 95%
         errors = bounds - mean
@@ -524,16 +515,16 @@ def plotHists(ax, samples, disableCI=False, disableLeg=False, disableAvg=False):
 
         ax.hist(bootHist, histtype="step", label=leg, linewidth=1)
         ax.axvline(mean, 0.9, 0.97, color="k", ls="--", alpha=0.4)
-        
+
         if not(disableCI):
             ax.axvspan(bounds[0], bounds[1], alpha=0.1, color="b")
-    
+
     if not(disableAvg):
         # Plot average over histograms
         avgHist = np.nanmean(samples, axis=0).flatten()
         ax.hist(avgHist, color="r", histtype="step", linewidth=2)
         ax.axvline(np.nanmean(avgHist), 0.75, 0.97, color="r", ls="--", linewidth=2)
-    
+
     if not(disableLeg):
         ax.legend(loc="upper center")
 
@@ -551,19 +542,19 @@ def selectRawSamplesPerIdx(bootSamples, idx):
 # TODO: Make use of this function?
 def calcCorrWithScatAngle(samples, IC):
     """Calculate correlation coefficient between histogram means and scattering angle."""
-    
+
     ipMatrix = np.loadtxt(IC.instrParsPath, dtype=str)[1:].astype(float)
-    
+
     firstSpec, lastSpec = IC.bootSavePath.name.split("_")[1].split("-")
     allSpec = ipMatrix[:, 0]
     selectedSpec = (allSpec>=int(firstSpec)) & (allSpec>=int(lastSpec))
-    
+
     thetas = ipMatrix[selectedSpec, 2]  # Scattering angle on third column
 
     # thetas = ipMatrix[firstIdx : lastIdx, 2]    # Scattering angle on third column
     assert thetas.shape == (len(samples),), f"Wrong shape: {thetas.shape}"
 
-    histMeans = np.nanmean(samples, axis=1) 
+    histMeans = np.nanmean(samples, axis=1)
 
     # Remove masked spectra:
     nanMask = np.isnan(histMeans)

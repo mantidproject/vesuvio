@@ -2,7 +2,6 @@
 import time
 import numpy as np
 from pathlib import Path
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 
@@ -12,33 +11,35 @@ ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
 class LoadVesuvioBackParameters:
-    runs='36517-36556'           
-    empty_runs='34038-34045'           
-    spectra='3-134'                    
+    runs='36517-36556'
+    empty_runs='34038-34045'
+    spectra='3-134'
     mode = 'DoubleDifference'
-    ipfile=ipFilesPath / "ip2018_3.par" 
+    ipfile=ipFilesPath / "ip2018_3.par"
 
-    subEmptyFromRaw = True      
-    scaleEmpty = 1    
-    scaleRaw = 1  
+    subEmptyFromRaw = True
+    scaleEmpty = 1
+    scaleRaw = 1
+
 
 class LoadVesuvioFrontParameters:
-    runs='36517-36556'                   
-    empty_runs='34038-34045'                 
-    spectra='135-182'                       
+    runs='36517-36556'
+    empty_runs='34038-34045'
+    spectra='135-182'
     mode='SingleDifference'
     ipfile=ipFilesPath / "ip2018_3.par"
 
-    subEmptyFromRaw = False        
-    scaleEmpty = 1      
+    subEmptyFromRaw = False
+    scaleEmpty = 1
     scaleRaw = 1
+
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
-    
-    transmission_guess =  0.92      
+
+    transmission_guess =  0.92
     multiple_scattering_order, number_of_events = 2, 1.e5
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  
+    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
@@ -49,12 +50,12 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([2.015, 12, 14, 27])
 
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers   
-            1, 6, 0.,     
-            1, 12, 0.,    
-            1, 12, 0.,   
-            1, 12.5, 0.    
+    initPars = np.array([
+        # Intensities, NCP widths, NCP centers
+        1, 6, 0.,
+        1, 12, 0.,
+        1, 12, 0.,
+        1, 12.5, 0.
         ])
     bounds = np.array([
             [0, np.nan], [3.53, 20], [-3, 1],
@@ -64,7 +65,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
         ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
 
-    noOfMSIterations = 4     
+    noOfMSIterations = 4
     firstSpec = 3    #3
     lastSpec = 134    #134
 
@@ -74,20 +75,20 @@ class BackwardInitialConditions(GeneralInitialConditions):
     MSCorrectionFlag = True
     GammaCorrectionFlag = False
 
-    tofBinning='50,1.,420'           
+    tofBinning='50,1.,420'
     maskTOFRange = None        # TOF Range for the resonance peak
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
 
-    masses = np.array([2.015, 12, 14, 27]) 
-  
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers  
-        0.4569, 6.5532, 0.,     
-        0.166, 12.1585, 0.,    
-        0.2295, 13.4784, 0.,   
-        0.1476, 17.0095, 0. 
+    masses = np.array([2.015, 12, 14, 27])
+
+    initPars = np.array([
+        # Intensities, NCP widths, NCP centers
+        0.4569, 6.5532, 0.,
+        0.166, 12.1585, 0.,
+        0.2295, 13.4784, 0.,
+        0.1476, 17.0095, 0.
     ])
     bounds = np.array([
         [0, np.nan], [5, 8], [-3, 1],
@@ -96,8 +97,8 @@ class ForwardInitialConditions(GeneralInitialConditions):
         [0, np.nan], [17.0095, 17.0095], [-3, 1]
     ])
     constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
-    
-    noOfMSIterations = 4  
+
+    noOfMSIterations = 4
     firstSpec = 135   #135
     lastSpec = 182  #182
 
@@ -107,9 +108,9 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     maskedSpecAllNo = np.array([180])
 
-    tofBinning="110,1.,430"         
+    tofBinning="110,1.,430"
     maskTOFRange = None        # TOF Range for the resonance peak
- 
+
 
 class YSpaceFitInitialConditions:
     showPlots = True
@@ -117,13 +118,13 @@ class YSpaceFitInitialConditions:
     rebinParametersForYSpaceFit = "-25, 0.5, 25"    # Needs to be symetric
     fitModel = "GC_C4_C6"     # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'ANSIO_GAUSSIAN'
     runMinos = True
-    globalFit = False 
-    nGlobalFitGroups = 4   
+    globalFit = False
+    nGlobalFitGroups = 4
     maskTypeProcedure = None   # Options: 'NCP', 'NAN', None
 
 
 class UserScriptControls:
-    runRoutine = False 
+    runRoutine = False
 
     # Choose main procedure to run
     procedure = "BACKWARD"   # Options: "BACKWARD", "FORWARD", "JOINT"
@@ -135,25 +136,25 @@ class BootstrapInitialConditions:
     runBootstrap = False
 
     procedure = "JOINT"
-    fitInYSpace = "JOINT" #"FORWARD"
+    fitInYSpace = "JOINT"  # "FORWARD"
 
-    bootstrapType = "BOOT_RESIDUALS"  # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS" 
-    nSamples = 600 
+    bootstrapType = "BOOT_RESIDUALS"  # Options: "JACKKNIFE", "BOOT_RESIDUALS", "BOOT_GAUSS_ERRS"
+    nSamples = 600
     skipMSIterations = False
     runningTest = False
     userConfirmation = True
 
 
 class BootstrapAnalysis:
-    runAnalysis = True 
+    runAnalysis = True
 
     # Choose whether to filter averages as done in original procedure
     filterAvg = True                 # True discards some unreasonable values of widths and intensities
-    
+
     # Flags below control the plots to show
-    plotRawWidthsIntensities = False 
+    plotRawWidthsIntensities = False
     plotMeanWidthsIntensities = True
-    plotMeansEvolution = False 
+    plotMeansEvolution = False
     plot2DHists = False
     plotYFitHists = True
 
@@ -161,7 +162,7 @@ class BootstrapAnalysis:
 start_time = time.time()
 
 wsBackIC = LoadVesuvioBackParameters
-wsFrontIC = LoadVesuvioFrontParameters  
+wsFrontIC = LoadVesuvioFrontParameters
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
