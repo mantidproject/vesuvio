@@ -22,6 +22,17 @@ jobs:
         with: 
           # Fetch entire history for all branches and tags
           fetch_depth: 0
+          
+      # Set up conda environnment
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.1.1
+        with:
+          miniforge-version: latest
+          miniforge-variant: Mambaforge
+          activate-environment: vesuvio-env
+          environment-file: environment.yml
+          python-version: 3.8
+          auto-activate-base: false
 
       # Runs flake8
       - name: Flake8
