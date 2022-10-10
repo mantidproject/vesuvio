@@ -1,4 +1,3 @@
-import matplotlib.ticker as mtick
 import unittest
 import numpy as np
 import numpy.testing as nptest
@@ -6,6 +5,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-poster')
+import matplotlib.ticker as mtick
 # plt.style.use('fivethirtyeight')
 plt.rcParams['axes.facecolor'] = (0.9, 0.9, 0.9)
 plt.rcParams.update({"axes.grid" : True, "grid.color": "white"})
@@ -18,22 +18,22 @@ currentPath = Path(__file__).absolute().parent  # Path to the repository
 oriResultsPatth = currentPath / "original_results"
 currResultsPatth = currentPath / "output_npz_for_testing"
 
-testForward = True
+testForward = True 
 if testForward:
-    pathToOriginal = oriResultsPatth / "4iter_forward_GB_MS.npz"
-    pathToOptimized = currResultsPatth / "spec_144-182_iter_3_MS_GC.npz"
+    pathToOriginal = oriResultsPatth / "4iter_forward_GB_MS.npz" 
+    pathToOptimized = currResultsPatth / "spec_144-182_iter_3_MS_GC.npz" 
 
 else:
-    pathToOriginal = oriResultsPatth / "4iter_backward_MS.npz"
-    pathToOptimized = currResultsPatth / "spec_3-134_iter_3_MS.npz"
+    pathToOriginal = oriResultsPatth / "4iter_backward_MS.npz" 
+    pathToOptimized = currResultsPatth / "spec_3-134_iter_3_MS.npz" 
 
 
 def displayMask(mask, rtol, string):
     noDiff = np.sum(mask)
     maskSize = mask.size
     print("\nNo of different "+string+f", rtol={rtol}:\n",
-          noDiff, " out of ", maskSize,
-          f"ie {100*noDiff/maskSize:.1f} %")
+        noDiff, " out of ", maskSize,
+        f"ie {100*noDiff/maskSize:.1f} %")    
 
 
 def displayMaskAllIter(mask, rtol, string):
@@ -41,7 +41,8 @@ def displayMaskAllIter(mask, rtol, string):
     for i, mask_i in enumerate(mask):
         noDiff = np.sum(mask_i)
         maskSize = mask_i.size
-        print(f"iter {i}: ", noDiff, " out of ", maskSize, f"ie {100*noDiff/maskSize:.1f} %")
+        print(f"iter {i}: ", noDiff, " out of ", maskSize, f"ie {100*noDiff/maskSize:.1f} %")    
+
 
 
 class TestFitParameters(unittest.TestCase):
@@ -76,11 +77,12 @@ class TestFitParameters(unittest.TestCase):
         totalDiffMask = ~ totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "parameters")
 
+        
         plotPars = False
         if plotPars:
             plt.figure()
-            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn,
-                       interpolation="nearest", norm=None)
+            plt.imshow(totalMask, aspect="auto", cmap=plt.cm.RdYlGn, 
+                        interpolation="nearest", norm=None)
             plt.title("Comparison between ori and opt pars")
             plt.xlabel("Parameters")
             plt.ylabel("Spectra")
@@ -93,12 +95,14 @@ class TestFitParameters(unittest.TestCase):
         totalDiffMask = ~ totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "chi2")
 
+
     def test_nit(self):
         totalMask = np.isclose(
             self.orinit, self.optnit, rtol=self.rtol, equal_nan=self.equal_nan
             )
         totalDiffMask = ~ totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "nit")
+
 
     def test_intensities(self):
         totalMask = np.isclose(
@@ -112,7 +116,7 @@ class TestNcp(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
         self.orincp = originalResults["all_tot_ncp"][:,:,:-1]
-
+        
         optimizedResults = np.load(pathToOptimized)
         self.optncp = optimizedResults["all_tot_ncp"]
 
@@ -129,14 +133,14 @@ class TestNcp(unittest.TestCase):
             )
         totalDiffMask = ~ totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "ncp")
-
+        
         plotNcp = False
         if plotNcp:
             noOfIter = len(self.orincp)
             fig, axs = plt.subplots(1, noOfIter)
             for i, ax in enumerate(axs):
-                ax.imshow(totalMask[i], aspect="auto", cmap=plt.cm.RdYlGn,
-                          interpolation="nearest", norm=None)
+                ax.imshow(totalMask[i], aspect="auto", cmap=plt.cm.RdYlGn, 
+                        interpolation="nearest", norm=None)
             fig.suptitle("Comparison between ori and opt ncp")
             axs[0].set_ylabel("Spectra")
             # axs.yaxis.set_major_formatter(mtick.FormatStrFormatter('%.2e'))
@@ -169,11 +173,11 @@ class TestMeanWidths(unittest.TestCase):
 
         optimizedResults = np.load(pathToOptimized)
         self.optmeanwidths = optimizedResults["all_mean_widths"]
-
+    
     def test_widths(self):
         print("\nFinal mean widths:",
-              "\nori: ", self.orimeanwidths[-1],
-              "\nopt: ", self.optmeanwidths[-1])
+            "\nori: ", self.orimeanwidths[-1], 
+            "\nopt: ", self.optmeanwidths[-1])
 
         plot_values_and_errors(self.orimeanwidths, self.optmeanwidths, "Widths")
 
@@ -185,11 +189,11 @@ class TestMeanIntensities(unittest.TestCase):
 
         optimizedResults = np.load(pathToOptimized)
         self.optmeanintensities = optimizedResults["all_mean_intensities"]
-
+    
     def test_intensities(self):
         print("\nFinal mean intensity ratios:",
-              "\nori: ", self.orimeanintensities[-1],
-              "\nopt: ", self.optmeanintensities[-1])
+            "\nori: ", self.orimeanintensities[-1], 
+            "\nopt: ", self.optmeanintensities[-1])
 
         plot_values_and_errors(self.orimeanintensities, self.optmeanintensities, "Intensity Ratios")
 
@@ -198,7 +202,7 @@ class TestFitWorkspaces(unittest.TestCase):
     def setUp(self):
         originalResults = np.load(pathToOriginal)
         self.oriws = originalResults["all_fit_workspaces"]
-
+        
         optimizedResults = np.load(pathToOptimized)
         self.optws = optimizedResults["all_fit_workspaces"]
 
