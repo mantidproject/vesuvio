@@ -1,22 +1,21 @@
-
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-import matplotlib.pyplot as plt
 from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
-testPath = Path(__file__).absolute().parent 
+testPath = Path(__file__).absolute().parent
 
 
-class BootstrapInitialConditions: # Not used, but still need to pass as arg
+class BootstrapInitialConditions:  # Not used, but still need to pass as arg
     runBootstrap = False
+
 
 class UserScriptControls:
     runRoutine = True
-    procedure = "FORWARD"   
-    fitInYSpace = None    
+    procedure = "FORWARD"
+    fitInYSpace = None
+
 
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
@@ -37,8 +36,8 @@ def displayMask(mask, rtol, string):
     noDiff = np.sum(mask)
     maskSize = mask.size
     print("\nNo of different "+string+f", rtol={rtol}:\n",
-        noDiff, " out of ", maskSize,
-        f"ie {100*noDiff/maskSize:.1f} %")    
+          noDiff, " out of ", maskSize,
+          f"ie {100*noDiff/maskSize:.1f} %")
 
 
 class TestFitParameters(unittest.TestCase):
@@ -52,7 +51,7 @@ class TestFitParameters(unittest.TestCase):
         self.oriwidths = self.orimainPars[:, :, 1::3]
         self.oricenters = self.orimainPars[:, :, 2::3]
 
-        optPars = currentResults.all_spec_best_par_chi_nit 
+        optPars = currentResults.all_spec_best_par_chi_nit
         self.optspec = optPars[:, :, 0]
         self.optchi2 = optPars[:, :, -2]
         self.optnit = optPars[:, :, -1]
@@ -83,7 +82,7 @@ class TestFitParameters(unittest.TestCase):
 class TestNcp(unittest.TestCase):
     def setUp(self):
         self.orincp = storedResults["all_tot_ncp"]
-        
+
         self.optncp = currentResults.all_tot_ncp
 
         self.rtol = 1e-7
@@ -101,7 +100,7 @@ class TestMeanWidths(unittest.TestCase):
         self.orimeanwidths = storedResults["all_mean_widths"]
 
         self.optmeanwidths = currentResults.all_mean_widths
-    
+
     def test_widths(self):
         # nptest.assert_allclose(self.orimeanwidths, self.optmeanwidths)
         nptest.assert_array_equal(self.orimeanwidths, self.optmeanwidths)
@@ -121,7 +120,7 @@ class TestMeanIntensities(unittest.TestCase):
 class TestFitWorkspaces(unittest.TestCase):
     def setUp(self):
         self.oriws = storedResults["all_fit_workspaces"]
-        
+
         self.optws = currentResults.all_fit_workspaces
 
         self.decimal = 8
@@ -133,4 +132,3 @@ class TestFitWorkspaces(unittest.TestCase):
             mask = ~np.isclose(oriws, optws, rtol=self.rtol, equal_nan=True)
             displayMask(mask, self.rtol, "wsFinal")
         nptest.assert_array_equal(self.optws, self.oriws)
-

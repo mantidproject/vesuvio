@@ -1,11 +1,10 @@
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
 from vesuvio_analysis.core_functions.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from .tests_IC import  scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
-testPath = Path(__file__).absolute().parent 
+testPath = Path(__file__).absolute().parent
 
 np.random.seed(1)   # Set seed so that tests match everytime
 
@@ -16,17 +15,19 @@ class BootstrapInitialConditions:
     procedure = "JOINT"
     fitInYSpace = "FORWARD"
 
-    bootstrapType = "BOOT_RESIDUALS" 
+    bootstrapType = "BOOT_RESIDUALS"
     nSamples = 3
     skipMSIterations = False
     runningTest = True
     userConfirmation = False
 
+
 class UserScriptControls:
-    runRoutine = False 
-    procedure = "FORWARD"   
-    fitInYSpace = None    
-    # bootstrap = "JOINT"   
+    runRoutine = False
+    procedure = "FORWARD"
+    fitInYSpace = None
+    # bootstrap = "JOINT"
+
 
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
@@ -56,6 +57,7 @@ bootYFitSamples = bootRes["fwdYFit"].bootSamples
 oriBootBack = testPath / "stored_boot_back.npz"
 oriBootFront = testPath / "stored_boot_front.npz"
 oriBootYFit = testPath / "stored_boot_yfit.npz"
+
 
 class TestJointBootstrap(unittest.TestCase):
 
@@ -93,5 +95,3 @@ class TestJointBootstrap(unittest.TestCase):
 
 #     def testYFit(self):
 #         nptest.assert_array_almost_equal(bootSingleYFitSamples, self.oriYFit)
-
-

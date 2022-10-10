@@ -1,8 +1,6 @@
-
-from random import sample
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
-import numpy as np
+
 currentPath = Path(__file__).absolute().parent
 experimentsPath = currentPath / ".."/ ".." / "experiments"
 
@@ -11,7 +9,8 @@ def completeICFromInputs(IC, scriptName, wsIC):
     """Assigns new methods to the initial conditions class from the inputs of that class"""
 
     assert IC.lastSpec > IC.firstSpec, "Last spectrum needs to be bigger than first spectrum"
-    assert ((IC.lastSpec<135) & (IC.firstSpec<135)) | ((IC.lastSpec>=135) & (IC.firstSpec>=135)), "First and last spec need to be both in Back or Front scattering."
+    assert ((IC.lastSpec<135) & (IC.firstSpec<135)) | ((IC.lastSpec>=135) & (IC.firstSpec>=135)
+                                                       ), "First and last spec need to be both in Back or Front scattering."
 
     if IC.lastSpec <= 134:
         IC.modeRunning = "BACKWARD"
@@ -33,24 +32,24 @@ def completeICFromInputs(IC, scriptName, wsIC):
     IC.subEmptyFromRaw = wsIC.subEmptyFromRaw
     IC.scaleEmpty = wsIC.scaleEmpty
     IC.scaleRaw = wsIC.scaleRaw
-    
+
     # When attribute InstrParsPath is not present, set it equal to path from wsIC
-    try:    
-        r = IC.InstrParsPath    # If present, leave it unaltered
+    try:
+        IC.InstrParsPath    # If present, leave it unaltered
     except AttributeError:
         IC.InstrParsPath = wsIC.ipfile
 
     # Sort out input and output paths
     rawPath, emptyPath = inputDirsForSample(wsIC, scriptName)
-    if not(rawPath.is_file()) or not(emptyPath.is_file()):    
+    if not(rawPath.is_file()) or not(emptyPath.is_file()):
         print(f"\nWorkspaces not found.\nSaving Workspaces:\n{rawPath.name}\n{emptyPath.name}")
         saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath)
-    
+
     IC.userWsRawPath = rawPath
     IC.userWsEmptyPath = emptyPath
 
     setOutputDirsForSample(IC, scriptName)
-    
+
     # Do not run bootstrap sample, by default
     IC.runningSampleWS = False
 
@@ -59,25 +58,25 @@ def completeICFromInputs(IC, scriptName, wsIC):
 
     # Default not running preliminary procedure to estimate HToMass0Ratio
     IC.runningPreliminary = False
-    
+
     # Set directories for figures
-    figSavePath = experimentsPath / scriptName /"figures" 
+    figSavePath = experimentsPath / scriptName /"figures"
     figSavePath.mkdir(exist_ok=True)
     IC.figSavePath = figSavePath
 
     # Create default of not running original version with histogram data
     try:
-        t = IC.runHistData
+        IC.runHistData
     except AttributeError:
         IC.runHistData = False
 
     # Norm voigt except when comparing with tests
     try:
-        d = IC.normVoigt
+        IC.normVoigt
     except AttributeError:
         IC.normVoigt = True
 
-    return 
+    return
 
 
 def inputDirsForSample(wsIC, sampleName):
@@ -119,14 +118,14 @@ def setOutputDirsForSample(IC, sampleName):
 
 
 def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
-    
+
     print(f"\nLoading and storing workspace sample runs: {wsIC.runs}\n")
 
     rawVesuvio = LoadVesuvio(
-        Filename=wsIC.runs, 
-        SpectrumList=wsIC.spectra, 
+        Filename=wsIC.runs,
+        SpectrumList=wsIC.spectra,
         Mode=wsIC.mode,
-        InstrumentParFile=str(wsIC.ipfile), 
+        InstrumentParFile=str(wsIC.ipfile),
         OutputWorkspace=rawPath.name
         )
 
@@ -134,23 +133,24 @@ def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
     print("\nRaw workspace stored locally.\n")
 
     emptyVesuvio = LoadVesuvio(
-        Filename=wsIC.empty_runs, 
-        SpectrumList=wsIC.spectra, 
+        Filename=wsIC.empty_runs,
+        SpectrumList=wsIC.spectra,
         Mode=wsIC.mode,
-        InstrumentParFile=str(wsIC.ipfile), 
+        InstrumentParFile=str(wsIC.ipfile),
         OutputWorkspace=emptyPath.name
         )
 
     SaveNexus(emptyVesuvio, str(emptyPath))
     print("\nEmpty workspace stored locally.\n")
-    return 
+    return
+
 
 def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
     if not(bootIC.runBootstrap):
         return
 
     try:    # Assume it is not running a test if atribute is not found
-        reading = bootIC.runningTest
+        bootIC.runningTest
     except AttributeError:
         bootIC.runningTest = False
 
@@ -164,7 +164,7 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName   # Name of sample currently running
     experimentsPath = currentPath/".."/".."/"experiments"
-    
+
     # Used to store running times required to estimate Bootstrap total run time.
     bootIC.runTimesPath = experimentsPath / sampleName / "running_times.txt"
 
@@ -197,14 +197,14 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
         IC.logFilePath = logFilePath
         IC.bootSavePathLog = logString(bootName, IC, yFitIC, bootIC, isYFit=False)
         IC.bootYFitSavePathLog = logString(bootNameYFit, IC, yFitIC, bootIC, isYFit=True)
-    return 
+    return
 
 
 def genBootFilesName (IC, bootIC):
     """Generates save file name for either BACKWARD or FORWARD class"""
 
     nSamples = bootIC.nSamples
-    if bootIC.bootstrapType=="JACKKNIFE": 
+    if bootIC.bootstrapType=="JACKKNIFE":
         nSamples = 3 if bootIC.runningTest else noOfHistsFromTOFBinning(IC)
 
     # Build Filename based on ic
@@ -227,36 +227,39 @@ def header_string():
     yspace fit data file: boot type | procedure | symmetrisation | rebin pars | fit model | mask type
     """
 
+
 def logString(bootDataName, IC, yFitIC, bootIC, isYFit):
     if isYFit:
-        log = (bootDataName+" : "+bootIC.bootstrapType+
-        " | "+str(bootIC.fitInYSpace)+
-        " | "+str(yFitIC.symmetrisationFlag)+
-        " | "+yFitIC.rebinParametersForYSpaceFit+
-        " | "+yFitIC.fitModel+
-        " | "+str(yFitIC.maskTypeProcedure))
+        log = (bootDataName+" : "+bootIC.bootstrapType
+               + " | "+str(bootIC.fitInYSpace)
+               + " | "+str(yFitIC.symmetrisationFlag)
+               + " | "+yFitIC.rebinParametersForYSpaceFit
+               + " | "+yFitIC.fitModel
+               + " | "+str(yFitIC.maskTypeProcedure))
     else:
-        log = (bootDataName+" : "+bootIC.bootstrapType+
-        " | "+str(bootIC.procedure)+
-        " | "+IC.tofBinning+
-        " | "+str(IC.maskTOFRange))
+        log = (bootDataName+" : "+bootIC.bootstrapType
+               + " | "+str(bootIC.procedure)
+               + " | "+IC.tofBinning
+               + " | "+str(IC.maskTOFRange))
     return log
 
 
 def noOfHistsFromTOFBinning(IC):
-    start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]  # Convert first to float and then to int because of decimal points
+    # Convert first to float and then to int because of decimal points
+    start, spacing, end = [int(float(s)) for s in IC.tofBinning.split(",")]
     return int((end-start)/spacing) - 1 # To account for last column being ignored
 
 
 def buildFinalWSName(scriptName: str, procedure: str, IC):
     # Format of corrected ws from last iteration
     name = scriptName + "_" + procedure + "_" + str(IC.noOfMSIterations)
-    return name 
+    return name
+
 
 def completeYFitIC(yFitIC, sampleName):
     # Set directories for figures
 
-    figSavePath = experimentsPath / sampleName /  "figures" 
+    figSavePath = experimentsPath / sampleName /  "figures"
     figSavePath.mkdir(exist_ok=True)
     yFitIC.figSavePath = figSavePath
     return
