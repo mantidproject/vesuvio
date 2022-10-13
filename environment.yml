@@ -2,9 +2,20 @@ name: vesuvio-env
 
 channels:
   - conda-forge
+  - mantid
+  - anaconda
 
 dependencies:
   - flake8
   - conda-wrappers
   - pre-commit==2.15
   - cmake=3.19.*|>=3.21.0
+  - coverage
+  - python=3.8.*
+  - mantid
+  - matplotlib
+  - iminuit
+  - pip
+  - h5py
+  - pip:
+    - jacobi
