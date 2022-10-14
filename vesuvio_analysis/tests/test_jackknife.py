@@ -4,9 +4,6 @@ import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
-testPath = Path(__file__).absolute().parent
-
-np.random.seed(3)   # Set seed so that tests match everytime
 
 
 class BootstrapInitialConditions:
@@ -29,36 +26,44 @@ class UserScriptControls:
     # bootstrap = "JOINT"
 
 
-bootIC = BootstrapInitialConditions
-userCtr = UserScriptControls
-
-bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
-jackBackSamples = bootRes["bckwdScat"].bootSamples
-jackFrontSamples = bootRes["fwdScat"].bootSamples
-
-
-# jackJointResults = bootRes
-
-# jackSamples = []
-# for jackRes in jackJointResults:
-#     jackSamples.append(jackRes.bootSamples)
-
-# jackBackSamples, jackFrontSamples = jackSamples
-
-
-oriJackBack = testPath / "stored_joint_jack_back.npz"
-oriJackFront = testPath / "stored_joint_jack_front.npz"
-
-
 class TestJointBootstrap(unittest.TestCase):
+    @classmethod
+    def _run_analysis(cls):
+        np.random.seed(3)  # Set seed so that tests match everytime
 
-    def setUp(self):
-        self.oriJointBack = np.load(oriJackBack)["boot_samples"]
-        self.oriJointFront = np.load(oriJackFront)["boot_samples"]
+        bootIC = BootstrapInitialConditions
+        userCtr = UserScriptControls
+
+        bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+
+        cls._jackBackSamples = bootRes["bckwdScat"].bootSamples
+        cls._jackFrontSamples = bootRes["fwdScat"].bootSamples
+
+        # jackJointResults = bootRes
+
+        # jackSamples = []
+        # for jackRes in jackJointResults:
+        #     jackSamples.append(jackRes.bootSamples)
+
+        # jackBackSamples, jackFrontSamples = jackSamples
+
+    @classmethod
+    def _load_benchmark_results(cls):
+        testPath = Path(__file__).absolute().parent
+        cls._oriJointBack = np.load(testPath / "stored_joint_jack_back.npz")["boot_samples"]
+        cls._oriJointFront = np.load(testPath / "stored_joint_jack_front.npz")["boot_samples"]
+
+    @classmethod
+    def setUpClass(cls):
+        cls._run_analysis()
+        cls._load_benchmark_results()
 
     def testBack(self):
-        nptest.assert_array_almost_equal(jackBackSamples, self.oriJointBack)
+        nptest.assert_array_almost_equal(self._jackBackSamples, self._oriJointBack)
 
     def testFront(self):
-        nptest.assert_array_almost_equal(jackFrontSamples, self.oriJointFront)
+        nptest.assert_array_almost_equal(self._jackFrontSamples, self._oriJointFront)
+
+
+if __name__ == '__main__':
+    unittest.main()
