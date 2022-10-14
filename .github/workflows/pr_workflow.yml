@@ -42,10 +42,10 @@ jobs:
       - name: unittests
         run: coverage run -m unittest discover -s ./vesuvio_analysis
 
-      # Runs system tests
-      - name: systemtests
-        run: python -m system_tests.test_runner
-
       # Report coverage
       - name: coverage
         run: coverage report
+
+      # Runs system tests
+      - name: systemtests
+        run: python -m system_tests.test_runner
