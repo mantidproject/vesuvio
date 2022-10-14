@@ -50,8 +50,7 @@ class AnalysisRunner:
     @classmethod
     def _load_benchmark_results(cls):
         testPath = Path(__file__).absolute().parent
-        oriPath = testPath / "stored_analysis.npz"   # Original data
-        benchmarkResults = np.load(oriPath)
+        benchmarkResults = np.load(str(testPath / "stored_analysis.npz"))
         AnalysisRunner._benchmarkResults = benchmarkResults
 
 

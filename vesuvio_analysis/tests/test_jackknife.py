@@ -50,8 +50,8 @@ class TestJointBootstrap(unittest.TestCase):
     @classmethod
     def _load_benchmark_results(cls):
         testPath = Path(__file__).absolute().parent
-        cls._oriJointBack = np.load(testPath / "stored_joint_jack_back.npz")["boot_samples"]
-        cls._oriJointFront = np.load(testPath / "stored_joint_jack_front.npz")["boot_samples"]
+        cls._oriJointBack = np.load(str(testPath / "stored_joint_jack_back.npz"))["boot_samples"]
+        cls._oriJointFront = np.load(str(testPath / "stored_joint_jack_front.npz"))["boot_samples"]
 
     @classmethod
     def setUpClass(cls):
