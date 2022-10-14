@@ -6,15 +6,8 @@ import numpy as np
 import unittest
 import numpy.testing as nptest
 from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
-testPath = Path(__file__).absolute().parent
+
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
-
-AnalysisDataService.clear()
-
-wsFinal = Load(str(testPath / "wsFinal.nxs"), OutputWorkspace=scriptName+"_FORWARD_1")
-for i in range(len(fwdIC.masses)):
-    fileName = "wsFinal_ncp_"+str(i)+".nxs"
-    Load(str(testPath / fileName), OutputWorkspace=wsFinal.name()+"_TOF_Fitted_Profile_"+str(i))
 
 
 class BootstrapInitialConditions: # Not used, but still need to pass as arg
@@ -27,35 +20,63 @@ class UserScriptControls:
     fitInYSpace = "FORWARD"
 
 
-bootIC = BootstrapInitialConditions
-userCtr = UserScriptControls
+class AnalysisRunner:
+    _benchmarkResults = None
+    _currentResults = None
+    _test_path = Path(__file__).absolute().parent
+    _workspaces_loaded = False
 
+    @classmethod
+    def load_workspaces(cls):
+        if not cls._workspaces_loaded:
+            cls._load_workspaces()
+            cls._workspaces_loaded = True
 
-yFitIC.symmetrisationFlag = False
-yFitIC.fitModel = "GC_C4_C6"
-oriPath = testPath / "stored_yspace_fit_GC.npz"
+    @classmethod
+    def get_benchmark_result(cls):
+        if not AnalysisRunner._benchmarkResults:
+            cls._load_benchmark_results()
+        return AnalysisRunner._benchmarkResults
 
-scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+    @classmethod
+    def get_current_result(cls):
+        if not AnalysisRunner._currentResults:
+            cls._run()
+        return AnalysisRunner._currentResults
 
+    @classmethod
+    def _load_workspaces(cls):
+        AnalysisDataService.clear()
+        wsFinal = Load(str(cls._test_path / "wsFinal.nxs"), OutputWorkspace=scriptName + "_FORWARD_1")
+        for i in range(len(fwdIC.masses)):
+            fileName = "wsFinal_ncp_" + str(i) + ".nxs"
+            Load(str(cls._test_path / fileName), OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profile_" + str(i))
 
-ySpaceFitResults = yfitRes
+    @classmethod
+    def _run(cls):
+        bootIC = BootstrapInitialConditions
+        userCtr = UserScriptControls
+        yFitIC.fitModel = "GC_C4_C6"
 
-# Test yspace
-# oriPath = testPath / "stored_yspace_fit.npz"
-storedResults = np.load(oriPath)
-currentResults = ySpaceFitResults
+        scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+        cls._currentResults = yfitRes
+
+    @classmethod
+    def _load_benchmark_results(cls):
+        cls._benchmarkResults = np.load(str(cls._test_path / "stored_yspace_fit_GC.npz"))
 
 
 class TestSymSumYSpace(unittest.TestCase):
-    def setUp(self):
-        self.oridataY = storedResults["YSpaceSymSumDataY"]
-        self.oridataE = storedResults["YSpaceSymSumDataE"]
+    @classmethod
+    def setUpClass(cls):
+        cls.oridataY = AnalysisRunner.get_benchmark_result()["YSpaceSymSumDataY"]
+        cls.oridataE = AnalysisRunner.get_benchmark_result()["YSpaceSymSumDataE"]
 
-        self.optdataY = currentResults.YSpaceSymSumDataY
-        self.optdataE = currentResults.YSpaceSymSumDataE
-        self.rtol = 0.000001
-        self.equal_nan = True
-        self.decimal = 6
+        cls.optdataY = AnalysisRunner.get_current_result().YSpaceSymSumDataY
+        cls.optdataE = AnalysisRunner.get_current_result().YSpaceSymSumDataE
+        cls.rtol = 0.000001
+        cls.equal_nan = True
+        cls.decimal = 6
 
     def test_YSpaceDataY(self):
         nptest.assert_allclose(self.oridataY, self.optdataY)
@@ -66,9 +87,8 @@ class TestSymSumYSpace(unittest.TestCase):
 
 class TestResolution(unittest.TestCase):
     def setUp(self):
-        self.orires = storedResults["resolution"]
-
-        self.optres = currentResults.resolution
+        self.orires = AnalysisRunner.get_benchmark_result()["resolution"]
+        self.optres = AnalysisRunner.get_current_result().resolution
 
         self.rtol = 0.0001
         self.equal_nan = True
@@ -80,9 +100,8 @@ class TestResolution(unittest.TestCase):
 
 class TestHdataY(unittest.TestCase):
     def setUp(self):
-        self.oriHdataY = storedResults["HdataY"]
-
-        self.optHdataY = currentResults.HdataY
+        self.oriHdataY = AnalysisRunner.get_benchmark_result()["HdataY"]
+        self.optHdataY = AnalysisRunner.get_current_result().HdataY
 
         self.rtol = 0.0001
         self.equal_nan = True
@@ -98,9 +117,8 @@ class TestHdataY(unittest.TestCase):
 
 class TestFinalRawDataY(unittest.TestCase):
     def setUp(self):
-        self.oriFinalDataY = storedResults["finalRawDataY"]
-
-        self.optFinalDataY = currentResults.finalRawDataY
+        self.oriFinalDataY = AnalysisRunner.get_benchmark_result()["finalRawDataY"]
+        self.optFinalDataY = AnalysisRunner.get_current_result().finalRawDataY
 
         self.rtol = 1e-6
         self.equal_nan = True
@@ -112,9 +130,8 @@ class TestFinalRawDataY(unittest.TestCase):
 
 class TestFinalRawDataE(unittest.TestCase):
     def setUp(self):
-        self.oriFinalDataE = storedResults["finalRawDataE"]
-
-        self.optFinalDataE = currentResults.finalRawDataE
+        self.oriFinalDataE = AnalysisRunner.get_benchmark_result()["finalRawDataE"]
+        self.optFinalDataE = AnalysisRunner.get_current_result().finalRawDataE
 
         self.rtol = 1e-6
         self.equal_nan = True
@@ -126,10 +143,9 @@ class TestFinalRawDataE(unittest.TestCase):
 
 class Testpopt(unittest.TestCase):
     def setUp(self):
-        self.oripopt = storedResults["popt"]
-
+        self.oripopt = AnalysisRunner.get_benchmark_result()["popt"]
         # Select only Fit results due to Mantid Fit
-        self.optpopt = currentResults.popt
+        self.optpopt = AnalysisRunner.get_current_result().popt
 
     def test_opt(self):
         print("\nori:\n", self.oripopt, "\nopt:\n", self.optpopt)
@@ -138,9 +154,8 @@ class Testpopt(unittest.TestCase):
 
 class Testperr(unittest.TestCase):
     def setUp(self):
-        self.oriperr = storedResults["perr"]
-
-        self.optperr = currentResults.perr
+        self.oriperr = AnalysisRunner.get_benchmark_result()["perr"]
+        self.optperr = AnalysisRunner.get_current_result().perr
 
     def test_perr(self):
         # print("\norierr:\n", self.oriperr, "\nopterr:\n", self.optperr)
