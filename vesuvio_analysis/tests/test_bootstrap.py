@@ -69,7 +69,6 @@ class TestJointBootstrap(unittest.TestCase):
     def setUpClass(cls):
         cls._run_analysis()
         cls._load_benchmark_results()
-        cls._set_up_complete = True
 
     def testBack(self):
         nptest.assert_array_almost_equal(self._bootBackSamples, self._oriJointBack)
