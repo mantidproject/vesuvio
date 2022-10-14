@@ -44,7 +44,7 @@ jobs:
 
       # Runs system tests
       - name: systemtests
-        run: python run system_tests/test_runner.py
+        run: python -m system_tests.test_runner
 
       # Report coverage
       - name: coverage
