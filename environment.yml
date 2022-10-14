@@ -17,5 +17,6 @@ dependencies:
   - iminuit
   - pip
   - h5py
+  - mock
   - pip:
     - jacobi

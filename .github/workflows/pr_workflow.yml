@@ -39,8 +39,12 @@ jobs:
         run: python -m flake8 --config=config.flake8
 
       # Runs tests
-      - name: unittest
-        run: coverage run -m unittest discover
+      - name: unittests
+        run: coverage run -m unittest discover -s ./vesuvio_analysis
+
+      # Runs system tests
+      - name: systemtests
+        run: python run system_tests/test_runner.py
 
       # Report coverage
       - name: coverage

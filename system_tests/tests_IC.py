@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
 
-ipFilesPath = Path(__file__).absolute().parent.parent / "ip_files"
+ipFilesPath = Path(__file__).absolute().parent.parent / "vesuvio_analysis" / "ip_files"
 ipFilePath = ipFilesPath / "ip2018_3.par"
 
 
