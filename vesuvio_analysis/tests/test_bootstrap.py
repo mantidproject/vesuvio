@@ -3,10 +3,7 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from .tests_IC import  scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
-testPath = Path(__file__).absolute().parent
-
-np.random.seed(1)   # Set seed so that tests match everytime
+from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 
 
 class BootstrapInitialConditions:
@@ -29,69 +26,92 @@ class UserScriptControls:
     # bootstrap = "JOINT"
 
 
-bootIC = BootstrapInitialConditions
-userCtr = UserScriptControls
-
-# Change yFItIC to default settings, running tests for yfit before hand changes this
-yFitIC.fitModel = "SINGLE_GAUSSIAN"
-yFitIC.symmetrisationFlag = True
-
-bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
-#TODO: Figure out why doing the two tests simultaneously fails the testing
-# Probably because running bootstrap alters the initial conditions of forward scattering
-# Test Joint procedure
-
-bootBackSamples = bootRes["bckwdScat"].bootSamples
-bootFrontSamples = bootRes["fwdScat"].bootSamples
-bootYFitSamples = bootRes["fwdYFit"].bootSamples
-
-# bootJointResults = bootRes
-
-# bootSamples = []
-# for bootRes in bootJointResults:
-#     bootSamples.append(bootRes.bootSamples)
-
-# bootBackSamples, bootFrontSamples, bootYFitSamples = bootSamples
-
-oriBootBack = testPath / "stored_boot_back.npz"
-oriBootFront = testPath / "stored_boot_front.npz"
-oriBootYFit = testPath / "stored_boot_yfit.npz"
-
-
 class TestJointBootstrap(unittest.TestCase):
+    @classmethod
+    def _run_analysis(cls):
+        print("##############################################")
+        print("----------------RUN ANALYSIS------------------")
+        print("##############################################")
+        np.random.seed(1)  # Set seed so that tests match everytime
+        bootIC = BootstrapInitialConditions
+        userCtr = UserScriptControls
 
-    def setUp(self):
-        self.oriJointBack = np.load(oriBootBack)["boot_samples"]
-        self.oriJointFront = np.load(oriBootFront)["boot_samples"]
-        self.oriJointYFit = np.load(oriBootYFit)["boot_samples"]
+        # Change yFItIC to default settings, running tests for yfit before hand changes this
+        yFitIC.fitModel = "SINGLE_GAUSSIAN"
+        yFitIC.symmetrisationFlag = True
+
+        bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+
+        # TODO: Figure out why doing the two tests simultaneously fails the testing
+        # Probably because running bootstrap alters the initial conditions of forward scattering
+        # Test Joint procedure
+
+        cls._bootBackSamples = bootRes["bckwdScat"].bootSamples
+        cls._bootFrontSamples = bootRes["fwdScat"].bootSamples
+        cls._bootYFitSamples = bootRes["fwdYFit"].bootSamples
+
+        # bootJointResults = bootRes
+
+        # bootSamples = []
+        # for bootRes in bootJointResults:
+        #     bootSamples.append(bootRes.bootSamples)
+
+        # bootBackSamples, bootFrontSamples, bootYFitSamples = bootSamples
+
+    @classmethod
+    def _load_benchmark_results(cls):
+        testPath = Path(__file__).absolute().parent
+        cls._oriJointBack = np.load(testPath / "stored_boot_back.npz")["boot_samples"]
+        cls._oriJointFront = np.load(testPath / "stored_boot_front.npz")["boot_samples"]
+        cls._oriJointYFit = np.load(testPath / "stored_boot_yfit.npz")["boot_samples"]
+
+    @classmethod
+    def setUpClass(cls):
+        cls._run_analysis()
+        cls._load_benchmark_results()
+        cls._set_up_complete = True
 
     def testBack(self):
-        nptest.assert_array_almost_equal(bootBackSamples, self.oriJointBack)
+        nptest.assert_array_almost_equal(self._bootBackSamples, self._oriJointBack)
 
     def testFront(self):
-        nptest.assert_array_almost_equal(bootFrontSamples, self.oriJointFront)
+        nptest.assert_array_almost_equal(self._bootFrontSamples, self._oriJointFront)
 
     def testYFit(self):
-        nptest.assert_array_almost_equal(bootYFitSamples, self.oriJointYFit)
+        nptest.assert_array_almost_equal(self._bootYFitSamples, self._oriJointYFit)
 
 
 # # Test Single procedure
-# bootSingleResults = runIndependentBootstrap(bckwdIC, bootIC, yfitIC)
-
-# bootSingleBackSamples = bootSingleResults[0].bootSamples
-# bootSingleYFitSamples = bootSingleResults[1].bootSamples
-
-# oriSingleBootBack = testPath / "stored_single_boot_back.npz"
-# oriSingleBootYFit = testPath / "stored_single_boot_back_yfit.npz"
-
 # class TestIndependentBootstrap(unittest.TestCase):
+#     def _run_analysis(self):
+#         np.random.seed(1)  # Set seed so that tests match everytime
+#         bootIC = BootstrapInitialConditions
+#         userCtr = UserScriptControls
+#
+#         # Change yFItIC to default settings, running tests for yfit before hand changes this
+#         yFitIC.fitModel = "SINGLE_GAUSSIAN"
+#         yFitIC.symmetrisationFlag = True
+#
+#         bootSingleResults = runIndependentBootstrap(bckwdIC, bootIC, yFitIC)
+#
+#         self._bootSingleBackSamples = bootSingleResults[0].bootSamples
+#         self._bootSingleYFitSamples = bootSingleResults[1].bootSamples
+#
+#     def _load_benchmark_results(self):
+#         testPath = Path(__file__).absolute().parent
+#         self._oriBack = np.load(testPath / "stored_single_boot_back.npz")["boot_samples"]
+#         self._oriYFit = np.load(testPath / "stored_single_boot_back_yfit.npz")["boot_vals"]
+#
 #     def setUp(self):
-#         self.oriBack = np.load(oriSingleBootBack)["boot_samples"]
-#         self.oriYFit = np.load(oriSingleBootYFit)["boot_vals"]
-
+#         self._run_analysis()
+#         self._load_benchmark_results()
+#
 #     def testBack(self):
-#         nptest.assert_array_almost_equal(bootSingleBackSamples, self.oriBack)
-
+#         nptest.assert_array_almost_equal(self._bootSingleBackSamples, self._oriBack)
+#
 #     def testYFit(self):
-#         nptest.assert_array_almost_equal(bootSingleYFitSamples, self.oriYFit)
+#         nptest.assert_array_almost_equal(self._bootSingleYFitSamples, self._oriYFit)
+#
+
+if __name__ == '__main__':
+    unittest.main()
