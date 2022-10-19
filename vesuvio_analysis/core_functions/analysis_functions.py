@@ -1,6 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from mantid.simpleapi import *
+import sys
+from mantid.simpleapi import (RenameWorkspace, CloneWorkspace, mtd, CreateEmptyTableWorkspace, Load, Rebin, Scale, SumSpectra, Minus,
+                              CropWorkspace, Integration, MaskDetectors, CreateWorkspace, CreateSampleShape, DeleteWorkspaces, Divide,
+                              Multiply, VesuvioThickness, VesuvioCalculateMS, SetInstrumentParameter, VesuvioCalculateGammaBackground,
+                              DeleteWorkspace)
 from scipy import optimize
 
 from .fit_in_yspace import passDataIntoWS, replaceZerosWithNCP
