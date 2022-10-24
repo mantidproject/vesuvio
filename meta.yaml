@@ -17,12 +17,14 @@ build:
   number: 0
 
 requirements:
-  build:
+  host:
     - python {{ python }}
+
+  build:
     - setuptools
 
   run:
-    - python
+    - python {{ python }}
     - mantid>=6.4.0
     - matplotlib
     - iminuit
