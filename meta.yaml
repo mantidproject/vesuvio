@@ -1,0 +1,41 @@
+  {% set version_tag = environ.get('GIT_DESCRIBE_TAG', '0.0.0') %}
+  {% set version_number = environ.get('GIT_DESCRIBE_NUMBER', '0') | string %}
+  {% set version_number = '_' + version_number if version_number != '0' else '' %}
+
+  {% set version = version_tag + version_number %}
+
+package:
+  name: vesuvio
+  version: {{ version }}
+
+source:
+  git_url: ./
+
+build:
+  noarch: python
+  script: python setup.py install --single-version-externally-managed --record=record.txt
+  number: 0
+
+requirements:
+  build:
+    - python {{ python }}
+    - setuptools
+
+  run:
+    - python
+    - mantid>=6.4.0
+    - matplotlib
+    - iminuit
+    - h5py
+    - mock
+    - jacobi
+
+test:
+  imports:
+    - vesuvio
+
+about:
+  home: https://github.com/mantidproject/vesuvio
+  license: GPL-3.0-or-later
+  summary: Vesuvio is an instrument that performs Neuton Compton Scattering, based at ISIS, RAL, UK. This code processes raw output data to determine
+           nuclear kinetic energies and moment distributions.
