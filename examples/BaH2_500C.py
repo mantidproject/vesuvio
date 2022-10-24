@@ -5,8 +5,12 @@ from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStor
 from vesuvio_analysis.core_functions.run_script import runScript
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
-experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
-ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
+experimentPath = Path(__file__).absolute().parent.parent / "experiments" / scriptName  # Path to the repository
+ipFilesPath = Path(__file__).absolute().parent.parent / "vesuvio_analysis" / "ip_files"
+
+print(scriptName)
+print(experimentPath)
+print(ipFilesPath)
 
 
 class LoadVesuvioBackParameters:
@@ -180,7 +184,7 @@ fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
-
+print(scriptName)
 runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 end_time = time.time()
