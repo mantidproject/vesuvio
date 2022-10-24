@@ -29,7 +29,7 @@ requirements:
 
 test:
   imports:
-    - vesuvio
+    - vesuvio.vesuvio_analysis
 
 about:
   home: https://github.com/mantidproject/vesuvio
