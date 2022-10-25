@@ -40,7 +40,7 @@ jobs:
 
       # Runs tests
       - name: Run Unit Tests
-        run: coverage run -m unittest discover -s ./vesuvio_analysis
+        run: coverage run -m unittest discover -s ./vesuvio/vesuvio_analysis
 
       # Report coverage
       - name: Report Coverage
@@ -48,4 +48,4 @@ jobs:
 
       # Runs system tests
       - name: Run System Tests
-        run: python -m system_tests.test_runner
+        run: python -m vesuvio/system_tests.test_runner
