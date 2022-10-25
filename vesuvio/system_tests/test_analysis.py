@@ -1,4 +1,4 @@
-from vesuvio_analysis.core_functions.run_script import runScript
+from vesuvio.vesuvio_analysis.core_functions.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
