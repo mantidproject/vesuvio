@@ -3,11 +3,11 @@ The tests below only pass in Mantid version 6.2,
 other versions give fail.
 """
 
-import system_tests.test_analysis as analysis
-import system_tests.test_bootstrap as bootstrap
-import system_tests.test_jackknife as jackknife
-import system_tests.test_yspace_fit as yspacefit
-import system_tests.test_yspace_fit_GC as yspacefitGC
+import vesuvio.system_tests.test_analysis as analysis
+import vesuvio.system_tests.test_bootstrap as bootstrap
+import vesuvio.system_tests.test_jackknife as jackknife
+import vesuvio.system_tests.test_yspace_fit as yspacefit
+import vesuvio.system_tests.test_yspace_fit_GC as yspacefitGC
 import unittest
 
 # Initialize the test suite

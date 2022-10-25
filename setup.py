@@ -11,7 +11,7 @@ import os
 
 from setuptools import find_packages, setup
 
-from vesuvio_analysis import __project_url__, __version__
+from vesuvio import __project_url__, __version__
 
 # ==============================================================================
 # Constants

@@ -1,6 +1,6 @@
 import unittest
 from mock import MagicMock
-from vesuvio_analysis.core_functions.analysis_functions import extractWS
+from vesuvio.vesuvio_analysis.core_functions.analysis_functions import extractWS
 
 
 class TestAnalysisFunctions(unittest.TestCase):
