@@ -1,0 +1,6 @@
+This file contains some information about each data file in the folder:
+
+spec_3-134_iter_4_MS_nsampl_600.npz : JOINT - 50,1.,420
+spec_3-134_iter_4_MS_ySpaceFit_nsampl_600.npz : JOINT - False - -25, 0.5, 25 - GC_C4_C6
+spec_135-182_iter_4_MS_GC_nsampl_600.npz : JOINT - 110,1.,430
+spec_135-182_iter_4_MS_GC_ySpaceFit_nsampl_600.npz : JOINT - False - -25, 0.5, 25 - GC_C4_C6

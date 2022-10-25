@@ -17,4 +17,4 @@ dependencies:
   - iminuit
   - h5py
   - mock
-  - jacobi
+  - jacobi==0.4.2 #pinned until newer versions functionality confirmed

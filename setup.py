@@ -19,7 +19,7 @@ from vesuvio_analysis import __project_url__, __version__
 NAME = 'vesuvio'
 THIS_DIR = os.path.dirname(__file__)
 _package_dirs = ['ip_files', 'experiments']
-_package_exts = ['.OPJ', '.par', '.DAT', '.DAT3', '.DAT6', '.txt', '.NXS', '.np']
+_package_exts = ['.OPJ', '.par', '.DAT', '.DAT3', '.DAT6', '.txt', '.NXS', '.nxs', '.np']
 
 
 # ==============================================================================
