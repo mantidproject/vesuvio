@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 
 
 class BootstrapInitialConditions:  # Not used, but still need to pass as arg

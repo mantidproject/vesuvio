@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 

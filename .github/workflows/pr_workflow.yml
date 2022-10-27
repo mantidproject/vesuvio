@@ -48,4 +48,4 @@ jobs:
 
       # Runs system tests
       - name: Run System Tests
-        run: python -m system_tests.test_runner.run
+        run: python -m unittest discover -s ./system_tests
