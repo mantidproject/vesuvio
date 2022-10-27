@@ -8,10 +8,6 @@ scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent.parent / "experiments" / scriptName  # Path to the repository
 ipFilesPath = Path(__file__).absolute().parent.parent / "vesuvio_analysis" / "ip_files"
 
-print(scriptName)
-print(experimentPath)
-print(ipFilesPath)
-
 
 class LoadVesuvioBackParameters:
     runs = '38531-38542'
@@ -184,7 +180,6 @@ fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
 bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
-print(scriptName)
 runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
 end_time = time.time()
