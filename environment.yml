@@ -15,8 +15,6 @@ dependencies:
   - mantid>=6.4.0
   - matplotlib
   - iminuit
-  - pip
   - h5py
   - mock
-  - pip:
-    - jacobi
+  - jacobi
