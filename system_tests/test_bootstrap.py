@@ -29,9 +29,6 @@ class UserScriptControls:
 class TestJointBootstrap(unittest.TestCase):
     @classmethod
     def _run_analysis(cls):
-        print("##############################################")
-        print("----------------RUN ANALYSIS------------------")
-        print("##############################################")
         np.random.seed(1)  # Set seed so that tests match everytime
         bootIC = BootstrapInitialConditions
         userCtr = UserScriptControls
