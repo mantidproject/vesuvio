@@ -12,8 +12,9 @@ dependencies:
   - cmake=3.19.*|>=3.21.0
   - coverage
   - python=3.8.*
-  - mantid
+  - mantid>=6.4.0
   - matplotlib
   - iminuit
   - h5py
+  - mock
   - jacobi

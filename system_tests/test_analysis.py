@@ -3,8 +3,7 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from .tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
-testPath = Path(__file__).absolute().parent
+from system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 
 
 class BootstrapInitialConditions:  # Not used, but still need to pass as arg
@@ -17,19 +16,42 @@ class UserScriptControls:
     fitInYSpace = None
 
 
-bootIC = BootstrapInitialConditions
-userCtr = UserScriptControls
+class AnalysisRunner:
+    _benchmarkResults = None
+    _currentResults = None
 
-scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+    @classmethod
+    def get_benchmark_result(cls):
+        if not AnalysisRunner._benchmarkResults:
+            cls._load_benchmark_results()
+        return AnalysisRunner._benchmarkResults
 
-wsFinal, forwardScatteringResults = scattRes
+    @classmethod
+    def get_current_result(cls):
+        if not AnalysisRunner._currentResults:
+            cls._run()
+        return AnalysisRunner._currentResults
 
-# Test the results
-np.set_printoptions(suppress=True, precision=8, linewidth=150)
+    @classmethod
+    def _run(cls):
+        bootIC = BootstrapInitialConditions
+        userCtr = UserScriptControls
 
-oriPath = testPath / "stored_analysis.npz"   # Original data
-storedResults = np.load(oriPath)
-currentResults = forwardScatteringResults
+        scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+
+        wsFinal, forwardScatteringResults = scattRes
+
+        # Test the results
+        np.set_printoptions(suppress=True, precision=8, linewidth=150)
+
+        currentResults = forwardScatteringResults
+        AnalysisRunner._currentResults = currentResults
+
+    @classmethod
+    def _load_benchmark_results(cls):
+        testPath = Path(__file__).absolute().parent
+        benchmarkResults = np.load(str(testPath / "stored_analysis.npz"))
+        AnalysisRunner._benchmarkResults = benchmarkResults
 
 
 def displayMask(mask, rtol, string):
@@ -41,8 +63,13 @@ def displayMask(mask, rtol, string):
 
 
 class TestFitParameters(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.benchmarkResults = AnalysisRunner.get_benchmark_result()
+        cls.currentResults = AnalysisRunner.get_current_result()
+
     def setUp(self):
-        oriPars = storedResults["all_spec_best_par_chi_nit"]
+        oriPars = self.benchmarkResults["all_spec_best_par_chi_nit"]
         self.orispec = oriPars[:, :, 0]
         self.orichi2 = oriPars[:, :, -2]
         self.orinit = oriPars[:, :, -1]
@@ -51,7 +78,7 @@ class TestFitParameters(unittest.TestCase):
         self.oriwidths = self.orimainPars[:, :, 1::3]
         self.oricenters = self.orimainPars[:, :, 2::3]
 
-        optPars = currentResults.all_spec_best_par_chi_nit
+        optPars = self.currentResults.all_spec_best_par_chi_nit
         self.optspec = optPars[:, :, 0]
         self.optchi2 = optPars[:, :, -2]
         self.optnit = optPars[:, :, -1]
@@ -80,10 +107,15 @@ class TestFitParameters(unittest.TestCase):
 
 
 class TestNcp(unittest.TestCase):
-    def setUp(self):
-        self.orincp = storedResults["all_tot_ncp"]
+    @classmethod
+    def setUpClass(cls):
+        cls.benchmarkResults = AnalysisRunner.get_benchmark_result()
+        cls.currentResults = AnalysisRunner.get_current_result()
 
-        self.optncp = currentResults.all_tot_ncp
+    def setUp(self):
+        self.orincp = self.benchmarkResults["all_tot_ncp"]
+
+        self.optncp = self.currentResults.all_tot_ncp
 
         self.rtol = 1e-7
         self.equal_nan = True
@@ -96,10 +128,15 @@ class TestNcp(unittest.TestCase):
 
 
 class TestMeanWidths(unittest.TestCase):
-    def setUp(self):
-        self.orimeanwidths = storedResults["all_mean_widths"]
+    @classmethod
+    def setUpClass(cls):
+        cls.benchmarkResults = AnalysisRunner.get_benchmark_result()
+        cls.currentResults = AnalysisRunner.get_current_result()
 
-        self.optmeanwidths = currentResults.all_mean_widths
+    def setUp(self):
+        self.orimeanwidths = self.benchmarkResults["all_mean_widths"]
+
+        self.optmeanwidths = self.currentResults.all_mean_widths
 
     def test_widths(self):
         # nptest.assert_allclose(self.orimeanwidths, self.optmeanwidths)
@@ -107,10 +144,15 @@ class TestMeanWidths(unittest.TestCase):
 
 
 class TestMeanIntensities(unittest.TestCase):
-    def setUp(self):
-        self.orimeanintensities = storedResults["all_mean_intensities"]
+    @classmethod
+    def setUpClass(cls):
+        cls.benchmarkResults = AnalysisRunner.get_benchmark_result()
+        cls.currentResults = AnalysisRunner.get_current_result()
 
-        self.optmeanintensities = currentResults.all_mean_intensities
+    def setUp(self):
+        self.orimeanintensities = self.benchmarkResults["all_mean_intensities"]
+
+        self.optmeanintensities = self.currentResults.all_mean_intensities
 
     def test_intensities(self):
         # nptest.assert_allclose(self.orimeanintensities, self.optmeanintensities)
@@ -118,10 +160,15 @@ class TestMeanIntensities(unittest.TestCase):
 
 
 class TestFitWorkspaces(unittest.TestCase):
-    def setUp(self):
-        self.oriws = storedResults["all_fit_workspaces"]
+    @classmethod
+    def setUpClass(cls):
+        cls.benchmarkResults = AnalysisRunner.get_benchmark_result()
+        cls.currentResults = AnalysisRunner.get_current_result()
 
-        self.optws = currentResults.all_fit_workspaces
+    def setUp(self):
+        self.oriws = self.benchmarkResults["all_fit_workspaces"]
+
+        self.optws = self.currentResults.all_fit_workspaces
 
         self.decimal = 8
         self.rtol = 1e-7
@@ -132,3 +179,7 @@ class TestFitWorkspaces(unittest.TestCase):
             mask = ~np.isclose(oriws, optws, rtol=self.rtol, equal_nan=True)
             displayMask(mask, self.rtol, "wsFinal")
         nptest.assert_array_equal(self.optws, self.oriws)
+
+
+if __name__ == '__main__':
+    unittest.main()
