@@ -1,0 +1,8 @@
+Image is inverted in vertical axis (mirrored)
+
+Cadmium mask is 8.39 mm (long axis, vertical)
+                5.75 mm (short axis, horizontal)
+		2.93 mm (short axis, vertical)
+		2.43 mm (long axis, horizontal)
+
+Video is 720 (Horizontal) x  576 (Vertical) Pixels
