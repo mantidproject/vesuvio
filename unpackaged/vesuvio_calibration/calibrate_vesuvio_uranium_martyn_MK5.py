@@ -188,6 +188,9 @@ class EVSCalibrationFit(PythonAlgorithm):
   def summary(self):
     return "Fits peaks to a list of spectra using the mass or the d-spacings (for bragg peaks) of the sample."
 
+  def category(self):
+        return "VesuvioCalibration"
+
   def PyInit(self):
 
     self.declareProperty(StringArrayProperty("Samples", Direction.Input),
@@ -892,6 +895,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
   def summary(self):
     return "Calculates the calibration parameters for the EVS intrument."
+
+  def category(self):
+        return "VesuvioCalibration"
 
   def PyInit(self):
 
