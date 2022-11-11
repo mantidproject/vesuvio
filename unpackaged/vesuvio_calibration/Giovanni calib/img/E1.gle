@@ -1,0 +1,36 @@
+size 31 18.2
+set hei 1.
+set texscale scale
+
+amove -1.4 -0.5
+
+begin graph
+size 35 20
+nobox
+
+data ../data/E1_from_Ipfiles.dat d1=c1,c2 d2=c1,c3 d3=c1,c4 d4=c1,c5 d5=c1,c6
+
+Eguess=4897.3
+
+let d1 = d1-Eguess
+let d2 = d2-Eguess
+let d3 = d3-Eguess
+
+let d90=0
+
+
+d1 line marker fsquare msize 0.3  color blue key " from Ip0004 (2013)"
+d2 line marker fdiamond msize 0.3 color green key "from Ip0005 (2014)"
+d3 line marker ftriangle msize 0.3  color red key " from IpSurvey (2015)"
+
+
+d90 line
+
+key position tl nobox
+
+xaxis min 0 max 200 dticks 20 
+yaxis min -4 max 4 dticks 2
+xtitle "Detector"  
+ytitle "E_1 [meV] - 4897.3 [meV] " 
+
+end graph

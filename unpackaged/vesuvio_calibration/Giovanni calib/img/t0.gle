@@ -1,0 +1,33 @@
+size 31 18.2
+set hei 1.
+set texscale scale
+
+amove -1.4 -0.5
+
+begin graph
+size 35 20
+nobox
+
+data ../data/t0_from_Ipfiles.dat d1=c1,c2 d2=c1,c3 d3=c1,c4 d4=c1,c5 d5=c1,c6
+
+let d90=0
+
+let d13=d1-d3
+let d20=-0.195970
+
+d5 impulses lwidth 0.2 key "standard deviation"
+
+
+d1 line marker fsquare msize 0.3  color blue key " from Ip0004 (2013)"
+d3 line marker ftriangle msize 0.3  color red key " from IpSurvey (2015)"
+d20 line color black lstyle 2 lwidth .05 key "t_0 = -0.196 for frontscattering"
+d90 line
+
+key position tr nobox
+
+xaxis min 0 max 150 dticks 10 
+yaxis min -0.3 max 0.3 dticks 0.1
+xtitle "Detector"  
+ytitle "t_0 [{\mu}s] " 
+
+end graph

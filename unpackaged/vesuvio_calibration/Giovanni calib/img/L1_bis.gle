@@ -1,0 +1,47 @@
+size 31 18.2
+set hei 1.
+set texscale scale
+
+amove -1.4 -0.5
+
+begin graph
+size 35 20
+nobox
+
+data ../data/L1_from_Ipfiles.dat d1=c1,c2 d2=c1,c3 d3=c1,c4 d4=c1,c5 d5=c1,c6 d6=c1,c7
+data ../data/Ip0005.disp d10=c1,c6
+
+
+let d1=d1*100
+let d2 = d2*100
+let d3 = d3*100
+let d6=d6*100
+let d5=d5*100
+let d10=d10*100
+
+
+let d1 = d1-d6
+let d2 = d2-d6
+let d3 = d3-d6
+let d10 = d10-d6
+let d90=0
+
+
+!d5 impulses lwidth 0.2 key "standard deviation"
+
+
+!d1 line marker fsquare msize 0.3  color blue key " from Ip0004 (2013)"
+d2 line marker fdiamond msize 0.3 color green key "from Ip0005 (2014)"
+!d3 line marker ftriangle msize 0.3  color red key " from IpSurvey (2015)"
+d10  marker diamond msize 0.3  color green key " in Ip0005 (2014)"
+
+d90 line
+
+key position tr nobox
+
+xaxis min 0 max 200 dticks 20 
+yaxis min -4 max 4 dticks 1
+xtitle "Detector"  
+ytitle "L_1 - L_1( IpSurvey) [cm] " 
+
+end graph
