@@ -2,5 +2,5 @@ include setup-requirements.txt
 include install-requirements.txt
 include test-requirements.txt
 include MANIFEST.in
-recursive-include vesuvio_analysis/ip_files *.OPJ *.par *.DAT *.DAT3 *.DAT6 *.txt
-recursive-include experiments *.NXS *.npz *.txt
+recursive-include vesuvio/vesuvio_analysis/ip_files *.OPJ *.par *.DAT *.DAT3 *.DAT6 *.txt
+recursive-include vesuvio/experiments *.NXS *.nxs *.npz *.txt

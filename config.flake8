@@ -4,11 +4,9 @@ exclude =
     .git,
     build,
     buildconfig,
-    vesuvio_analysis/scribles,
-    experiments/original_inputs,
-    original_inputs.py,
+    vesuvio/vesuvio_analysis/scribles,
+    vesuvio/experiments/original_inputs,
+    vesuvio/original_inputs.py,
     unpackaged
-
-
 max-complexity = 20
 max-line-length = 140
