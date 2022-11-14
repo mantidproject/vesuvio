@@ -1335,7 +1335,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param ws_name - name of the workspace to save the IP file from.
       @param spec_list - spectrum range to save to file.
     """
-    file_header = b'\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1']) + '\n'
+    file_header = '\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1']) + '\n'
     fmt = "%d  %d  %.4f  %.4f  %.3f  %.4f"
 
     det = read_table_column(ws_name, 'Spectrum', spec_list)
@@ -1349,7 +1349,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     file_data = np.append(file_data, np.column_stack((det, det, theta, t0, L0, L1)), axis=0)
 
     #workdir = config['defaultsave.directory']
-    workdir='C:\\Users\\vesuvio\\Desktop\\Mantid Vesuvio Calibration 2015\\uranium calibration and IP files'
+    workdir='C:\\Repos\\GitHub\Working Files\\VesuvioCalibrationScript\\VesuvioCalibration\\VesuvioCalibration\\uranium calibration and IP files'
     #workdir='K:\\Neutron_computations\\MANTID\Mantid Vesuvio Calibration 2015\\uranium calibration and IP files'
     file_path = os.path.join(workdir, self._output_workspace_name+'.par')
 
