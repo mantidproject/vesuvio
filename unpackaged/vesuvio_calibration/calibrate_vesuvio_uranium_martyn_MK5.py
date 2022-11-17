@@ -357,7 +357,6 @@ class EVSCalibrationFit(PythonAlgorithm):
   def _fit_bragg_peaks(self):
     #ESTIMATE PEAK POSITIONS USING D SPACING
     peak_positions = self._estimate_bragg_peak_positions()
-    print(peak_positions)
     num_peaks, num_spectra = peak_positions.shape
     self._prog_reporter = Progress(self, 0.0, 1.0, num_spectra)
 
@@ -395,7 +394,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
         status, chi2, ncm, params, fws, func, cost_func = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
 
-        if not "successful" in status:
+        if not status == "success":
             #FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % i)
             peak_table_u = self._sample + '_peaks_table_unconstrained%d' % spec_number
@@ -405,13 +404,24 @@ class EVSCalibrationFit(PythonAlgorithm):
             CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
             self._filter_found_peaks_by_estimated(peak_table_u, peak_estimates_list, i, peak_table_temp)
             fit_output_name_u = fit_output_name + "_unconstrained"
-            status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u = self._fit_found_peaks(peak_table_temp, peak_estimates_list, i,
-                                                                         fit_output_name_u)
-            if "successful" in status_u:
-                peak_table = peak_table_temp
-                print("unconstrained fit success")
+            status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u = self._fit_found_peaks(peak_table_temp, None, i,
+                                                                                                  fit_output_name_u)
+            if chi2_u < chi2:
+                params = params_u
+                status = "unused" #mark initial fit as unused
+                self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % i)
+                if self._create_output:
+                    output_workspaces.append(fit_output_name_u + '_Workspace')
+                else:
+                    DeleteWorkspace(fit_output_name_u + '_Workspace')
             else:
-                print("unconstrained fit unsuccessful")
+                DeleteWorkspace(fit_output_name_u + '_Workspace')
+
+            DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
+            DeleteWorkspace(fit_output_name_u + '_Parameters')
+            DeleteWorkspace(peak_table + "_temp")
+            DeleteWorkspace(peak_table_u)
+        DeleteWorkspace(peak_table)
 
         fit_values = dict(zip(params.column(0), params.column(1)))
         fit_errors = dict(zip(params.column(0), params.column(2)))
@@ -427,10 +437,10 @@ class EVSCalibrationFit(PythonAlgorithm):
         DeleteWorkspace(fit_output_name + '_NormalisedCovarianceMatrix')
         DeleteWorkspace(fit_output_name + '_Parameters')
 
-        if self._create_output:
-            output_workspaces.append(fit_output_name + '_Workspace')
-        else:
+        if status == "unused" or not self._create_output:
             DeleteWorkspace(fit_output_name + '_Workspace')
+        else:
+            output_workspaces.append(fit_output_name + '_Workspace')
 
     if self._create_output:
         GroupWorkspaces(','.join(output_workspaces), OutputWorkspace=self._output_workspace_name + "_Peak_Fits")
@@ -473,13 +483,19 @@ class EVSCalibrationFit(PythonAlgorithm):
     prefix = ''#'f0.'
     position = prefix + self._func_param_names['Position']
 
-    self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
+    if peak_estimates_list is not None: #If no peak estimates list, we are doing an unconstrained fit
+        #Don't yet understand what this is doing here
+        print(peak_estimates_list)
+        self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
+        unconstrained=False
+    else:
+        unconstrained=True
 
     for peak_index in range(mtd[peak_table].rowCount()):
             peak_params.append(mtd[peak_table].row(peak_index))
 
     #build function string
-    func_string = self._build_multiple_peak_function(peak_params)
+    func_string = self._build_multiple_peak_function(peak_params, workspace_index, unconstrained)
 
     #select min and max x range for fitting
     positions = [params[position] for params in peak_params]
@@ -526,8 +542,6 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         #find inital parameters given the estimate position
         peak_table = '__' + self._sample + '_peaks_table_%d_%d' % (i,j)
-        #get peak fitting parameters - majority hard coded
-        print(f"PEAK CENTRE: {peak_centre}")
         find_peak_params = self._get_find_peak_parameters(spec_number, [peak_centre])
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=j, PeaksList=peak_table, **find_peak_params)
 
@@ -717,7 +731,6 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
 
     run_numbers = [run for run in self._parse_run_numbers(ws_numbers)]
-    print(run_numbers)
     self._load_file(run_numbers[0], output_name)
 
     temp_ws_name = '__EVS_calib_temp_ws'
@@ -804,7 +817,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _build_multiple_peak_function(self, peaks):
+  def _build_multiple_peak_function(self, peaks, workspace_index, unconstrained):
     """
       Builds a string describing a composite function that can be passed to Fit.
       This will be a linear background with multiple peaks of either a Gaussian or Voigt shape.
@@ -816,7 +829,14 @@ class EVSCalibrationFit(PythonAlgorithm):
     if(len(peaks) == 0):
         return ''
 
-    fit_func = self._build_linear_background_function(peaks[0], False)
+    if not unconstrained:
+        fit_func = self._build_linear_background_function(peaks[0], False)
+    else:
+        #NEED TO REPLACE LORENTZ POS AS COULD BE GAUSS
+        FindPeakBackground(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, FitWindow = [peaks[0]["LorentzPos"] - 1000, peaks[len(peaks)-1]["LorentzPos"] + 1000], BackgroundType="Linear", OutputWorkspace="temp_fit_bg")
+        fit_func = f'name=LinearBackground, A0={mtd["temp_fit_bg"].cell("bkg0",0)}, A1={mtd["temp_fit_bg"].cell("bkg1",0)};'
+        DeleteWorkspace("temp_fit_bg")
+
     fit_func += '('
     for i, peak in enumerate(peaks):
         fit_func += self._build_peak_function(peak)
