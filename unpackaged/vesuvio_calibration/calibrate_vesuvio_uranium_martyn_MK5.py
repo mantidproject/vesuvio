@@ -11,6 +11,7 @@
 from mantid.kernel import *
 from mantid.api import *
 from mantid.simpleapi import *
+from functools import partial
 
 import os
 import sys
@@ -410,15 +411,11 @@ class EVSCalibrationFit(PythonAlgorithm):
                 params = params_u
                 status = "unused" #mark initial fit as unused
                 self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % i)
-                if self._create_output:
-                    output_workspaces.append(fit_output_name_u + '_Workspace')
-                else:
-                    DeleteWorkspace(fit_output_name_u + '_Workspace')
             else:
                 DeleteWorkspace(fit_output_name_u + '_Workspace')
+                DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
+                DeleteWorkspace(fit_output_name_u + '_Parameters')
 
-            DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
-            DeleteWorkspace(fit_output_name_u + '_Parameters')
             DeleteWorkspace(peak_table + "_temp")
             DeleteWorkspace(peak_table_u)
         DeleteWorkspace(peak_table)
@@ -436,9 +433,17 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         DeleteWorkspace(fit_output_name + '_NormalisedCovarianceMatrix')
         DeleteWorkspace(fit_output_name + '_Parameters')
+        if status == "unused":
+            DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
+            DeleteWorkspace(fit_output_name_u + '_Parameters')
 
         if status == "unused" or not self._create_output:
             DeleteWorkspace(fit_output_name + '_Workspace')
+
+        if status == "unused" and not self._create_output:
+            DeleteWorkspace(fit_output_name_u + '_Workspace')
+        elif status == "unused":
+            output_workspaces.append(fit_output_name_u + '_Workspace')
         else:
             output_workspaces.append(fit_output_name + '_Workspace')
 
@@ -455,25 +460,26 @@ class EVSCalibrationFit(PythonAlgorithm):
             peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
 
     #loop through accendings delta, assign peaks until there are none left to be assigned.
-    peak_estimate_deltas.sort(key=self._get_third_elem)
-    index_position_index_matches = []
+    peak_estimate_deltas.sort(key=partial(self._get_x_elem, elem=2))
+    index_matches = []
     for peak_estimate_index, position_index, delta in peak_estimate_deltas:
         #if all estimated peaks matched, break
-        if len(index_position_index_matches)==len(peak_estimates_list):
+        if len(index_matches)==len(peak_estimates_list):
             break
         #assign match for smallest delta if that position or estimate has not been already matched
-        if position_index not in [i[1] for i in index_position_index_matches] and peak_estimate_index not in [i[0] for i in index_position_index_matches]:
-            index_position_index_matches.append((peak_estimate_index, position_index))
+        if position_index not in [i[1] for i in index_matches] and peak_estimate_index not in [i[0] for i in index_matches]:
+            index_matches.append((peak_estimate_index, position_index))
 
-    if len(index_position_index_matches)==len(peak_estimates_list):
+    if len(index_matches)==len(peak_estimates_list):
+        index_matches.sort(key=partial(self._get_x_elem, elem=1))
         for col_index in range(mtd[table_to_overwrite].columnCount()):
             for row_index in range(mtd[table_to_overwrite].rowCount()):
-                position_row_index = index_position_index_matches[row_index][1]
+                position_row_index = index_matches[row_index][1]
                 mtd[table_to_overwrite].setCell(row_index,col_index, mtd[peak_table].cell(position_row_index, col_index))
 
 #----------------------------------------------------------------------------------------
-  def _get_third_elem(self, input_list):
-    return input_list[2]
+  def _get_x_elem(self, input_list, elem):
+    return input_list[elem]
 
 #----------------------------------------------------------------------------------------
 
