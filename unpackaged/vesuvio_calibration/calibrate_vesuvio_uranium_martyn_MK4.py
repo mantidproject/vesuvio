@@ -148,10 +148,10 @@ def read_table_column(table_name, column_name, spec_list=DETECTOR_RANGE):
 
   offset = DETECTOR_RANGE[0]
   if len(spec_list) > 1:
-	lower, upper = spec_list
+    lower, upper = spec_list
   else:
-	lower = spec_list[0]
-	upper = spec_list[0]
+    lower = spec_list[0]
+    upper = spec_list[0]
 
   column_values = mtd[table_name].column(column_name)
   return np.array(column_values[lower-offset:upper+1-offset])
@@ -338,7 +338,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     CreateEmptyTableWorkspace(OutputWorkspace=peaks_table)
 
     param_names = ['f0.A0', 'f0.A1']
-    for i in xrange(num_peaks):
+    for i in range(num_peaks):
       param_names += ['f' + str(i) + '.' + name for name in self._func_param_names.values()]
 
     err_names = [name + '_Err' for name in param_names]
@@ -364,7 +364,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         prefix = ''#'f0.'
         position = prefix + self._func_param_names['Position']
         
-        print peak_estimates_list
+        print(peak_estimates_list)
         self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
         
         for peak_index in range(mtd[peak_table].rowCount()):
@@ -388,10 +388,10 @@ class EVSCalibrationFit(PythonAlgorithm):
         
         #fit function to workspace
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
-        status, chi2, ncm, params, fws = Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True,
-                                             StartX=xmin, EndX=xmax, WorkspaceIndex=i,
-                                             CalcErrors=True, Output=fit_output_name,
-                                             Minimizer='Levenberg-Marquardt,RelError=1e-8')
+        status, chi2, ncm, params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True,
+                                                              StartX=xmin, EndX=xmax, WorkspaceIndex=i,
+                                                              CalcErrors=True, Output=fit_output_name,
+                                                              Minimizer='Levenberg-Marquardt,RelError=1e-8')
 
         fit_values = dict(zip(params.column(0), params.column(1)))
         fit_errors = dict(zip(params.column(0), params.column(2)))
@@ -470,10 +470,10 @@ class EVSCalibrationFit(PythonAlgorithm):
         else:
           logger.warning('Could not specify fit window. Using full spectrum x range.')
 
-        status, chi2, ncm, params, fws = Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True,
-                                             StartX=xmin, EndX=xmax, WorkspaceIndex=j,
-                                             CalcErrors=True, Output=fit_output_name,
-                                             Minimizer='Levenberg-Marquardt,RelError=1e-8')
+        status, chi2, ncm, params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True,
+                                                              StartX=xmin, EndX=xmax, WorkspaceIndex=j,
+                                                              CalcErrors=True, Output=fit_output_name,
+                                                              Minimizer='Levenberg-Marquardt,RelError=1e-8')
 
         #output fit parameters to table workspace
         fit_values = dict(zip(params.column(0), params.column(1)))
@@ -656,7 +656,7 @@ class EVSCalibrationFit(PythonAlgorithm):
           sample_range = run.split('-')
           sample_range = map(int, sample_range)
 
-          for i in xrange(*sample_range):
+          for i in range(*sample_range):
             yield str(i)
 
         else:
@@ -827,7 +827,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         peak_y = mtd[peak].readY(1)
         peak_e = mtd[peak].readE(1)
 
-        index = np.where(data_x == peak_x[0])[0]
+        index = int(np.where(data_x == peak_x[0])[0])
         data_y = peak_collection.dataY(j)
         data_y[index:index + peak_y.size] = peak_y
 
@@ -948,7 +948,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
     #repeatedly fit L1, E1 and Theta parameters
     table_group = []
-    for i in xrange(self._iterations):
+    for i in range(self._iterations):
       #calibrate  E1 from backscattering and use the backscattering averaged value for all detectors  
       E1_fit_back = self._current_workspace + '_E1_back'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=BACKSCATTERING_RANGE,
@@ -1217,7 +1217,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     table_ws = mtd[ws_name]
     table_ws.addColumn('int', 'Spectrum')
 
-    for value in xrange(DETECTOR_RANGE[0], DETECTOR_RANGE[1]+1):
+    for value in range(DETECTOR_RANGE[0], DETECTOR_RANGE[1]+1):
       table_ws.addRow([value])
 
     column_names = ['t0','t0_Err','L0','L0_Err','L1','L1_Err','E1','E1_Err','theta','theta_Err']
@@ -1304,7 +1304,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param ws_name - name of the workspace to save the IP file from.
       @param spec_list - spectrum range to save to file.
     """
-    file_header = b'\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1']) + '\n'
+    file_header = '\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1']) + '\n'
     fmt = "%d  %d  %.4f  %.4f  %.3f  %.4f"
 
     det = read_table_column(ws_name, 'Spectrum', spec_list)
