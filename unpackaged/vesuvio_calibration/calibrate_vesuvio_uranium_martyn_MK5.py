@@ -82,6 +82,7 @@ NEUTRON_MASS_AMU = scipy.constants.value("neutron mass in u")
 MEV_CONVERSION = 1.602176487e-22
 
 #misc helper functions used by both algorithms
+
 #----------------------------------------------------------------------------------------
 
 def calculate_r_theta(sample_mass, thetas):
@@ -403,7 +404,7 @@ class EVSCalibrationFit(PythonAlgorithm):
             FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table_u, **find_peak_params_u)
             peak_table_temp = peak_table + "_temp"
             CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
-            self._filter_found_peaks_by_estimated(peak_table_u, peak_estimates_list, i, peak_table_temp)
+            self._filter_found_peaks_by_estimated(peak_table_u, peak_estimates_list, peak_table_temp)
             fit_output_name_u = fit_output_name + "_unconstrained"
             status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u = self._fit_found_peaks(peak_table_temp, None, i,
                                                                                                   fit_output_name_u)
@@ -452,12 +453,13 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _filter_found_peaks_by_estimated(self, peak_table, peak_estimates_list, spec_index, table_to_overwrite):
+  def _filter_found_peaks_by_estimated(self, peak_table, peak_estimates_list, table_to_overwrite):
     peak_estimate_deltas = []
     #with estimates for spectrum, loop through all peaks, get and store delta from peak estimates
     for peak_estimate_index, peak_estimate in enumerate(peak_estimates_list):
         for position_index, position in enumerate(mtd[peak_table].column(2)): #this may vary for different peaks
-            peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
+            if not position == 0: #STOP BUG WHERE FOUND PEAKS RETURNS 0 POSITION PEAK AT END
+                peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
 
     #loop through accendings delta, assign peaks until there are none left to be assigned.
     peak_estimate_deltas.sort(key=partial(self._get_x_elem, elem=2))
@@ -467,15 +469,25 @@ class EVSCalibrationFit(PythonAlgorithm):
         if len(index_matches)==len(peak_estimates_list):
             break
         #assign match for smallest delta if that position or estimate has not been already matched
-        if position_index not in [i[1] for i in index_matches] and peak_estimate_index not in [i[0] for i in index_matches]:
-            index_matches.append((peak_estimate_index, position_index))
+        if position_index not in [i[1] for i in index_matches] and \
+           peak_estimate_index not in [i[0] for i in index_matches] and \
+           all(x>position_index for x in [i[1] for i in index_matches if i[0]>peak_estimate_index]) and \
+           all(x<position_index for x in [i[1] for i in index_matches if i[0]<peak_estimate_index]):
+              index_matches.append((peak_estimate_index, position_index))
 
-    if len(index_matches)==len(peak_estimates_list):
+    if len(index_matches) > 0:
         index_matches.sort(key=partial(self._get_x_elem, elem=1))
+        mtd[table_to_overwrite].setRowCount(len(peak_estimates_list))
         for col_index in range(mtd[table_to_overwrite].columnCount()):
+            match_n = 0
             for row_index in range(mtd[table_to_overwrite].rowCount()):
-                position_row_index = index_matches[row_index][1]
-                mtd[table_to_overwrite].setCell(row_index,col_index, mtd[peak_table].cell(position_row_index, col_index))
+                if row_index in [x[0] for x in index_matches]:
+                    position_row_index = index_matches[match_n][1]
+                    mtd[table_to_overwrite].setCell(row_index,col_index, mtd[peak_table].cell(position_row_index, col_index))
+                    match_n+=1
+                else: #otherwise just use estimate position
+                    pos_str = "LorentzPos" if self._peak_function == 'Voigt' else "PeakCentre"
+                    mtd[table_to_overwrite].setCell(pos_str, row_index, peak_estimates_list[row_index])
 
 #----------------------------------------------------------------------------------------
   def _get_x_elem(self, input_list, elem):
@@ -491,7 +503,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     if peak_estimates_list is not None: #If no peak estimates list, we are doing an unconstrained fit
         #Don't yet understand what this is doing here
-        print(peak_estimates_list)
+        #print(peak_estimates_list)
         self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
         unconstrained=False
     else:
@@ -529,12 +541,14 @@ class EVSCalibrationFit(PythonAlgorithm):
       containing one table workspace per peak with parameters for each detector.
     """
 
+    #ESTIMATE PEAK POSITIONS FROM ENERGY ESTIMATES AND PREVIOUS PARAMETERS.
     peak_positions = self._estimate_peak_positions()
     num_peaks, num_spectra = peak_positions.shape
     self._prog_reporter = Progress(self,0.0,1.0,num_peaks*num_spectra)
 
     self._parameter_tables = []
     self._fit_workspaces = []
+    #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
     for i, peak_estimates_list in enumerate(peak_positions):
       #create parameter table
       peaks_table = self._output_workspace_name + '_Peak_%d_Parameters' % i
@@ -542,6 +556,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
       #fit every spectrum
       self._peak_fit_workspaces = []
+      #LOOP THROUGH PEAK ESTIMATES FOR THIS SPECTRUM
       for j, peak_centre in enumerate(peak_estimates_list):
         spec_number = self._spec_list[0]+j
         self._prog_reporter.report("Fitting peak %d to spectrum %d" % (i,spec_number))
@@ -549,6 +564,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         #find inital parameters given the estimate position
         peak_table = '__' + self._sample + '_peaks_table_%d_%d' % (i,j)
         find_peak_params = self._get_find_peak_parameters(spec_number, [peak_centre])
+        #FIND DATA PEAK RELATED TO ESTIMATED PEAK
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=j, PeaksList=peak_table, **find_peak_params)
 
         #extract data from table
@@ -738,8 +754,8 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     run_numbers = [run for run in self._parse_run_numbers(ws_numbers)]
     self._load_file(run_numbers[0], output_name)
-
     temp_ws_name = '__EVS_calib_temp_ws'
+
     for run_number in run_numbers[1:]:
       self._load_file(run_number, temp_ws_name)
       Plus(output_name, temp_ws_name, OutputWorkspace=output_name)
@@ -776,6 +792,7 @@ class EVSCalibrationFit(PythonAlgorithm):
       @param ws_name - name of the run to load.
       @param output_name - name to call the loaded workspace
     """
+
     try:
       LoadVesuvio(Filename=ws_name, Mode=self._mode, OutputWorkspace=output_name,
                   SpectrumList="%d-%d" % (self._spec_list[0], self._spec_list[-1]),
@@ -838,8 +855,12 @@ class EVSCalibrationFit(PythonAlgorithm):
     if not unconstrained:
         fit_func = self._build_linear_background_function(peaks[0], False)
     else:
-        #NEED TO REPLACE LORENTZ POS AS COULD BE GAUSS
-        FindPeakBackground(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, FitWindow = [peaks[0]["LorentzPos"] - 1000, peaks[len(peaks)-1]["LorentzPos"] + 1000], BackgroundType="Linear", OutputWorkspace="temp_fit_bg")
+        pos_str = "LorentzPos" if self._peak_function == 'Voigt' else "PeakCentre"
+        if len(peaks) > 1:
+            fit_window = [peaks[0][pos_str] - 1000, peaks[len(peaks)-1][pos_str] + 1000]
+        else:
+            fit_window = [peaks[0][pos_str] - 1000, peaks[0][pos_str] + 1000]
+        FindPeakBackground(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, FitWindow=fit_window, BackgroundType="Linear", OutputWorkspace="temp_fit_bg")
         fit_func = f'name=LinearBackground, A0={mtd["temp_fit_bg"].cell("bkg0",0)}, A1={mtd["temp_fit_bg"].cell("bkg1",0)};'
         DeleteWorkspace("temp_fit_bg")
 
