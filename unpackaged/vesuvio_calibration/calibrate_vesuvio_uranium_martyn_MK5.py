@@ -82,7 +82,6 @@ NEUTRON_MASS_AMU = scipy.constants.value("neutron mass in u")
 MEV_CONVERSION = 1.602176487e-22
 
 #misc helper functions used by both algorithms
-
 #----------------------------------------------------------------------------------------
 
 def calculate_r_theta(sample_mass, thetas):
@@ -182,6 +181,20 @@ def read_fitting_result_table_column(table_name, column_name, spec_list):
 
   return np.array(column_values[lower-offset:upper+1-offset])
   
+#----------------------------------------------------------------------------------------
+
+def generate_fit_function_header(function_type, error=False):
+    if function_type == 'Voigt':
+        error_str = "Err" if error else ""
+        func_header = {'Height': 'LorentzAmp', 'Position': 'LorentzPos', 'Width': 'LorentzFWHM', 'Width_2': 'GaussianFWHM'}
+    elif function_type == 'Gaussian':
+        error_str = "_Err" if error else ""
+        func_header = {'Height': 'Height', 'Width': 'Sigma', 'Position': 'PeakCentre'}
+    else:
+        raise ValueError("Unsupported fit function type: %s" % function_type)
+
+    return {k: v+error_str for k,v in func_header.items()}
+
 #----------------------------------------------------------------------------------------
 
 
@@ -298,14 +311,9 @@ class EVSCalibrationFit(PythonAlgorithm):
     if len(self._bkg_run_numbers) > 0:
       self._background = '' + self._bkg_run_numbers[0]
 
-
     #fit function type
-    if self._peak_function == 'Voigt':
-      self._func_param_names = {'Height': 'LorentzAmp', 'Position': 'LorentzPos', 'Width': 'LorentzFWHM', 'Width_2': 'GaussianFWHM'}
-    elif self._peak_function == 'Gaussian':
-      self._func_param_names = {'Height': 'Height', 'Width': 'Sigma', 'Position': 'PeakCentre'}
-    else:
-      raise ValueError("Unsupported fit function type: %s" % self._peak_function)
+    self._func_param_names = generate_fit_function_header(self._peak_function)
+    self._func_param_names_error = generate_fit_function_header(self._peak_function, error=True)
 
     #validate instrument parameter workspace/file
     if self._param_workspace != "":
@@ -396,6 +404,9 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
         status, chi2, ncm, params, fws, func, cost_func = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
 
+        if status == "success": #check for nans (usually signifies expected peaks not found).
+            status = "nans found" if self._check_nans(fit_output_name + '_Parameters') else status
+
         if not status == "success":
             #FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % i)
@@ -453,6 +464,15 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
+  def _check_nans(self, table_name):
+    print("checking nans")
+    table_ws = mtd[table_name]
+    for i in range(table_ws.columnCount())[1:]: #skip header col:
+        if any(np.isnan(table_ws.column(i))):
+            return True
+    return False
+#----------------------------------------------------------------------------------------
+
   def _filter_found_peaks_by_estimated(self, peak_table, peak_estimates_list, table_to_overwrite):
     peak_estimate_deltas = []
     #with estimates for spectrum, loop through all peaks, get and store delta from peak estimates
@@ -486,7 +506,7 @@ class EVSCalibrationFit(PythonAlgorithm):
                     mtd[table_to_overwrite].setCell(row_index,col_index, mtd[peak_table].cell(position_row_index, col_index))
                     match_n+=1
                 else: #otherwise just use estimate position
-                    pos_str = "LorentzPos" if self._peak_function == 'Voigt' else "PeakCentre"
+                    pos_str = self._func_param_names["Position"]
                     mtd[table_to_overwrite].setCell(pos_str, row_index, peak_estimates_list[row_index])
 
 #----------------------------------------------------------------------------------------
@@ -855,7 +875,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     if not unconstrained:
         fit_func = self._build_linear_background_function(peaks[0], False)
     else:
-        pos_str = "LorentzPos" if self._peak_function == 'Voigt' else "PeakCentre"
+        pos_str = self._func_param_names["Position"]
         if len(peaks) > 1:
             fit_window = [peaks[0][pos_str] - 1000, peaks[len(peaks)-1][pos_str] + 1000]
         else:
@@ -1047,6 +1067,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self._current_workspace = self._output_workspace_name + '_Iteration_0'
     self._create_calib_parameter_table(self._current_workspace)
 
+    #PEAK FUNCTIONS
+    self._theta_peak_function = 'Gaussian'
+    self._theta_func_param_names = generate_fit_function_header(self._theta_peak_function)
+    self._theta_func_param_names_error = generate_fit_function_header(self._theta_peak_function, error=True)
+
     if self._calc_L0:
       #calibrate L0 from the fronstscattering detectors, use the value of the L0 calibrated from frontscattering detectors  for all detectors
       L0_fit = self._current_workspace + '_L0'
@@ -1084,7 +1109,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
       #calibrate theta for all detectors
       theta_fit = self._current_workspace + '_theta'
-      self._run_calibration_fit(Samples=self._samples, Background=self._background, Function='Voigt', Mode='FoilOut', SpectrumRange=DETECTOR_RANGE,
+      self._run_calibration_fit(Samples=self._samples, Background=self._background, Function=self._theta_peak_function, Mode='FoilOut', SpectrumRange=DETECTOR_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, DSpacings=self._d_spacings, OutputWorkspace=theta_fit, CreateOutput=self._create_output,
                                 PeakType='Bragg')
       self._theta_peak_fits = theta_fit + '_Peak_Parameters'
@@ -1261,7 +1286,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     d_spacings = d_spacings.reshape(1, d_spacings.size).T
 
     peak_centres = []
-    col_names = [name for name in mtd[table_name].getColumnNames() if 'LorentzPos' in name and 'LorentzPos_Err' not in name]
+    pos_str = self._theta_func_param_names["Position"]
+    err_str = self._theta_func_param_names_error["Position"]
+    col_names = [name for name in mtd[table_name].getColumnNames() if pos_str in name and err_str not in name]
     for name in col_names:
       t = np.asarray(mtd[table_name].column(name))
       peak_centres.append(t)

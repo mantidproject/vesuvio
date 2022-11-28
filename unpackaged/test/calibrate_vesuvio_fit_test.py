@@ -3,6 +3,7 @@ from mock import MagicMock, patch
 from functools import partial
 
 import unittest
+import numpy as np
 
 
 class TestVesuvioCalibrationFit(unittest.TestCase):
@@ -225,6 +226,73 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
         self.assertEqual([(0, 0, found_peaks[0]), (1, 0, found_peaks[1]), ('LorentzPos', 2, peak_estimates_list[2])], self.set_cell_list)
+
+    def test_estimate_bragg_peak_positions(self):
+        def side_effect(arg1, arg2):
+            if arg1 == 'L0':
+                return 11.05
+            elif arg1 == 'L1':
+                return 0.5505
+            elif arg1 == 't0':
+                return -0.2
+            elif arg1 == 'theta':
+                return 139.5371
+
+        alg = EVSCalibrationFit()
+        alg._spec_list = [22]
+        alg._read_param_column = MagicMock()
+        alg._read_param_column.side_effect = side_effect
+        alg._d_spacings = np.array([1.75, 2.475, 2.858])
+
+        estimated_positions = alg._estimate_bragg_peak_positions()
+        np.testing.assert_almost_equal([9629.84, 13619.43, 15727.03], estimated_positions.flatten().tolist(), 0.01)
+        print(estimated_positions)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
+    def test_check_nans_true(self, mock_mtd):
+        alg = EVSCalibrationFit()
+        table_ws = 'table_ws'
+        data = [9440, np.nan, 15417]
+        return_mock_obj_table_ws = MagicMock()
+        return_mock_obj_table_ws.column.return_value = data
+        return_mock_obj_table_ws.columnCount.return_value = len(data)
+
+        mtd_mock_dict = {'table_ws': return_mock_obj_table_ws}
+
+        self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
+
+        self.assertTrue(alg._check_nans(table_ws))
+
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
+    def test_check_nans_false(self, mock_mtd):
+        alg = EVSCalibrationFit()
+        table_ws = 'table_ws'
+        data = [9440, 13351, 15417]
+        return_mock_obj_table_ws = MagicMock()
+        return_mock_obj_table_ws.column.return_value = data
+        return_mock_obj_table_ws.columnCount.return_value = len(data)
+
+        mtd_mock_dict = {'table_ws': return_mock_obj_table_ws}
+
+        self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
+
+        self.assertFalse(alg._check_nans(table_ws))
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
+    def test_check_nans_str(self, mock_mtd):
+        alg = EVSCalibrationFit()
+        table_ws = 'table_ws'
+        data = ['str1', 'str2', 'str3']
+        return_mock_obj_table_ws = MagicMock()
+        return_mock_obj_table_ws.column.return_value = data
+        return_mock_obj_table_ws.columnCount.return_value = len(data)
+
+        mtd_mock_dict = {'table_ws': return_mock_obj_table_ws}
+
+        self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
+
+        self.assertFalse(alg._check_nans(table_ws))
 
 if __name__ == '__main__':
     unittest.main()
