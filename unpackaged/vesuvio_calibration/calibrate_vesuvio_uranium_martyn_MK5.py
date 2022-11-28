@@ -548,7 +548,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     #fit function to workspace
     return Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True, StartX=xmin, EndX=xmax,
-               WorkspaceIndex=workspace_index, CalcErrors=True, Output=fit_output_name, Minimizer='Levenberg-Marquardt,RelError=1e-8')
+               WorkspaceIndex=workspace_index, CalcErrors=True, Output=fit_output_name, Minimizer='Levenberg-Marquardt,AbsError=0,RelError=1e-8')
 
 #----------------------------------------------------------------------------------------
 
