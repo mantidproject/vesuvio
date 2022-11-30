@@ -57,6 +57,7 @@ PEAK_TYPES = ["Resonance", "Recoil", "Bragg"]
 
 BRAGG_PEAK_CROP_RANGE = (2000, 17000)
 BRAGG_FIT_WINDOW_RANGE = 500
+BRAGG_PEAK_POSITION_TOLERANCE = 1000
 
 RECOIL_PEAK_CROP_RANGE = (300, 500)
 RECOIL_FIT_WINDOW_RANGE = 300
@@ -403,9 +404,8 @@ class EVSCalibrationFit(PythonAlgorithm):
        
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
         status, chi2, ncm, params, fws, func, cost_func, xMin, xMax = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
-        status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', num_peaks, peak_height_rel_threshold=0.25) else status
+        status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=0.25) else status
 
-        print(status)
         if not status == "success":
             #FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % i)
@@ -418,7 +418,7 @@ class EVSCalibrationFit(PythonAlgorithm):
             fit_output_name_u = fit_output_name + "_unconstrained"
             status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
                                                                                                               fit_output_name_u, (xMin, xMax))
-            status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', num_peaks, peak_height_rel_threshold=0.25) else status_u
+            status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list, peak_height_rel_threshold=0.25) else status_u
             if chi2_u < chi2 and status_u != "peaks invalid":
                 params = params_u
                 status = "unused" #mark initial fit as unused
@@ -463,12 +463,12 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _check_fitted_peak_validity(self, table_name, expected_peak_num, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
+  def _check_fitted_peak_validity(self, table_name, estimated_peaks, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
     check_nans = self._check_nans(table_name)
-    check_num_peaks = self._check_num_peaks(table_name, expected_peak_num)
+    check_peak_positions = self._check_peak_positions(table_name, estimated_peaks)
     check_peak_heights = self._check_peak_heights(table_name, peak_height_abs_threshold, peak_height_rel_threshold)
     
-    if check_nans and check_num_peaks and check_peak_heights:
+    if check_nans and check_peak_positions and check_peak_heights:
         return True
     else:
         return False
@@ -485,22 +485,22 @@ class EVSCalibrationFit(PythonAlgorithm):
     
 #----------------------------------------------------------------------------------------
     
-  def _check_num_peaks(self, table_name, expected_peak_num):
+  def _check_peak_positions(self, table_name, estimated_positions):
     pos_str = self._func_param_names["Position"]
 
-    peak_positions = []
+    i = 0
+    invalid_positions = []
     for name, value in zip(mtd[table_name].column("Name"), mtd[table_name].column("Value")):
         if pos_str in name:
-            peak_positions.append(value)
-    
-    num_peaks_fitted = len(peak_positions)
-  
-    if expected_peak_num == num_peaks_fitted:
-        return True
-    else:
-        print(f"Number of peaks invalid. Found {num_peaks_fitted}, expected {expected_peak_num}.")
-        return False
+            if not (value >= estimated_positions[i] - BRAGG_PEAK_POSITION_TOLERANCE and value <= estimated_positions[i] + BRAGG_PEAK_POSITION_TOLERANCE):
+                invalid_positions.append(value)
+            i += 1
 
+    if len(invalid_positions) > 0:
+        print(f"Invalid peak positions found: {invalid_positions}")
+        return False
+    else:
+        return True
 
 #----------------------------------------------------------------------------------------
 
@@ -601,8 +601,8 @@ class EVSCalibrationFit(PythonAlgorithm):
     if xLimits:
         xmin, xmax = xLimits
     else:
-        xmin = min(positions) - self._fit_window_range
-        xmax = max(positions) + self._fit_window_range
+        xmin = min(peak_estimates_list) - BRAGG_PEAK_POSITION_TOLERANCE - self._fit_window_range
+        xmax = max(peak_estimates_list) + BRAGG_PEAK_POSITION_TOLERANCE + self._fit_window_range
 
     #xmin, xmax = None, None
 
@@ -716,7 +716,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         find_peak_params['PeakPositions'] = peak_centre
 
     if self._fitting_bragg_peaks and not unconstrained:
-        find_peak_params['PeakPositionTolerance'] = 1000
+        find_peak_params['PeakPositionTolerance'] = BRAGG_PEAK_POSITION_TOLERANCE
 
         if spec_number >= FRONTSCATTERING_RANGE[0]:
             find_peak_params['FWHM'] = 70
