@@ -402,11 +402,10 @@ class EVSCalibrationFit(PythonAlgorithm):
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table, **find_peak_params)
        
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
-        status, chi2, ncm, params, fws, func, cost_func = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
+        status, chi2, ncm, params, fws, func, cost_func, xMin, xMax = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
+        status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', num_peaks, peak_height_rel_threshold=0.25) else status
 
-        if status == "success": #check for nans (usually signifies expected peaks not found).
-            status = "nans found" if self._check_nans(fit_output_name + '_Parameters') else status
-
+        print(status)
         if not status == "success":
             #FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % i)
@@ -417,9 +416,10 @@ class EVSCalibrationFit(PythonAlgorithm):
             CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
             self._filter_found_peaks_by_estimated(peak_table_u, peak_estimates_list, peak_table_temp)
             fit_output_name_u = fit_output_name + "_unconstrained"
-            status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u = self._fit_found_peaks(peak_table_temp, None, i,
-                                                                                                  fit_output_name_u)
-            if chi2_u < chi2:
+            status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
+                                                                                                              fit_output_name_u, (xMin, xMax))
+            status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', num_peaks, peak_height_rel_threshold=0.25) else status_u
+            if chi2_u < chi2 and status_u != "peaks invalid":
                 params = params_u
                 status = "unused" #mark initial fit as unused
                 self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % i)
@@ -451,7 +451,6 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         if status == "unused" or not self._create_output:
             DeleteWorkspace(fit_output_name + '_Workspace')
-
         if status == "unused" and not self._create_output:
             DeleteWorkspace(fit_output_name_u + '_Workspace')
         elif status == "unused":
@@ -464,13 +463,71 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
+  def _check_fitted_peak_validity(self, table_name, expected_peak_num, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
+    check_nans = self._check_nans(table_name)
+    check_num_peaks = self._check_num_peaks(table_name, expected_peak_num)
+    check_peak_heights = self._check_peak_heights(table_name, peak_height_abs_threshold, peak_height_rel_threshold)
+    
+    if check_nans and check_num_peaks and check_peak_heights:
+        return True
+    else:
+        return False
+    
+#----------------------------------------------------------------------------------------
+
   def _check_nans(self, table_name):
-    print("checking nans")
     table_ws = mtd[table_name]
-    for i in range(table_ws.columnCount())[1:]: #skip header col:
-        if any(np.isnan(table_ws.column(i))):
-            return True
-    return False
+    for i in table_ws.column("Value"):
+        if np.isnan(i):
+            print(f"nan found in value common, indicates invalid peak")
+            return False
+    return True
+    
+#----------------------------------------------------------------------------------------
+    
+  def _check_num_peaks(self, table_name, expected_peak_num):
+    pos_str = self._func_param_names["Position"]
+
+    peak_positions = []
+    for name, value in zip(mtd[table_name].column("Name"), mtd[table_name].column("Value")):
+        if pos_str in name:
+            peak_positions.append(value)
+    
+    num_peaks_fitted = len(peak_positions)
+  
+    if expected_peak_num == num_peaks_fitted:
+        return True
+    else:
+        print(f"Number of peaks invalid. Found {num_peaks_fitted}, expected {expected_peak_num}.")
+        return False
+
+
+#----------------------------------------------------------------------------------------
+
+  def _check_peak_heights(self, table_name, abs_threshold_over_bg, rel_threshold_over_bg):
+    height_str = self._func_param_names["Height"]
+    pos_str = self._func_param_names["Position"]
+    
+    peak_heights = []
+    peak_positions = []
+    for name, value in zip(mtd[table_name].column("Name"), mtd[table_name].column("Value")):
+        if height_str in name:
+            peak_heights.append(value)
+        elif pos_str in name:
+            peak_positions.append(value)
+        elif name == "f0.A0":
+            linear_bg_A0 = value
+        elif name == "f0.A1":
+            linear_bg_A1 = value
+
+    for height, pos in zip(peak_heights, peak_positions):
+        bg = pos * linear_bg_A1 + linear_bg_A0
+        required_height = bg*rel_threshold_over_bg + abs_threshold_over_bg
+        if height < required_height:
+            print(f"Peak height threshold not met. Found {height}, required {required_height}.")
+            return False
+    return True
+
 #----------------------------------------------------------------------------------------
 
   def _filter_found_peaks_by_estimated(self, peak_table, peak_estimates_list, table_to_overwrite):
@@ -515,7 +572,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _fit_found_peaks(self, peak_table, peak_estimates_list, workspace_index, fit_output_name):
+  def _fit_found_peaks(self, peak_table, peak_estimates_list, workspace_index, fit_output_name, xLimits=None):
     #get parameters from the peaks table
     peak_params = []
     prefix = ''#'f0.'
@@ -541,14 +598,18 @@ class EVSCalibrationFit(PythonAlgorithm):
     if len(positions) < 1:
         raise RuntimeError("FindPeaks could not find a peaks with the given parameters: %s" % find_peak_params)
 
-    xmin = min(positions) - self._fit_window_range
-    xmax = max(positions) + self._fit_window_range
+    if xLimits:
+        xmin, xmax = xLimits
+    else:
+        xmin = min(positions) - self._fit_window_range
+        xmax = max(positions) + self._fit_window_range
 
     #xmin, xmax = None, None
 
     #fit function to workspace
     return Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True, StartX=xmin, EndX=xmax,
-               WorkspaceIndex=workspace_index, CalcErrors=True, Output=fit_output_name, Minimizer='Levenberg-Marquardt,AbsError=0,RelError=1e-8')
+               WorkspaceIndex=workspace_index, CalcErrors=True, Output=fit_output_name, Minimizer='Levenberg-Marquardt,AbsError=0,RelError=1e-8') \
+               + (xmin,) + (xmax,)
 
 #----------------------------------------------------------------------------------------
 
