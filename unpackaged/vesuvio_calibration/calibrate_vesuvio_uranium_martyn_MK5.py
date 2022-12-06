@@ -512,13 +512,15 @@ class EVSCalibrationFit(PythonAlgorithm):
         return True
 
 #----------------------------------------------------------------------------------------
-  def evaluate_peak_height_against_bg(height, position, linear_bg_A0, linear_bg_A1, rel_threshold, abs_threshold):
+
+ def _evaluate_peak_height_against_bg(self, height, position, linear_bg_A0, linear_bg_A1, rel_threshold, abs_threshold):
     bg = position * linear_bg_A1 + linear_bg_A0
     required_height = bg*rel_threshold + abs_threshold
-        if height < required_height:
-            return False
-        else:
-            return True
+    if height < required_height:
+        return False
+    else:
+        return True
+
 #----------------------------------------------------------------------------------------
 
   def _check_peak_heights(self, table_name, abs_threshold_over_bg, rel_threshold_over_bg):
@@ -538,10 +540,8 @@ class EVSCalibrationFit(PythonAlgorithm):
             linear_bg_A1 = value
 
     for height, pos in zip(peak_heights, peak_positions):
-        bg = pos * linear_bg_A1 + linear_bg_A0
-        required_height = bg*rel_threshold_over_bg + abs_threshold_over_bg
-        if height < required_height:
-            print(f"Peak height threshold not met. Found {height}, required {required_height}.")
+        if not self._evaluate_peak_height_against_bg(height, pos, linear_bg_A0, linear_bg_A1, abs_threshold_over_bg, rel_threshold_over_bg):
+            print(f"Peak height threshold not met. Found height: {height}")
             return False
     return True
 
@@ -553,7 +553,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     #with estimates for spectrum, loop through all peaks, get and store delta from peak estimates
     for peak_estimate_index, peak_estimate in enumerate(peak_estimates_list):
         for position_index, (position, height) in enumerate(zip(mtd[peak_table].column(2), mtd[peak_table].column(1))):
-            if not position == 0 and height > (position * linear_bg_A1 + linear_bg_A0) * peak_height_rel_threshold + peak_height_abs_threshold:
+            if not position == 0 and self._evaluate_peak_height_against_bg(height, position, linear_bg_A0, linear_bg_A1, peak_height_abs_threshold, peak_height_rel_threshold):
                 peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
 
     #loop through accendings delta, assign peaks until there are none left to be assigned.
