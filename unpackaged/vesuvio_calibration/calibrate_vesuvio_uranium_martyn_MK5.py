@@ -414,7 +414,16 @@ class EVSCalibrationFit(PythonAlgorithm):
             FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table_u, **find_peak_params_u)
             peak_table_temp = peak_table + "_temp"
             CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
-            self._filter_found_peaks_by_estimated(peak_table_u, peak_estimates_list, peak_table_temp)
+
+            #FIT LINEAR BG TO DATA
+            temp_bg_fit = Fit(Function="(name=LinearBackground,A0=0,A1=0)", InputWorkspace=self._sample, Output="temp_bg_fit", CreateOutput=True)
+            linear_bg_coeffs = temp_bg_fit.OutputParameters.cell("Value", 0), temp_bg_fit.OutputParameters.cell("Value", 1)
+            DeleteWorkspace('temp_bg_fit_Workspace')
+            DeleteWorkspace('temp_bg_fit_NormalisedCovarianceMatrix')
+            DeleteWorkspace('temp_bg_fit_Parameters')
+
+            #FILTER FOUND PEAKS USING ESTIMATED POSITIONS AND MINIMUM HEIGHT
+            self._filter_found_peaks(peak_table_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs, peak_height_rel_threshold=0.25)
             fit_output_name_u = fit_output_name + "_unconstrained"
             status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
                                                                                                               fit_output_name_u, (xMin, xMax))
@@ -503,6 +512,14 @@ class EVSCalibrationFit(PythonAlgorithm):
         return True
 
 #----------------------------------------------------------------------------------------
+  def evaluate_peak_height_against_bg(height, position, linear_bg_A0, linear_bg_A1, rel_threshold, abs_threshold):
+    bg = position * linear_bg_A1 + linear_bg_A0
+    required_height = bg*rel_threshold + abs_threshold
+        if height < required_height:
+            return False
+        else:
+            return True
+#----------------------------------------------------------------------------------------
 
   def _check_peak_heights(self, table_name, abs_threshold_over_bg, rel_threshold_over_bg):
     height_str = self._func_param_names["Height"]
@@ -530,12 +547,13 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _filter_found_peaks_by_estimated(self, peak_table, peak_estimates_list, table_to_overwrite):
+  def _filter_found_peaks(self, peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
     peak_estimate_deltas = []
+    linear_bg_A0, linear_bg_A1 = linear_bg_coeffs
     #with estimates for spectrum, loop through all peaks, get and store delta from peak estimates
     for peak_estimate_index, peak_estimate in enumerate(peak_estimates_list):
-        for position_index, position in enumerate(mtd[peak_table].column(2)): #this may vary for different peaks
-            if not position == 0: #STOP BUG WHERE FOUND PEAKS RETURNS 0 POSITION PEAK AT END
+        for position_index, (position, height) in enumerate(zip(mtd[peak_table].column(2), mtd[peak_table].column(1))):
+            if not position == 0 and height > (position * linear_bg_A1 + linear_bg_A0) * peak_height_rel_threshold + peak_height_abs_threshold:
                 peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
 
     #loop through accendings delta, assign peaks until there are none left to be assigned.
