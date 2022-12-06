@@ -65,6 +65,7 @@ RECOIL_FIT_WINDOW_RANGE = 300
 RESONANCE_PEAK_CROP_RANGE =(100, 350)
 RESONANCE_FIT_WINDOW_RANGE = 50
 
+PEAK_HEIGHT_RELATIVE_THRESHOLD = 0.25
 
 #energy used to estimate peak position
 ENERGY_ESTIMATE = 4897.3
@@ -404,7 +405,7 @@ class EVSCalibrationFit(PythonAlgorithm):
        
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
         status, chi2, ncm, params, fws, func, cost_func, xMin, xMax = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
-        status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=0.25) else status
+        status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status
 
         if not status == "success":
             #FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
@@ -415,19 +416,13 @@ class EVSCalibrationFit(PythonAlgorithm):
             peak_table_temp = peak_table + "_temp"
             CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
 
-            #FIT LINEAR BG TO DATA
-            temp_bg_fit = Fit(Function="(name=LinearBackground,A0=0,A1=0)", InputWorkspace=self._sample, Output="temp_bg_fit", CreateOutput=True)
-            linear_bg_coeffs = temp_bg_fit.OutputParameters.cell("Value", 0), temp_bg_fit.OutputParameters.cell("Value", 1)
-            DeleteWorkspace('temp_bg_fit_Workspace')
-            DeleteWorkspace('temp_bg_fit_NormalisedCovarianceMatrix')
-            DeleteWorkspace('temp_bg_fit_Parameters')
-
             #FILTER FOUND PEAKS USING ESTIMATED POSITIONS AND MINIMUM HEIGHT
-            self._filter_found_peaks(peak_table_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs, peak_height_rel_threshold=0.25)
+            linear_bg_coeffs = self._calc_linear_bg_coefficients()
+            self._filter_found_peaks(peak_table_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
             fit_output_name_u = fit_output_name + "_unconstrained"
             status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
                                                                                                               fit_output_name_u, (xMin, xMax))
-            status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list, peak_height_rel_threshold=0.25) else status_u
+            status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status_u
             if chi2_u < chi2 and status_u != "peaks invalid":
                 params = params_u
                 status = "unused" #mark initial fit as unused
@@ -472,6 +467,16 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
+  def _calc_linear_bg_coefficients(self):
+    temp_bg_fit = Fit(Function="(name=LinearBackground,A0=0,A1=0)", InputWorkspace=self._sample, Output="temp_bg_fit", CreateOutput=True)
+    linear_bg_coeffs = temp_bg_fit.OutputParameters.cell("Value", 0), temp_bg_fit.OutputParameters.cell("Value", 1)
+    DeleteWorkspace('temp_bg_fit_Workspace')
+    DeleteWorkspace('temp_bg_fit_NormalisedCovarianceMatrix')
+    DeleteWorkspace('temp_bg_fit_Parameters')
+    return linear_bg_coeffs
+
+#----------------------------------------------------------------------------------------
+
   def _check_fitted_peak_validity(self, table_name, estimated_peaks, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
     check_nans = self._check_nans(table_name)
     check_peak_positions = self._check_peak_positions(table_name, estimated_peaks)
@@ -513,7 +518,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
- def _evaluate_peak_height_against_bg(self, height, position, linear_bg_A0, linear_bg_A1, rel_threshold, abs_threshold):
+  def _evaluate_peak_height_against_bg(self, height, position, linear_bg_A0, linear_bg_A1, rel_threshold, abs_threshold):
     bg = position * linear_bg_A1 + linear_bg_A0
     required_height = bg*rel_threshold + abs_threshold
     if height < required_height:
