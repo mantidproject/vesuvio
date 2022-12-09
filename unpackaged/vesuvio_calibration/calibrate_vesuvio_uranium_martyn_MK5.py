@@ -408,32 +408,42 @@ class EVSCalibrationFit(PythonAlgorithm):
         status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status
 
         if not status == "success":
-            #FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
+            # FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % i)
             peak_table_u = self._sample + '_peaks_table_unconstrained%d' % spec_number
             find_peak_params_u = self._get_find_peak_parameters(spec_number, None, unconstrained=True)
-            FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table_u, **find_peak_params_u)
-            peak_table_temp = peak_table + "_temp"
-            CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
+            try:  # Needed as sometimes "Matrix A is singular" occurs, have been unable to work out why.
+                FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table_u, **find_peak_params_u)
+                peaks_found = True
+            except ValueError:
+                logger.error("This error relates to the unconstrained workflow. Result from standard workflow will be used.")
+                peaks_found = False
 
-            #FILTER FOUND PEAKS USING ESTIMATED POSITIONS AND MINIMUM HEIGHT
-            linear_bg_coeffs = self._calc_linear_bg_coefficients()
-            self._filter_found_peaks(peak_table_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-            fit_output_name_u = fit_output_name + "_unconstrained"
-            status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
-                                                                                                              fit_output_name_u, (xMin, xMax))
-            status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status_u
-            if chi2_u < chi2 and status_u != "peaks invalid":
-                params = params_u
-                status = "unused" #mark initial fit as unused
-                self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % i)
-            else:
-                DeleteWorkspace(fit_output_name_u + '_Workspace')
-                DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
-                DeleteWorkspace(fit_output_name_u + '_Parameters')
+            if peaks_found:
+                peak_table_temp = peak_table + "_temp"
+                CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
 
-            DeleteWorkspace(peak_table + "_temp")
-            DeleteWorkspace(peak_table_u)
+                # FILTER FOUND PEAKS USING ESTIMATED POSITIONS AND MINIMUM HEIGHT
+                linear_bg_coeffs = self._calc_linear_bg_coefficients()
+                self._filter_found_peaks(peak_table_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs,
+                                         peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
+                fit_output_name_u = fit_output_name + "_unconstrained"
+                status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
+                                                                                                                  fit_output_name_u,
+                                                                                                                  (xMin, xMax))
+                status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list,
+                                                                                   peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status_u
+                if chi2_u < chi2 and status_u != "peaks invalid":
+                    params = params_u
+                    status = "unused"  # mark initial fit as unused
+                    self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % i)
+                else:
+                    DeleteWorkspace(fit_output_name_u + '_Workspace')
+                    DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
+                    DeleteWorkspace(fit_output_name_u + '_Parameters')
+
+                DeleteWorkspace(peak_table + "_temp")
+                DeleteWorkspace(peak_table_u)
         DeleteWorkspace(peak_table)
 
         fit_values = dict(zip(params.column(0), params.column(1)))
