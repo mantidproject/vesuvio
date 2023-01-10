@@ -61,7 +61,7 @@ PEAK_TYPES = ["Resonance", "Recoil", "Bragg"]
 # self._fit_window_range applies bith to fitting the resonances and the lead recoil peaks
 # it is defined as the range left and right from the peak centre (i. e. the whole fitting window is twice the fitting range)
 
-BRAGG_PEAK_CROP_RANGE = (2000, 17000)
+BRAGG_PEAK_CROP_RANGE = (2000, 20000)
 BRAGG_FIT_WINDOW_RANGE = 500
 BRAGG_PEAK_POSITION_TOLERANCE = 1000
 
@@ -858,7 +858,12 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._d_spacings = self._d_spacings.reshape(1, self._d_spacings.size).T
 
     lambdas = 2 * self._d_spacings * np.sin(np.radians(thetas) / 2)
-    tof = (lambdas * scipy.constants.m_n * (L0 + L1)) / scipy.constants.h + t0
+    
+    L1_nan_to_num = np.nan_to_num(L1)
+    
+    print(L1_nan_to_num)
+    
+    tof = (lambdas * scipy.constants.m_n * (L0 + L1_nan_to_num)) / scipy.constants.h + t0
     tof *= 1e+6
 
     return tof
@@ -1350,6 +1355,25 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     r_theta = calculate_r_theta(self._sample_mass, theta)
     
     peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
+    peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+    peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
+    peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
+    peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
+    peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
+    peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
+    peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
+    
+    badSpecs=np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
+    (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
+    (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
+    (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
+    (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
+    (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
+    (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
+    (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
+    (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
+    
+    peak_centres[badSpecs] = np.nan
 
 
     delta_t = (peak_centres - t0) / 1e+6
@@ -1379,6 +1403,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     t0 = read_table_column(self._current_workspace, 't0', spec_list)
     L0 = read_table_column(self._current_workspace, 'L0', spec_list)
     L1 = read_table_column(self._param_table, 'L1', spec_list)
+    L1_nan_to_num = np.nan_to_num(L1)
     spec = read_table_column(self._current_workspace, 'Spectrum', spec_list)
 
     t0 /= 1e+6
@@ -1399,7 +1424,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     masked_peak_centres = np.ma.masked_array(peak_centres, np.logical_or(peak_centres<=2000,peak_centres>=20000)) 
     masked_peak_centres /=  1e+6
 
-    sin_theta = ((masked_peak_centres - t0) * scipy.constants.h) / (scipy.constants.m_n * d_spacings * 2 * (L0+L1))
+    sin_theta = ((masked_peak_centres - t0) * scipy.constants.h) / (scipy.constants.m_n * d_spacings * 2 * (L0+L1_nan_to_num))
     theta = np.arcsin(sin_theta) * 2
     theta = np.degrees(theta)
 
@@ -1428,6 +1453,25 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     r_theta = calculate_r_theta(self._sample_mass, theta)
 
     peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
+    peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+    peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
+    peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
+    peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
+    peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
+    peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
+    peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
+    
+    badSpecs=np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
+    (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
+    (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
+    (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
+    (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
+    (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
+    (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
+    (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
+    (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
+    
+    peak_centres[badSpecs] = np.nan
 
     delta_t = (peak_centres - t0) / 1e+6
     v1 = (L0 * r_theta + L1) / delta_t
@@ -1435,16 +1479,19 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     E1 = 0.5*scipy.constants.m_n*v1**2
     E1 /= MEV_CONVERSION
     
-
     spec_range = DETECTOR_RANGE[1]+1 - DETECTOR_RANGE[0]
     mean_E1 = np.empty(spec_range)
     E1_error = np.empty(spec_range)
 
-    mean_E1.fill(np.mean(E1))
-    E1_error.fill(scipy.stats.sem(E1))
+    mean_E1.fill(np.nanmean(E1))
+    E1_error.fill(np.nanstd(E1))
+    
+    #mean_E1.fill(np.nanmean(4897.1))
+    #E1_error.fill(np.nanmean(0.8))
 
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
+
 
 
 #----------------------------------------------------------------------------------------
