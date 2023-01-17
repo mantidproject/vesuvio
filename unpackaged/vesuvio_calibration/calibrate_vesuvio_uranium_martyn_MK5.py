@@ -1483,11 +1483,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     mean_E1 = np.empty(spec_range)
     E1_error = np.empty(spec_range)
 
-    mean_E1.fill(np.nanmean(E1))
-    E1_error.fill(np.nanstd(E1))
+    #mean_E1.fill(np.nanmean(E1))
+    #E1_error.fill(np.nanstd(E1))
     
-    #mean_E1.fill(np.nanmean(4897.1))
-    #E1_error.fill(np.nanmean(0.8))
+    mean_E1.fill(np.nanmean(4897.3))
+    E1_error.fill(np.nanmean(0.4))
 
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
@@ -1617,7 +1617,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param ws_name - name of the workspace to save the IP file from.
       @param spec_list - spectrum range to save to file.
     """
-    file_header = '\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1']) + '\n'
+    file_header = '\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1'])
     fmt = "%d  %d  %.4f  %.4f  %.3f  %.4f"
 
     det = read_table_column(ws_name, 'Spectrum', spec_list)
@@ -1630,14 +1630,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     file_data = np.asarray([[1,1,0,0,0,0], [2,2,0,0,0,0]])
     file_data = np.append(file_data, np.column_stack((det, det, theta, t0, L0, L1)), axis=0)
 
-    #workdir = config['defaultsave.directory']
-    workdir='C:\\Repos\\GitHub\Working Files\\VesuvioCalibrationScript\\VesuvioCalibration\\VesuvioCalibration\\uranium calibration and IP files'
-    #workdir='K:\\Neutron_computations\\MANTID\Mantid Vesuvio Calibration 2015\\uranium calibration and IP files'
+    workdir = config['defaultsave.directory']
     file_path = os.path.join(workdir, self._output_workspace_name+'.par')
 
     with open(file_path, 'wb') as f_handle:
-      f_handle.write(file_header)
-      np.savetxt(f_handle, file_data, fmt=fmt)
+      np.savetxt(f_handle, file_data, header = file_header, fmt=fmt)
 
 #----------------------------------------------------------------------------------------
 
