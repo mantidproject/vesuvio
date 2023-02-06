@@ -1148,6 +1148,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self.declareProperty(FloatArrayProperty('DSpacings', [], greaterThanZero, Direction.Input),
       doc="List of d-spacings used to estimate the positions of peaks in TOF.")
 
+    self.declareProperty(FloatArrayProperty('E1FixedValueAndError', [], greaterThanZero, Direction.Input),
+      doc="Value at which to fix E1 and E1 error (form: E1 value, E1 Error). If no input is provided, values will be calculated.")
+
     self.declareProperty('Iterations', 2, validator=IntBoundedValidator(lower=1),
       doc="Number of iterations to perform. Default is 2.")
 
@@ -1451,34 +1454,39 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param table_name - name of table containing fitted parameters for the peak centres
       @param spec_list - spectrum range to calculate t0 for.
     """
-    t0 = read_table_column(self._current_workspace, 't0', spec_list)
-    L0 = read_table_column(self._current_workspace, 'L0', spec_list)
 
-    L1 = read_table_column(self._param_table, 'L1', spec_list)
-    theta = read_table_column(self._current_workspace, 'theta', spec_list)
-    r_theta = calculate_r_theta(self._sample_mass, theta)
-
-    peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
-    peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
-
-    invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
-    peak_centres[invalid_spectra] = np.nan
-
-    delta_t = (peak_centres - t0) / 1e+6
-    v1 = (L0 * r_theta + L1) / delta_t
-
-    E1 = 0.5*scipy.constants.m_n*v1**2
-    E1 /= MEV_CONVERSION
-    
-    spec_range = DETECTOR_RANGE[1]+1 - DETECTOR_RANGE[0]
+    spec_range = DETECTOR_RANGE[1] + 1 - DETECTOR_RANGE[0]
     mean_E1 = np.empty(spec_range)
     E1_error = np.empty(spec_range)
 
-    #mean_E1.fill(np.nanmean(E1))
-    #E1_error.fill(np.nanstd(E1))
+    if not self._E1_value_and_error:
+        t0 = read_table_column(self._current_workspace, 't0', spec_list)
+        L0 = read_table_column(self._current_workspace, 'L0', spec_list)
+
+        L1 = read_table_column(self._param_table, 'L1', spec_list)
+        theta = read_table_column(self._current_workspace, 'theta', spec_list)
+        r_theta = calculate_r_theta(self._sample_mass, theta)
+
+        peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
+        peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+
+        invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+        peak_centres[invalid_spectra] = np.nan
+
+        delta_t = (peak_centres - t0) / 1e+6
+        v1 = (L0 * r_theta + L1) / delta_t
+
+        E1 = 0.5*scipy.constants.m_n*v1**2
+        E1 /= MEV_CONVERSION
+
+        mean_E1_val = np.nanmean(E1)
+        E1_error_val = np.nanstd(E1)
+    else:
+        mean_E1_val = self._E1_value_and_error[0]
+        E1_error_val = self._E1_value_and_error[1]
     
-    mean_E1.fill(np.nanmean(4897.3))
-    E1_error.fill(np.nanmean(0.4))
+    mean_E1.fill(mean_E1_val)
+    E1_error.fill(E1_error_val)
 
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
@@ -1494,6 +1502,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self._param_file = self.getProperty("InstrumentParameterFile").value
     self._sample_mass = self.getProperty("Mass").value
     self._d_spacings = self.getProperty("DSpacings").value.tolist()
+    self._E1_value_and_error = self.getProperty("E1FixedValueAndError").value.tolist()
     self._calc_L0 = self.getProperty("CalculateL0").value
     self._make_IP_file = self.getProperty("CreateIPFile").value
     self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
