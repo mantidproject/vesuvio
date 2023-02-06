@@ -860,9 +860,6 @@ class EVSCalibrationFit(PythonAlgorithm):
     lambdas = 2 * self._d_spacings * np.sin(np.radians(thetas) / 2)
     
     L1_nan_to_num = np.nan_to_num(L1)
-    
-    print(L1_nan_to_num)
-    
     tof = (lambdas * scipy.constants.m_n * (L0 + L1_nan_to_num)) / scipy.constants.h + t0
     tof *= 1e+6
 
@@ -1356,14 +1353,39 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     
     peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
     peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+    invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+    peak_centres[invalid_spectra] = np.nan
+
+    delta_t = (peak_centres - t0) / 1e+6
+    delta_t_error = t0_error / 1e+6
+
+    E1 *= MEV_CONVERSION
+    v1 = np.sqrt(2*E1/scipy.constants.m_n)
+    L1 = v1 * delta_t - L0 * r_theta
+    L1_error = v1 * delta_t_error 
+
+    self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
+    self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
+
+#----------------------------------------------------------------------------------------
+
+  def _identify_invalid_spectra(self, peak_table, peak_centres, peak_centres_errors, spec_list):
+    """
+      Inspect fitting results, and identify the fits associated with invalid spectra. These are spectra associated with detectors
+      which have lost foil coverage following a recent reduction in distance from source to detectors.
+
+      @param peak_table - name of table containing fitted parameters each spectra.
+      @param spec_list - spectrum range to inspect.
+      @return a list of invalid spectra.
+    """
     peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
     peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
     peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
     peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
     peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
     peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
-    
-    badSpecs=np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
+
+    invalid_spectra = np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
     (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
     (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
     (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
@@ -1372,26 +1394,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
     (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
     (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
-    
-    peak_centres[badSpecs] = np.nan
 
+    return invalid_spectra
 
-    delta_t = (peak_centres - t0) / 1e+6
-    
-    delta_t_error = t0_error / 1e+6
-
-
-    E1 *= MEV_CONVERSION
-    v1 = np.sqrt(2*E1/scipy.constants.m_n)
-    L1 = v1 * delta_t - L0 * r_theta
-    L1_error = v1 * delta_t_error 
-
-
-
-    self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
-    self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
-
-#----------------------------------------------------------------------------------------
+ # ----------------------------------------------------------------------------------------
 
   def _calculate_scattering_angle(self, table_name, spec_list):
     """
@@ -1454,24 +1460,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
     peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
     peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
-    peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
-    peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
-    peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
-    peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
-    peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
-    peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
-    
-    badSpecs=np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
-    (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
-    (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
-    (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
-    (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
-    (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
-    (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
-    (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
-    (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
-    
-    peak_centres[badSpecs] = np.nan
+
+    invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+    peak_centres[invalid_spectra] = np.nan
 
     delta_t = (peak_centres - t0) / 1e+6
     v1 = (L0 * r_theta + L1) / delta_t
@@ -1491,8 +1482,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
-
-
 
 #----------------------------------------------------------------------------------------
 
