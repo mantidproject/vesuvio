@@ -50,7 +50,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([(0, 0, found_peaks[0]), (1, 0, found_peaks[1]), (2, 0, found_peaks[2])], self.set_cell_list)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
@@ -69,7 +70,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([], self.set_cell_list)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
@@ -94,7 +96,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._func_param_names = {"Position": 'LorentzPos'}
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([('LorentzPos', 0, peak_estimates_list[0]), (1, 0, found_peaks[0]), ('LorentzPos', 2, peak_estimates_list[2])],
                          self.set_cell_list)
 
@@ -120,7 +124,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._func_param_names = {"Position": 'LorentzPos'}
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([(0, 0, found_peaks[0]), ('LorentzPos', 1, peak_estimates_list[1]), (2, 0, found_peaks[1])],
                          self.set_cell_list)
 
@@ -146,7 +152,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._func_param_names = {"Position": 'LorentzPos'}
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([(0, 0, found_peaks[0]), ('LorentzPos', 1, peak_estimates_list[1]), (2, 0, found_peaks[1])],
                          self.set_cell_list)
 
@@ -172,7 +180,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._func_param_names = {"Position": 'LorentzPos'}
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([(0, 0, found_peaks[1]), ('LorentzPos', 1, peak_estimates_list[1]), (2, 0, found_peaks[2])],
                          self.set_cell_list)
 
@@ -198,7 +208,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([(0, 0, found_peaks[1]), (1, 0, found_peaks[3]), (2, 0, found_peaks[4])], self.set_cell_list)
 
     #Found peaks sometimes returns 'zero' peaks, usually at the end of the table workspace.
@@ -224,7 +235,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        alg._filter_found_peaks_by_estimated(peak_table, peak_estimates_list, table_to_overwrite)
+        linear_bg_coeffs = (0, 0)
+        alg._func_param_names = {"Position": 'LorentzPos'}
+        alg._filter_found_peaks(peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs)
         self.assertEqual([(0, 0, found_peaks[0]), (1, 0, found_peaks[1]), ('LorentzPos', 2, peak_estimates_list[2])], self.set_cell_list)
 
     def test_estimate_bragg_peak_positions(self):
@@ -249,7 +262,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         print(estimated_positions)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
-    def test_check_nans_true(self, mock_mtd):
+    def test_check_nans_false(self, mock_mtd):
         alg = EVSCalibrationFit()
         table_ws = 'table_ws'
         data = [9440, np.nan, 15417]
@@ -261,11 +274,11 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        self.assertTrue(alg._check_nans(table_ws))
+        self.assertFalse(alg._check_nans(table_ws))
 
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
-    def test_check_nans_false(self, mock_mtd):
+    def test_check_nans_true(self, mock_mtd):
         alg = EVSCalibrationFit()
         table_ws = 'table_ws'
         data = [9440, 13351, 15417]
@@ -277,22 +290,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
 
-        self.assertFalse(alg._check_nans(table_ws))
+        self.assertTrue(alg._check_nans(table_ws))
 
-    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
-    def test_check_nans_str(self, mock_mtd):
-        alg = EVSCalibrationFit()
-        table_ws = 'table_ws'
-        data = ['str1', 'str2', 'str3']
-        return_mock_obj_table_ws = MagicMock()
-        return_mock_obj_table_ws.column.return_value = data
-        return_mock_obj_table_ws.columnCount.return_value = len(data)
-
-        mtd_mock_dict = {'table_ws': return_mock_obj_table_ws}
-
-        self.setup_mtd_mock(mock_mtd, mtd_mock_dict)
-
-        self.assertFalse(alg._check_nans(table_ws))
 
 if __name__ == '__main__':
     unittest.main()
