@@ -6,6 +6,7 @@ from functools import partial
 
 from mantid.api import WorkspaceGroup
 from mantid.simpleapi import *
+from mock import patch
 from unpackaged.vesuvio_calibration.tests.testhelpers.algorithms import create_algorithm
 from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import (calculate_r_theta, FRONTSCATTERING_RANGE, DETECTOR_RANGE,
                                                                                   BACKSCATTERING_RANGE, ENERGY_ESTIMATE, MEV_CONVERSION,
@@ -13,7 +14,14 @@ from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import 
                                                                                   U_BACKSCATTERING_SAMPLE, U_BACKSCATTERING_BACKGROUND,
                                                                                   U_MASS, U_PEAK_ENERGIES)
 
-from mock import patch
+
+D_SPACINGS_COPPER = [2.0865, 1.807, 1.278, 1.0897]
+D_SPACINGS_LEAD = [1.489, 1.750, 2.475, 2.858]
+D_SPACINGS_NIOBIUM = [2.3356, 1.6515, 1.3484, 1.1678]
+
+MASS_COPPER = 63.546
+MASS_LEAD = 207.19
+MASS_NIOBIUM = 92.906
 
 class EVSCalibrationTest(unittest.TestCase):
 
@@ -31,9 +39,9 @@ class EVSCalibrationTest(unittest.TestCase):
         self._run_range = "17087-17088"
         self._background = "17086"
         #Mass of copper in amu
-        self._mass = 63.546
+        self._mass = MASS_COPPER
         #d-spacings of a copper sample
-        self._d_spacings = np.array([2.0865, 1.807, 1.278, 1.0897])
+        self._d_spacings = np.array(D_SPACINGS_COPPER)
         self._d_spacings.sort()
         self._energy_estimates = np.array(ENERGY_ESTIMATE)
         self._mode = 'FoilOut'
@@ -42,9 +50,9 @@ class EVSCalibrationTest(unittest.TestCase):
         self._run_range = "17083-17084"
         self._background = "17086"
         #Mass of a lead in amu
-        self._mass = 207.19
+        self._mass = MASS_LEAD
         #d-spacings of a lead sample
-        self._d_spacings = np.array([1.489, 1.750, 2.475, 2.858])
+        self._d_spacings = np.array(D_SPACINGS_LEAD)
         self._d_spacings.sort()
         self._energy_estimates = np.array(ENERGY_ESTIMATE)
         self._mode = 'FoilOut'
@@ -53,9 +61,9 @@ class EVSCalibrationTest(unittest.TestCase):
         self._run_range = "17089-17091"
         self._background = "17086"
         #Mass of a lead in amu
-        self._mass = 92.906
+        self._mass = MASS_NIOBIUM
         #d-spacings of a lead sample
-        self._d_spacings = np.array([2.3356, 1.6515, 1.3484, 1.1678])
+        self._d_spacings = np.array(D_SPACINGS_NIOBIUM)
         self._d_spacings.sort()
         self._energy_estimates = np.array(ENERGY_ESTIMATE)
         self._mode = 'FoilOut'
@@ -63,7 +71,8 @@ class EVSCalibrationTest(unittest.TestCase):
     def _setup_E1_fit_test(self):
         self._spec_list = DETECTOR_RANGE
         self._d_spacings = []
-        self._background = ''
+        self._run_range = U_FRONTSCATTERING_SAMPLE # Single Difference only for forward scattering detectors
+        self._background = U_FRONTSCATTERING_BACKGROUND
         self._mode = 'SingleDifference'
 
     def _setup_uranium_test(self):
@@ -81,18 +90,20 @@ class EVSCalibrationTest(unittest.TestCase):
             self._load_file_vesuvio(ws_name, output_name, run_range)
         except RuntimeError:
             self._load_file_raw(ws_name, output_name, run_range)
+        print('Load Successful')
 
     def _load_file_vesuvio(self, ws_name, output_name, run_range):
         try:
             prefix = 'EVS'
             filename = f'{os.path.dirname(__file__)}\data\{prefix}{ws_name}.raw'
-            LoadVesuvio(Filename=filename, Mode='FoilOut', OutputWorkspace=output_name,
+            LoadVesuvio(Filename=filename, Mode=self._mode, OutputWorkspace=output_name,
                         SpectrumList="%d-%d" % (run_range[0], run_range[1]),
                         EnableLogging=False)
-        except RuntimeError:
+        except RuntimeError as e:
+            print(e)
             prefix = 'VESUVIO000'
             filename = f'{os.path.dirname(__file__)}\data\{prefix}{ws_name}.raw'
-            LoadVesuvio(Filename=filename, Mode='FoilOut', OutputWorkspace=output_name,
+            LoadVesuvio(Filename=filename, Mode=self._mode, OutputWorkspace=output_name,
                         SpectrumList="%d-%d" % (run_range[0], run_range[1]),
                         EnableLogging=False)
 
@@ -102,7 +113,8 @@ class EVSCalibrationTest(unittest.TestCase):
             filename = f'{os.path.dirname(__file__)}\data\{prefix}{ws_name}.raw'
             LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=run_range[0], SpectrumMax=run_range[-1],
                     EnableLogging=False)
-        except RuntimeError:
+        except RuntimeError as e:
+            print(e)
             prefix = 'VESUVIO000'
             filename = f'{os.path.dirname(__file__)}\data\{prefix}{ws_name}.raw'
             LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=run_range[0], SpectrumMax=run_range[-1],
@@ -131,6 +143,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_lead(self, load_file_mock):
@@ -141,6 +154,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_niobium(self, load_file_mock):
@@ -151,6 +165,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_uranium(self, load_file_mock):
@@ -161,6 +176,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_lead_with_uranium(self, load_file_mock):
@@ -171,6 +187,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_l0_calc(self, load_file_mock):
@@ -182,6 +199,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_multiple_iterations(self, load_file_mock):
@@ -193,6 +211,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table)
 
     def tearDown(self):
         mtd.clear()
@@ -208,6 +227,14 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         self.assertFalse(np.isnan(thetas).any())
         self.assertFalse(np.isinf(thetas).any())
         np.testing.assert_allclose(actual_thetas, thetas, rtol=rel_tolerance)
+
+    def assert_L1_parameters_match_expected(self, params_table, rel_tolerance=0.4):
+        L1 = params_table.column('L1')
+        actual_L1 = self._calibrated_params['L1']
+
+        self.assertFalse(np.isnan(L1).any())
+        self.assertFalse(np.isinf(L1).any())
+        np.testing.assert_allclose(actual_L1, L1, rtol=rel_tolerance)
 
     def create_evs_calibration_alg(self):
         args = {
@@ -268,6 +295,8 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
         self._setup_E1_fit_test()
         self._output_workspace = "copper_peak_fit"
 
+        load_file_mock.side_effect = partial(self._load_file_side_effect, run_range=FRONTSCATTERING_RANGE)
+
         expected_values = self.calculate_energy_peak_positions()
         params_table = self.run_evs_calibration_fit("Recoil")
         self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.7)
@@ -278,7 +307,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
         self._setup_E1_fit_test()
         self._output_workspace = "lead_peak_fit"
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = partial(self._load_file_side_effect, run_range=FRONTSCATTERING_RANGE)
 
         expected_values = self.calculate_energy_peak_positions()
         params_table = self.run_evs_calibration_fit("Recoil")
