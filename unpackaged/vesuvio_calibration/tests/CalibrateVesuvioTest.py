@@ -69,10 +69,9 @@ class EVSCalibrationTest(unittest.TestCase):
         self._mode = 'FoilOut'
 
     def _setup_E1_fit_test(self):
-        self._spec_list = DETECTOR_RANGE
+        self._spec_list = FRONTSCATTERING_RANGE
         self._d_spacings = []
-        self._run_range = U_FRONTSCATTERING_SAMPLE # Single Difference only for forward scattering detectors
-        self._background = U_FRONTSCATTERING_BACKGROUND
+        self._background = ''
         self._mode = 'SingleDifference'
 
     def _setup_uranium_test(self):
