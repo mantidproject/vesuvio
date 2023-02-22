@@ -378,6 +378,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     #PARAM NAMES FOR LINEAR BACKGROUND
     param_names = ['f0.A0', 'f0.A1']
+
     #ADD OTHER PARAM NAMES DEPENDING UPON CHOSEN PEAK FUNCTION
     for i in range(num_peaks):
       param_names += ['f' + str(i) + '.' + name for name in self._func_param_names.values()]
@@ -402,7 +403,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         logger.notice(str(i) + '   ' + str(find_peak_params))
         #FIND PEAKS USING ESTIMATES, CONSTRAINED BY PEAK PARAMETERS
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table, **find_peak_params)
-       
+
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
         status, chi2, ncm, params, fws, func, cost_func, xMin, xMax = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
         status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status
@@ -867,6 +868,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
 
     run_numbers = [run for run in self._parse_run_numbers(ws_numbers)]
+
     self._load_file(run_numbers[0], output_name)
     temp_ws_name = '__EVS_calib_temp_ws'
 

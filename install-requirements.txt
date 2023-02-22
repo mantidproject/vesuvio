@@ -2,4 +2,4 @@ python==3.8.*
 matplotlib
 iminuit
 h5py
-jacobi
+jacobi==0.4.2
