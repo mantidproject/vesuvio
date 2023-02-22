@@ -11,6 +11,7 @@
 from mantid.kernel import *
 from mantid.api import *
 from mantid.simpleapi import *
+from functools import partial
 
 import os
 import sys
@@ -56,6 +57,7 @@ PEAK_TYPES = ["Resonance", "Recoil", "Bragg"]
 
 BRAGG_PEAK_CROP_RANGE = (2000, 17000)
 BRAGG_FIT_WINDOW_RANGE = 500
+BRAGG_PEAK_POSITION_TOLERANCE = 1000
 
 RECOIL_PEAK_CROP_RANGE = (300, 500)
 RECOIL_FIT_WINDOW_RANGE = 300
@@ -63,6 +65,7 @@ RECOIL_FIT_WINDOW_RANGE = 300
 RESONANCE_PEAK_CROP_RANGE =(100, 350)
 RESONANCE_FIT_WINDOW_RANGE = 50
 
+PEAK_HEIGHT_RELATIVE_THRESHOLD = 0.25
 
 #energy used to estimate peak position
 ENERGY_ESTIMATE = 4897.3
@@ -182,6 +185,20 @@ def read_fitting_result_table_column(table_name, column_name, spec_list):
   
 #----------------------------------------------------------------------------------------
 
+def generate_fit_function_header(function_type, error=False):
+    if function_type == 'Voigt':
+        error_str = "Err" if error else ""
+        func_header = {'Height': 'LorentzAmp', 'Position': 'LorentzPos', 'Width': 'LorentzFWHM', 'Width_2': 'GaussianFWHM'}
+    elif function_type == 'Gaussian':
+        error_str = "_Err" if error else ""
+        func_header = {'Height': 'Height', 'Width': 'Sigma', 'Position': 'PeakCentre'}
+    else:
+        raise ValueError("Unsupported fit function type: %s" % function_type)
+
+    return {k: v+error_str for k,v in func_header.items()}
+
+#----------------------------------------------------------------------------------------
+
 
 class EVSCalibrationFit(PythonAlgorithm):
 
@@ -296,14 +313,9 @@ class EVSCalibrationFit(PythonAlgorithm):
     if len(self._bkg_run_numbers) > 0:
       self._background = '' + self._bkg_run_numbers[0]
 
-
     #fit function type
-    if self._peak_function == 'Voigt':
-      self._func_param_names = {'Height': 'LorentzAmp', 'Position': 'LorentzPos', 'Width': 'LorentzFWHM', 'Width_2': 'GaussianFWHM'}
-    elif self._peak_function == 'Gaussian':
-      self._func_param_names = {'Height': 'Height', 'Width': 'Sigma', 'Position': 'PeakCentre'}
-    else:
-      raise ValueError("Unsupported fit function type: %s" % self._peak_function)
+    self._func_param_names = generate_fit_function_header(self._peak_function)
+    self._func_param_names_error = generate_fit_function_header(self._peak_function, error=True)
 
     #validate instrument parameter workspace/file
     if self._param_workspace != "":
@@ -355,25 +367,33 @@ class EVSCalibrationFit(PythonAlgorithm):
 #----------------------------------------------------------------------------------------
 
   def _fit_bragg_peaks(self):
+    #ESTIMATE PEAK POSITIONS USING D SPACING
     peak_positions = self._estimate_bragg_peak_positions()
     num_peaks, num_spectra = peak_positions.shape
     self._prog_reporter = Progress(self, 0.0, 1.0, num_spectra)
 
+    #CREATE OUTPUT PARAMETERS TABLE
     peaks_table = self._output_workspace_name + '_Peak_Parameters'
     CreateEmptyTableWorkspace(OutputWorkspace=peaks_table)
 
+    #PARAM NAMES FOR LINEAR BACKGROUND
     param_names = ['f0.A0', 'f0.A1']
+
+    #ADD OTHER PARAM NAMES DEPENDING UPON CHOSEN PEAK FUNCTION
     for i in range(num_peaks):
       param_names += ['f' + str(i) + '.' + name for name in self._func_param_names.values()]
 
+    #GENERATE ERROR NAMES FROM PARAM NAMES, ZIP TO GET COL NAMES
     err_names = [name + '_Err' for name in param_names]
     col_names = [element for tupl in zip(param_names, err_names) for element in tupl]
 
+    #CREATE OUTPUT TABLE FROM COL NAMES, STARTING WITH SPECTRA COLUMN
     mtd[peaks_table].addColumn('int', 'Spectrum')
     for name in col_names:
         mtd[peaks_table].addColumn('double', name)
 
     output_workspaces = []
+    #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
     for i, peak_estimates_list in enumerate(peak_positions.transpose()):
         self._prog_reporter.report("Fitting to spectrum %d" % i)
 
@@ -381,42 +401,51 @@ class EVSCalibrationFit(PythonAlgorithm):
         peak_table = self._sample + '_peaks_table_%d' % spec_number
         find_peak_params = self._get_find_peak_parameters(spec_number, peak_estimates_list)
         logger.notice(str(i) + '   ' + str(find_peak_params))
+        #FIND PEAKS USING ESTIMATES, CONSTRAINED BY PEAK PARAMETERS
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table, **find_peak_params)
-       
 
-        #get parameters from the peaks table
-        peak_params = []
-        prefix = ''#'f0.'
-        position = prefix + self._func_param_names['Position']
-        
-        print(peak_estimates_list)
-        self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
-        
-        for peak_index in range(mtd[peak_table].rowCount()):
-            peak_params.append(mtd[peak_table].row(peak_index))
-        DeleteWorkspace(peak_table)
-  
- 
-        #build function string
-        func_string = self._build_multiple_peak_function(peak_params)
-        
-        #select min and max x range for fitting
-        positions = [params[position] for params in peak_params]
-
-        if len(positions) < 1:
-            raise RuntimeError("FindPeaks could not find a peaks with the given parameters: %s" % find_peak_params)
-
-        xmin = min(positions) - self._fit_window_range
-        xmax = max(positions) + self._fit_window_range
-       
-        #xmin, xmax = None, None
-        
-        #fit function to workspace
         fit_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
-        status, chi2, ncm, params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True,
-                                                              StartX=xmin, EndX=xmax, WorkspaceIndex=i,
-                                                              CalcErrors=True, Output=fit_output_name,
-                                                              Minimizer='Levenberg-Marquardt,RelError=1e-8')
+        status, chi2, ncm, params, fws, func, cost_func, xMin, xMax = self._fit_found_peaks(peak_table, peak_estimates_list, i, fit_output_name)
+        status = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status
+
+        if not status == "success":
+            # FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
+            self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % i)
+            peak_table_u = self._sample + '_peaks_table_unconstrained%d' % spec_number
+            find_peak_params_u = self._get_find_peak_parameters(spec_number, None, unconstrained=True)
+            try:  # Needed as sometimes "Matrix A is singular" occurs, have been unable to work out why.
+                FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=i, PeaksList=peak_table_u, **find_peak_params_u)
+                peaks_found = True
+            except ValueError:
+                logger.error("This error relates to the unconstrained workflow. Result from standard workflow will be used.")
+                peaks_found = False
+
+            if peaks_found:
+                peak_table_temp = peak_table + "_temp"
+                CloneWorkspace(InputWorkspace=mtd[peak_table], OutputWorkspace=peak_table_temp)
+
+                # FILTER FOUND PEAKS USING ESTIMATED POSITIONS AND MINIMUM HEIGHT
+                linear_bg_coeffs = self._calc_linear_bg_coefficients()
+                self._filter_found_peaks(peak_table_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs,
+                                         peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
+                fit_output_name_u = fit_output_name + "_unconstrained"
+                status_u, chi2_u, ncm_u, params_u, fws_u, func_u, cost_func_u, xMin, xMax = self._fit_found_peaks(peak_table_temp, None, i,
+                                                                                                                  fit_output_name_u,
+                                                                                                                  (xMin, xMax))
+                status_u = "peaks invalid" if not self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list,
+                                                                                   peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else status_u
+                if chi2_u < chi2 and status_u != "peaks invalid":
+                    params = params_u
+                    status = "unused"  # mark initial fit as unused
+                    self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % i)
+                else:
+                    DeleteWorkspace(fit_output_name_u + '_Workspace')
+                    DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
+                    DeleteWorkspace(fit_output_name_u + '_Parameters')
+
+                DeleteWorkspace(peak_table + "_temp")
+                DeleteWorkspace(peak_table_u)
+        DeleteWorkspace(peak_table)
 
         fit_values = dict(zip(params.column(0), params.column(1)))
         fit_errors = dict(zip(params.column(0), params.column(2)))
@@ -431,15 +460,190 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         DeleteWorkspace(fit_output_name + '_NormalisedCovarianceMatrix')
         DeleteWorkspace(fit_output_name + '_Parameters')
+        if status == "unused":
+            DeleteWorkspace(fit_output_name_u + '_NormalisedCovarianceMatrix')
+            DeleteWorkspace(fit_output_name_u + '_Parameters')
 
-        if self._create_output:
-            output_workspaces.append(fit_output_name + '_Workspace')
-        else:
+        if status == "unused" or not self._create_output:
             DeleteWorkspace(fit_output_name + '_Workspace')
+        if status == "unused" and not self._create_output:
+            DeleteWorkspace(fit_output_name_u + '_Workspace')
+        elif status == "unused":
+            output_workspaces.append(fit_output_name_u + '_Workspace')
+        else:
+            output_workspaces.append(fit_output_name + '_Workspace')
 
     if self._create_output:
         GroupWorkspaces(','.join(output_workspaces), OutputWorkspace=self._output_workspace_name + "_Peak_Fits")
 
+#----------------------------------------------------------------------------------------
+
+  def _calc_linear_bg_coefficients(self):
+    temp_bg_fit = Fit(Function="(name=LinearBackground,A0=0,A1=0)", InputWorkspace=self._sample, Output="temp_bg_fit", CreateOutput=True)
+    linear_bg_coeffs = temp_bg_fit.OutputParameters.cell("Value", 0), temp_bg_fit.OutputParameters.cell("Value", 1)
+    DeleteWorkspace('temp_bg_fit_Workspace')
+    DeleteWorkspace('temp_bg_fit_NormalisedCovarianceMatrix')
+    DeleteWorkspace('temp_bg_fit_Parameters')
+    return linear_bg_coeffs
+
+#----------------------------------------------------------------------------------------
+
+  def _check_fitted_peak_validity(self, table_name, estimated_peaks, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
+    check_nans = self._check_nans(table_name)
+    check_peak_positions = self._check_peak_positions(table_name, estimated_peaks)
+    check_peak_heights = self._check_peak_heights(table_name, peak_height_abs_threshold, peak_height_rel_threshold)
+    
+    if check_nans and check_peak_positions and check_peak_heights:
+        return True
+    else:
+        return False
+    
+#----------------------------------------------------------------------------------------
+
+  def _check_nans(self, table_name):
+    table_ws = mtd[table_name]
+    for i in table_ws.column("Value"):
+        if np.isnan(i):
+            print(f"nan found in value common, indicates invalid peak")
+            return False
+    return True
+    
+#----------------------------------------------------------------------------------------
+    
+  def _check_peak_positions(self, table_name, estimated_positions):
+    pos_str = self._func_param_names["Position"]
+
+    i = 0
+    invalid_positions = []
+    for name, value in zip(mtd[table_name].column("Name"), mtd[table_name].column("Value")):
+        if pos_str in name:
+            if not (value >= estimated_positions[i] - BRAGG_PEAK_POSITION_TOLERANCE and value <= estimated_positions[i] + BRAGG_PEAK_POSITION_TOLERANCE):
+                invalid_positions.append(value)
+            i += 1
+
+    if len(invalid_positions) > 0:
+        print(f"Invalid peak positions found: {invalid_positions}")
+        return False
+    else:
+        return True
+
+#----------------------------------------------------------------------------------------
+
+  def _evaluate_peak_height_against_bg(self, height, position, linear_bg_A0, linear_bg_A1, rel_threshold, abs_threshold):
+    bg = position * linear_bg_A1 + linear_bg_A0
+    required_height = bg*rel_threshold + abs_threshold
+    if height < required_height:
+        return False
+    else:
+        return True
+
+#----------------------------------------------------------------------------------------
+
+  def _check_peak_heights(self, table_name, abs_threshold_over_bg, rel_threshold_over_bg):
+    height_str = self._func_param_names["Height"]
+    pos_str = self._func_param_names["Position"]
+    
+    peak_heights = []
+    peak_positions = []
+    for name, value in zip(mtd[table_name].column("Name"), mtd[table_name].column("Value")):
+        if height_str in name:
+            peak_heights.append(value)
+        elif pos_str in name:
+            peak_positions.append(value)
+        elif name == "f0.A0":
+            linear_bg_A0 = value
+        elif name == "f0.A1":
+            linear_bg_A1 = value
+
+    for height, pos in zip(peak_heights, peak_positions):
+        if not self._evaluate_peak_height_against_bg(height, pos, linear_bg_A0, linear_bg_A1, abs_threshold_over_bg, rel_threshold_over_bg):
+            print(f"Peak height threshold not met. Found height: {height}")
+            return False
+    return True
+
+#----------------------------------------------------------------------------------------
+
+  def _filter_found_peaks(self, peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs, peak_height_abs_threshold=0, peak_height_rel_threshold=0):
+    peak_estimate_deltas = []
+    linear_bg_A0, linear_bg_A1 = linear_bg_coeffs
+    #with estimates for spectrum, loop through all peaks, get and store delta from peak estimates
+    for peak_estimate_index, peak_estimate in enumerate(peak_estimates_list):
+        for position_index, (position, height) in enumerate(zip(mtd[peak_table].column(2), mtd[peak_table].column(1))):
+            if not position == 0 and self._evaluate_peak_height_against_bg(height, position, linear_bg_A0, linear_bg_A1, peak_height_abs_threshold, peak_height_rel_threshold):
+                peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
+
+    #loop through accendings delta, assign peaks until there are none left to be assigned.
+    peak_estimate_deltas.sort(key=partial(self._get_x_elem, elem=2))
+    index_matches = []
+    for peak_estimate_index, position_index, delta in peak_estimate_deltas:
+        #if all estimated peaks matched, break
+        if len(index_matches)==len(peak_estimates_list):
+            break
+        #assign match for smallest delta if that position or estimate has not been already matched
+        if position_index not in [i[1] for i in index_matches] and \
+           peak_estimate_index not in [i[0] for i in index_matches] and \
+           all(x>position_index for x in [i[1] for i in index_matches if i[0]>peak_estimate_index]) and \
+           all(x<position_index for x in [i[1] for i in index_matches if i[0]<peak_estimate_index]):
+              index_matches.append((peak_estimate_index, position_index))
+
+    if len(index_matches) > 0:
+        index_matches.sort(key=partial(self._get_x_elem, elem=1))
+        mtd[table_to_overwrite].setRowCount(len(peak_estimates_list))
+        for col_index in range(mtd[table_to_overwrite].columnCount()):
+            match_n = 0
+            for row_index in range(mtd[table_to_overwrite].rowCount()):
+                if row_index in [x[0] for x in index_matches]:
+                    position_row_index = index_matches[match_n][1]
+                    mtd[table_to_overwrite].setCell(row_index,col_index, mtd[peak_table].cell(position_row_index, col_index))
+                    match_n+=1
+                else: #otherwise just use estimate position
+                    pos_str = self._func_param_names["Position"]
+                    mtd[table_to_overwrite].setCell(pos_str, row_index, peak_estimates_list[row_index])
+
+#----------------------------------------------------------------------------------------
+  def _get_x_elem(self, input_list, elem):
+    return input_list[elem]
+
+#----------------------------------------------------------------------------------------
+
+  def _fit_found_peaks(self, peak_table, peak_estimates_list, workspace_index, fit_output_name, xLimits=None):
+    #get parameters from the peaks table
+    peak_params = []
+    prefix = ''#'f0.'
+    position = prefix + self._func_param_names['Position']
+
+    if peak_estimates_list is not None: #If no peak estimates list, we are doing an unconstrained fit
+        #Don't yet understand what this is doing here
+        #print(peak_estimates_list)
+        self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
+        unconstrained=False
+    else:
+        unconstrained=True
+
+    for peak_index in range(mtd[peak_table].rowCount()):
+            peak_params.append(mtd[peak_table].row(peak_index))
+
+    #build function string
+    func_string = self._build_multiple_peak_function(peak_params, workspace_index, unconstrained)
+
+    #select min and max x range for fitting
+    positions = [params[position] for params in peak_params]
+
+    if len(positions) < 1:
+        raise RuntimeError("FindPeaks could not find a peaks with the given parameters: %s" % find_peak_params)
+
+    if xLimits:
+        xmin, xmax = xLimits
+    else:
+        xmin = min(peak_estimates_list) - BRAGG_PEAK_POSITION_TOLERANCE - self._fit_window_range
+        xmax = max(peak_estimates_list) + BRAGG_PEAK_POSITION_TOLERANCE + self._fit_window_range
+
+    #xmin, xmax = None, None
+
+    #fit function to workspace
+    return Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True, StartX=xmin, EndX=xmax,
+               WorkspaceIndex=workspace_index, CalcErrors=True, Output=fit_output_name, Minimizer='Levenberg-Marquardt,AbsError=0,RelError=1e-8') \
+               + (xmin,) + (xmax,)
 
 #----------------------------------------------------------------------------------------
 
@@ -452,12 +656,14 @@ class EVSCalibrationFit(PythonAlgorithm):
       containing one table workspace per peak with parameters for each detector.
     """
 
+    #ESTIMATE PEAK POSITIONS FROM ENERGY ESTIMATES AND PREVIOUS PARAMETERS.
     peak_positions = self._estimate_peak_positions()
     num_peaks, num_spectra = peak_positions.shape
     self._prog_reporter = Progress(self,0.0,1.0,num_peaks*num_spectra)
 
     self._parameter_tables = []
     self._fit_workspaces = []
+    #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
     for i, peak_estimates_list in enumerate(peak_positions):
       #create parameter table
       peaks_table = self._output_workspace_name + '_Peak_%d_Parameters' % i
@@ -465,6 +671,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
       #fit every spectrum
       self._peak_fit_workspaces = []
+      #LOOP THROUGH PEAK ESTIMATES FOR THIS SPECTRUM
       for j, peak_centre in enumerate(peak_estimates_list):
         spec_number = self._spec_list[0]+j
         self._prog_reporter.report("Fitting peak %d to spectrum %d" % (i,spec_number))
@@ -472,6 +679,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         #find inital parameters given the estimate position
         peak_table = '__' + self._sample + '_peaks_table_%d_%d' % (i,j)
         find_peak_params = self._get_find_peak_parameters(spec_number, [peak_centre])
+        #FIND DATA PEAK RELATED TO ESTIMATED PEAK
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=j, PeaksList=peak_table, **find_peak_params)
 
         #extract data from table
@@ -525,28 +733,31 @@ class EVSCalibrationFit(PythonAlgorithm):
     
 #----------------------------------------------------------------------------------------
     
-  def _get_find_peak_parameters(self, spec_number, peak_centre):
+  def _get_find_peak_parameters(self, spec_number, peak_centre, unconstrained=False):
     """
       Get find peak parameters
 
       @param spec_num - the current spectrum number being fitted
       @return dictionary of parameters for find peaks
     """
+
     find_peak_params = {}
-    find_peak_params['PeakPositions'] = peak_centre
     find_peak_params['PeakFunction'] = self._peak_function
     find_peak_params['RawPeakParameters'] = True
     find_peak_params['BackgroundType'] = 'Linear'
 
-    if self._fitting_bragg_peaks:
-        find_peak_params['PeakPositionTolerance'] = 1000
+    if not unconstrained:
+        find_peak_params['PeakPositions'] = peak_centre
+
+    if self._fitting_bragg_peaks and not unconstrained:
+        find_peak_params['PeakPositionTolerance'] = BRAGG_PEAK_POSITION_TOLERANCE
 
         if spec_number >= FRONTSCATTERING_RANGE[0]:
             find_peak_params['FWHM'] = 70
         else:
             find_peak_params['FWHM'] = 5
 
-    else:
+    elif not self._fitting_bragg_peaks:
       if self._fitting_resonance_peaks:
         # 25 seems to be able to fit the final peak in the first backscattering spectrum
         if spec_number >= FRONTSCATTERING_RANGE[0]:
@@ -556,7 +767,6 @@ class EVSCalibrationFit(PythonAlgorithm):
       else:
         # #ust be recoil
         half_peak_window = 60
-
 
       fit_windows = [[peak-half_peak_window, peak+half_peak_window] for peak in peak_centre]
       # flatten the list: http://stackoverflow.com/questions/952914/making-a-flat-list-out-of-list-of-lists-in-python
@@ -658,10 +868,10 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
 
     run_numbers = [run for run in self._parse_run_numbers(ws_numbers)]
-    print(run_numbers)
-    self._load_file(run_numbers[0], output_name)
 
+    self._load_file(run_numbers[0], output_name)
     temp_ws_name = '__EVS_calib_temp_ws'
+
     for run_number in run_numbers[1:]:
       self._load_file(run_number, temp_ws_name)
       Plus(output_name, temp_ws_name, OutputWorkspace=output_name)
@@ -698,6 +908,7 @@ class EVSCalibrationFit(PythonAlgorithm):
       @param ws_name - name of the run to load.
       @param output_name - name to call the loaded workspace
     """
+
     try:
       LoadVesuvio(Filename=ws_name, Mode=self._mode, OutputWorkspace=output_name,
                   SpectrumList="%d-%d" % (self._spec_list[0], self._spec_list[-1]),
@@ -745,7 +956,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _build_multiple_peak_function(self, peaks):
+  def _build_multiple_peak_function(self, peaks, workspace_index, unconstrained):
     """
       Builds a string describing a composite function that can be passed to Fit.
       This will be a linear background with multiple peaks of either a Gaussian or Voigt shape.
@@ -757,7 +968,18 @@ class EVSCalibrationFit(PythonAlgorithm):
     if(len(peaks) == 0):
         return ''
 
-    fit_func = self._build_linear_background_function(peaks[0], False)
+    if not unconstrained:
+        fit_func = self._build_linear_background_function(peaks[0], False)
+    else:
+        pos_str = self._func_param_names["Position"]
+        if len(peaks) > 1:
+            fit_window = [peaks[0][pos_str] - 1000, peaks[len(peaks)-1][pos_str] + 1000]
+        else:
+            fit_window = [peaks[0][pos_str] - 1000, peaks[0][pos_str] + 1000]
+        FindPeakBackground(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, FitWindow=fit_window, BackgroundType="Linear", OutputWorkspace="temp_fit_bg")
+        fit_func = f'name=LinearBackground, A0={mtd["temp_fit_bg"].cell("bkg0",0)}, A1={mtd["temp_fit_bg"].cell("bkg1",0)};'
+        DeleteWorkspace("temp_fit_bg")
+
     fit_func += '('
     for i, peak in enumerate(peaks):
         fit_func += self._build_peak_function(peak)
@@ -941,6 +1163,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self._current_workspace = self._output_workspace_name + '_Iteration_0'
     self._create_calib_parameter_table(self._current_workspace)
 
+    #PEAK FUNCTIONS
+    self._theta_peak_function = 'Gaussian'
+    self._theta_func_param_names = generate_fit_function_header(self._theta_peak_function)
+    self._theta_func_param_names_error = generate_fit_function_header(self._theta_peak_function, error=True)
+
     if self._calc_L0:
       #calibrate L0 from the fronstscattering detectors, use the value of the L0 calibrated from frontscattering detectors  for all detectors
       L0_fit = self._current_workspace + '_L0'
@@ -978,7 +1205,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
       #calibrate theta for all detectors
       theta_fit = self._current_workspace + '_theta'
-      self._run_calibration_fit(Samples=self._samples, Background=self._background, Function='Voigt', Mode='FoilOut', SpectrumRange=DETECTOR_RANGE,
+      self._run_calibration_fit(Samples=self._samples, Background=self._background, Function=self._theta_peak_function, Mode='FoilOut', SpectrumRange=DETECTOR_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, DSpacings=self._d_spacings, OutputWorkspace=theta_fit, CreateOutput=self._create_output,
                                 PeakType='Bragg')
       self._theta_peak_fits = theta_fit + '_Peak_Parameters'
@@ -1155,7 +1382,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     d_spacings = d_spacings.reshape(1, d_spacings.size).T
 
     peak_centres = []
-    col_names = [name for name in mtd[table_name].getColumnNames() if 'LorentzPos' in name and 'LorentzPos_Err' not in name]
+    pos_str = self._theta_func_param_names["Position"]
+    err_str = self._theta_func_param_names_error["Position"]
+    col_names = [name for name in mtd[table_name].getColumnNames() if pos_str in name and err_str not in name]
     for name in col_names:
       t = np.asarray(mtd[table_name].column(name))
       peak_centres.append(t)
