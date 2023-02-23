@@ -23,7 +23,11 @@ MASS_COPPER = 63.546
 MASS_LEAD = 207.19
 MASS_NIOBIUM = 92.906
 
+
 class EVSCalibrationTest(unittest.TestCase):
+    def __init__(self, methodName = ...):
+        super().__init__(methodName)
+        self._mode = ['FoilOut']
 
     def load_ip_file(self):
         param_names = ['spectrum', 'theta', 't0', 'L0', 'L1']
@@ -44,7 +48,6 @@ class EVSCalibrationTest(unittest.TestCase):
         self._d_spacings = np.array(D_SPACINGS_COPPER)
         self._d_spacings.sort()
         self._energy_estimates = np.array(ENERGY_ESTIMATE)
-        self._mode = 'FoilOut'
 
     def _setup_lead_test(self):
         self._run_range = "17083-17084"
@@ -55,7 +58,6 @@ class EVSCalibrationTest(unittest.TestCase):
         self._d_spacings = np.array(D_SPACINGS_LEAD)
         self._d_spacings.sort()
         self._energy_estimates = np.array(ENERGY_ESTIMATE)
-        self._mode = 'FoilOut'
 
     def _setup_niobium_test(self):
         self._run_range = "17089-17091"
@@ -66,13 +68,11 @@ class EVSCalibrationTest(unittest.TestCase):
         self._d_spacings = np.array(D_SPACINGS_NIOBIUM)
         self._d_spacings.sort()
         self._energy_estimates = np.array(ENERGY_ESTIMATE)
-        self._mode = 'FoilOut'
 
     def _setup_E1_fit_test(self):
         self._spec_list = FRONTSCATTERING_RANGE
         self._d_spacings = []
         self._background = ''
-        self._mode = 'SingleDifference'
 
     def _setup_uranium_test(self):
         self._function = 'Gaussian'
@@ -80,30 +80,34 @@ class EVSCalibrationTest(unittest.TestCase):
         self._d_spacings = []
         self._energy_estimates = np.array(U_PEAK_ENERGIES)
         self._energy_estimates.sort()
-        self._mode = 'FoilOut'
 
-    def _load_file_side_effect(self, *args, run_range=DETECTOR_RANGE):
+    def _select_mode(self):
+        self._selected_mode = self._mode.pop(0) if len(self._mode) > 1 else self._mode[0]
+
+    def _load_file_side_effect(self, *args, spec_range=DETECTOR_RANGE):
         ws_name = args[0]
         output_name = args[1]
+        self._select_mode()
+
         try:
-            self._load_file_vesuvio(ws_name, output_name, run_range)
+            self._load_file_vesuvio(ws_name, output_name, spec_range)
         except RuntimeError:
-            self._load_file_raw(ws_name, output_name, run_range)
+            self._load_file_raw(ws_name, output_name, spec_range)
         print('Load Successful')
 
-    def _load_file_vesuvio(self, ws_name, output_name, run_range):
+    def _load_file_vesuvio(self, ws_name, output_name, spec_range):
         try:
             prefix = 'EVS'
             filename = f'{os.path.dirname(__file__)}\data\{prefix}{ws_name}.raw'
-            LoadVesuvio(Filename=filename, Mode=self._mode, OutputWorkspace=output_name,
-                        SpectrumList="%d-%d" % (run_range[0], run_range[1]),
+            LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
+                        SpectrumList="%d-%d" % (spec_range[0], spec_range[1]),
                         EnableLogging=False)
         except RuntimeError as e:
             print(e)
             prefix = 'VESUVIO000'
             filename = f'{os.path.dirname(__file__)}\data\{prefix}{ws_name}.raw'
-            LoadVesuvio(Filename=filename, Mode=self._mode, OutputWorkspace=output_name,
-                        SpectrumList="%d-%d" % (run_range[0], run_range[1]),
+            LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
+                        SpectrumList="%d-%d" % (spec_range[0], spec_range[1]),
                         EnableLogging=False)
 
     def _load_file_raw(self, ws_name, output_name, run_range):
@@ -137,6 +141,8 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
     def test_copper(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
+        #modes in order of call of EVSCalibrationFit in the EVSCalibrationAnalysis function
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -148,6 +154,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
     def test_lead(self, load_file_mock):
         self._setup_lead_test()
         self._output_workspace = "lead_analysis_test"
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -159,6 +166,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
     def test_niobium(self, load_file_mock):
         self._setup_niobium_test()
         self._output_workspace = "niobium_analysis_test"
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -170,6 +178,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
     def test_copper_with_uranium(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -181,6 +190,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
     def test_lead_with_uranium(self, load_file_mock):
         self._setup_lead_test()
         self._output_workspace = "lead_analysis_test"
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -193,6 +203,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         self._setup_copper_test()
         self._calc_L0 = True
         self._output_workspace = "copper_analysis_test"
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -205,6 +216,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         self._setup_copper_test()
         self._iterations = 2
         self._output_workspace = "copper_analysis_test"
+        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -260,7 +272,6 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
         self._function = 'Voigt'
         self._parameter_file = f'{os.path.dirname(__file__)}\data\IP0005.par'
         self._calibrated_params = self.load_ip_file()
-        self._mode = 'FoilOut'
         self._energy_estimates = np.array([ENERGY_ESTIMATE])
         self._alg = None
 
@@ -293,6 +304,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
         self._setup_copper_test()
         self._setup_E1_fit_test()
         self._output_workspace = "copper_peak_fit"
+        self._mode = ['SingleDifference']
 
         load_file_mock.side_effect = partial(self._load_file_side_effect, run_range=FRONTSCATTERING_RANGE)
 
@@ -302,9 +314,10 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_peaks_lead(self, load_file_mock):
-        self._setup_copper_test()
+        self._setup_lead_test()
         self._setup_E1_fit_test()
         self._output_workspace = "lead_peak_fit"
+        self._mode = ['SingleDifference']
 
         load_file_mock.side_effect = partial(self._load_file_side_effect, run_range=FRONTSCATTERING_RANGE)
 
@@ -383,8 +396,8 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
         args = {
                 "OutputWorkspace": self._output_workspace, "Samples": self._run_range, "Background": self._background,
                 "InstrumentParameterFile": self._parameter_file, "DSpacings": self._d_spacings, "Energy": self._energy_estimates,
-                "CreateOutput": False, "Function": self._function, "Mode": self._mode, "SpectrumRange": self._spec_list, "PeakType":
-                peak_type
+                "CreateOutput": False, "Function": self._function, "Mode": self._mode[0],
+                "SpectrumRange": self._spec_list, "PeakType": peak_type
                 }
 
         self._alg = create_algorithm("EVSCalibrationFit", **args)
