@@ -204,7 +204,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.2, 170: 0.7}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.65, 170: 0.75}})
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_lead(self, load_file_mock):
@@ -214,7 +214,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.19, 170: 0.67}, "Theta": {156: 0.19}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: 0.70}, "Theta": {156: 0.19}})
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_niobium(self, load_file_mock):
@@ -224,7 +224,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.2, 170: IGNORE_DETECTOR, 171: IGNORE_DETECTOR}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: IGNORE_DETECTOR, 171: IGNORE_DETECTOR}})
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_uranium(self, load_file_mock):
@@ -234,7 +234,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.2, 170: 0.7}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: 0.75}})
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_lead_with_uranium(self, load_file_mock):
@@ -244,7 +244,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.19, 170: 0.67}, "Theta": {156: 0.19}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: 0.7}, "Theta": {156: 0.19}})
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_l0_calc(self, load_file_mock):
@@ -259,7 +259,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.39, 170: 0.69, 171: 0.13, 178: 0.12}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.45, 170: 0.75, 171: 0.15, 178: 0.15}})
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_multiple_iterations(self, load_file_mock):
@@ -273,7 +273,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.2, 170: IGNORE_DETECTOR}})
+        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: IGNORE_DETECTOR}})
 
     def tearDown(self):
         mtd.clear()
