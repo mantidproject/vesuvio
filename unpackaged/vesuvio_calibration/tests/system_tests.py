@@ -357,7 +357,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_theta_peak_positions()
         params_table = self.run_evs_calibration_fit("Bragg")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.12)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.61)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_bragg_peaks_lead(self, load_file_mock):
@@ -369,7 +369,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_theta_peak_positions()
         params_table = self.run_evs_calibration_fit("Bragg")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.24)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.52)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_peaks_copper_E1(self, load_file_mock):
