@@ -267,7 +267,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
 
         params_table = self.run_evs_calibration_analysis()
         self.assert_theta_parameters_match_expected(params_table)
-        self.assert_L1_parameters_match_expected(params_table)
+        self.assert_L1_parameters_match_expected(params_table, rel_tolerance=0.4)  # Element 116
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_multiple_iterations(self, load_file_mock):
@@ -291,7 +291,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
     # Misc helper functions
     #------------------------------------------------------------------
 
-    def assert_theta_parameters_match_expected(self, params_table, rel_tolerance=0.4):
+    def assert_theta_parameters_match_expected(self, params_table, rel_tolerance=0.2):
         thetas = params_table.column('theta')
         actual_thetas = self._calibrated_params['theta']
 
@@ -299,7 +299,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         self.assertFalse(np.isinf(thetas).any())
         np.testing.assert_allclose(actual_thetas, thetas, rtol=rel_tolerance)
 
-    def assert_L1_parameters_match_expected(self, params_table, rel_tolerance=0.4):
+    def assert_L1_parameters_match_expected(self, params_table, rel_tolerance=0.2):
         L1 = params_table.column('L1')
         actual_L1 = self._calibrated_params['L1']
 
@@ -357,7 +357,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_theta_peak_positions()
         params_table = self.run_evs_calibration_fit("Bragg")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.7)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.12)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_bragg_peaks_lead(self, load_file_mock):
@@ -369,7 +369,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_theta_peak_positions()
         params_table = self.run_evs_calibration_fit("Bragg")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.7)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.24)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_peaks_copper_E1(self, load_file_mock):
@@ -383,7 +383,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_energy_peak_positions()
         params_table = self.run_evs_calibration_fit("Recoil")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.7)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.12)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_peaks_lead_E1(self, load_file_mock):
@@ -397,7 +397,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_energy_peak_positions()
         params_table = self.run_evs_calibration_fit("Recoil")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.7)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.12)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_frontscattering_uranium(self, load_file_mock):
@@ -411,7 +411,7 @@ class EVSCalibrationFitTests(EVSCalibrationTest):
 
         expected_values = self.calculate_energy_peak_positions()
         params_table = self.run_evs_calibration_fit("Recoil")
-        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.1)
+        self.assert_fitted_positions_match_expected(expected_values, params_table, rel_tolerance=0.07)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_fit_backscattering_uranium(self, load_file_mock):
@@ -547,7 +547,8 @@ def _assert_allclose_excluding_bad_detectors(expected_position, position, rtol, 
             try:
                 np.testing.assert_allclose(elem_m, elem_n, rtol, atol)
             except AssertionError:
-                test_failures.append(f"Element {i} does not match. Expected {elem_m}, found {elem_n}")
+                test_failures.append(f"Element {i}: Expected {elem_m}, found {elem_n}. atol "
+                                     f"{abs(elem_n-elem_m)}, rtol {abs(elem_n-elem_m)/elem_n}")
     if test_failures:
         raise AssertionError(test_failures)
 
