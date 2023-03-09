@@ -287,23 +287,21 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
       Setup parameters for fitting.
     """
-    self._sample_run_numbers = self.getProperty("Samples").value
-    self._bkg_run_numbers = self.getProperty("Background").value
-    self._peak_function = self.getProperty("Function").value
+    self._setup_spectra_list()
+    self._setup_run_numbers_and_output_workspace()
+    self._setup_function_type()
+    self._setup_parameter_workspace()
+    self._setup_peaks_and_set_crop_and_fit_ranges()
+    self._setup_class_variables_from_properties()
+
+  def _setup_class_variables_from_properties(self):
     self._mode = self.getProperty("Mode").value
     self._energy_estimates = self.getProperty("Energy").value
     self._sample_mass = self.getProperty("Mass").value
-    self._d_spacings = self.getProperty("DSpacings").value
-    self._param_file = self.getPropertyValue('InstrumentParameterFile')
-    self._peak_type = self.getPropertyValue('PeakType')
-    self._param_workspace = self.getPropertyValue('InstrumentParameterWorkspace')
-    self._spec_list = self.getProperty("SpectrumRange").value.tolist()
-    self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
     self._create_output = self.getProperty("CreateOutput").value
 
-    self._d_spacings.sort()
-
-    #validate spectra list
+  def _setup_spectra_list(self):
+    self._spec_list = self.getProperty("SpectrumRange").value.tolist()
     if len(self._spec_list) > 2:
       self._spec_list = [self._spec_list[0], self._spec_list[-1]]
     elif len(self._spec_list) == 1:
@@ -311,19 +309,25 @@ class EVSCalibrationFit(PythonAlgorithm):
     elif len(self._spec_list) < 1:
       raise ValueError("You must specify a spectrum range.")
 
-    #validate sample run numbers
+  def _setup_run_numbers_and_output_workspace(self):
+    self._sample_run_numbers = self.getProperty("Samples").value
+    self._bkg_run_numbers = self.getProperty("Background").value
+    self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
     if len(self._sample_run_numbers) == 0:
       raise ValueError("You must supply at least one sample run number.")
-
-    self._sample = self._output_workspace_name + '_Sample_' + '_'.join(self._sample_run_numbers)
     if len(self._bkg_run_numbers) > 0:
       self._background = '' + self._bkg_run_numbers[0]
 
-    #fit function type
+    self._sample = self._output_workspace_name + '_Sample_' + '_'.join(self._sample_run_numbers)
+
+  def _setup_function_type(self):
+    self._peak_function = self.getProperty("Function").value
     self._func_param_names = generate_fit_function_header(self._peak_function)
     self._func_param_names_error = generate_fit_function_header(self._peak_function, error=True)
 
-    #validate instrument parameter workspace/file
+  def _setup_parameter_workspace(self):
+    self._param_workspace = self.getPropertyValue('InstrumentParameterWorkspace')
+    self._param_file = self.getPropertyValue('InstrumentParameterFile')
     if self._param_workspace != "":
       self._param_table = self._param_workspace
     elif self._param_file != "":
@@ -331,22 +335,29 @@ class EVSCalibrationFit(PythonAlgorithm):
       self._param_table = os.path.splitext(base)[0]
       load_instrument_parameters(self._param_file, self._param_table)
 
-    # check peak types
-    self._fitting_recoil_peaks = False
-    self._fitting_resonance_peaks = False
-    self._fitting_bragg_peaks = len(self._d_spacings) > 0
+  def _setup_peaks_and_set_crop_and_fit_ranges(self):
+    self._d_spacings = self.getProperty("DSpacings").value
+    self._d_spacings.sort()
+    self._peak_type = self.getPropertyValue('PeakType')
+
     if self._fitting_bragg_peaks:
-        self._ws_crop_range = BRAGG_PEAK_CROP_RANGE
-        self._fit_window_range = BRAGG_FIT_WINDOW_RANGE          
-    else:
-      if self._peak_type == "Recoil":
-        self._fitting_recoil_peaks = True
-        self._ws_crop_range = RECOIL_PEAK_CROP_RANGE
-        self._fit_window_range = RECOIL_FIT_WINDOW_RANGE
-      elif self._peak_type == "Resonance":
-        self._fitting_resonance_peaks = True
-        self._ws_crop_range = RESONANCE_PEAK_CROP_RANGE
-        self._fit_window_range = RESONANCE_FIT_WINDOW_RANGE
+      self._ws_crop_range, self._fit_window_range = BRAGG_PEAK_CROP_RANGE, BRAGG_FIT_WINDOW_RANGE
+    elif self._fitting_recoil_peaks:
+      self._ws_crop_range, self._fit_window_range = RECOIL_PEAK_CROP_RANGE, RECOIL_FIT_WINDOW_RANGE
+    elif self._fitting_resonance_peaks:
+      self._ws_crop_range, self._fit_window_range = RESONANCE_PEAK_CROP_RANGE, RESONANCE_FIT_WINDOW_RANGE
+
+  @property
+  def _fitting_bragg_peaks(self):
+    return len(self._d_spacings) > 0
+
+  @property
+  def _fitting_recoil_peaks(self):
+    return self._peak_type == "Recoil" and not self._fitting_bragg_peaks
+
+  @property
+  def _fitting_resonance_peaks(self):
+    return self._peak_type == "Resonance" and not self._fitting_bragg_peaks
 
 #----------------------------------------------------------------------------------------
 
