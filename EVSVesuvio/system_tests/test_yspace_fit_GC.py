@@ -1,11 +1,11 @@
-from vesuvio.vesuvio_analysis.core_functions.run_script import runScript
+from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from vesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from EVSVesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 

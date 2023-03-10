@@ -1,6 +1,6 @@
-from vesuvio.vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from vesuvio.vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
-from vesuvio.vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, noOfHistsFromTOFBinning
+from EVSVesuvio.vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
+from EVSVesuvio.vesuvio_analysis.core_functions.procedures import runJointBackAndForwardProcedure, runIndependentIterativeProcedure
+from EVSVesuvio.vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, noOfHistsFromTOFBinning
 from mantid.api import AnalysisDataService, mtd
 from mantid.simpleapi import CloneWorkspace, SaveNexus, Load, SumSpectra
 from scipy import stats

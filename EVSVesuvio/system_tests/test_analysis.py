@@ -1,9 +1,9 @@
-from vesuvio.vesuvio_analysis.core_functions.run_script import runScript
+from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from vesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from EVSVesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
 
 
 class BootstrapInitialConditions:  # Not used, but still need to pass as arg
