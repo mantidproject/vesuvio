@@ -354,21 +354,27 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
       Preprocess a workspace. This include optionally dividing by a background
     """
-    self._load_files(self._sample_run_numbers, self._sample)
-
     xmin, xmax = self._ws_crop_range
-    CropWorkspace(self._sample, XMin=xmin, XMax=xmax, OutputWorkspace=self._sample)
+    self._load_to_ads_and_crop(self._sample_run_numbers, self._sample, xmin, xmax)
 
-    if len(self._bkg_run_numbers) > 0:
-      self._load_files(self._bkg_run_numbers, self._background)
-
-      CropWorkspace(self._background, XMin=xmin, XMax=xmax, OutputWorkspace=self._background)
-      RebinToWorkspace(WorkspaceToRebin=self._background, WorkspaceToMatch=self._sample, OutputWorkspace=self._background)
-      Divide(self._sample, self._background, OutputWorkspace=self._sample)
-
-      DeleteWorkspace(self._background)
+    if self._background_provided:
+      self._load_to_ads_and_crop(self._bkg_run_numbers, self._background, xmin, xmax)
+      self._normalise_sample_by_background()
 
     ReplaceSpecialValues(self._sample, NaNValue=0, NaNError=0, InfinityValue=0, InfinityError=0, OutputWorkspace=self._sample)
+
+  @property
+  def _background_provided(self):
+    return len(self._bkg_run_numbers) > 0
+
+  def _load_to_ads_and_crop(self, run_numbers, output, xmin, xmax):
+    self._load_files(run_numbers, output)
+    CropWorkspace(output, XMin=xmin, XMax=xmax, OutputWorkspace=output)
+
+  def _normalise_sample_by_background(self):
+    RebinToWorkspace(WorkspaceToRebin=self._background, WorkspaceToMatch=self._sample, OutputWorkspace=self._background)
+    Divide(self._sample, self._background, OutputWorkspace=self._sample)
+    DeleteWorkspace(self._background)
 
 #----------------------------------------------------------------------------------------
 
