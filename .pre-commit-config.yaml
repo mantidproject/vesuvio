@@ -8,15 +8,15 @@ repos:
     hooks:
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-        exclude: 'vesuvio/vesuvio_analysis/scribles|vesuvio/experiments/original_inputs|vesuvio/original_inputs.py|unpackaged'
+        exclude: 'EVSVesuvio/vesuvio_analysis/scribles|EVSVesuvio/experiments/original_inputs|EVSVesuvio/original_inputs.py|unpackaged'
         types: ['python']
       - id: check-added-large-files
         args: ['--maxkb=4096']
-        exclude: 'vesuvio/experiments/original_inputs|unpackaged'
+        exclude: 'EVSVesuvio/experiments/original_inputs|unpackaged'
 
   - repo: https://gitlab.com/pycqa/flake8.git
     rev: 5.0.4
     hooks:
       - id: flake8
         args: ['--config', 'config.flake8']
-        exclude: 'vesuvio/vesuvio_analysis/scribles|vesuvio/experiments/original_inputs|vesuvio/original_inputs.py|unpackaged'
+        exclude: 'EVSVesuvio/vesuvio_analysis/scribles|EVSVesuvio/experiments/original_inputs|EVSVesuvio/original_inputs.py|unpackaged'
