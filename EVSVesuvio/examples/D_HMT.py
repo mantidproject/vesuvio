@@ -2,8 +2,8 @@
 import time
 import numpy as np
 from pathlib import Path
-from vesuvio.vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
-from vesuvio.vesuvio_analysis.core_functions.run_script import runScript
+from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
+from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
 
 scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
 experimentPath = Path(__file__).absolute().parent.parent / "experiments" / scriptName  # Path to experiments/sample
