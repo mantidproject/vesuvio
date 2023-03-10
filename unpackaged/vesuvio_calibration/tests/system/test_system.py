@@ -177,7 +177,7 @@ class EVSCalibrationTest(unittest.TestCase):
         mtd.clear()
 
 
-class EVSCalibrationAnalysisTests(EVSCalibrationTest):
+class TestEVSCalibrationAnalysis(EVSCalibrationTest):
 
     def setUp(self):
         self._parameter_file = f'{os.path.dirname(__file__)}\data\IP0005.par'
@@ -336,7 +336,7 @@ class EVSCalibrationAnalysisTests(EVSCalibrationTest):
         return self.execute_evs_calibration_analysis()
 
 
-class EVSCalibrationFitTests(EVSCalibrationTest):
+class TestEVSCalibrationFit(EVSCalibrationTest):
     
     def setUp(self):
         self._function = 'Voigt'
