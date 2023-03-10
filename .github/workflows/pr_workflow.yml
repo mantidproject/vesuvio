@@ -43,7 +43,7 @@ jobs:
       #  run: coverage run -m unittest discover -s ./EVSvesuvio/vesuvio_analysis
 
       - name: Run EVSVesuvio Calibration Unit Tests
-        run: coverage run -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit
+        run: python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit
 
       # Report coverage
       - name: Report Coverage
