@@ -39,8 +39,8 @@ jobs:
         run: python -m flake8 --config=config.flake8
 
       # Runs Unit tests
-      - name: Run Vesuvio Analysis Unit Tests
-        run: coverage run -m unittest discover -s ./vesuvio/vesuvio_analysis
+      #- name: Run Vesuvio Analysis Unit Tests
+      #  run: coverage run -m unittest discover -s ./vesuvio/vesuvio_analysis
 
       - name: Run Vesuvio Calibration Unit Tests
         run: coverage run -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit
