@@ -5,7 +5,7 @@
   {% set version = version_tag + version_number %}
 
 package:
-  name: vesuvio
+  name: EVSvesuvio
   version: {{ version }}
 
 source:
@@ -29,7 +29,7 @@ requirements:
 
 test:
   imports:
-    - vesuvio
+    - EVSvesuvio
 
 about:
   home: https://github.com/mantidproject/vesuvio
