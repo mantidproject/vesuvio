@@ -46,8 +46,8 @@ jobs:
         run: python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit
 
       # Report coverage
-      - name: Report Coverage
-        run: coverage report
+      #- name: Report Coverage
+      #  run: coverage report
 
       # Runs system tests
       #- name: Run EVSVesuvio Analysis System Tests
