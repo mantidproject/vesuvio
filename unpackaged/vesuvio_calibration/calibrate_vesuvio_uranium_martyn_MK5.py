@@ -8,14 +8,20 @@
   (15 October 2010), doi:10.1016/j.nima.2010.09.079 by J. Mayers, M. A. Adams
 """
 
-from mantid.kernel import *
-from mantid.api import *
-from mantid.simpleapi import *
+from mantid.kernel import StringArrayProperty, Direction, StringListValidator, IntArrayBoundedValidator, IntArrayProperty,\
+     FloatArrayBoundedValidator, FloatArrayMandatoryValidator, StringMandatoryValidator, IntBoundedValidator,\
+     FloatArrayProperty, logger
+from mantid.api import FileProperty, FileAction, ITableWorkspaceProperty, PropertyMode, Progress, TextAxis, PythonAlgorithm, \
+     AlgorithmFactory, WorkspaceFactory, AlgorithmManager
+from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWorkspace, RebinToWorkspace, Divide,\
+     ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution,\
+     FindPeakBackground, ExtractSingleSpectrum, SumSpectra, AppendSpectra, ConvertTableToMatrixWorkspace,\
+     ConjoinWorkspaces, Transpose, PlotPeakByLogValue, CloneWorkspace, Fit, RenameWorkspace
+
 from functools import partial
 
 import os
 import sys
-import math
 import scipy.constants
 import scipy.stats
 import numpy as np
