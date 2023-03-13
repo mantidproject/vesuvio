@@ -147,13 +147,13 @@ class EVSCalibrationTest(unittest.TestCase):
         print("Attempting LoadVesuvio")
         try:
             prefix = 'EVS'
-            filename = f'{os.path.dirname(__file__)}\data\{prefix}{sample_no}.raw'
+            filename = f'{os.path.dirname(os.path.dirname(__file__))}\data\{prefix}{sample_no}.raw'
             LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
                         SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
                         EnableLogging=False)
         except RuntimeError:
             prefix = 'VESUVIO000'
-            filename = f'{os.path.dirname(__file__)}\data\{prefix}{sample_no}.raw'
+            filename = f'{os.path.dirname(os.path.dirname(__file__))}\data\{prefix}{sample_no}.raw'
             LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
                         SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
                         EnableLogging=False)
@@ -162,13 +162,13 @@ class EVSCalibrationTest(unittest.TestCase):
         print("Attempting LoadRaw")
         try:
             prefix = 'EVS'
-            filename = f'{os.path.dirname(__file__)}\data\{prefix}{sample_no}.raw'
+            filename = f'{os.path.dirname(os.path.dirname(__file__))}\data\{prefix}{sample_no}.raw'
             LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=self._selected_spec_range[0],
                     SpectrumMax=self._selected_spec_range[-1], EnableLogging=False)
         except RuntimeError as err:
             print(err)
             prefix = 'VESUVIO000'
-            filename = f'{os.path.dirname(__file__)}\data\{prefix}{sample_no}.raw'
+            filename = f'{os.path.dirname(os.path.dirname(__file__))}\data\{prefix}{sample_no}.raw'
             LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=self._selected_spec_range[0],
                     SpectrumMax=self._selected_spec_range[-1], EnableLogging=False)
         ConvertToDistribution(output_name, EnableLogging=False)
@@ -180,7 +180,7 @@ class EVSCalibrationTest(unittest.TestCase):
 class TestEVSCalibrationAnalysis(EVSCalibrationTest):
 
     def setUp(self):
-        self._parameter_file = f'{os.path.dirname(__file__)}\data\IP0005.par'
+        self._parameter_file = f'{os.path.dirname(os.path.dirname(__file__))}\data\IP0005.par'
         self._calibrated_params = self.load_ip_file()
         self._iterations = 1
         self._alg = None
@@ -340,7 +340,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
     
     def setUp(self):
         self._function = 'Voigt'
-        self._parameter_file = f'{os.path.dirname(__file__)}\data\IP0005.par'
+        self._parameter_file = f'{os.path.dirname(os.path.dirname(__file__))}\data\IP0005.par'
         self._calibrated_params = self.load_ip_file()
         self._energy_estimates = np.array([ENERGY_ESTIMATE])
         self._alg = None
