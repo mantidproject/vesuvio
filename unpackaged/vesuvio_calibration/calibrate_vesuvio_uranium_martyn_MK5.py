@@ -385,7 +385,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._prog_reporter = Progress(self, 0.0, 1.0, num_spectra)
 
     output_parameters_tbl_name = self._output_workspace_name + '_Peak_Parameters'
-    self._create_output_parameters_table_ws(output_parameters_tbl_name)
+    self._create_output_parameters_table_ws(output_parameters_tbl_name, num_estimated_peaks)
 
     output_workspaces = []
     #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
