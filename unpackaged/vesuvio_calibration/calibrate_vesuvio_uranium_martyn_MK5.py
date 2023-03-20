@@ -379,34 +379,17 @@ class EVSCalibrationFit(PythonAlgorithm):
 #----------------------------------------------------------------------------------------
 
   def _fit_bragg_peaks(self):
-    #ESTIMATE PEAK POSITIONS USING D SPACING
-    peak_positions = self._estimate_bragg_peak_positions()
-    num_peaks, num_spectra = peak_positions.shape
+    estimated_peak_positions = self._estimate_bragg_peak_positions()
+    num_estimated_peaks, num_spectra = estimated_peak_positions.shape
+
     self._prog_reporter = Progress(self, 0.0, 1.0, num_spectra)
 
-    #CREATE OUTPUT PARAMETERS TABLE
-    peaks_table = self._output_workspace_name + '_Peak_Parameters'
-    CreateEmptyTableWorkspace(OutputWorkspace=peaks_table)
-
-    #PARAM NAMES FOR LINEAR BACKGROUND
-    param_names = ['f0.A0', 'f0.A1']
-
-    #ADD OTHER PARAM NAMES DEPENDING UPON CHOSEN PEAK FUNCTION
-    for i in range(num_peaks):
-      param_names += ['f' + str(i) + '.' + name for name in self._func_param_names.values()]
-
-    #GENERATE ERROR NAMES FROM PARAM NAMES, ZIP TO GET COL NAMES
-    err_names = [name + '_Err' for name in param_names]
-    col_names = [element for tupl in zip(param_names, err_names) for element in tupl]
-
-    #CREATE OUTPUT TABLE FROM COL NAMES, STARTING WITH SPECTRA COLUMN
-    mtd[peaks_table].addColumn('int', 'Spectrum')
-    for name in col_names:
-        mtd[peaks_table].addColumn('double', name)
+    output_parameters_tbl_name = self._output_workspace_name + '_Peak_Parameters'
+    self._create_output_parameters_table_ws(output_parameters_tbl_name)
 
     output_workspaces = []
     #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
-    for i, peak_estimates_list in enumerate(peak_positions.transpose()):
+    for i, peak_estimates_list in enumerate(estimated_peak_positions.transpose()):
         self._prog_reporter.report("Fitting to spectrum %d" % i)
 
         spec_number = self._spec_list[0]+i
@@ -464,11 +447,12 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         row_values = [fit_values['f0.A0'], fit_values['f0.A1']]
         row_errors = [fit_errors['f0.A0'], fit_errors['f0.A1']]
+        param_names = self._get_param_names(num_estimated_peaks)
         row_values += [fit_values['f1.' + name] for name in param_names[2:]]
         row_errors += [fit_errors['f1.' + name] for name in param_names[2:]]
         row = [element for tupl in zip(row_values, row_errors) for element in tupl]
 
-        mtd[peaks_table].addRow([spec_number] + row)
+        mtd[output_parameters_tbl_name].addRow([spec_number] + row)
 
         DeleteWorkspace(fit_output_name + '_NormalisedCovarianceMatrix')
         DeleteWorkspace(fit_output_name + '_Parameters')
@@ -487,6 +471,27 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     if self._create_output:
         GroupWorkspaces(','.join(output_workspaces), OutputWorkspace=self._output_workspace_name + "_Peak_Fits")
+
+  def _create_output_parameters_table_ws(self, output_table_name, num_estimated_peaks):
+    CreateEmptyTableWorkspace(OutputWorkspace=output_table_name)
+
+    col_headers = self._generate_column_headers(num_estimated_peaks)
+
+    mtd[output_table_name].addColumn('int', 'Spectrum')
+    for name in col_headers:
+        mtd[output_table_name].addColumn('double', name)
+
+  def _generate_column_headers(self, num_estimated_peaks):
+    param_names = self._get_param_names(num_estimated_peaks)
+    err_names = [name + '_Err' for name in param_names]
+    col_headers = [element for tupl in zip(param_names, err_names) for element in tupl]
+    return col_headers
+
+  def _get_param_names(self, num_estimated_peaks):
+      param_names = ['f0.A0', 'f0.A1']
+      for i in range(num_estimated_peaks):
+          param_names += ['f' + str(i) + '.' + name for name in self._func_param_names.values()]
+      return param_names
 
 #----------------------------------------------------------------------------------------
 
