@@ -397,29 +397,17 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_peaks_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
         fit_results = self._fit_peaks_to_spectra(index, spec_number, peak_estimates_list, find_peaks_output_name,
                                                  fit_peaks_output_name)
-        selected_params = fit_results['params']
-        if not fit_results['status'] == "success":
-            # FIND PEAKS RELATIVELY UNCONSTRAINED (u) BY PEAK PARAMETERS
-            self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
 
-            find_peaks_output_name_u = find_peaks_output_name + '_unconstrained'
-            fit_peaks_output_name_u = fit_peaks_output_name + '_unconstrained'
+        find_peaks_output_name_u = find_peaks_output_name + '_unconstrained'
+        fit_peaks_output_name_u = fit_peaks_output_name + '_unconstrained'
+        fit_results_u = None
+        if not fit_results['status'] == "success":
+            self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
             fit_results_u = self._fit_peaks_to_spectra_unconstrained(index, spec_number, peak_estimates_list, find_peaks_output_name,
                                                                      find_peaks_output_name_u, fit_peaks_output_name_u,
                                                                      (fit_results['xmin'], fit_results['xmax']))
 
-            if fit_results_u['chi2'] < fit_results['chi2'] and fit_results_u['status'] != "peaks invalid":
-                selected_params = fit_results_u['params']
-                fit_results['status'] = "unused"  # mark initial fit as unused
-                self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % index)
-            else:
-                DeleteWorkspace(fit_peaks_output_name_u + '_Workspace')
-                DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
-                DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
-
-            DeleteWorkspace(find_peaks_output_name + "_temp")
-            DeleteWorkspace(find_peaks_output_name_u)
-        DeleteWorkspace(find_peaks_output_name)
+        selected_params, unconstrained_fit_selected = self._select_best_fit_params(spec_number, fit_results, fit_results_u)
 
         fit_values = dict(zip(selected_params.column(0), selected_params.column(1)))
         fit_errors = dict(zip(selected_params.column(0), selected_params.column(2)))
@@ -433,20 +421,9 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         mtd[output_parameters_tbl_name].addRow([spec_number] + row)
 
-        DeleteWorkspace(fit_peaks_output_name + '_NormalisedCovarianceMatrix')
-        DeleteWorkspace(fit_peaks_output_name + '_Parameters')
-        if fit_results['status'] == "unused":
-            DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
-            DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
-
-        if fit_results['status'] == "unused" or not self._create_output:
-            DeleteWorkspace(fit_peaks_output_name + '_Workspace')
-        if fit_results['status'] == "unused" and not self._create_output:
-            DeleteWorkspace(fit_peaks_output_name_u + '_Workspace')
-        elif fit_results['status'] == "unused":
-            output_workspaces.append(fit_peaks_output_name_u + '_Workspace')
-        else:
-            output_workspaces.append(fit_peaks_output_name + '_Workspace')
+        output_workspaces.append(self._get_output_and_clean_workspaces(fit_results_u is not None, unconstrained_fit_selected,
+                                                                       find_peaks_output_name, find_peaks_output_name_u,
+                                                                       fit_peaks_output_name, fit_peaks_output_name_u))
 
     if self._create_output:
         GroupWorkspaces(','.join(output_workspaces), OutputWorkspace=self._output_workspace_name + "_Peak_Fits")
@@ -513,6 +490,38 @@ class EVSCalibrationFit(PythonAlgorithm):
                                                peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else \
                   fit_results_u['status']
           return fit_results_u
+
+  def _select_best_fit_params(self, spec_num, fit_results, fit_results_u=None):
+      selected_params = fit_results['params']
+      unconstrained_fit_selected = False
+      if fit_results_u:
+          if fit_results_u['chi2'] < fit_results['chi2'] and fit_results_u['status'] != "peaks invalid":
+              selected_params = fit_results_u['params']
+              unconstrained_fit_selected = True
+              self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % spec_num)
+      return selected_params, unconstrained_fit_selected
+
+  def _get_output_and_clean_workspaces(self, unconstrained_fit_performed, unconstrained_fit_selected, find_peaks_output_name,
+                           find_peaks_output_name_u, fit_peaks_output_name, fit_peaks_output_name_u):
+
+      output_workspace = fit_peaks_output_name + '_Workspace'
+
+      DeleteWorkspace(fit_peaks_output_name + '_NormalisedCovarianceMatrix')
+      DeleteWorkspace(fit_peaks_output_name + '_Parameters')
+      DeleteWorkspace(find_peaks_output_name)
+
+      if unconstrained_fit_performed:
+          DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
+          DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
+          DeleteWorkspace(find_peaks_output_name_u)
+          DeleteWorkspace(find_peaks_output_name + "_temp")
+          if unconstrained_fit_selected:
+              output_workspace = fit_peaks_output_name_u + '_Workspace'
+              DeleteWorkspace(fit_peaks_output_name + '_Workspace')
+          else:
+              DeleteWorkspace(fit_peaks_output_name_u + '_Workspace')
+      return output_workspace
+
 
 #----------------------------------------------------------------------------------------
 
