@@ -388,14 +388,13 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._create_output_parameters_table_ws(output_parameters_tbl_name, num_estimated_peaks)
 
     output_workspaces = []
-    #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
-    for index, peak_estimates_list in enumerate(estimated_peak_positions.transpose()):
+    for index, estimated_peak_positions_in_spectra in enumerate(estimated_peak_positions.transpose()):
         spec_number = self._spec_list[0]+index
         self._prog_reporter.report("Fitting to spectrum %d" % spec_number)
 
         find_peaks_output_name = self._sample + '_peaks_table_%d' % spec_number
         fit_peaks_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
-        fit_results = self._fit_peaks_to_spectra(index, spec_number, peak_estimates_list, find_peaks_output_name,
+        fit_results = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions_in_spectra, find_peaks_output_name,
                                                  fit_peaks_output_name)
 
         find_peaks_output_name_u = find_peaks_output_name + '_unconstrained'
@@ -403,23 +402,13 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_results_u = None
         if not fit_results['status'] == "success":
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
-            fit_results_u = self._fit_peaks_to_spectra_unconstrained(index, spec_number, peak_estimates_list, find_peaks_output_name,
-                                                                     find_peaks_output_name_u, fit_peaks_output_name_u,
-                                                                     (fit_results['xmin'], fit_results['xmax']))
+            fit_results_u = self._fit_peaks_to_spectra_unconstrained(index, spec_number, estimated_peak_positions_in_spectra,
+                                                                     find_peaks_output_name, find_peaks_output_name_u,
+                                                                     fit_peaks_output_name_u, (fit_results['xmin'], fit_results['xmax']))
 
         selected_params, unconstrained_fit_selected = self._select_best_fit_params(spec_number, fit_results, fit_results_u)
 
-        fit_values = dict(zip(selected_params.column(0), selected_params.column(1)))
-        fit_errors = dict(zip(selected_params.column(0), selected_params.column(2)))
-
-        row_values = [fit_values['f0.A0'], fit_values['f0.A1']]
-        row_errors = [fit_errors['f0.A0'], fit_errors['f0.A1']]
-        param_names = self._get_param_names(num_estimated_peaks)
-        row_values += [fit_values['f1.' + name] for name in param_names[2:]]
-        row_errors += [fit_errors['f1.' + name] for name in param_names[2:]]
-        row = [element for tupl in zip(row_values, row_errors) for element in tupl]
-
-        mtd[output_parameters_tbl_name].addRow([spec_number] + row)
+        self._output_params_to_table(spec_number, num_estimated_peaks, selected_params, output_parameters_tbl_name)
 
         output_workspaces.append(self._get_output_and_clean_workspaces(fit_results_u is not None, unconstrained_fit_selected,
                                                                        find_peaks_output_name, find_peaks_output_name_u,
@@ -500,6 +489,19 @@ class EVSCalibrationFit(PythonAlgorithm):
               unconstrained_fit_selected = True
               self._prog_reporter.report("Fit to spectrum %d without constraining parameters successful" % spec_num)
       return selected_params, unconstrained_fit_selected
+
+  def _output_params_to_table(self, spec_num, num_estimated_peaks, params, output_table_name):
+      fit_values = dict(zip(params.column(0), params.column(1)))
+      fit_errors = dict(zip(params.column(0), params.column(2)))
+
+      row_values = [fit_values['f0.A0'], fit_values['f0.A1']]
+      row_errors = [fit_errors['f0.A0'], fit_errors['f0.A1']]
+      param_names = self._get_param_names(num_estimated_peaks)
+      row_values += [fit_values['f1.' + name] for name in param_names[2:]]
+      row_errors += [fit_errors['f1.' + name] for name in param_names[2:]]
+      row = [element for tupl in zip(row_values, row_errors) for element in tupl]
+
+      mtd[output_table_name].addRow([spec_num] + row)
 
   def _get_output_and_clean_workspaces(self, unconstrained_fit_performed, unconstrained_fit_selected, find_peaks_output_name,
                            find_peaks_output_name_u, fit_peaks_output_name, fit_peaks_output_name_u):
