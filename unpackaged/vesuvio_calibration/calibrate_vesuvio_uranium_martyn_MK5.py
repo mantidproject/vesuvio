@@ -25,6 +25,7 @@ import sys
 import scipy.constants
 import scipy.stats
 import numpy as np
+import time
 
 # Configuration for Uranium runs / Indium runs
 #----------------------------------------------------------------------------------------
@@ -105,6 +106,37 @@ def calculate_r_theta(sample_mass, thetas):
   r_theta = (np.cos(rad_theta) + np.sqrt( (sample_mass / NEUTRON_MASS_AMU)**2 - np.sin(rad_theta)**2 )) / ((sample_mass / NEUTRON_MASS_AMU) +1)
 
   return r_theta
+  
+#----------------------------------------------------------------------------------------
+  
+def identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list):
+  """
+    Inspect fitting results, and identify the fits associated with invalid spectra. These are spectra associated with detectors
+    which have lost foil coverage following a recent reduction in distance from source to detectors.
+
+    @param peak_table - name of table containing fitted parameters each spectra.
+    @param spec_list - spectrum range to inspect.
+    @return a list of invalid spectra.
+  """
+  peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
+  peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
+  peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
+  peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
+  peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
+  peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
+
+  invalid_spectra = np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
+  (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
+  (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
+  (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
+  (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
+  (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
+  (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
+  (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
+  (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
+
+  return invalid_spectra
+
 
 #----------------------------------------------------------------------------------------
 # The IP text file load function skips the first 3 rows of the text file.
@@ -261,6 +293,8 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     self.declareProperty('OutputWorkspace', '', StringMandatoryValidator(),
       doc="Name to call the output workspace.")
+      
+    self.declareProperty('CalculateSharedParameter', False, doc='Calculate shared parameter across all detectors')
 
 #----------------------------------------------------------------------------------------
 
@@ -299,6 +333,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._energy_estimates = self.getProperty("Energy").value
     self._sample_mass = self.getProperty("Mass").value
     self._create_output = self.getProperty("CreateOutput").value
+    self._calculate_shared_parameter = self.getProperty("CalculateSharedParameter").value
 
   def _setup_spectra_list(self):
     self._spec_list = self.getProperty("SpectrumRange").value.tolist()
@@ -754,6 +789,13 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
+    if self._calculate_shared_parameter == True:
+        peak_centres = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
+        peak_centres_errors = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err', self._spec_list)
+
+        invalid_spectra = identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors, self._spec_list)
+        self._fit_shared_parameter(estimated_peak_positions_all_peaks, invalid_spectra)
+
   def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name, output_parameter_table_headers):
     spec_number = self._spec_list[0] + spec_index
     self._prog_reporter.report("Fitting peak %d to spectrum %d" % (peak_index, spec_number))
@@ -814,6 +856,106 @@ class EVSCalibrationFit(PythonAlgorithm):
     if not self._create_output:
       DeleteWorkspace(fws)
 
+#----------------------------------------------------------------------------------------
+
+  def _fit_shared_parameter(self, peak_positions, invalid_spectra):
+    """
+      Fit peaks to all detectors, with one set of fit parameters for all detectors.
+    """
+    
+    peak_centre = np.float(np.nanmean(peak_positions, axis=1))
+    find_peak_params = self._get_find_peak_parameters(self._spec_list[0], [peak_centre])
+    
+    peaks_table = '__' + self._sample + '_peaks_table'
+    param_names = self._create_parameter_table(peaks_table)
+    peak_table = '__' + self._sample + '_peak_table'
+    FindPeaks(InputWorkspace=self._sample, PeaksList=peak_table, **find_peak_params)
+
+    #extract data from table
+    if mtd[peak_table].rowCount() > 0:
+        peak_params = mtd[peak_table].row(0)
+        DeleteWorkspace(peak_table)
+    else:
+        logger.error('FindPeaks could not find any peaks matching the parameters:\n' + str(find_peak_params))
+        sys.exit()
+    
+    fit_func = self._build_function_string(peak_params)
+    
+    start_str = 'composite=MultiDomainFunction, NumDeriv=1;'
+ 
+    sample_ws = mtd[self._sample]
+    
+    MaskDetectors(Workspace=sample_ws, WorkspaceIndexList=invalid_spectra)
+
+    validSpecs = ExtractUnmaskedSpectra(InputWorkspace=sample_ws, OutputWorkspace='valid_spectra')
+    
+    n_valid_specs = validSpecs.getNumberHistograms()
+    
+    fit_func = ('(composite=CompositeFunction, NumDeriv=false, $domains=i;' + fit_func[:-1] + ');') * n_valid_specs
+    composite_func = start_str + fit_func[:-1]
+      
+    ties = ','.join(f'f{i}.f1.{p}=f0.f1.{p}' for p in self._func_param_names.values() for i in range(1,n_valid_specs))
+    func_string = composite_func + f';ties=({ties})' 
+    
+    fit_output_name = '__' + self._output_workspace_name + '_Peak_0'
+
+    #find x window
+    xmin, xmax = None, None
+    position = '' + self._func_param_names['Position']
+    if peak_params[position] > 0:
+      xmin = peak_params[position]-self._fit_window_range
+      xmax = peak_params[position]+self._fit_window_range
+    else:
+      logger.warning('Could not specify fit window. Using full spectrum x range.')
+
+    # create new workspace for each spectra
+    x = validSpecs.readX(0)
+    y = validSpecs.readY(0)
+    e = validSpecs.readE(0)
+    out_ws = self._sample + '_Spec_0'
+    CreateWorkspace(DataX=x, DataY=y, DataE=e, NSpec=1, OutputWorkspace=out_ws)
+    
+    other_inputs = [CreateWorkspace(DataX=validSpecs.readX(j), DataY=validSpecs.readY(j), DataE=validSpecs.readE(j),
+                                    OutputWorkspace=f'{self._sample}_Spec_{j}')
+                   for j in range(1,n_valid_specs)] 
+                                                     
+    added_args = {f'InputWorkspace_{i + 1}': v for i,v in enumerate(other_inputs)}
+    
+    print('starting global fit')
+    start = time.time()
+         
+    status, chi2, ncm, params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=out_ws, IgnoreInvalidData=True,
+                                                              StartX=xmin, EndX=xmax,
+                                                              CalcErrors=True, Output=fit_output_name,
+                                                              Minimizer='SteepestDescent,RelError=1e-8', **added_args)
+                                                              
+    end = time.time()
+    print(end-start)
+    
+    [DeleteWorkspace(f"{self._sample}_Spec_{i}") for i in range(0,n_valid_specs)]
+    
+    fit_values = dict(zip(params.column(0), params.column(1)))
+    fit_errors = dict(zip(params.column(0), params.column(2)))
+
+    row_values = [fit_values['f0.' + name] for name in param_names]
+    row_errors = [fit_errors['f0.' + name] for name in param_names]
+    row = [element for tupl in zip(row_values, row_errors) for element in tupl]
+    
+    mtd[peaks_table].addRow([0] + row)
+
+    self._parameter_tables = peaks_table
+    self._peak_fit_workspaces = fws.name()
+
+    DeleteWorkspace(ncm)
+    DeleteWorkspace(params)
+    if not self._create_output:
+      DeleteWorkspace(fws)
+
+    #self._fit_workspaces = self._peak_fit_workspaces
+    
+    GroupWorkspaces(self._parameter_tables, OutputWorkspace=self._output_workspace_name + '_Shared_Peak_Parameters')
+ 
+>>>>>>> 1b75c5c (add function for shared parameter fitting)
 #----------------------------------------------------------------------------------------
     
   def _get_find_peak_parameters(self, spec_number, peak_centre, unconstrained=False):
@@ -1300,12 +1442,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       self._theta_peak_fits = theta_fit + '_Peak_Parameters'
       self._calculate_scattering_angle(self._theta_peak_fits, DETECTOR_RANGE)
       
-      #calibrate  E1 for backscattering detectors and use the backscattering averaged value for all detectors    
+      #calibrate  E1 for backscattering detectors and use the backscattering averaged value for all detectors
       E1_fit_back = self._current_workspace + '_E1_back'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=BACKSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
-                                PeakType='Recoil')
-      
+                                PeakType='Recoil', CalculateSharedParameter=True)
       
       E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()[0]
       self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE)
@@ -1317,7 +1458,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       E1_fit_front = self._current_workspace + '_E1_front'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=FRONTSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
-                                PeakType='Recoil')
+                                PeakType='Recoil', CalculateSharedParameter=True)
       
       E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()[0]
       self._calculate_final_flight_path(E1_peak_fits_front, FRONTSCATTERING_RANGE)
@@ -1434,7 +1575,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     
     peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
     peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
-    invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+    invalid_spectra = identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
     peak_centres[invalid_spectra] = np.nan
 
     print(f'Invalid Spectra Index Found and Marked NAN: {invalid_spectra.flatten()} from Spectra Index List:'
@@ -1529,7 +1670,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
- 
+
 
   def _calculate_final_energy(self, peak_table, spec_list):
     """
@@ -1554,7 +1695,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
         peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
 
-        invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+        invalid_spectra = identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
         peak_centres[invalid_spectra] = np.nan
 
         delta_t = (peak_centres - t0) / 1e+6
