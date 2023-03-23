@@ -470,9 +470,6 @@ class EVSCalibrationFit(PythonAlgorithm):
                                            'status']
       return fit_results
 
-
-
-
   def _run_find_peaks(self, workspace_index, find_peaks_output_name, find_peaks_input_params, unconstrained):
       try:
           FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name,
