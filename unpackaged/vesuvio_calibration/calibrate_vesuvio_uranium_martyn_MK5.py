@@ -400,9 +400,9 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_results_u = None
         if not fit_results['status'] == "success":
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
-            fit_results_u = self._fit_peaks_to_spectra_unconstrained(index, spec_number, estimated_peak_positions,
-                                                                     find_peaks_output_name, fit_peaks_output_name,
-                                                                     (fit_results['xmin'], fit_results['xmax']))
+            fit_results_u = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions, find_peaks_output_name,
+                                                       fit_peaks_output_name, unconstrained=True,
+                                                       x_range=(fit_results['xmin'], fit_results['xmax']))
 
         selected_params, unconstrained_fit_selected = self._select_best_fit_params(spec_number, fit_results, fit_results_u)
 
@@ -441,50 +441,38 @@ class EVSCalibrationFit(PythonAlgorithm):
       return param_names
 
   def _fit_peaks_to_spectra(self, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name,
-                            fit_peaks_output_name):
-      find_peak_input_params = self._get_find_peak_parameters(spec_number, peak_estimates_list)
+                            fit_peaks_output_name, unconstrained=False, x_range=None):
+      if unconstrained:
+          find_peaks_output_name = self._get_unconstrained_ws_name(find_peaks_output_name)
+          fit_peaks_output_name = self._get_unconstrained_ws_name(fit_peaks_output_name)
+          self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
 
+      find_peak_input_params = self._get_find_peak_parameters(spec_number, peak_estimates_list, unconstrained)
       logger.notice(str(spec_number) + '   ' + str(find_peak_input_params))
-      FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name,
-                **find_peak_input_params)
-
-      fit_results = self._fit_found_peaks(find_peaks_output_name, peak_estimates_list, workspace_index, fit_peaks_output_name)
-      fit_results['status'] = "peaks invalid" if not \
-          self._check_fitted_peak_validity(fit_peaks_output_name + '_Parameters', peak_estimates_list,
-                                           peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else fit_results['status']
-      return fit_results
-
-  def _fit_peaks_to_spectra_unconstrained(self, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name,
-                                          fit_peaks_output_name, x_range):
-      find_peaks_output_name_u = self._get_unconstrained_ws_name(find_peaks_output_name)
-      fit_peaks_output_name_u = self._get_unconstrained_ws_name(fit_peaks_output_name)
-
-      self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
-
-      find_peak_input_params = self._get_find_peak_parameters(spec_number, None, unconstrained=True)
-
-      try:  # Needed as sometimes "Matrix A is singular" occurs, have been unable to work out why.
-          FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name_u,
+      try:
+          FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name,
                     **find_peak_input_params)
-          peaks_found = True
+          if mtd[find_peaks_output_name].rowCount() > 0:
+              peaks_found = True
+          else:
+              raise ValueError
       except ValueError:
-          logger.error("This error relates to the unconstrained workflow. Result from standard workflow will be used.")
           peaks_found = False
+          if not unconstrained: #Ignore error if unconstrained, as we will use peaks found during constrained workflow.
+              raise ValueError("Error finding peaks.")
 
       if peaks_found:
-          peak_table_temp = find_peaks_output_name + "_temp"
-          CloneWorkspace(InputWorkspace=mtd[find_peaks_output_name], OutputWorkspace=peak_table_temp)
+          if unconstrained:
+              linear_bg_coeffs = self._calc_linear_bg_coefficients()
+              self._filter_found_peaks(find_peaks_output_name, peak_estimates_list, linear_bg_coeffs,
+                                       peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
 
-          # FILTER FOUND PEAKS USING ESTIMATED POSITIONS AND MINIMUM HEIGHT
-          linear_bg_coeffs = self._calc_linear_bg_coefficients()
-          self._filter_found_peaks(find_peaks_output_name_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs,
-                                   peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-          fit_results_u = self._fit_found_peaks(peak_table_temp, None, workspace_index, fit_peaks_output_name_u, x_range)
-          fit_results_u['status'] = "peaks invalid" if not \
-              self._check_fitted_peak_validity(fit_peaks_output_name_u + '_Parameters', peak_estimates_list,
-                                               peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else \
-                  fit_results_u['status']
-          return fit_results_u
+          fit_results = self._fit_found_peaks(find_peaks_output_name, peak_estimates_list if not unconstrained else None,
+                                              workspace_index, fit_peaks_output_name, x_range)
+          fit_results['status'] = "peaks invalid" if not \
+              self._check_fitted_peak_validity(fit_peaks_output_name + '_Parameters', peak_estimates_list,
+                                               peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else fit_results['status']
+          return fit_results
 
   def _select_best_fit_params(self, spec_num, fit_results, fit_results_u=None):
       selected_params = fit_results['params']
@@ -523,7 +511,6 @@ class EVSCalibrationFit(PythonAlgorithm):
           DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
           DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
           DeleteWorkspace(find_peaks_output_name_u)
-          DeleteWorkspace(find_peaks_output_name + "_temp")
           if unconstrained_fit_selected:
               output_workspace = fit_peaks_output_name_u + '_Workspace'
               DeleteWorkspace(fit_peaks_output_name + '_Workspace')
@@ -619,12 +606,16 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _filter_found_peaks(self, peak_table, peak_estimates_list, table_to_overwrite, linear_bg_coeffs, peak_height_abs_threshold=0.0, peak_height_rel_threshold=0.0):
+  def _filter_found_peaks(self, find_peaks_output_name, peak_estimates_list, linear_bg_coeffs, peak_height_abs_threshold=0.0, peak_height_rel_threshold=0.0):
+    unfiltered_fits_ws_name = find_peaks_output_name + '_unfiltered'
+    CloneWorkspace(InputWorkspace=mtd[find_peaks_output_name], OutputWorkspace=unfiltered_fits_ws_name)
+
     peak_estimate_deltas = []
     linear_bg_A0, linear_bg_A1 = linear_bg_coeffs
     #with estimates for spectrum, loop through all peaks, get and store delta from peak estimates
     for peak_estimate_index, peak_estimate in enumerate(peak_estimates_list):
-        for position_index, (position, height) in enumerate(zip(mtd[peak_table].column(2), mtd[peak_table].column(1))):
+        for position_index, (position, height) in enumerate(zip(mtd[unfiltered_fits_ws_name].column(2),
+                                                                mtd[unfiltered_fits_ws_name].column(1))):
             if not position == 0 and self._evaluate_peak_height_against_bg(height, position, linear_bg_A0, linear_bg_A1, peak_height_abs_threshold, peak_height_rel_threshold):
                 peak_estimate_deltas.append((peak_estimate_index, position_index, abs(position - peak_estimate)))
 
@@ -644,17 +635,19 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     if len(index_matches) > 0:
         index_matches.sort(key=partial(self._get_x_elem, elem=1))
-        mtd[table_to_overwrite].setRowCount(len(peak_estimates_list))
-        for col_index in range(mtd[table_to_overwrite].columnCount()):
+        mtd[find_peaks_output_name].setRowCount(len(peak_estimates_list))
+        for col_index in range(mtd[find_peaks_output_name].columnCount()):
             match_n = 0
-            for row_index in range(mtd[table_to_overwrite].rowCount()):
+            for row_index in range(mtd[find_peaks_output_name].rowCount()):
                 if row_index in [x[0] for x in index_matches]:
                     position_row_index = index_matches[match_n][1]
-                    mtd[table_to_overwrite].setCell(row_index,col_index, mtd[peak_table].cell(position_row_index, col_index))
+                    mtd[find_peaks_output_name].setCell(row_index,col_index,
+                                                    mtd[unfiltered_fits_ws_name].cell(position_row_index, col_index))
                     match_n+=1
                 else: #otherwise just use estimate position
                     pos_str = self._func_param_names["Position"]
-                    mtd[table_to_overwrite].setCell(pos_str, row_index, peak_estimates_list[row_index])
+                    mtd[find_peaks_output_name].setCell(pos_str, row_index, peak_estimates_list[row_index])
+    DeleteWorkspace(unfiltered_fits_ws_name)
 
 #----------------------------------------------------------------------------------------
   def _get_x_elem(self, input_list, elem):
@@ -685,7 +678,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     positions = [params[position] for params in peak_params]
 
     if len(positions) < 1:
-        raise RuntimeError("FindPeaks could not find a peaks with the given parameters: %s" % find_peak_params)
+        raise RuntimeError("No position parameter provided.")
 
     if xLimits:
         xmin, xmax = xLimits
