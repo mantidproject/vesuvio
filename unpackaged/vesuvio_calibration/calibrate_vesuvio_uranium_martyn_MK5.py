@@ -379,8 +379,8 @@ class EVSCalibrationFit(PythonAlgorithm):
 #----------------------------------------------------------------------------------------
 
   def _fit_bragg_peaks(self):
-    estimated_peak_positions = self._estimate_bragg_peak_positions()
-    num_estimated_peaks, num_spectra = estimated_peak_positions.shape
+    estimated_peak_positions_all_spec = self._estimate_bragg_peak_positions()
+    num_estimated_peaks, num_spectra = estimated_peak_positions_all_spec.shape
 
     self._prog_reporter = Progress(self, 0.0, 1.0, num_spectra)
 
@@ -388,34 +388,36 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._create_output_parameters_table_ws(output_parameters_tbl_name, num_estimated_peaks)
 
     output_workspaces = []
-    for index, estimated_peak_positions_in_spectra in enumerate(estimated_peak_positions.transpose()):
+    for index, estimated_peak_positions in enumerate(estimated_peak_positions_all_spec.transpose()):
         spec_number = self._spec_list[0]+index
         self._prog_reporter.report("Fitting to spectrum %d" % spec_number)
 
         find_peaks_output_name = self._sample + '_peaks_table_%d' % spec_number
         fit_peaks_output_name = self._output_workspace_name + '_Spec_%d' % spec_number
-        fit_results = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions_in_spectra, find_peaks_output_name,
+        fit_results = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions, find_peaks_output_name,
                                                  fit_peaks_output_name)
 
-        find_peaks_output_name_u = find_peaks_output_name + '_unconstrained'
-        fit_peaks_output_name_u = fit_peaks_output_name + '_unconstrained'
         fit_results_u = None
         if not fit_results['status'] == "success":
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
-            fit_results_u = self._fit_peaks_to_spectra_unconstrained(index, spec_number, estimated_peak_positions_in_spectra,
-                                                                     find_peaks_output_name, find_peaks_output_name_u,
-                                                                     fit_peaks_output_name_u, (fit_results['xmin'], fit_results['xmax']))
+            fit_results_u = self._fit_peaks_to_spectra_unconstrained(index, spec_number, estimated_peak_positions,
+                                                                     find_peaks_output_name, fit_peaks_output_name,
+                                                                     (fit_results['xmin'], fit_results['xmax']))
 
         selected_params, unconstrained_fit_selected = self._select_best_fit_params(spec_number, fit_results, fit_results_u)
 
         self._output_params_to_table(spec_number, num_estimated_peaks, selected_params, output_parameters_tbl_name)
 
-        output_workspaces.append(self._get_output_and_clean_workspaces(fit_results_u is not None, unconstrained_fit_selected,
-                                                                       find_peaks_output_name, find_peaks_output_name_u,
-                                                                       fit_peaks_output_name, fit_peaks_output_name_u))
+        output_workspaces.append(
+            self._get_output_and_clean_workspaces(fit_results_u is not None, unconstrained_fit_selected, find_peaks_output_name,
+                                                  fit_peaks_output_name))
 
     if self._create_output:
         GroupWorkspaces(','.join(output_workspaces), OutputWorkspace=self._output_workspace_name + "_Peak_Fits")
+
+  @staticmethod
+  def _get_unconstrained_ws_name(ws_name):
+      return ws_name + '_unconstrained'
 
   def _create_output_parameters_table_ws(self, output_table_name, num_estimated_peaks):
     CreateEmptyTableWorkspace(OutputWorkspace=output_table_name)
@@ -452,7 +454,11 @@ class EVSCalibrationFit(PythonAlgorithm):
                                            peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else fit_results['status']
       return fit_results
 
-  def _fit_peaks_to_spectra_unconstrained(self, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name, find_peaks_output_name_u, fit_output_name_u, x_range):
+  def _fit_peaks_to_spectra_unconstrained(self, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name,
+                                          fit_peaks_output_name, x_range):
+      find_peaks_output_name_u = self._get_unconstrained_ws_name(find_peaks_output_name)
+      fit_peaks_output_name_u = self._get_unconstrained_ws_name(fit_peaks_output_name)
+
       self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
 
       find_peak_input_params = self._get_find_peak_parameters(spec_number, None, unconstrained=True)
@@ -473,9 +479,9 @@ class EVSCalibrationFit(PythonAlgorithm):
           linear_bg_coeffs = self._calc_linear_bg_coefficients()
           self._filter_found_peaks(find_peaks_output_name_u, peak_estimates_list, peak_table_temp, linear_bg_coeffs,
                                    peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-          fit_results_u = self._fit_found_peaks(peak_table_temp, None, workspace_index, fit_output_name_u, x_range)
+          fit_results_u = self._fit_found_peaks(peak_table_temp, None, workspace_index, fit_peaks_output_name_u, x_range)
           fit_results_u['status'] = "peaks invalid" if not \
-              self._check_fitted_peak_validity(fit_output_name_u + '_Parameters', peak_estimates_list,
+              self._check_fitted_peak_validity(fit_peaks_output_name_u + '_Parameters', peak_estimates_list,
                                                peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else \
                   fit_results_u['status']
           return fit_results_u
@@ -504,14 +510,15 @@ class EVSCalibrationFit(PythonAlgorithm):
       mtd[output_table_name].addRow([spec_num] + row)
 
   def _get_output_and_clean_workspaces(self, unconstrained_fit_performed, unconstrained_fit_selected, find_peaks_output_name,
-                           find_peaks_output_name_u, fit_peaks_output_name, fit_peaks_output_name_u):
-
-      output_workspace = fit_peaks_output_name + '_Workspace'
+                                       fit_peaks_output_name):
+      find_peaks_output_name_u = self._get_unconstrained_ws_name(find_peaks_output_name)
+      fit_peaks_output_name_u = self._get_unconstrained_ws_name(fit_peaks_output_name)
 
       DeleteWorkspace(fit_peaks_output_name + '_NormalisedCovarianceMatrix')
       DeleteWorkspace(fit_peaks_output_name + '_Parameters')
       DeleteWorkspace(find_peaks_output_name)
 
+      output_workspace = fit_peaks_output_name + '_Workspace'
       if unconstrained_fit_performed:
           DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
           DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
