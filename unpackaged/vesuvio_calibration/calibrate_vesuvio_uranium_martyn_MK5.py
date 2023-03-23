@@ -445,13 +445,38 @@ class EVSCalibrationFit(PythonAlgorithm):
       if unconstrained:
           find_peaks_output_name = self._get_unconstrained_ws_name(find_peaks_output_name)
           fit_peaks_output_name = self._get_unconstrained_ws_name(fit_peaks_output_name)
-          self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
+          logger.notice("Fitting to spectrum %d without constraining parameters" % spec_number)
 
-      find_peak_input_params = self._get_find_peak_parameters(spec_number, peak_estimates_list, unconstrained)
-      logger.notice(str(spec_number) + '   ' + str(find_peak_input_params))
+      find_peaks_input_params = self._get_find_peak_parameters(spec_number, peak_estimates_list, unconstrained)
+      logger.notice(str(spec_number) + '   ' + str(find_peaks_input_params))
+      peaks_found = self._run_find_peaks(workspace_index, find_peaks_output_name, find_peaks_input_params, unconstrained)
+
+      if peaks_found:
+          return self._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
+                                                  fit_peaks_output_name, x_range, unconstrained)
+
+  def _filter_and_fit_found_peaks(self, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,
+                                  x_range, unconstrained):
+      if unconstrained:
+          linear_bg_coeffs = self._calc_linear_bg_coefficients()
+          self._filter_found_peaks(find_peaks_output_name, peak_estimates_list, linear_bg_coeffs,
+                                   peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
+
+      fit_results = self._fit_found_peaks(find_peaks_output_name, peak_estimates_list if not unconstrained else None,
+                                          workspace_index, fit_peaks_output_name, x_range)
+      fit_results['status'] = "peaks invalid" if not \
+          self._check_fitted_peak_validity(fit_peaks_output_name + '_Parameters', peak_estimates_list,
+                                           peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else fit_results[
+                                           'status']
+      return fit_results
+
+
+
+
+  def _run_find_peaks(self, workspace_index, find_peaks_output_name, find_peaks_input_params, unconstrained):
       try:
           FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name,
-                    **find_peak_input_params)
+                    **find_peaks_input_params)
           if mtd[find_peaks_output_name].rowCount() > 0:
               peaks_found = True
           else:
@@ -460,19 +485,7 @@ class EVSCalibrationFit(PythonAlgorithm):
           peaks_found = False
           if not unconstrained: #Ignore error if unconstrained, as we will use peaks found during constrained workflow.
               raise ValueError("Error finding peaks.")
-
-      if peaks_found:
-          if unconstrained:
-              linear_bg_coeffs = self._calc_linear_bg_coefficients()
-              self._filter_found_peaks(find_peaks_output_name, peak_estimates_list, linear_bg_coeffs,
-                                       peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-
-          fit_results = self._fit_found_peaks(find_peaks_output_name, peak_estimates_list if not unconstrained else None,
-                                              workspace_index, fit_peaks_output_name, x_range)
-          fit_results['status'] = "peaks invalid" if not \
-              self._check_fitted_peak_validity(fit_peaks_output_name + '_Parameters', peak_estimates_list,
-                                               peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD) else fit_results['status']
-          return fit_results
+      return peaks_found
 
   def _select_best_fit_params(self, spec_num, fit_results, fit_results_u=None):
       selected_params = fit_results['params']
