@@ -790,11 +790,21 @@ class EVSCalibrationFit(PythonAlgorithm):
     GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
     if self._calculate_shared_parameter == True:
+        init_Gaussian_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.GaussianFWHM', self._spec_list)
+        init_Gaussian_FWHM = np.nanmean(init_Gaussian_FWHM[init_Gaussian_FWHM != 0])
+        init_Lorentz_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzFWHM', self._spec_list)
+        init_Lorentz_FWHM = np.nanmean(init_Lorentz_FWHM[init_Lorentz_FWHM != 0])
+        init_Lorentz_Amp = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzAmp', self._spec_list)
+        init_Lorentz_Amp = np.nanmean(init_Lorentz_Amp[init_Lorentz_Amp != 0])
+        init_Lorentz_Pos = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
+        init_Lorentz_Pos = np.nanmean(init_Lorentz_Pos[init_Lorentz_Pos != 0])
+        
+        initial_params = {'A0': 0.0, 'A1': 0.0, 'LorentzAmp': init_Lorentz_Amp, 'LorentzPos': init_Lorentz_Pos, 'LorentzFWHM': init_Lorentz_FWHM, 'GaussianFWHM': init_Gaussian_FWHM}
+
         peak_centres = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
         peak_centres_errors = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err', self._spec_list)
-
         invalid_spectra = identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors, self._spec_list)
-        self._fit_shared_parameter(estimated_peak_positions_all_peaks, invalid_spectra)
+        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers)
 
   def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name, output_parameter_table_headers):
     spec_number = self._spec_list[0] + spec_index
@@ -843,7 +853,6 @@ class EVSCalibrationFit(PythonAlgorithm):
   def _output_fit_params_to_table_ws(self, spec_num, params, output_table_name, output_table_headers):
     fit_values = dict(zip(params.column(0), params.column(1)))
     fit_errors = dict(zip(params.column(0), params.column(2)))
-
     row_values = [fit_values[name] for name in output_table_headers]
     row_errors = [fit_errors[name] for name in output_table_headers]
     row = [element for tupl in zip(row_values, row_errors) for element in tupl]
@@ -858,37 +867,18 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _fit_shared_parameter(self, peak_positions, invalid_spectra):
+  def _fit_shared_parameter(self, invalid_spectra, initial_params, param_names):
     """
       Fit peaks to all detectors, with one set of fit parameters for all detectors.
     """
     
-    peak_centre = np.float(np.nanmean(peak_positions, axis=1))
-    find_peak_params = self._get_find_peak_parameters(self._spec_list[0], [peak_centre])
-    
     peaks_table = '__' + self._sample + '_peaks_table'
-    param_names = self._create_parameter_table(peaks_table)
-    peak_table = '__' + self._sample + '_peak_table'
-    FindPeaks(InputWorkspace=self._sample, PeaksList=peak_table, **find_peak_params)
 
-    #extract data from table
-    if mtd[peak_table].rowCount() > 0:
-        peak_params = mtd[peak_table].row(0)
-        DeleteWorkspace(peak_table)
-    else:
-        logger.error('FindPeaks could not find any peaks matching the parameters:\n' + str(find_peak_params))
-        sys.exit()
-    
-    fit_func = self._build_function_string(peak_params)
-    
+    fit_func = self._build_function_string(initial_params)
     start_str = 'composite=MultiDomainFunction, NumDeriv=1;'
- 
     sample_ws = mtd[self._sample]
-    
     MaskDetectors(Workspace=sample_ws, WorkspaceIndexList=invalid_spectra)
-
     validSpecs = ExtractUnmaskedSpectra(InputWorkspace=sample_ws, OutputWorkspace='valid_spectra')
-    
     n_valid_specs = validSpecs.getNumberHistograms()
     
     fit_func = ('(composite=CompositeFunction, NumDeriv=false, $domains=i;' + fit_func[:-1] + ');') * n_valid_specs
