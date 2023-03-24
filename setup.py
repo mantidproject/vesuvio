@@ -1,5 +1,5 @@
 """
-Vesuvio
+EVSVesuvio
 =============
 
 #ABOUT HERE
@@ -11,15 +11,15 @@ import os
 
 from setuptools import find_packages, setup
 
-from vesuvio_analysis import __project_url__, __version__
+from EVSVesuvio import __project_url__, __version__
 
 # ==============================================================================
 # Constants
 # ==============================================================================
-NAME = 'vesuvio'
+NAME = 'EVSVesuvio'
 THIS_DIR = os.path.dirname(__file__)
 _package_dirs = ['ip_files', 'experiments']
-_package_exts = ['.OPJ', '.par', '.DAT', '.DAT3', '.DAT6', '.txt', '.NXS', '.np']
+_package_exts = ['.OPJ', '.par', '.DAT', '.DAT3', '.DAT6', '.txt', '.NXS', '.nxs', '.np']
 
 
 # ==============================================================================

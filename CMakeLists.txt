@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 # Define the project name.
-project(Vesuvio)
+project(EVSVesuvio)
 
 # Policy settings
 if(POLICY CMP0022)

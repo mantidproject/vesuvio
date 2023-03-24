@@ -5,7 +5,7 @@
   {% set version = version_tag + version_number %}
 
 package:
-  name: vesuvio
+  name: EVSvesuvio
   version: {{ version }}
 
 source:
@@ -25,11 +25,11 @@ requirements:
     - iminuit
     - h5py
     - mock
-    - jacobi
+    - jacobi==0.4.2 #pinned untill 0.5.0 is proven
 
 test:
   imports:
-    - vesuvio_analysis
+    - EVSvesuvio
 
 about:
   home: https://github.com/mantidproject/vesuvio
