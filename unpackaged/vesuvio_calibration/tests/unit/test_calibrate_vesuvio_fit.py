@@ -686,68 +686,70 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertFalse(result)
 
     @staticmethod
-    def _setup_filter_and_fit_found_peaks_mocks(unconstrained, filter_found_peaks_called=True):
-        instance = EVSCalibrationFit()
+    def _setup_filter_and_fit_found_peaks_mocks():
+        alg = EVSCalibrationFit()
         workspace_index = 0
         peak_estimates_list = 'peak_estimates_list'
         find_peaks_output_name = 'find_peaks_output'
         fit_peaks_output_name = 'fit_peaks_output'
         x_range = (1, 2)
 
-        if unconstrained:
-            instance._calc_linear_bg_coefficients = MagicMock(return_value='linear_bg_coeffs')
-        if filter_found_peaks_called:
-            instance._filter_found_peaks = MagicMock()
-        instance._fit_found_peaks = MagicMock(return_value={'status': 'some_status'})
-        instance._check_fitted_peak_validity = MagicMock(return_value=True)
+        alg._calc_linear_bg_coefficients = MagicMock(return_value='linear_bg_coeffs')
+        alg._filter_found_peaks = MagicMock()
+        alg._fit_found_peaks = MagicMock(return_value={'status': 'test_status'})
+        alg._check_fitted_peak_validity = MagicMock(return_value=True)
 
-        return instance, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range
+        return alg, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range
 
     def test_filter_and_fit_found_peaks_unconstrained(self):
-        instance, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range = self._setup_filter_and_fit_found_peaks_mocks(
-            unconstrained=True)
+        alg, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,\
+            x_range = self._setup_filter_and_fit_found_peaks_mocks()
 
-        fit_results = instance._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
+        fit_results = alg._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
                                                            fit_peaks_output_name, x_range, unconstrained=True)
 
-        instance._calc_linear_bg_coefficients.assert_called_once()
-        instance._filter_found_peaks.assert_called_once_with(find_peaks_output_name, peak_estimates_list,
+        alg._calc_linear_bg_coefficients.assert_called_once()
+        alg._filter_found_peaks.assert_called_once_with(find_peaks_output_name, peak_estimates_list,
                                                              'linear_bg_coeffs',
                                                              peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-        instance._fit_found_peaks.assert_called_once_with(find_peaks_output_name, None, workspace_index,
+        alg._fit_found_peaks.assert_called_once_with(find_peaks_output_name, None, workspace_index,
                                                           fit_peaks_output_name, x_range)
-        instance._check_fitted_peak_validity.assert_called_once_with(fit_peaks_output_name + '_Parameters',
+        alg._check_fitted_peak_validity.assert_called_once_with(fit_peaks_output_name + '_Parameters',
                                                                      peak_estimates_list,
                                                                      peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-        self.assertEqual(fit_results['status'], 'some_status')
+        self.assertEqual(fit_results['status'], 'test_status')
 
 
     def test_filter_and_fit_found_peaks_not_unconstrained(self):
-        instance, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range = self._setup_filter_and_fit_found_peaks_mocks(
-            unconstrained=False, filter_found_peaks_called=False)
+        alg, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,\
+            x_range = self._setup_filter_and_fit_found_peaks_mocks()
 
-        fit_results = instance._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
+        fit_results = alg._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
                                                            fit_peaks_output_name, x_range, unconstrained=False)
 
-        instance._calc_linear_bg_coefficients.assert_not_called()
-        instance._filter_found_peaks.assert_not_called()
-        instance._fit_found_peaks.assert_called_once_with(find_peaks_output_name, peak_estimates_list, workspace_index,
+        alg._calc_linear_bg_coefficients.assert_not_called()
+        alg._filter_found_peaks.assert_not_called()
+        alg._fit_found_peaks.assert_called_once_with(find_peaks_output_name, peak_estimates_list, workspace_index,
                                                           fit_peaks_output_name, x_range)
-        instance._check_fitted_peak_validity.assert_called_once_with(fit_peaks_output_name + '_Parameters',
+        alg._check_fitted_peak_validity.assert_called_once_with(fit_peaks_output_name + '_Parameters',
                                                                      peak_estimates_list,
                                                                      peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
-        self.assertEqual(fit_results['status'], 'some_status')
+        self.assertEqual(fit_results['status'], 'test_status')
 
     def test_filter_and_fit_found_peaks_invalid_peaks(self):
-        instance, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range = self._setup_filter_and_fit_found_peaks_mocks(unconstrained=False, filter_found_peaks_called=False)
-        instance._check_fitted_peak_validity.return_value = False
+        alg, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,\
+            x_range = self._setup_filter_and_fit_found_peaks_mocks()
+        alg._check_fitted_peak_validity.return_value = False
 
-        fit_results = instance._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range, unconstrained=False)
+        fit_results = alg._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
+                                                           fit_peaks_output_name, x_range, unconstrained=False)
 
-        instance._calc_linear_bg_coefficients.assert_not_called()
-        instance._filter_found_peaks.assert_not_called()
-        instance._fit_found_peaks.assert_called_once_with(find_peaks_output_name, peak_estimates_list, workspace_index, fit_peaks_output_name, x_range)
-        instance._check_fitted_peak_validity.assert_called_once_with(fit_peaks_output_name + '_Parameters', peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
+        alg._calc_linear_bg_coefficients.assert_not_called()
+        alg._filter_found_peaks.assert_not_called()
+        alg._fit_found_peaks.assert_called_once_with(find_peaks_output_name, peak_estimates_list, workspace_index,
+                                                          fit_peaks_output_name, x_range)
+        alg._check_fitted_peak_validity.assert_called_once_with(fit_peaks_output_name + '_Parameters',
+                                                                     peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
         self.assertEqual(fit_results['status'], 'peaks invalid')
 
 
