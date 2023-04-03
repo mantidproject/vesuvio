@@ -752,9 +752,63 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                                      peak_estimates_list, peak_height_rel_threshold=PEAK_HEIGHT_RELATIVE_THRESHOLD)
         self.assertEqual(fit_results['status'], 'peaks invalid')
 
+    @staticmethod
+    def _setup_fit_peaks_to_spectra_mocks(peaks_found):
+        alg = EVSCalibrationFit()
+        workspace_index = 0
+        spec_number = 1
+        peak_estimates_list = 'peak_estimates_list'
+        find_peaks_output_name = 'find_peaks_output'
+        fit_peaks_output_name = 'fit_peaks_output'
+        x_range = (1, 2)
 
+        alg._get_unconstrained_ws_name = MagicMock(side_effect=lambda x: x + '_unconstrained')
+        alg._get_find_peak_parameters = MagicMock(return_value='find_peaks_params')
+        alg._run_find_peaks = MagicMock(return_value=peaks_found)
+        alg._filter_and_fit_found_peaks = MagicMock(return_value='fit_results')
 
+        return alg, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name, x_range
 
+    def test_fit_peaks_to_spectra_unconstrained_peaks_found(self):
+        alg, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,\
+            x_range = self._setup_fit_peaks_to_spectra_mocks(peaks_found=True)
+
+        result = alg._fit_peaks_to_spectra(workspace_index, spec_number, peak_estimates_list, find_peaks_output_name,
+                                           fit_peaks_output_name, unconstrained=True, x_range=x_range)
+
+        alg._get_find_peak_parameters.assert_called_once_with(spec_number, peak_estimates_list, True)
+        alg._run_find_peaks.assert_called_once_with(workspace_index, find_peaks_output_name + '_unconstrained',
+                                                    'find_peaks_params', True)
+        alg._filter_and_fit_found_peaks.assert_called_once_with(workspace_index, peak_estimates_list,
+                                                                find_peaks_output_name + '_unconstrained',
+                                                                fit_peaks_output_name + '_unconstrained', x_range, True)
+        self.assertEqual(result, 'fit_results')
+
+    def test_fit_peaks_to_spectra_not_unconstrained_peaks_found(self):
+        alg, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,\
+            x_range = self._setup_fit_peaks_to_spectra_mocks(peaks_found=True)
+
+        result = alg._fit_peaks_to_spectra(workspace_index, spec_number, peak_estimates_list, find_peaks_output_name,
+                                           fit_peaks_output_name, unconstrained=False, x_range=x_range)
+
+        alg._get_find_peak_parameters.assert_called_once_with(spec_number, peak_estimates_list, False)
+        alg._run_find_peaks.assert_called_once_with(workspace_index, find_peaks_output_name, 'find_peaks_params', False)
+        alg._filter_and_fit_found_peaks.assert_called_once_with(workspace_index, peak_estimates_list,
+                                                                find_peaks_output_name, fit_peaks_output_name, x_range,
+                                                                False)
+        self.assertEqual(result, 'fit_results')
+
+    def test_fit_peaks_to_spectra_not_unconstrained_peaks_not_found(self):
+        alg, workspace_index, spec_number, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,\
+            x_range = self._setup_fit_peaks_to_spectra_mocks(peaks_found=False)
+
+        result = alg._fit_peaks_to_spectra(workspace_index, spec_number, peak_estimates_list, find_peaks_output_name,
+                                           fit_peaks_output_name, unconstrained=False, x_range=x_range)
+
+        alg._get_find_peak_parameters.assert_called_once_with(spec_number, peak_estimates_list, False)
+        alg._run_find_peaks.assert_called_once_with(workspace_index, find_peaks_output_name, 'find_peaks_params', False)
+        alg._filter_and_fit_found_peaks.assert_not_called()
+        self.assertEqual(result, None)
 
 
 if __name__ == '__main__':
