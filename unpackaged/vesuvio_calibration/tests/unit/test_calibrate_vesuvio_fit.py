@@ -1,7 +1,7 @@
 from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import EVSCalibrationFit, DETECTOR_RANGE, \
      ENERGY_ESTIMATE, BRAGG_PEAK_CROP_RANGE, BRAGG_FIT_WINDOW_RANGE, RECOIL_PEAK_CROP_RANGE, RECOIL_FIT_WINDOW_RANGE, \
      RESONANCE_PEAK_CROP_RANGE, RESONANCE_FIT_WINDOW_RANGE, PEAK_HEIGHT_RELATIVE_THRESHOLD
-from mock import MagicMock, patch, call
+from mock import MagicMock, patch, call, ANY
 from functools import partial
 
 import unittest
@@ -809,6 +809,80 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._run_find_peaks.assert_called_once_with(workspace_index, find_peaks_output_name, 'find_peaks_params', False)
         alg._filter_and_fit_found_peaks.assert_not_called()
         self.assertEqual(result, None)
+
+    @staticmethod
+    def _setup_fit_bragg_peaks_mocks(fit_results, selected_params, output_workspaces):
+        alg = EVSCalibrationFit()
+        alg._estimate_bragg_peak_positions = MagicMock(return_value=np.array([[1, 2], [3, 4]]).transpose())
+        alg._create_output_parameters_table_ws = MagicMock()
+        alg._fit_peaks_to_spectra = MagicMock(side_effect=fit_results)
+        alg._select_best_fit_params = MagicMock(side_effect=[(selected_params[0], False), (selected_params[1], False)])
+        alg._output_params_to_table = MagicMock()
+        alg._get_output_and_clean_workspaces = MagicMock(side_effect=output_workspaces)
+        alg._spec_list = [1]
+        alg._sample = 'sample'
+        alg._output_workspace_name = 'output'
+        alg._create_output = True
+        alg._prog_reporter = MagicMock()
+
+        return alg
+
+    def _test_calls_individually(self, call_list, calls):
+        for j, call in enumerate(call_list):
+            for i, arg in enumerate(call.args):
+                expected_arg = calls[j][i]
+                try:
+                    self.assertEqual(arg, expected_arg)
+                except ValueError:
+                    np.testing.assert_array_equal(arg, expected_arg)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
+    def test_fit_bragg_peaks_success(self, group_workspaces_mock):
+        fit_result_ret_val = {'status': 'success'}
+        fit_results = lambda *args: fit_result_ret_val
+        selected_params = ['selected_params1', 'selected_params2']
+        output_workspaces = ['ws1', 'ws2']
+
+        alg = self._setup_fit_bragg_peaks_mocks(fit_results, selected_params, output_workspaces)
+        alg._fit_bragg_peaks()
+
+        fit_peaks_to_spectra_call_list = alg._fit_peaks_to_spectra.call_args_list
+        self._test_calls_individually(fit_peaks_to_spectra_call_list, [
+                                      [0, 1, [1, 2], 'sample_peaks_table_1', 'output_Spec_1', False],
+                                      [1, 2, [3, 4], 'sample_peaks_table_2', 'output_Spec_2', False]])
+        alg._select_best_fit_params.assert_has_calls([call(1, fit_result_ret_val, None),
+                                                      call(2, fit_result_ret_val, None)])
+        alg._output_params_to_table.assert_has_calls([call(1, 2, selected_params[0], 'output_Peak_Parameters'),
+                                                      call(2, 2, selected_params[1], 'output_Peak_Parameters')])
+        alg._get_output_and_clean_workspaces.assert_has_calls([call(False, False, 'sample_peaks_table_1', 'output_Spec_1'),
+                                                               call(False, False, 'sample_peaks_table_2', 'output_Spec_2')])
+        group_workspaces_mock.assert_called_once_with(','.join(output_workspaces), OutputWorkspace='output_Peak_Fits')
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
+    def test_fit_bragg_peaks_not_success(self, group_workspaces_mock):
+        x_range = (1, 2)
+        fit_res = {'status': 'failure', 'xmin': x_range[0], 'xmax': x_range[1]}
+        rit_u_res = {'status': 'success'}
+        fit_results = [fit_res, rit_u_res, fit_res, rit_u_res]
+        selected_params = ['selected_params1', 'selected_params2']
+        output_workspaces = ['ws1', 'ws2']
+
+        alg = self._setup_fit_bragg_peaks_mocks(fit_results, selected_params, output_workspaces)
+        alg._fit_bragg_peaks()
+
+        fit_peaks_to_spectra_call_list = alg._fit_peaks_to_spectra.call_args_list
+        self._test_calls_individually(fit_peaks_to_spectra_call_list, [
+                                      [0, 1, [1, 2], 'sample_peaks_table_1', 'output_Spec_1', False],
+                                      [0, 1, [1, 2], 'sample_peaks_table_1', 'output_Spec_1', True, x_range],
+                                      [1, 2, [3, 4], 'sample_peaks_table_2', 'output_Spec_2', False],
+                                      [1, 2, [3, 4], 'sample_peaks_table_2', 'output_Spec_2', True, x_range]])
+        alg._select_best_fit_params.assert_has_calls([call(1, fit_res, rit_u_res),
+                                                      call(2, fit_res, rit_u_res)])
+        alg._output_params_to_table.assert_has_calls([call(1, 2, selected_params[0], 'output_Peak_Parameters'),
+                                                      call(2, 2, selected_params[1], 'output_Peak_Parameters')])
+        alg._get_output_and_clean_workspaces.assert_has_calls([call(True, False, 'sample_peaks_table_1', 'output_Spec_1'),
+                                                               call(True, False, 'sample_peaks_table_2', 'output_Spec_2')])
+        group_workspaces_mock.assert_called_once_with(','.join(output_workspaces), OutputWorkspace='output_Peak_Fits')
 
 
 if __name__ == '__main__':
