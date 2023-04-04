@@ -668,81 +668,88 @@ class EVSCalibrationFit(PythonAlgorithm):
       containing one table workspace per peak with parameters for each detector.
     """
 
-    #ESTIMATE PEAK POSITIONS FROM ENERGY ESTIMATES AND PREVIOUS PARAMETERS.
-    peak_positions = self._estimate_peak_positions()
-    num_peaks, num_spectra = peak_positions.shape
-    self._prog_reporter = Progress(self,0.0,1.0,num_peaks*num_spectra)
+    estimated_peak_positions_all_spec = self._estimate_peak_positions()
+    num_estimated_peaks, num_spectra = estimated_peak_positions_all_spec.shape
 
-    self._parameter_tables = []
-    self._fit_workspaces = []
-    #LOOP PEAK ESTIMATES FOR EACH SPECTRUM
-    for i, peak_estimates_list in enumerate(peak_positions):
-      #create parameter table
-      peaks_table = self._output_workspace_name + '_Peak_%d_Parameters' % i
-      param_names = self._create_parameter_table(peaks_table)
+    self._prog_reporter = Progress(self, 0.0, 1.0, *num_spectra)
 
-      #fit every spectrum
+    self._output_parameter_tables = []
+    self._peak_fit_workspaces_by_spec = []
+    for spec_index, estimated_peak_positions in enumerate(estimated_peak_positions_all_spec):
+
       self._peak_fit_workspaces = []
-      #LOOP THROUGH PEAK ESTIMATES FOR THIS SPECTRUM
-      for j, peak_centre in enumerate(peak_estimates_list):
-        spec_number = self._spec_list[0]+j
-        self._prog_reporter.report("Fitting peak %d to spectrum %d" % (i,spec_number))
+      for peak_index, peak_position in enumerate(estimated_peak_positions):
+        output_parameter_table_name, fit_workspace_name = self.fit_peak(spec_index, peak_index, peak_position)
+        self._output_parameter_tables.append(output_parameter_table_name)
+        self._peak_fit_workspaces.append(fit_workspace_name)
 
-        #find inital parameters given the estimate position
-        peak_table = '__' + self._sample + '_peaks_table_%d_%d' % (i,j)
-        find_peak_params = self._get_find_peak_parameters(spec_number, [peak_centre])
-        #FIND DATA PEAK RELATED TO ESTIMATED PEAK
-        FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=j, PeaksList=peak_table, **find_peak_params)
+      self._peak_fit_workspaces_by_spec.append(self._peak_fit_workspaces)
 
-        #extract data from table
-        if mtd[peak_table].rowCount() > 0:
-          peak_params = mtd[peak_table].row(0)
-          DeleteWorkspace(peak_table)
-        else:
-          logger.error('FindPeaks could not find any peaks matching the parameters:\n' + str(find_peak_params))
-          sys.exit()
+    GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
-        #build fit function string
-        func_string = self._build_function_string(peak_params)
-        fit_output_name = '__' + self._output_workspace_name + '_Peak_%d_Spec_%d' % (i,j)
+  def _fit_peak(self, spec_index, peak_index, peak_position):
+    output_parameter_table_name = self._output_workspace_name + '_Peak_%d_Parameters' % spec_index
+    output_parameter_table_headers = self._create_parameter_table_and_output_headers(output_parameter_table_name)
 
-        #find x window
-        xmin, xmax = None, None
-        position = '' + self._func_param_names['Position']
-        if peak_params[position] > 0:
-          xmin = peak_params[position]-self._fit_window_range
-          xmax = peak_params[position]+self._fit_window_range
-        else:
-          logger.warning('Could not specify fit window. Using full spectrum x range.')
+    spec_number = self._spec_list[0] + peak_index
+    self._prog_reporter.report("Fitting peak %d to spectrum %d" % (spec_index, spec_number))
 
-        status, chi2, ncm, params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=self._sample, IgnoreInvalidData=True,
-                                                              StartX=xmin, EndX=xmax, WorkspaceIndex=j,
-                                                              CalcErrors=True, Output=fit_output_name,
-                                                              Minimizer='Levenberg-Marquardt,RelError=1e-8')
+    peak_params = self._find_peaks_and_output_params(spec_index, spec_number, peak_index, peak_position)
+    fit_func_string = self._build_function_string(peak_params)
+    xmin, xmax = self._find_fit_x_window(peak_params)
+    fit_output_name = '__' + self._output_workspace_name + '_Peak_%d_Spec_%d' % (spec_index, peak_index)
+    status, chi2, ncm, fit_params, fws, func, cost_func = Fit(Function=fit_func_string, InputWorkspace=self._sample,
+                                                        IgnoreInvalidData=True,
+                                                        StartX=xmin, EndX=xmax, WorkspaceIndex=peak_index,
+                                                        CalcErrors=True, Output=fit_output_name,
+                                                        Minimizer='Levenberg-Marquardt,RelError=1e-8')
 
-        #output fit parameters to table workspace
-        fit_values = dict(zip(params.column(0), params.column(1)))
-        fit_errors = dict(zip(params.column(0), params.column(2)))
+    self._output_fit_params_to_table_ws(spec_number, fit_params, output_parameter_table_name,
+                                      output_parameter_table_headers)
+    fit_workspace_name = fws.name()
+    self.del_fit_workspaces(ncm, fit_params, fws)
 
-        row_values = [fit_values[name] for name in param_names]
-        row_errors = [fit_errors[name] for name in param_names]
-        row = [element for tupl in zip(row_values, row_errors) for element in tupl]
+    return fit_workspace_name, output_parameter_table_name
 
-        mtd[peaks_table].addRow([spec_number] + row)
+  def _find_peaks_and_output_params(self, spec_index, spec_number, peak_index, peak_position):
+    peak_table_name = '__' + self._sample + '_peaks_table_%d_%d' % (spec_index, peak_index)
+    find_peak_params = self._get_find_peak_parameters(spec_number, [peak_position])
+    FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=peak_index, PeaksList=peak_table_name, **find_peak_params)
+    if mtd[peak_table_name].rowCount() == 0:
+      logger.error('FindPeaks could not find any peaks matching the parameters:\n' + str(find_peak_params))
+      sys.exit()
 
-        self._parameter_tables.append(peaks_table)
-        self._peak_fit_workspaces.append(fws.name())
+    peak_params = mtd[peak_table_name].row(0)
+    DeleteWorkspace(peak_table_name)
+    return peak_params
 
-        DeleteWorkspace(ncm)
-        DeleteWorkspace(params)
-        if not self._create_output:
-          DeleteWorkspace(fws)
+  def _find_fit_x_window(self, peak_params):
+    xmin, xmax = None, None
 
-      self._fit_workspaces.append(self._peak_fit_workspaces)
+    position = '' + self._func_param_names['Position']
+    if peak_params[position] > 0:
+      xmin = peak_params[position] - self._fit_window_range
+      xmax = peak_params[position] + self._fit_window_range
+    else:
+      logger.warning('Could not specify fit window. Using full spectrum x range.')
+    return xmin, xmax
 
-    GroupWorkspaces(self._parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
+  def _output_fit_params_to_table_ws(self, spec_num, params, output_table_name, output_table_headers):
+    fit_values = dict(zip(params.column(0), params.column(1)))
+    fit_errors = dict(zip(params.column(0), params.column(2)))
 
-    
+    row_values = [fit_values[name] for name in output_table_headers]
+    row_errors = [fit_errors[name] for name in output_table_headers]
+    row = [element for tupl in zip(row_values, row_errors) for element in tupl]
+
+    mtd[output_table_name].addRow([spec_num] + row)
+
+  def del_fit_workspaces(self, ncm, fit_params, fws):
+    DeleteWorkspace(ncm)
+    DeleteWorkspace(fit_params)
+    if not self._create_output:
+      DeleteWorkspace(fws)
+
 #----------------------------------------------------------------------------------------
     
   def _get_find_peak_parameters(self, spec_number, peak_centre, unconstrained=False):
@@ -788,7 +795,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _create_parameter_table(self, peaks_table):
+  def _create_parameter_table_and_output_headers(self, peaks_table):
       """
         Create a table workspace with headers corresponding to the parameters
         output from fitting.
@@ -1069,7 +1076,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
       Output the fit workspace for each spectrum fitted.
     """
-    fit_workspaces = map(list, zip(*self._fit_workspaces))
+    fit_workspaces = map(list, zip(*self._peak_fit_workspaces_by_spec))
     group_ws_names = []
     for i, peak_fits in enumerate(fit_workspaces):
       ws_name = self._output_workspace_name + '_%d_Workspace' % i
