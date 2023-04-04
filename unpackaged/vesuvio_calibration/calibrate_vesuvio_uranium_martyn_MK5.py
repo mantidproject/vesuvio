@@ -671,7 +671,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     estimated_peak_positions_all_spec = self._estimate_peak_positions()
     num_estimated_peaks, num_spectra = estimated_peak_positions_all_spec.shape
 
-    self._prog_reporter = Progress(self, 0.0, 1.0, *num_spectra)
+    self._prog_reporter = Progress(self, 0.0, 1.0, num_spectra)
 
     self._output_parameter_tables = []
     self._peak_fit_workspaces_by_spec = []
@@ -679,7 +679,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
       self._peak_fit_workspaces = []
       for peak_index, peak_position in enumerate(estimated_peak_positions):
-        output_parameter_table_name, fit_workspace_name = self.fit_peak(spec_index, peak_index, peak_position)
+        fit_workspace_name, output_parameter_table_name = self._fit_peak(spec_index, peak_index, peak_position)
         self._output_parameter_tables.append(output_parameter_table_name)
         self._peak_fit_workspaces.append(fit_workspace_name)
 
