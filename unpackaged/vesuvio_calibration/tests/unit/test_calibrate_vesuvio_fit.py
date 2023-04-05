@@ -1,3 +1,5 @@
+import sys
+
 from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import EVSCalibrationFit, DETECTOR_RANGE, \
      ENERGY_ESTIMATE, BRAGG_PEAK_CROP_RANGE, BRAGG_FIT_WINDOW_RANGE, RECOIL_PEAK_CROP_RANGE, RECOIL_FIT_WINDOW_RANGE, \
      RESONANCE_PEAK_CROP_RANGE, RESONANCE_FIT_WINDOW_RANGE
@@ -415,6 +417,171 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                               SpectrumMin=spec_list[0], SpectrumMax=spec_list[-1],
                                               EnableLogging=False)
         mock_convert_to_dist.assert_called_once_with(output_name, EnableLogging=False)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
+    def test_fit_peaks(self, group_workspaces_mock):
+        alg = EVSCalibrationFit()
+        alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
+        alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
+        alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
+        alg._output_workspace_name = 'output_ws_name'
+        alg._fit_peaks()
+        alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
+                                                                         call('output_ws_name_Peak_1_Parameters')])
+        alg._fit_peak.assert_has_calls([call(0, 0, 5, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(0, 1, 10, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(0, 2, 15, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(1, 0, 2.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
+                                        call(1, 1, 7.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
+                                        call(1, 2, 10.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])])
+        self.assertEqual([['fit_ws_0_0', 'fit_ws_0_1', 'fit_ws_0_2'], ['fit_ws_1_0', 'fit_ws_1_1', 'fit_ws_1_2']],
+                         alg._peak_fit_workspaces)
+        group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters'],
+                                                      OutputWorkspace='output_ws_name_Peak_Parameters')
+
+    @staticmethod
+    def _setup_alg_mocks_fit_peak():
+        alg = EVSCalibrationFit()
+        alg._find_peaks_and_output_params = MagicMock(return_value='peak_params')
+        alg._build_function_string = MagicMock(return_value='function_string')
+        alg._find_fit_x_window = MagicMock(return_value=(0, 10))
+        alg._output_fit_params_to_table_ws = MagicMock()
+        alg._sample = 'sample'
+        alg._output_workspace_name = 'output'
+        alg._spec_list = [30]
+        alg._prog_reporter = MagicMock()
+        alg._del_fit_workspaces = MagicMock()
+
+        return alg
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.Fit')
+    def test_fit_peak(self, mock_fit):
+        alg = self._setup_alg_mocks_fit_peak()
+
+        fit_workspace = MagicMock()
+        fit_workspace.name.return_value = 'fws'
+        fit_results = ('success', 0.5, 'ncm', 'fit_params', fit_workspace, 'func', 'cost_func')
+        mock_fit.return_value = fit_results
+
+        fit_workspace_name = alg._fit_peak(0, 0, 5, 'output_Peak_0_Parameters', ['a', 'b', 'c'])
+
+        alg._find_peaks_and_output_params.assert_called_once_with(0, 30, 0, 5)
+        alg._build_function_string.assert_called_once_with('peak_params')
+        alg._find_fit_x_window.assert_called_once_with('peak_params')
+        mock_fit.assert_called_once_with(Function='function_string', InputWorkspace='sample',
+                                         IgnoreInvalidData=True, StartX=0, EndX=10, WorkspaceIndex=0,
+                                         CalcErrors=True, Output='__output_Peak_0_Spec_0',
+                                         Minimizer='Levenberg-Marquardt,RelError=1e-8')
+        alg._output_fit_params_to_table_ws.assert_called_once_with(30, 'fit_params', 'output_Peak_0_Parameters',
+                                                                   ['a', 'b', 'c'])
+        alg._del_fit_workspaces.assert_called_once_with('ncm', 'fit_params', fit_workspace)
+
+        self.assertEqual(fit_workspace_name, 'fws')
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.DeleteWorkspace')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.FindPeaks')
+    def test_find_peaks_and_output_params(self, find_peaks_mock, delete_workspace_mock, mtd_mock):
+        alg = EVSCalibrationFit()
+        alg._sample = 'sample'
+        find_peak_params_ret_val = {'a': 1, 'b': 2, 'c': 3}
+        alg._get_find_peak_parameters = MagicMock(return_value=find_peak_params_ret_val)
+        peak_table_name_ws = MagicMock()
+        peak_table_name_ws.rowCount.return_value = 5
+        mtd_mock.__getitem__.return_value = peak_table_name_ws
+
+        alg._find_peaks_and_output_params(0, 30, 3, 5)
+
+        alg._get_find_peak_parameters.assert_called_once_with(30, [5])
+        find_peaks_mock.assert_called_once_with(InputWorkspace='sample', WorkspaceIndex=3, PeaksList='__sample_peaks_table_0_3',
+                                                **find_peak_params_ret_val)
+        peak_table_name_ws.rowCount.assert_called_once()
+        delete_workspace_mock.assert_called_once_with('__sample_peaks_table_0_3')
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.sys')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.logger.error')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.FindPeaks')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._get_find_peak_parameters')
+    def test_find_peaks_and_output_params_no_peaks_found(self, find_peak_params_mock, find_peaks_mock, mtd_mock, logger_mock,
+                                                         sys_mock):
+        alg = EVSCalibrationFit()
+        alg._sample = 'sample'
+        find_peak_params_ret_val = {'a': 4, 'b': 5, 'c': 6}
+        find_peak_params_mock.return_value = find_peak_params_ret_val
+        peak_table_name_ws = MagicMock()
+        peak_table_name_ws.rowCount.return_value = 0
+        mtd_mock.__getitem__.return_value = peak_table_name_ws
+        sys_mock.exit.side_effect = Exception("Emulate Sys Exit")
+
+        with self.assertRaises(Exception):
+            alg._find_peaks_and_output_params(2, 32, 2, 7.5)
+
+        find_peak_params_mock.assert_called_once_with(32, [7.5])
+        find_peaks_mock.assert_called_once_with(InputWorkspace='sample', WorkspaceIndex=2, PeaksList='__sample_peaks_table_2_2',
+                                                **find_peak_params_ret_val)
+        peak_table_name_ws.rowCount.assert_called_once()
+        logger_mock.assert_called_once()
+        sys_mock.exit.assert_called_once()
+
+    def test_find_fit_x_window(self):
+        alg = EVSCalibrationFit()
+        alg._func_param_names = {'Position': 'Position_key'}
+        alg._fit_window_range = 2
+
+        xmin, xmax = alg._find_fit_x_window({'Position_key': 5})
+        self.assertEqual(3, xmin)
+        self.assertEqual(7, xmax)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.logger.warning')
+    def test_find_fit_x_window_position_less_than_1(self, logger_mock):
+        alg = EVSCalibrationFit()
+        alg._func_param_names = {'Position': 'Position_key'}
+        alg._fit_window_range = 2
+
+        xmin, xmax = alg._find_fit_x_window({'Position_key': 0})
+        self.assertEqual(None, xmin)
+        self.assertEqual(None, xmax)
+        logger_mock.assert_called_once()
+
+    def _params_column_side_effect(self, col_index):
+        if col_index == 0:
+            return ['a', 'b', 'c']
+        elif col_index == 1:
+            return [1, 2, 3]
+        elif col_index == 2:
+            return [0.1, 0.2, 0.3]
+        else:
+            raise ValueError("incorrect column index supplied")
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd')
+    def test_output_fit_params_to_table_ws(self, mtd_mock):
+        alg = EVSCalibrationFit()
+        spec_num = 45
+        params_mock = MagicMock()
+        params_mock.column.side_effect = self._params_column_side_effect
+        output_table_name = 'output_table'
+        output_table_headers = ['a', 'b', 'c']
+        output_table_ws_mock = MagicMock()
+        mtd_mock.__getitem__.return_value = output_table_ws_mock
+
+        alg._output_fit_params_to_table_ws(spec_num , params_mock, output_table_name, output_table_headers)
+        mtd_mock.__getitem__.assert_called_once_with(output_table_name)
+        output_table_ws_mock.addRow.assert_called_once_with([spec_num, 1, 0.1, 2, 0.2, 3, 0.3])
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.DeleteWorkspace')
+    def test_del_fit_workspace(self, del_ws_mock):
+        alg = EVSCalibrationFit()
+        alg._create_output = True
+        alg._del_fit_workspaces('ncm', 'params', 'fws')
+        del_ws_mock.assert_has_calls([call('ncm'), call('params')])
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.DeleteWorkspace')
+    def test_del_fit_workspace_create_output_true(self, del_ws_mock):
+        alg = EVSCalibrationFit()
+        alg._create_output = False
+        alg._del_fit_workspaces('ncm', 'params', 'fws')
+        del_ws_mock.assert_has_calls([call('ncm'), call('params'), call('fws')])
 
 
 if __name__ == '__main__':
