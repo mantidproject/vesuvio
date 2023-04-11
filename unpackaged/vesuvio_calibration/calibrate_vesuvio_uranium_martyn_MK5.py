@@ -1378,6 +1378,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       which have lost foil coverage following a recent reduction in distance from source to detectors.
 
       @param peak_table - name of table containing fitted parameters each spectra.
+      @param peak_centres - a list of the found peak centres
+      @param peak_centres_errors - a list of errors associated with the peak centres
       @param spec_list - spectrum range to inspect.
       @return a list of invalid spectra.
     """
