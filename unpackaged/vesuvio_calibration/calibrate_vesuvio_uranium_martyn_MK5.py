@@ -1359,6 +1359,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
     peak_centres[invalid_spectra] = np.nan
 
+    print(f'Invalid Spectra Index Found and Marked NAN: {invalid_spectra.flatten()} from Spectra Index List:'
+          f'{[x-3 for x in spec_list]}')
+
     delta_t = (peak_centres - t0) / 1e+6
     delta_t_error = t0_error / 1e+6
 
