@@ -1414,6 +1414,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param table_name - name of table containing fitted parameters for the peak centres
       @param spec_list - spectrum range to calculate t0 for.
     """
+    import pydevd_pycharm
+    pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
+
     t0 = read_table_column(self._current_workspace, 't0', spec_list)
     L0 = read_table_column(self._current_workspace, 'L0', spec_list)
     L1 = read_table_column(self._param_table, 'L1', spec_list)
