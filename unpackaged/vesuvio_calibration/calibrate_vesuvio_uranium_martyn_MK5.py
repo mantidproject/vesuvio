@@ -12,7 +12,7 @@ from mantid.kernel import StringArrayProperty, Direction, StringListValidator, I
      FloatArrayBoundedValidator, FloatArrayMandatoryValidator, StringMandatoryValidator, IntBoundedValidator,\
      FloatArrayProperty, logger
 from mantid.api import FileProperty, FileAction, ITableWorkspaceProperty, PropertyMode, Progress, TextAxis, PythonAlgorithm, \
-     AlgorithmFactory, WorkspaceFactory, AlgorithmManager
+     AlgorithmFactory, WorkspaceFactory, AlgorithmManager, AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWorkspace, RebinToWorkspace, Divide,\
      ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution,\
      FindPeakBackground, ExtractSingleSpectrum, SumSpectra, AppendSpectra, ConvertTableToMatrixWorkspace,\
@@ -397,19 +397,19 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_results = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions, find_peaks_output_name,
                                                  fit_peaks_output_name)
 
-        fit_results_u = None
-        if not fit_results['status'] == "success":
+        fit_results_unconstrained = None
+        if fit_results['status'] != "success":
             self._prog_reporter.report("Fitting to spectrum %d without constraining parameters" % spec_number)
-            fit_results_u = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions, find_peaks_output_name,
-                                                       fit_peaks_output_name, unconstrained=True,
-                                                       x_range=(fit_results['xmin'], fit_results['xmax']))
+            fit_results_unconstrained = self._fit_peaks_to_spectra(index, spec_number, estimated_peak_positions, find_peaks_output_name,
+                                                                   fit_peaks_output_name, unconstrained=True,
+                                                                   x_range=(fit_results['xmin'], fit_results['xmax']))
 
-        selected_params, unconstrained_fit_selected = self._select_best_fit_params(spec_number, fit_results, fit_results_u)
+        selected_params, unconstrained_fit_selected = self._select_best_fit_params(spec_number, fit_results, fit_results_unconstrained)
 
         self._output_params_to_table(spec_number, num_estimated_peaks, selected_params, output_parameters_tbl_name)
 
         output_workspaces.append(
-            self._get_output_and_clean_workspaces(fit_results_u is not None, unconstrained_fit_selected, find_peaks_output_name,
+            self._get_output_and_clean_workspaces(fit_results_unconstrained is not None, unconstrained_fit_selected, find_peaks_output_name,
                                                   fit_peaks_output_name))
 
     if self._create_output:
@@ -420,13 +420,14 @@ class EVSCalibrationFit(PythonAlgorithm):
       return ws_name + '_unconstrained'
 
   def _create_output_parameters_table_ws(self, output_table_name, num_estimated_peaks):
-    CreateEmptyTableWorkspace(OutputWorkspace=output_table_name)
+    table = CreateEmptyTableWorkspace()
 
     col_headers = self._generate_column_headers(num_estimated_peaks)
 
-    mtd[output_table_name].addColumn('int', 'Spectrum')
+    table.addColumn('int', 'Spectrum')
     for name in col_headers:
-        mtd[output_table_name].addColumn('double', name)
+        table.addColumn('double', name)
+    AnalysisDataService.addOrReplace(output_table_name, table)
 
   def _generate_column_headers(self, num_estimated_peaks):
     param_names = self._get_param_names(num_estimated_peaks)

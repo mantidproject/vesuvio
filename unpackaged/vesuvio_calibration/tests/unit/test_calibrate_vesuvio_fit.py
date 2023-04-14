@@ -470,17 +470,18 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_convert_to_dist.assert_called_once_with(output_name, EnableLogging=False)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.CreateEmptyTableWorkspace')
-    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.mtd', new_callable=dict)
-    def test_create_output_parameters_table_ws(self, mock_mtd_module, mock_create_empty_table_ws):
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.AnalysisDataService')
+    def test_create_output_parameters_table_ws(self, mock_ADS, mock_create_empty_table_ws):
         output_table_name = 'test_output_table'
         num_estimated_peaks = 3
         alg = EVSCalibrationFit()
         alg._generate_column_headers = MagicMock(return_value=['col1', 'col2', 'col3'])
         mock_output_table = MagicMock()
-        mock_mtd_module[output_table_name] = mock_output_table
+        mock_create_empty_table_ws.return_value = mock_output_table
 
         alg._create_output_parameters_table_ws(output_table_name, num_estimated_peaks)
-        mock_create_empty_table_ws.assert_called_once_with(OutputWorkspace=output_table_name)
+        mock_create_empty_table_ws.assert_called_once()
+        mock_ADS.addOrReplace.assert_called_once_with(output_table_name, mock_output_table)
 
         mock_output_table.addColumn.assert_any_call('int', 'Spectrum')
         for name in ['col1', 'col2', 'col3']:
