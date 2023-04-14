@@ -12,6 +12,7 @@ from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import 
                                                                                   U_FRONTSCATTERING_SAMPLE, U_FRONTSCATTERING_BACKGROUND,
                                                                                   U_BACKSCATTERING_SAMPLE, U_BACKSCATTERING_BACKGROUND,
                                                                                   U_MASS, U_PEAK_ENERGIES)
+from copy import copy
 
 
 D_SPACINGS_COPPER = [2.0865, 1.807, 1.278, 1.0897]
@@ -23,7 +24,8 @@ MASS_LEAD = 207.19
 MASS_NIOBIUM = 92.906
 
 DEFAULT_RELATIVE_TOLERANCE = 0.1
-IGNORE_DETECTOR = 100
+IGNORE_DETECTOR = 100  # Detectors to be ignored by the system test, as specified by the user
+INVALID_DETECTOR = 101  # Detectors identified as invalid by the script
 
 
 class EVSCalibrationTest(unittest.TestCase):
@@ -207,7 +209,12 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.65, 170: 0.75}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                             165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_lead(self, load_file_mock):
@@ -217,7 +224,12 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: 0.70}, "Theta": {156: 0.19}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.25, 170: 0.70}, "Theta": {156: 0.19}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [137, 141, 143, 144, 145, 146, 161, 170, 171,
+                                                                             178, 180, 182, 183]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_niobium(self, load_file_mock):
@@ -227,7 +239,15 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: IGNORE_DETECTOR, 171: IGNORE_DETECTOR}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.25, 170: IGNORE_DETECTOR, 171: IGNORE_DETECTOR}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [3, 41, 44, 48, 49, 65, 73, 89, 99, 100, 102,
+                                                                             110, 114, 118, 123, 126, 131, 138, 141, 143,
+                                                                             146, 147, 151, 154, 156, 157, 159, 160, 162,
+                                                                             163, 166, 170, 171, 172, 178, 179, 180, 181,
+                                                                             182, 186, 187, 189, 191]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_uranium(self, load_file_mock):
@@ -237,7 +257,12 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: 0.75}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.25, 170: 0.75}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                             165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_lead_with_uranium(self, load_file_mock):
@@ -247,7 +272,12 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: 0.7}, "Theta": {156: 0.19}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.25, 170: 0.70}, "Theta": {156: 0.19}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [137, 141, 143, 144, 145, 146, 161, 170, 171,
+                                                                             178, 180, 182, 183]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_l0_calc(self, load_file_mock):
@@ -262,7 +292,12 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.45, 170: 0.75, 171: 0.15, 178: 0.15}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.45, 170: 0.75, 171: 0.15, 178: 0.15}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                             165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
     def test_copper_with_multiple_iterations(self, load_file_mock):
@@ -276,7 +311,13 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self.run_evs_calibration_analysis()
-        self.assert_parameters_match_expected(params_table, {"L1": {116: 0.25, 170: IGNORE_DETECTOR}})
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.25, 170: IGNORE_DETECTOR}, "Theta": {156: 0.14, 158: 0.14, 167: 0.2,
+                                                                                       170: 0.5, 182: 0.3}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                             165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     def tearDown(self):
         mtd.clear()
@@ -297,9 +338,16 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         L1 = params_table.column('L1')
         actual_L1 = self._calibrated_params['L1']
 
-        self.assertFalse(np.isnan(L1).any())
+        #  Filter invalid detectors then mask
+        invalid_detectors = [(k, rel_tolerance.pop(k))[0] for k, v in copy(rel_tolerance).items() if v == INVALID_DETECTOR]
+        invalid_detector_mask = np.zeros(len(L1))
+        for index in invalid_detectors:
+            invalid_detector_mask[index] = 1
+
+        self.assertFalse(np.isnan(np.ma.masked_array(L1, mask=invalid_detector_mask)).any())
         self.assertFalse(np.isinf(L1).any())
-        return _assert_allclose_excluding_bad_detectors(actual_L1, L1, rel_tolerance)
+        return _assert_allclose_excluding_bad_detectors(np.ma.masked_array(actual_L1, mask=invalid_detector_mask),
+                                                        np.ma.masked_array(L1, mask=invalid_detector_mask), rel_tolerance)
 
     def assert_parameters_match_expected(self, params_table, tolerances=None):
         rel_tol_theta, rel_tol_L1 = self._extract_tolerances(tolerances)
@@ -316,6 +364,8 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         if tolerances:
             if "Theta" in tolerances:
                 theta_tol = tolerances["Theta"]
+                if INVALID_DETECTOR in theta_tol.values():
+                    raise ValueError('INVALID DETECTORS ONLY RELATE TO L1 TOLERANCES')
             if "L1" in tolerances:
                 L1_tol = tolerances["L1"]
         return theta_tol, L1_tol
@@ -550,6 +600,8 @@ def _assert_allclose_excluding_bad_detectors(expected_position, position, rtol, 
     np.set_printoptions(threshold=sys.maxsize)
     test_failures = []
     for i, (elem_m, elem_n) in enumerate(zip(expected_position, position)):
+        if np.ma.is_masked(elem_m) and np.ma.is_masked(elem_n):  # detector masked
+            break
         detector_specific_rtol = rtol[i] if i in rtol else default_rtol
         try:
             np.testing.assert_allclose(elem_m, elem_n, detector_specific_rtol, atol=0)

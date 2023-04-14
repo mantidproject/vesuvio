@@ -61,7 +61,7 @@ PEAK_TYPES = ["Resonance", "Recoil", "Bragg"]
 # self._fit_window_range applies bith to fitting the resonances and the lead recoil peaks
 # it is defined as the range left and right from the peak centre (i. e. the whole fitting window is twice the fitting range)
 
-BRAGG_PEAK_CROP_RANGE = (2000, 17000)
+BRAGG_PEAK_CROP_RANGE = (2000, 20000)
 BRAGG_FIT_WINDOW_RANGE = 500
 BRAGG_PEAK_POSITION_TOLERANCE = 1000
 
@@ -930,7 +930,9 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._d_spacings = self._d_spacings.reshape(1, self._d_spacings.size).T
 
     lambdas = 2 * self._d_spacings * np.sin(np.radians(thetas) / 2)
-    tof = (lambdas * scipy.constants.m_n * (L0 + L1)) / scipy.constants.h + t0
+    
+    L1_nan_to_num = np.nan_to_num(L1)
+    tof = (lambdas * scipy.constants.m_n * (L0 + L1_nan_to_num)) / scipy.constants.h + t0
     tof *= 1e+6
 
     return tof
@@ -1218,6 +1220,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self.declareProperty(FloatArrayProperty('DSpacings', [], greaterThanZero, Direction.Input),
       doc="List of d-spacings used to estimate the positions of peaks in TOF.")
 
+    self.declareProperty(FloatArrayProperty('E1FixedValueAndError', [], greaterThanZero, Direction.Input),
+      doc="Value at which to fix E1 and E1 error (form: E1 value, E1 Error). If no input is provided, values will be calculated.")
+
     self.declareProperty('Iterations', 2, validator=IntBoundedValidator(lower=1),
       doc="Number of iterations to perform. Default is 2.")
 
@@ -1422,24 +1427,57 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     r_theta = calculate_r_theta(self._sample_mass, theta)
     
     peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
+    peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+    invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+    peak_centres[invalid_spectra] = np.nan
 
+    print(f'Invalid Spectra Index Found and Marked NAN: {invalid_spectra.flatten()} from Spectra Index List:'
+          f'{[x-3 for x in spec_list]}')
 
     delta_t = (peak_centres - t0) / 1e+6
-    
     delta_t_error = t0_error / 1e+6
-
 
     E1 *= MEV_CONVERSION
     v1 = np.sqrt(2*E1/scipy.constants.m_n)
     L1 = v1 * delta_t - L0 * r_theta
     L1_error = v1 * delta_t_error 
 
-
-
     self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
     self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
 
 #----------------------------------------------------------------------------------------
+
+  def _identify_invalid_spectra(self, peak_table, peak_centres, peak_centres_errors, spec_list):
+    """
+      Inspect fitting results, and identify the fits associated with invalid spectra. These are spectra associated with detectors
+      which have lost foil coverage following a recent reduction in distance from source to detectors.
+
+      @param peak_table - name of table containing fitted parameters each spectra.
+      @param peak_centres - a list of the found peak centres
+      @param peak_centres_errors - a list of errors associated with the peak centres
+      @param spec_list - spectrum range to inspect.
+      @return a list of invalid spectra.
+    """
+    peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
+    peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
+    peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
+    peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
+    peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
+    peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
+
+    invalid_spectra = np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
+    (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
+    (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
+    (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
+    (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
+    (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
+    (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
+    (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
+    (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
+
+    return invalid_spectra
+
+ # ----------------------------------------------------------------------------------------
 
   def _calculate_scattering_angle(self, table_name, spec_list):
     """
@@ -1448,9 +1486,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param table_name - name of table containing fitted parameters for the peak centres
       @param spec_list - spectrum range to calculate t0 for.
     """
+
     t0 = read_table_column(self._current_workspace, 't0', spec_list)
     L0 = read_table_column(self._current_workspace, 'L0', spec_list)
     L1 = read_table_column(self._param_table, 'L1', spec_list)
+    L1_nan_to_num = np.nan_to_num(L1)
     spec = read_table_column(self._current_workspace, 'Spectrum', spec_list)
 
     t0 /= 1e+6
@@ -1471,7 +1511,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     masked_peak_centres = np.ma.masked_array(peak_centres, np.logical_or(peak_centres<=2000,peak_centres>=20000)) 
     masked_peak_centres /=  1e+6
 
-    sin_theta = ((masked_peak_centres - t0) * scipy.constants.h) / (scipy.constants.m_n * d_spacings * 2 * (L0+L1))
+    sin_theta = ((masked_peak_centres - t0) * scipy.constants.h) / (scipy.constants.m_n * d_spacings * 2 * (L0+L1_nan_to_num))
     theta = np.arcsin(sin_theta) * 2
     theta = np.degrees(theta)
 
@@ -1492,32 +1532,42 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param table_name - name of table containing fitted parameters for the peak centres
       @param spec_list - spectrum range to calculate t0 for.
     """
-    t0 = read_table_column(self._current_workspace, 't0', spec_list)
-    L0 = read_table_column(self._current_workspace, 'L0', spec_list)
 
-    L1 = read_table_column(self._param_table, 'L1', spec_list)
-    theta = read_table_column(self._current_workspace, 'theta', spec_list)
-    r_theta = calculate_r_theta(self._sample_mass, theta)
-
-    peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
-
-    delta_t = (peak_centres - t0) / 1e+6
-    v1 = (L0 * r_theta + L1) / delta_t
-
-    E1 = 0.5*scipy.constants.m_n*v1**2
-    E1 /= MEV_CONVERSION
-    
-
-    spec_range = DETECTOR_RANGE[1]+1 - DETECTOR_RANGE[0]
+    spec_range = DETECTOR_RANGE[1] + 1 - DETECTOR_RANGE[0]
     mean_E1 = np.empty(spec_range)
     E1_error = np.empty(spec_range)
 
-    mean_E1.fill(np.mean(E1))
-    E1_error.fill(scipy.stats.sem(E1))
+    if not self._E1_value_and_error:
+        t0 = read_table_column(self._current_workspace, 't0', spec_list)
+        L0 = read_table_column(self._current_workspace, 'L0', spec_list)
+
+        L1 = read_table_column(self._param_table, 'L1', spec_list)
+        theta = read_table_column(self._current_workspace, 'theta', spec_list)
+        r_theta = calculate_r_theta(self._sample_mass, theta)
+
+        peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
+        peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+
+        invalid_spectra = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+        peak_centres[invalid_spectra] = np.nan
+
+        delta_t = (peak_centres - t0) / 1e+6
+        v1 = (L0 * r_theta + L1) / delta_t
+
+        E1 = 0.5*scipy.constants.m_n*v1**2
+        E1 /= MEV_CONVERSION
+
+        mean_E1_val = np.nanmean(E1)
+        E1_error_val = np.nanstd(E1)
+    else:
+        mean_E1_val = self._E1_value_and_error[0]
+        E1_error_val = self._E1_value_and_error[1]
+    
+    mean_E1.fill(mean_E1_val)
+    E1_error.fill(E1_error_val)
 
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
-
 
 #----------------------------------------------------------------------------------------
 
@@ -1530,6 +1580,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self._param_file = self.getProperty("InstrumentParameterFile").value
     self._sample_mass = self.getProperty("Mass").value
     self._d_spacings = self.getProperty("DSpacings").value.tolist()
+    self._E1_value_and_error = self.getProperty("E1FixedValueAndError").value.tolist()
     self._calc_L0 = self.getProperty("CalculateL0").value
     self._make_IP_file = self.getProperty("CreateIPFile").value
     self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
@@ -1642,7 +1693,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       @param ws_name - name of the workspace to save the IP file from.
       @param spec_list - spectrum range to save to file.
     """
-    file_header = '\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1']) + '\n'
+    file_header = '\t'.join(['plik', 'det', 'theta', 't0', 'L0', 'L1'])
     fmt = "%d  %d  %.4f  %.4f  %.3f  %.4f"
 
     det = read_table_column(ws_name, 'Spectrum', spec_list)
@@ -1655,14 +1706,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     file_data = np.asarray([[1,1,0,0,0,0], [2,2,0,0,0,0]])
     file_data = np.append(file_data, np.column_stack((det, det, theta, t0, L0, L1)), axis=0)
 
-    #workdir = config['defaultsave.directory']
-    workdir='C:\\Repos\\GitHub\Working Files\\VesuvioCalibrationScript\\VesuvioCalibration\\VesuvioCalibration\\uranium calibration and IP files'
-    #workdir='K:\\Neutron_computations\\MANTID\Mantid Vesuvio Calibration 2015\\uranium calibration and IP files'
+    workdir = config['defaultsave.directory']
     file_path = os.path.join(workdir, self._output_workspace_name+'.par')
 
     with open(file_path, 'wb') as f_handle:
-      f_handle.write(file_header)
-      np.savetxt(f_handle, file_data, fmt=fmt)
+      np.savetxt(f_handle, file_data, header = file_header, fmt=fmt)
 
 #----------------------------------------------------------------------------------------
 
