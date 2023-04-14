@@ -1,7 +1,7 @@
 from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import EVSCalibrationFit, DETECTOR_RANGE, \
      ENERGY_ESTIMATE, BRAGG_PEAK_CROP_RANGE, BRAGG_FIT_WINDOW_RANGE, RECOIL_PEAK_CROP_RANGE, RECOIL_FIT_WINDOW_RANGE, \
      RESONANCE_PEAK_CROP_RANGE, RESONANCE_FIT_WINDOW_RANGE
-from mock import MagicMock, patch
+from mock import MagicMock, patch, call
 from functools import partial
 from mantid.kernel import IntArrayProperty, StringArrayProperty, FloatArrayProperty
 
@@ -463,6 +463,128 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._setup_peaks_and_set_crop_and_fit_ranges()
         self.assertEqual(RESONANCE_PEAK_CROP_RANGE, alg._ws_crop_range)
         self.assertEqual(RESONANCE_FIT_WINDOW_RANGE, alg._fit_window_range)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.ReplaceSpecialValues')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_to_ads_and_crop')
+    def test_preprocess_no_bg(self, mock_load_to_ads_and_crop, mock_replace_special_values):
+        test_run_numbers = [1, 2, 3, 4]
+        test_crop_range = [3, 10]
+        test_sample_ws_name = "test_ws"
+
+        alg = EVSCalibrationFit()
+        alg._ws_crop_range = test_crop_range
+        alg._sample_run_numbers = test_run_numbers
+        alg._sample = test_sample_ws_name
+        alg._bkg_run_numbers = []
+        alg._preprocess()
+        mock_load_to_ads_and_crop.assert_called_once_with(test_run_numbers, test_sample_ws_name, test_crop_range[0],
+                                                          test_crop_range[-1])
+        mock_replace_special_values.assert_called_once_with(test_sample_ws_name, NaNValue=0, NaNError=0, InfinityValue=0,
+                                                            InfinityError=0, OutputWorkspace=test_sample_ws_name)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._normalise_sample_by_background')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.ReplaceSpecialValues')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_to_ads_and_crop')
+    def test_preprocess_with_bg(self, mock_load_to_ads_and_crop, mock_replace_special_values, mock_normalise_sample):
+        test_run_numbers = [1, 2, 3, 4]
+        test_bg_run_numbers = [5, 6]
+        test_crop_range = [3, 10]
+        test_sample_ws_name = "test_ws"
+
+        alg = EVSCalibrationFit()
+        alg._ws_crop_range = test_crop_range
+        alg._sample_run_numbers = test_run_numbers
+        alg._sample = test_sample_ws_name
+        alg._bkg_run_numbers = test_bg_run_numbers
+        alg._background = test_bg_run_numbers[0]
+        alg._preprocess()
+        mock_load_to_ads_and_crop.assert_has_calls([call(test_run_numbers, test_sample_ws_name, test_crop_range[0],
+                                                         test_crop_range[-1]),
+                                                    call(test_bg_run_numbers, test_bg_run_numbers[0], test_crop_range[0],
+                                                         test_crop_range[-1])])
+        mock_normalise_sample.assert_called_once()
+        mock_replace_special_values.assert_called_once_with(test_sample_ws_name, NaNValue=0, NaNError=0, InfinityValue=0,
+                                                            InfinityError=0, OutputWorkspace=test_sample_ws_name)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.CropWorkspace')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_files')
+    def test_load_to_ads_and_crop(self, mock_load_files, mock_crop_workspace):
+        alg = EVSCalibrationFit()
+        run_numbers = [1, 2, 3, 4]
+        output = "test_ws"
+        xmin = 3
+        xmax = 10
+
+        alg._load_to_ads_and_crop(run_numbers, output, xmin, xmax)
+        mock_load_files.assert_called_once_with(run_numbers, output)
+        mock_crop_workspace.assert_called_once_with(output, XMin=xmin, XMax=xmax, OutputWorkspace=output)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.DeleteWorkspace')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.Divide')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.RebinToWorkspace')
+    def test_normalise_sample_by_background(self, mock_rebin, mock_divide, mock_delete):
+        alg = EVSCalibrationFit()
+        sample_ws = 'test_ws'
+        bg_ws = 'bg_ws'
+
+        alg._sample = sample_ws
+        alg._background = bg_ws
+
+        alg._normalise_sample_by_background()
+        mock_rebin.assert_called_once_with(WorkspaceToRebin=bg_ws, WorkspaceToMatch=sample_ws, OutputWorkspace=bg_ws)
+        mock_divide.assert_called_once_with(sample_ws, bg_ws, OutputWorkspace=sample_ws)
+        mock_delete.assert_called_once_with(bg_ws)
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.DeleteWorkspace')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.Plus')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
+    def test_load_files(self, mock_load_file, mock_plus, mock_delete):
+        alg = EVSCalibrationFit()
+        ws_numbers = ['1-4']  # Note this is parsed as '1-3', is this intentional?
+        output_name = 'test_ws'
+        alg._load_files(ws_numbers, output_name)
+        mock_load_file.assert_has_calls([call('1', output_name), call('2', '__EVS_calib_temp_ws'),
+                                         call('3', '__EVS_calib_temp_ws')])
+        mock_plus.assert_has_calls([call(output_name, '__EVS_calib_temp_ws', OutputWorkspace=output_name),
+                                    call(output_name, '__EVS_calib_temp_ws', OutputWorkspace=output_name)])
+        mock_delete.assert_has_calls([call('__EVS_calib_temp_ws'), call('__EVS_calib_temp_ws')])
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.LoadRaw')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.LoadVesuvio')
+    def test_load_file_vesuvio(self, mock_load_vesuvio, mock_load_raw):
+        alg = EVSCalibrationFit()
+        ws_name = 'test_file'
+        output_name = 'test_ws'
+        mode = 'FoilOut'
+        spec_list = [3, 4, 5, 6]
+        alg._mode = mode
+        alg._spec_list = spec_list
+
+        alg._load_file(ws_name, output_name)
+        mock_load_vesuvio.assert_called_once_with(Filename=ws_name, Mode=mode, OutputWorkspace=output_name,
+                                                  SpectrumList="%d-%d" % (spec_list[0], spec_list[-1]),
+                                                  EnableLogging=False)
+        mock_load_raw.assert_not_called()
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.ConvertToDistribution')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.LoadRaw')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.LoadVesuvio')
+    def test_load_file_raw(self, mock_load_vesuvio, mock_load_raw, mock_convert_to_dist):
+        alg = EVSCalibrationFit()
+        ws_name = 'test_file'
+        output_name = 'test_ws'
+        mode = 'FoilOut'
+        spec_list = [3, 4, 5, 6]
+        alg._mode = mode
+        alg._spec_list = spec_list
+        mock_load_vesuvio.side_effect = RuntimeError()
+
+        alg._load_file(ws_name, output_name)
+        mock_load_raw.assert_called_once_with('EVS' + ws_name + '.raw', OutputWorkspace=output_name,
+                                              SpectrumMin=spec_list[0], SpectrumMax=spec_list[-1],
+                                              EnableLogging=False)
+        mock_convert_to_dist.assert_called_once_with(output_name, EnableLogging=False)
+
 
 if __name__ == '__main__':
     unittest.main()
