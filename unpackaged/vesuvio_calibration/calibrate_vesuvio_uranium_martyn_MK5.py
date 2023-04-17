@@ -16,7 +16,8 @@ from mantid.api import FileProperty, FileAction, ITableWorkspaceProperty, Proper
 from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWorkspace, RebinToWorkspace, Divide,\
      ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution,\
      FindPeakBackground, ExtractSingleSpectrum, SumSpectra, AppendSpectra, ConvertTableToMatrixWorkspace,\
-     ConjoinWorkspaces, Transpose, PlotPeakByLogValue, CloneWorkspace, Fit, RenameWorkspace
+     ConjoinWorkspaces, Transpose, PlotPeakByLogValue, CloneWorkspace, Fit, RenameWorkspace, MaskDetectors,\
+     ExtractUnmaskedSpectra, CreateWorkspace
 
 from functools import partial
 
@@ -780,8 +781,8 @@ class EVSCalibrationFit(PythonAlgorithm):
       output_parameter_table_name = self._output_workspace_name + '_Peak_%d_Parameters' % peak_index
       output_parameter_table_headers = self._create_parameter_table_and_output_headers(output_parameter_table_name)
       for spec_index, peak_position in enumerate(estimated_peak_positions):
-        fit_workspace_name = self._fit_peak(peak_index, spec_index, peak_position, output_parameter_table_name,
-                                            output_parameter_table_headers)
+        fit_workspace_name, x_range = self._fit_peak(peak_index, spec_index, peak_position, output_parameter_table_name,
+                                                     output_parameter_table_headers)
         self._peak_fit_workspaces_by_spec.append(fit_workspace_name)
 
       self._output_parameter_tables.append(output_parameter_table_name)
@@ -804,7 +805,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         peak_centres = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
         peak_centres_errors = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err', self._spec_list)
         invalid_spectra = identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors, self._spec_list)
-        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers)
+        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers, output_parameter_table_name, x_range)
 
   def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name, output_parameter_table_headers):
     spec_number = self._spec_list[0] + spec_index
@@ -825,7 +826,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     fit_workspace_name = fws.name()
     self._del_fit_workspaces(ncm, fit_params, fws)
 
-    return fit_workspace_name
+    return fit_workspace_name, (xmin, xmax)
 
   def _find_peaks_and_output_params(self, peak_index, spec_number, spec_index, peak_position):
     peak_table_name = '__' + self._sample + '_peaks_table_%d_%d' % (peak_index, spec_index)
@@ -867,12 +868,14 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _fit_shared_parameter(self, invalid_spectra, initial_params, param_names):
+  def _fit_shared_parameter(self, invalid_spectra, initial_params, param_names, old_peak_table, x_range):
     """
       Fit peaks to all detectors, with one set of fit parameters for all detectors.
     """
-    
+
     peaks_table = '__' + self._sample + '_peaks_table'
+    CloneWorkspace(InputWorkspace=old_peak_table, OutputWorkspace=peaks_table)
+    mtd[peaks_table].setRowCount(0)
 
     fit_func = self._build_function_string(initial_params)
     start_str = 'composite=MultiDomainFunction, NumDeriv=1;'
@@ -889,14 +892,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     
     fit_output_name = '__' + self._output_workspace_name + '_Peak_0'
 
-    #find x window
-    xmin, xmax = None, None
-    position = '' + self._func_param_names['Position']
-    if peak_params[position] > 0:
-      xmin = peak_params[position]-self._fit_window_range
-      xmax = peak_params[position]+self._fit_window_range
-    else:
-      logger.warning('Could not specify fit window. Using full spectrum x range.')
+    xmin, xmax = x_range
 
     # create new workspace for each spectra
     x = validSpecs.readX(0)
@@ -944,8 +940,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     #self._fit_workspaces = self._peak_fit_workspaces
     
     GroupWorkspaces(self._parameter_tables, OutputWorkspace=self._output_workspace_name + '_Shared_Peak_Parameters')
- 
->>>>>>> 1b75c5c (add function for shared parameter fitting)
+
 #----------------------------------------------------------------------------------------
     
   def _get_find_peak_parameters(self, spec_number, peak_centre, unconstrained=False):
