@@ -295,7 +295,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     self.declareProperty('OutputWorkspace', '', StringMandatoryValidator(),
       doc="Name to call the output workspace.")
       
-    self.declareProperty('CalculateSharedParameter', False, doc='Calculate shared parameter across all detectors')
+    self.declareProperty('GlobalFitSharedParameter', False, doc='Perform a global fit to calculate shared parameter across all detectors')
 
 #----------------------------------------------------------------------------------------
 
@@ -334,7 +334,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._energy_estimates = self.getProperty("Energy").value
     self._sample_mass = self.getProperty("Mass").value
     self._create_output = self.getProperty("CreateOutput").value
-    self._calculate_shared_parameter = self.getProperty("CalculateSharedParameter").value
+    self._global_fit_shared_parameter = self.getProperty("GlobalFitSharedParameter").value
 
   def _setup_spectra_list(self):
     self._spec_list = self.getProperty("SpectrumRange").value.tolist()
@@ -790,7 +790,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
-    if self._calculate_shared_parameter == True:
+    if self._global_fit_shared_parameter == True:
         init_Gaussian_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.GaussianFWHM', self._spec_list)
         init_Gaussian_FWHM = np.nanmean(init_Gaussian_FWHM[init_Gaussian_FWHM != 0])
         init_Lorentz_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzFWHM', self._spec_list)
@@ -1429,7 +1429,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       E1_fit_back = self._current_workspace + '_E1_back'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=BACKSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
-                                PeakType='Recoil', CalculateSharedParameter=True)
+                                PeakType='Recoil', GlobalFitSharedParameter=False)
       
       E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
       self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE)
@@ -1441,7 +1441,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       E1_fit_front = self._current_workspace + '_E1_front'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=FRONTSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
-                                PeakType='Recoil', CalculateSharedParameter=True)
+                                PeakType='Recoil', GlobalFitSharedParameter=False)
       
       E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
       self._calculate_final_flight_path(E1_peak_fits_front[0], FRONTSCATTERING_RANGE)
