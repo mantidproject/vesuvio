@@ -286,6 +286,10 @@ class EVSCalibrationFit(PythonAlgorithm):
                          doc='Choose the peak type that is being fitted.'
                          'Note that supplying a set of dspacings overrides the setting here')
 
+    shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+    self.declareProperty('SharedParameterFitType', "Individual", doc='Calculate shared parameters using an individual and/or'
+                                                              'global fit.', validator=shared_fit_type_validator)
+
     self.declareProperty(ITableWorkspaceProperty("InstrumentParameterWorkspace", "", Direction.Input, PropertyMode.Optional),
       doc='Workspace contain instrument parameters.')
 
@@ -294,8 +298,6 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     self.declareProperty('OutputWorkspace', '', StringMandatoryValidator(),
       doc="Name to call the output workspace.")
-      
-    self.declareProperty('GlobalFitSharedParameter', False, doc='Perform a global fit to calculate shared parameter across all detectors')
 
 #----------------------------------------------------------------------------------------
 
@@ -334,7 +336,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._energy_estimates = self.getProperty("Energy").value
     self._sample_mass = self.getProperty("Mass").value
     self._create_output = self.getProperty("CreateOutput").value
-    self._global_fit_shared_parameter = self.getProperty("GlobalFitSharedParameter").value
+    self._global_fit_shared_parameter = self.getProperty("SharedParameterFitType").value
 
   def _setup_spectra_list(self):
     self._spec_list = self.getProperty("SpectrumRange").value.tolist()
@@ -1357,6 +1359,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self.declareProperty('Iterations', 2, validator=IntBoundedValidator(lower=1),
       doc="Number of iterations to perform. Default is 2.")
 
+    shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+    self.declareProperty('SharedParameterFitType', "Individual", doc='Calculate shared parameters using an individual and/or'
+                                                              'global fit.', validator=shared_fit_type_validator)
+
     self.declareProperty('CreateOutput', False,
       doc="Whether to create output from fitting.")
 
@@ -1429,7 +1435,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       E1_fit_back = self._current_workspace + '_E1_back'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=BACKSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
-                                PeakType='Recoil', GlobalFitSharedParameter=False)
+                                PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type)
       
       E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
       self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE)
@@ -1441,7 +1447,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       E1_fit_front = self._current_workspace + '_E1_front'
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=FRONTSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
-                                PeakType='Recoil', GlobalFitSharedParameter=False)
+                                PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type)
       
       E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
       self._calculate_final_flight_path(E1_peak_fits_front[0], FRONTSCATTERING_RANGE)
@@ -1731,6 +1737,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     self._sample_mass = self.getProperty("Mass").value
     self._d_spacings = self.getProperty("DSpacings").value.tolist()
     self._E1_value_and_error = self.getProperty("E1FixedValueAndError").value.tolist()
+    self._shared_parameter_fit_type = self.getProperty("SharedParameterFitType").value
     self._calc_L0 = self.getProperty("CalculateL0").value
     self._make_IP_file = self.getProperty("CreateIPFile").value
     self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
