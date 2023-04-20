@@ -1432,10 +1432,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                                 PeakType='Recoil', CalculateSharedParameter=True)
       
       E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
-      self._calculate_final_energy(E1_peak_fits_back[0], BACKSCATTERING_RANGE)
+      self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE)
       
       # calibrate L1 for backscattering detectors based on the averaged E1 value  and calibrated theta values 
-      self._calculate_final_flight_path(E1_peak_fits_back, BACKSCATTERING_RANGE)
+      self._calculate_final_flight_path(E1_peak_fits_back[0], BACKSCATTERING_RANGE)
       
       # calibrate L1 for frontscattering detectors based on the averaged E1 value  and calibrated theta values 
       E1_fit_front = self._current_workspace + '_E1_front'
@@ -1679,7 +1679,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         peak_centres = read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos', spec_list)
         peak_centres_errors = read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos_Err', spec_list)
-
 
         invalid_spectra = identify_invalid_spectra(peak_table[0], peak_centres, peak_centres_errors, spec_list)
         peak_centres[invalid_spectra] = np.nan
