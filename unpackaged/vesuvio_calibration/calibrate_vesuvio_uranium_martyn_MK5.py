@@ -336,7 +336,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     self._energy_estimates = self.getProperty("Energy").value
     self._sample_mass = self.getProperty("Mass").value
     self._create_output = self.getProperty("CreateOutput").value
-    self._global_fit_shared_parameter = self.getProperty("SharedParameterFitType").value
+    self._shared_parameter_fit_type = self.getProperty("SharedParameterFitType").value
 
   def _setup_spectra_list(self):
     self._spec_list = self.getProperty("SpectrumRange").value.tolist()
@@ -792,22 +792,25 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
-    if self._global_fit_shared_parameter == True:
-        init_Gaussian_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.GaussianFWHM', self._spec_list)
-        init_Gaussian_FWHM = np.nanmean(init_Gaussian_FWHM[init_Gaussian_FWHM != 0])
-        init_Lorentz_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzFWHM', self._spec_list)
-        init_Lorentz_FWHM = np.nanmean(init_Lorentz_FWHM[init_Lorentz_FWHM != 0])
-        init_Lorentz_Amp = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzAmp', self._spec_list)
-        init_Lorentz_Amp = np.nanmean(init_Lorentz_Amp[init_Lorentz_Amp != 0])
-        init_Lorentz_Pos = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
-        init_Lorentz_Pos = np.nanmean(init_Lorentz_Pos[init_Lorentz_Pos != 0])
-        
-        initial_params = {'A0': 0.0, 'A1': 0.0, 'LorentzAmp': init_Lorentz_Amp, 'LorentzPos': init_Lorentz_Pos, 'LorentzFWHM': init_Lorentz_FWHM, 'GaussianFWHM': init_Gaussian_FWHM}
+    if self._shared_parameter_fit_type != "Individual":
+      self._shared_parameter_fit(output_parameter_table_name, output_parameter_table_headers)
 
-        peak_centres = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
-        peak_centres_errors = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err', self._spec_list)
-        invalid_spectra = identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors, self._spec_list)
-        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers)
+  def _shared_parameter_fit(self, output_parameter_table_name, output_parameter_table_headers):
+    init_Gaussian_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.GaussianFWHM', self._spec_list)
+    init_Gaussian_FWHM = np.nanmean(init_Gaussian_FWHM[init_Gaussian_FWHM != 0])
+    init_Lorentz_FWHM = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzFWHM', self._spec_list)
+    init_Lorentz_FWHM = np.nanmean(init_Lorentz_FWHM[init_Lorentz_FWHM != 0])
+    init_Lorentz_Amp = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzAmp', self._spec_list)
+    init_Lorentz_Amp = np.nanmean(init_Lorentz_Amp[init_Lorentz_Amp != 0])
+    init_Lorentz_Pos = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
+    init_Lorentz_Pos = np.nanmean(init_Lorentz_Pos[init_Lorentz_Pos != 0])
+
+    initial_params = {'A0': 0.0, 'A1': 0.0, 'LorentzAmp': init_Lorentz_Amp, 'LorentzPos': init_Lorentz_Pos, 'LorentzFWHM': init_Lorentz_FWHM, 'GaussianFWHM': init_Gaussian_FWHM}
+
+    peak_centres = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
+    peak_centres_errors = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err', self._spec_list)
+    invalid_spectra = identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors, self._spec_list)
+    self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers)
 
   def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name, output_parameter_table_headers):
     spec_number = self._spec_list[0] + spec_index
