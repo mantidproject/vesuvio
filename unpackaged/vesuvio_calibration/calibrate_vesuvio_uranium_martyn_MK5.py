@@ -431,7 +431,7 @@ class EVSCalibrationFit(PythonAlgorithm):
       return ws_name + '_unconstrained'
 
   def _create_output_parameters_table_ws(self, output_table_name, num_estimated_peaks):
-    table = CreateEmptyTableWorkspace()
+    table = CreateEmptyTableWorkspace(OutputWorkspace=output_table_name)
 
     col_headers = self._generate_column_headers(num_estimated_peaks)
 
