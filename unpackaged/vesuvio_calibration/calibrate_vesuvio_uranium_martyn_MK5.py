@@ -420,7 +420,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._output_params_to_table(spec_number, num_estimated_peaks, selected_params, output_parameters_tbl_name)
 
         output_workspaces.append(
-            self._get_output_and_clean_workspaces(fit_results_unconstrained is not None, unconstrained_fit_selected, find_peaks_output_name,
+            self._get_output_and_clean_workspaces(fit_results_unconstrained is not None, fit_results_unconstrained is not False, unconstrained_fit_selected, find_peaks_output_name,
                                                   fit_peaks_output_name))
 
     if self._create_output:
@@ -466,6 +466,8 @@ class EVSCalibrationFit(PythonAlgorithm):
       if peaks_found:
           return self._filter_and_fit_found_peaks(workspace_index, peak_estimates_list, find_peaks_output_name,
                                                   fit_peaks_output_name, x_range, unconstrained)
+      else:
+          return False
 
   def _filter_and_fit_found_peaks(self, workspace_index, peak_estimates_list, find_peaks_output_name, fit_peaks_output_name,
                                   x_range, unconstrained):
@@ -519,7 +521,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
       mtd[output_table_name].addRow([spec_num] + row)
 
-  def _get_output_and_clean_workspaces(self, unconstrained_fit_performed, unconstrained_fit_selected, find_peaks_output_name,
+  def _get_output_and_clean_workspaces(self, unconstrained_fit_performed, unconstrained_peaks_found, unconstrained_fit_selected, find_peaks_output_name,
                                        fit_peaks_output_name):
       find_peaks_output_name_u = self._get_unconstrained_ws_name(find_peaks_output_name)
       fit_peaks_output_name_u = self._get_unconstrained_ws_name(fit_peaks_output_name)
@@ -530,14 +532,17 @@ class EVSCalibrationFit(PythonAlgorithm):
 
       output_workspace = fit_peaks_output_name + '_Workspace'
       if unconstrained_fit_performed:
-          DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
-          DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
           DeleteWorkspace(find_peaks_output_name_u)
-          if unconstrained_fit_selected:
-              output_workspace = fit_peaks_output_name_u + '_Workspace'
-              DeleteWorkspace(fit_peaks_output_name + '_Workspace')
-          else:
-              DeleteWorkspace(fit_peaks_output_name_u + '_Workspace')
+
+          if unconstrained_peaks_found:
+              DeleteWorkspace(fit_peaks_output_name_u + '_NormalisedCovarianceMatrix')
+              DeleteWorkspace(fit_peaks_output_name_u + '_Parameters')
+
+              if unconstrained_fit_selected:
+                  output_workspace = fit_peaks_output_name_u + '_Workspace'
+                  DeleteWorkspace(fit_peaks_output_name + '_Workspace')
+              else:
+                  DeleteWorkspace(fit_peaks_output_name_u + '_Workspace')
       return output_workspace
 
 
@@ -1137,8 +1142,9 @@ class EVSCalibrationFit(PythonAlgorithm):
     """
       Output the fit workspace for each spectrum fitted.
     """
-    fit_workspaces = map(list, zip(*self._peak_fit_workspaces_by_spec))
+    fit_workspaces = map(list, zip(*self._peak_fit_workspaces))
     group_ws_names = []
+
     for i, peak_fits in enumerate(fit_workspaces):
       ws_name = self._output_workspace_name + '_%d_Workspace' % i
       ExtractSingleSpectrum(InputWorkspace=self._sample, WorkspaceIndex=i, OutputWorkspace=ws_name)

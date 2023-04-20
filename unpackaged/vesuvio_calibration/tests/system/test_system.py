@@ -319,6 +319,23 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                              165, 167, 168, 169, 170, 182, 191, 192]})
         self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
+    def test_copper_create_output(self, load_file_mock):
+        self._setup_copper_test()
+        self._output_workspace = "copper_analysis_test"
+
+        load_file_mock.side_effect = self._load_file_side_effect
+
+        self.create_evs_calibration_alg()
+        self._alg.setProperty("CreateOutput", True)
+        params_table = self.execute_evs_calibration_analysis()
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                             165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
+
     def tearDown(self):
         mtd.clear()
 
