@@ -805,7 +805,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         peak_centres = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
         peak_centres_errors = read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err', self._spec_list)
         invalid_spectra = identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors, self._spec_list)
-        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers, output_parameter_table_name, x_range)
+        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers)
 
   def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name, output_parameter_table_headers):
     spec_number = self._spec_list[0] + spec_index
@@ -868,14 +868,20 @@ class EVSCalibrationFit(PythonAlgorithm):
 
 #----------------------------------------------------------------------------------------
 
-  def _fit_shared_parameter(self, invalid_spectra, initial_params, param_names, old_peak_table, x_range):
+  def _fit_shared_parameter(self, invalid_spectra, initial_params, param_names):
     """
       Fit peaks to all detectors, with one set of fit parameters for all detectors.
     """
 
-    peaks_table = '__' + self._sample + '_peaks_table'
-    CloneWorkspace(InputWorkspace=old_peak_table, OutputWorkspace=peaks_table)
-    mtd[peaks_table].setRowCount(0)
+    shared_peak_table = self._output_workspace_name + '_shared_peak_parameters'
+    CreateEmptyTableWorkspace(OutputWorkspace=shared_peak_table)
+
+    err_names = [name + '_Err' for name in param_names]
+    col_names = [element for tupl in zip(param_names, err_names) for element in tupl]
+
+    mtd[shared_peak_table].addColumn('int', 'Spectrum')
+    for name in col_names:
+        mtd[shared_peak_table].addColumn('double', name)
 
     fit_func = self._build_function_string(initial_params)
     start_str = 'composite=MultiDomainFunction, NumDeriv=1;'
@@ -892,7 +898,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     
     fit_output_name = '__' + self._output_workspace_name + '_Peak_0'
 
-    xmin, xmax = x_range
+    xmin, xmax = None, None
 
     # create new workspace for each spectra
     x = validSpecs.readX(0)
@@ -908,16 +914,11 @@ class EVSCalibrationFit(PythonAlgorithm):
     added_args = {f'InputWorkspace_{i + 1}': v for i,v in enumerate(other_inputs)}
     
     print('starting global fit')
-    start = time.time()
          
     status, chi2, ncm, params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=out_ws, IgnoreInvalidData=True,
                                                               StartX=xmin, EndX=xmax,
                                                               CalcErrors=True, Output=fit_output_name,
                                                               Minimizer='SteepestDescent,RelError=1e-8', **added_args)
-                                                              
-    end = time.time()
-    print(end-start)
-    
     [DeleteWorkspace(f"{self._sample}_Spec_{i}") for i in range(0,n_valid_specs)]
     
     fit_values = dict(zip(params.column(0), params.column(1)))
@@ -926,20 +927,17 @@ class EVSCalibrationFit(PythonAlgorithm):
     row_values = [fit_values['f0.' + name] for name in param_names]
     row_errors = [fit_errors['f0.' + name] for name in param_names]
     row = [element for tupl in zip(row_values, row_errors) for element in tupl]
-    
-    mtd[peaks_table].addRow([0] + row)
 
-    self._parameter_tables = peaks_table
-    self._peak_fit_workspaces = fws.name()
+    mtd[shared_peak_table].addRow([0] + row)
 
     DeleteWorkspace(ncm)
     DeleteWorkspace(params)
     if not self._create_output:
       DeleteWorkspace(fws)
 
-    #self._fit_workspaces = self._peak_fit_workspaces
-    
-    GroupWorkspaces(self._parameter_tables, OutputWorkspace=self._output_workspace_name + '_Shared_Peak_Parameters')
+    DeleteWorkspace(validSpecs)
+
+    mtd[self._output_workspace_name + '_Peak_Parameters'].add(shared_peak_table)
 
 #----------------------------------------------------------------------------------------
     
@@ -1433,8 +1431,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
                                 PeakType='Recoil', CalculateSharedParameter=True)
       
-      E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()[0]
-      self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE)
+      E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
+      self._calculate_final_energy(E1_peak_fits_back[0], BACKSCATTERING_RANGE)
       
       # calibrate L1 for backscattering detectors based on the averaged E1 value  and calibrated theta values 
       self._calculate_final_flight_path(E1_peak_fits_back, BACKSCATTERING_RANGE)
@@ -1445,8 +1443,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
                                 PeakType='Recoil', CalculateSharedParameter=True)
       
-      E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()[0]
-      self._calculate_final_flight_path(E1_peak_fits_front, FRONTSCATTERING_RANGE)
+      E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
+      self._calculate_final_flight_path(E1_peak_fits_front[0], FRONTSCATTERING_RANGE)
   
 
       #make the fitted parameters for this iteration the input to the next iteration.
@@ -1668,6 +1666,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
     spec_range = DETECTOR_RANGE[1] + 1 - DETECTOR_RANGE[0]
     mean_E1 = np.empty(spec_range)
     E1_error = np.empty(spec_range)
+    global_E1 = np.empty(spec_range)
+    global_E1_error = np.empty(spec_range)
 
     if not self._E1_value_and_error:
         t0 = read_table_column(self._current_workspace, 't0', spec_list)
@@ -1677,10 +1677,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         theta = read_table_column(self._current_workspace, 'theta', spec_list)
         r_theta = calculate_r_theta(self._sample_mass, theta)
 
-        peak_centres = read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
-        peak_centres_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+        peak_centres = read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos', spec_list)
+        peak_centres_errors = read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos_Err', spec_list)
 
-        invalid_spectra = identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
+
+        invalid_spectra = identify_invalid_spectra(peak_table[0], peak_centres, peak_centres_errors, spec_list)
         peak_centres[invalid_spectra] = np.nan
 
         delta_t = (peak_centres - t0) / 1e+6
@@ -1691,15 +1692,33 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         mean_E1_val = np.nanmean(E1)
         E1_error_val = np.nanstd(E1)
+
     else:
         mean_E1_val = self._E1_value_and_error[0]
         E1_error_val = self._E1_value_and_error[1]
-    
+
+    # calculate global energy
+    peak_centre = read_fitting_result_table_column(peak_table[1], 'f1.LorentzPos', [0])
+    peak_centre = [peak_centre] * len(peak_centres)
+
+    delta_t = (peak_centre - t0) / 1e+6
+    v1 = (L0 * r_theta + L1) / delta_t
+    E1 = 0.5*scipy.constants.m_n*v1**2
+    E1 /= MEV_CONVERSION
+
+    global_E1_val = np.nanmean(E1)
+    global_E1_error_val = np.nanstd(E1)
+
     mean_E1.fill(mean_E1_val)
     E1_error.fill(E1_error_val)
 
+    global_E1.fill(global_E1_val)
+    global_E1_error.fill(global_E1_error_val)
+
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
+    self._set_table_column(self._current_workspace, 'global_E1', global_E1)
+    self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
 
 #----------------------------------------------------------------------------------------
 
