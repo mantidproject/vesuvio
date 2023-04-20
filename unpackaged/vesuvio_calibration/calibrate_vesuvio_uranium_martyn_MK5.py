@@ -458,8 +458,9 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._output_params_to_table(spec_number, num_estimated_peaks, selected_params, output_parameters_tbl_name)
 
         output_workspaces.append(
-            self._get_output_and_clean_workspaces(fit_results_unconstrained is not None, fit_results_unconstrained is not False, unconstrained_fit_selected, find_peaks_output_name,
-                                                  fit_peaks_output_name))
+            self._get_output_and_clean_workspaces(fit_results_unconstrained is not None,
+                                                  (fit_results_unconstrained is not None and fit_results_unconstrained is not False),
+                                                  unconstrained_fit_selected, find_peaks_output_name, fit_peaks_output_name))
 
     if self._create_output:
         GroupWorkspaces(','.join(output_workspaces), OutputWorkspace=self._output_workspace_name + "_Peak_Fits")
@@ -783,8 +784,8 @@ class EVSCalibrationFit(PythonAlgorithm):
       output_parameter_table_name = self._output_workspace_name + '_Peak_%d_Parameters' % peak_index
       output_parameter_table_headers = self._create_parameter_table_and_output_headers(output_parameter_table_name)
       for spec_index, peak_position in enumerate(estimated_peak_positions):
-        fit_workspace_name, x_range = self._fit_peak(peak_index, spec_index, peak_position, output_parameter_table_name,
-                                                     output_parameter_table_headers)
+        fit_workspace_name = self._fit_peak(peak_index, spec_index, peak_position, output_parameter_table_name,
+                                            output_parameter_table_headers)
         self._peak_fit_workspaces_by_spec.append(fit_workspace_name)
 
       self._output_parameter_tables.append(output_parameter_table_name)
@@ -831,7 +832,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     fit_workspace_name = fws.name()
     self._del_fit_workspaces(ncm, fit_params, fws)
 
-    return fit_workspace_name, (xmin, xmax)
+    return fit_workspace_name
 
   def _find_peaks_and_output_params(self, peak_index, spec_number, spec_index, peak_position):
     peak_table_name = '__' + self._sample + '_peaks_table_%d_%d' % (peak_index, spec_index)

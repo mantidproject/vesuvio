@@ -641,12 +641,13 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_convert_to_dist.assert_called_once_with(output_name, EnableLogging=False)
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
-    def test_fit_peaks(self, group_workspaces_mock):
+    def test_fit_peaks_individual(self, group_workspaces_mock):
         alg = EVSCalibrationFit()
         alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
         alg._output_workspace_name = 'output_ws_name'
+        alg._shared_parameter_fit_type = 'Individual'
         alg._fit_peaks()
         alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
                                                                          call('output_ws_name_Peak_1_Parameters')])
@@ -660,6 +661,54 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                          alg._peak_fit_workspaces)
         group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters'],
                                                       OutputWorkspace='output_ws_name_Peak_Parameters')
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._shared_parameter_fit')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
+    def test_fit_peaks_shared(self, group_workspaces_mock, shared_parameter_fit_mock):
+        alg = EVSCalibrationFit()
+        alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
+        alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
+        alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
+        alg._output_workspace_name = 'output_ws_name'
+        alg._shared_parameter_fit_type = 'Shared'
+        alg._fit_peaks()
+        alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
+                                                                         call('output_ws_name_Peak_1_Parameters')])
+        alg._fit_peak.assert_has_calls([call(0, 0, 5, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(0, 1, 10, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(0, 2, 15, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(1, 0, 2.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
+                                        call(1, 1, 7.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
+                                        call(1, 2, 10.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])])
+        self.assertEqual([['fit_ws_0_0', 'fit_ws_0_1', 'fit_ws_0_2'], ['fit_ws_1_0', 'fit_ws_1_1', 'fit_ws_1_2']],
+                         alg._peak_fit_workspaces)
+        group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters'],
+                                                      OutputWorkspace='output_ws_name_Peak_Parameters')
+        shared_parameter_fit_mock.assert_called_once_with('output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])
+
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._shared_parameter_fit')
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
+    def test_fit_peaks_both(self, group_workspaces_mock, shared_parameter_fit_mock):
+        alg = EVSCalibrationFit()
+        alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
+        alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
+        alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
+        alg._output_workspace_name = 'output_ws_name'
+        alg._shared_parameter_fit_type = 'Both'
+        alg._fit_peaks()
+        alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
+                                                                         call('output_ws_name_Peak_1_Parameters')])
+        alg._fit_peak.assert_has_calls([call(0, 0, 5, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(0, 1, 10, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(0, 2, 15, 'output_ws_name_Peak_0_Parameters', ['a', 'b', 'c']),
+                                        call(1, 0, 2.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
+                                        call(1, 1, 7.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
+                                        call(1, 2, 10.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])])
+        self.assertEqual([['fit_ws_0_0', 'fit_ws_0_1', 'fit_ws_0_2'], ['fit_ws_1_0', 'fit_ws_1_1', 'fit_ws_1_2']],
+                         alg._peak_fit_workspaces)
+        group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters'],
+                                                      OutputWorkspace='output_ws_name_Peak_Parameters')
+        shared_parameter_fit_mock.assert_called_once_with('output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])
 
     @staticmethod
     def _setup_alg_mocks_fit_peak():
@@ -907,7 +956,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg = EVSCalibrationFit()
         find_peaks_output_name = 'test_find_output_name'
         fit_peaks_output_name = 'test_fit_output_name'
-        output_ws = alg._get_output_and_clean_workspaces(False, False, find_peaks_output_name, fit_peaks_output_name)
+        output_ws = alg._get_output_and_clean_workspaces(False, False, False, find_peaks_output_name, fit_peaks_output_name)
         mock_delete_ws.assert_has_calls([call(fit_peaks_output_name + '_NormalisedCovarianceMatrix'),
                                          call(fit_peaks_output_name + '_Parameters'),
                                          call(find_peaks_output_name)])
@@ -918,14 +967,14 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg = EVSCalibrationFit()
         find_peaks_output_name = 'test_find_output_name'
         fit_peaks_output_name = 'test_fit_output_name'
-        output_ws = alg._get_output_and_clean_workspaces(True, False, find_peaks_output_name, fit_peaks_output_name)
+        output_ws = alg._get_output_and_clean_workspaces(True, True, False, find_peaks_output_name, fit_peaks_output_name)
         mock_delete_ws.assert_has_calls([call(fit_peaks_output_name + '_NormalisedCovarianceMatrix'),
-                                         call(fit_peaks_output_name + '_Parameters'),
-                                         call(find_peaks_output_name),
-                                         call(fit_peaks_output_name + '_unconstrained' + '_NormalisedCovarianceMatrix'),
-                                         call(fit_peaks_output_name + '_unconstrained' + '_Parameters'),
-                                         call(find_peaks_output_name + '_unconstrained'),
-                                         call(fit_peaks_output_name + '_unconstrained' + '_Workspace')])
+                                        call(fit_peaks_output_name + '_Parameters'),
+                                        call(find_peaks_output_name),
+                                        call(find_peaks_output_name + '_unconstrained'),
+                                        call(fit_peaks_output_name + '_unconstrained_NormalisedCovarianceMatrix'),
+                                        call(fit_peaks_output_name + '_unconstrained_Parameters'),
+                                        call(fit_peaks_output_name + '_unconstrained_Workspace')])
         self.assertEqual(output_ws, fit_peaks_output_name + '_Workspace')
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.DeleteWorkspace')
@@ -933,14 +982,14 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg = EVSCalibrationFit()
         find_peaks_output_name = 'test_find_output_name'
         fit_peaks_output_name = 'test_fit_output_name'
-        output_ws = alg._get_output_and_clean_workspaces(True, True, find_peaks_output_name, fit_peaks_output_name)
+        output_ws = alg._get_output_and_clean_workspaces(True, True, True, find_peaks_output_name, fit_peaks_output_name)
         mock_delete_ws.assert_has_calls([call(fit_peaks_output_name + '_NormalisedCovarianceMatrix'),
-                                         call(fit_peaks_output_name + '_Parameters'),
-                                         call(find_peaks_output_name),
-                                         call(fit_peaks_output_name + '_unconstrained' + '_NormalisedCovarianceMatrix'),
-                                         call(fit_peaks_output_name + '_unconstrained' + '_Parameters'),
-                                         call(find_peaks_output_name + '_unconstrained'),
-                                         call(fit_peaks_output_name + '_Workspace')])
+                                        call(fit_peaks_output_name + '_Parameters'),
+                                        call(find_peaks_output_name),
+                                        call(find_peaks_output_name + '_unconstrained'),
+                                        call(fit_peaks_output_name + '_unconstrained_NormalisedCovarianceMatrix'),
+                                        call(fit_peaks_output_name + '_unconstrained_Parameters'),
+                                        call(fit_peaks_output_name + '_Workspace')])
         self.assertEqual(output_ws, fit_peaks_output_name + '_unconstrained' + '_Workspace')
 
     def test_generate_column_headers(self):
@@ -1145,7 +1194,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._get_find_peak_parameters.assert_called_once_with(spec_number, peak_estimates_list, False)
         alg._run_find_peaks.assert_called_once_with(workspace_index, find_peaks_output_name, 'find_peaks_params', False)
         alg._filter_and_fit_found_peaks.assert_not_called()
-        self.assertEqual(result, None)
+        self.assertEqual(result, False)
 
     @staticmethod
     def _setup_fit_bragg_peaks_mocks(fit_results, selected_params, output_workspaces):
@@ -1191,8 +1240,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                       call(2, fit_result_ret_val, None)])
         alg._output_params_to_table.assert_has_calls([call(1, 2, selected_params[0], 'output_Peak_Parameters'),
                                                       call(2, 2, selected_params[1], 'output_Peak_Parameters')])
-        alg._get_output_and_clean_workspaces.assert_has_calls([call(False, False, 'sample_peaks_table_1', 'output_Spec_1'),
-                                                               call(False, False, 'sample_peaks_table_2', 'output_Spec_2')])
+        alg._get_output_and_clean_workspaces.assert_has_calls([call(False, False, False, 'sample_peaks_table_1', 'output_Spec_1'),
+                                                               call(False, False, False, 'sample_peaks_table_2', 'output_Spec_2')])
         group_workspaces_mock.assert_called_once_with(','.join(output_workspaces), OutputWorkspace='output_Peak_Fits')
 
     @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.GroupWorkspaces')
@@ -1217,8 +1266,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                       call(2, fit_res, rit_u_res)])
         alg._output_params_to_table.assert_has_calls([call(1, 2, selected_params[0], 'output_Peak_Parameters'),
                                                       call(2, 2, selected_params[1], 'output_Peak_Parameters')])
-        alg._get_output_and_clean_workspaces.assert_has_calls([call(True, False, 'sample_peaks_table_1', 'output_Spec_1'),
-                                                               call(True, False, 'sample_peaks_table_2', 'output_Spec_2')])
+        alg._get_output_and_clean_workspaces.assert_has_calls([call(True, True, False, 'sample_peaks_table_1', 'output_Spec_1'),
+                                                               call(True, True, False, 'sample_peaks_table_2', 'output_Spec_2')])
         group_workspaces_mock.assert_called_once_with(','.join(output_workspaces), OutputWorkspace='output_Peak_Fits')
 
 
