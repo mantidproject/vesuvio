@@ -26,7 +26,6 @@ import sys
 import scipy.constants
 import scipy.stats
 import numpy as np
-import time
 
 # Configuration for Uranium runs / Indium runs
 #----------------------------------------------------------------------------------------
