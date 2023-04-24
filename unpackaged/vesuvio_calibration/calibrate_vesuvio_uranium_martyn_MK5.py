@@ -138,7 +138,6 @@ def identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec
 
   return invalid_spectra
 
-
 #----------------------------------------------------------------------------------------
 # The IP text file load function skips the first 3 rows of the text file.
 # This assumes that there is one line for the file header and 2 lines for
@@ -288,7 +287,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
     self.declareProperty('SharedParameterFitType', "Individual", doc='Calculate shared parameters using an individual and/or'
-                                                              'global fit.', validator=shared_fit_type_validator)
+                         'global fit.', validator=shared_fit_type_validator)
 
     self.declareProperty(ITableWorkspaceProperty("InstrumentParameterWorkspace", "", Direction.Input, PropertyMode.Optional),
       doc='Workspace contain instrument parameters.')
@@ -1365,7 +1364,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
     shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
     self.declareProperty('SharedParameterFitType', "Individual", doc='Calculate shared parameters using an individual and/or'
-                                                              'global fit.', validator=shared_fit_type_validator)
+                         'global fit.', validator=shared_fit_type_validator)
 
     self.declareProperty('CreateOutput', False,
       doc="Whether to create output from fitting.")
@@ -1584,38 +1583,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
     self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
     self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
-
-#----------------------------------------------------------------------------------------
-
-  def _identify_invalid_spectra(self, peak_table, peak_centres, peak_centres_errors, spec_list):
-    """
-      Inspect fitting results, and identify the fits associated with invalid spectra. These are spectra associated with detectors
-      which have lost foil coverage following a recent reduction in distance from source to detectors.
-
-      @param peak_table - name of table containing fitted parameters each spectra.
-      @param peak_centres - a list of the found peak centres
-      @param peak_centres_errors - a list of errors associated with the peak centres
-      @param spec_list - spectrum range to inspect.
-      @return a list of invalid spectra.
-    """
-    peak_Gaussian_FWHM = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
-    peak_Gaussian_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
-    peak_Lorentz_FWHM = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
-    peak_Lorentz_FWHM_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
-    peak_Lorentz_Amp = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
-    peak_Lorentz_Amp_errors = read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
-
-    invalid_spectra = np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors))  | \
-    (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors))  | \
-    (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
-    (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
-    (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
-    (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
-    (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
-    (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
-    (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
-
-    return invalid_spectra
 
  # ----------------------------------------------------------------------------------------
 
