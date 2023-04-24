@@ -1440,9 +1440,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=BACKSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
                                 PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type)
-      
+
       E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
-      self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE)
+      self._calculate_final_energy(E1_peak_fits_back, BACKSCATTERING_RANGE, self._shared_parameter_fit_type != "Individual")
       
       # calibrate L1 for backscattering detectors based on the averaged E1 value  and calibrated theta values 
       self._calculate_final_flight_path(E1_peak_fits_back[0], BACKSCATTERING_RANGE)
@@ -1452,7 +1452,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
       self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference', SpectrumRange=FRONTSCATTERING_RANGE,
                                 InstrumentParameterWorkspace=self._param_table, Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
                                 PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type)
-      
+
       E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
       self._calculate_final_flight_path(E1_peak_fits_front[0], FRONTSCATTERING_RANGE)
   
@@ -1665,7 +1665,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
 
 
-  def _calculate_final_energy(self, peak_table, spec_list):
+  def _calculate_final_energy(self, peak_table, spec_list, calculate_global):
     """
       Calculate the final energy using the fitted peak centres of a run.
 
@@ -1706,28 +1706,29 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         mean_E1_val = self._E1_value_and_error[0]
         E1_error_val = self._E1_value_and_error[1]
 
-    # calculate global energy
-    peak_centre = read_fitting_result_table_column(peak_table[1], 'f1.LorentzPos', [0])
-    peak_centre = [peak_centre] * len(peak_centres)
-
-    delta_t = (peak_centre - t0) / 1e+6
-    v1 = (L0 * r_theta + L1) / delta_t
-    E1 = 0.5*scipy.constants.m_n*v1**2
-    E1 /= MEV_CONVERSION
-
-    global_E1_val = np.nanmean(E1)
-    global_E1_error_val = np.nanstd(E1)
-
     mean_E1.fill(mean_E1_val)
     E1_error.fill(E1_error_val)
 
-    global_E1.fill(global_E1_val)
-    global_E1_error.fill(global_E1_error_val)
-
     self._set_table_column(self._current_workspace, 'E1', mean_E1)
     self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
-    self._set_table_column(self._current_workspace, 'global_E1', global_E1)
-    self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
+
+    if calculate_global:  # This fn will need updating for the only global option
+        peak_centre = read_fitting_result_table_column(peak_table[1], 'f1.LorentzPos', [0])
+        peak_centre = [peak_centre] * len(peak_centres)
+
+        delta_t = (peak_centre - t0) / 1e+6
+        v1 = (L0 * r_theta + L1) / delta_t
+        E1 = 0.5*scipy.constants.m_n*v1**2
+        E1 /= MEV_CONVERSION
+
+        global_E1_val = np.nanmean(E1)
+        global_E1_error_val = np.nanstd(E1)
+
+        global_E1.fill(global_E1_val)
+        global_E1_error.fill(global_E1_error_val)
+
+        self._set_table_column(self._current_workspace, 'global_E1', global_E1)
+        self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
 
 #----------------------------------------------------------------------------------------
 

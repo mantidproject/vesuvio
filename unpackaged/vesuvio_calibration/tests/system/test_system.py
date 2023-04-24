@@ -336,6 +336,24 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                              165, 167, 168, 169, 170, 182, 191, 192]})
         self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
+    @patch('unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5.EVSCalibrationFit._load_file')
+    def test_copper_with_individual_and_global_fit(self, load_file_mock):
+        self._setup_copper_test()
+        self._output_workspace = "copper_analysis_test"
+
+        load_file_mock.side_effect = self._load_file_side_effect
+
+        self.create_evs_calibration_alg()
+        self._alg.setProperty("SharedParameterFitType", "Both")
+        params_table = self.execute_evs_calibration_analysis()
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
+        detector_specific_r_tols["L1"].update({k: INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                             165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assert_parameters_match_expected(params_table, detector_specific_r_tols)
+        self.assert_E1_parameters_match_expected(params_table, 3e-3, "Both")
+
     def tearDown(self):
         mtd.clear()
 
@@ -365,6 +383,15 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self.assertFalse(np.isinf(L1).any())
         return _assert_allclose_excluding_bad_detectors(np.ma.masked_array(actual_L1, mask=invalid_detector_mask),
                                                         np.ma.masked_array(L1, mask=invalid_detector_mask), rel_tolerance)
+
+    def assert_E1_parameters_match_expected(self, params_table, rel_tolerance, fit_type):
+        if fit_type != "Shared":
+            E1 = params_table.column('E1')[0]
+            self.assertAlmostEqual(E1, ENERGY_ESTIMATE, delta=ENERGY_ESTIMATE*rel_tolerance)
+
+        if fit_type != "Individual":
+            global_E1 = params_table.column('global_E1')[0]
+            self.assertAlmostEqual(global_E1, ENERGY_ESTIMATE, delta=ENERGY_ESTIMATE*rel_tolerance)
 
     def assert_parameters_match_expected(self, params_table, tolerances=None):
         rel_tol_theta, rel_tol_L1 = self._extract_tolerances(tolerances)
