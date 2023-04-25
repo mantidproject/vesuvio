@@ -17,6 +17,5 @@ from mantid.api import AlgorithmFactory
 from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
 from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
 
-if __name__ == "__main__":
-    AlgorithmFactory.subscribe(EVSCalibrationFit)
-    AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
+AlgorithmFactory.subscribe(EVSCalibrationFit)
+AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
