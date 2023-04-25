@@ -1,4 +1,4 @@
-from unpackaged.vesuvio_calibration.calibrate_vesuvio_uranium_martyn_MK5 import EVSCalibrationAnalysis
+from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
 
 import unittest
 
