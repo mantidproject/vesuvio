@@ -176,6 +176,24 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    def test_copper_create_invalid_detectors_specified(self, load_file_mock):
+        self._setup_copper_test()
+        self._output_workspace = "copper_analysis_test"
+
+        load_file_mock.side_effect = self._load_file_side_effect
+
+        self._create_evs_calibration_alg()
+        self._alg.setProperty("InvalidDetectors", [3, 5, 7, 141, 144, 149, 150, 159, 161, 163, 166, 167, 168, 170, 171, 172, 173, 185, 194,
+                                                   195])
+        params_table = self._execute_evs_calibration_analysis()
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
+        detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [0, 2, 4, 138, 141, 146, 147, 156, 158, 160, 163,
+                                                                                           164, 165, 167, 168, 169, 170, 182, 191, 192]})
+        self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
+
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_with_individual_and_global_fit(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"

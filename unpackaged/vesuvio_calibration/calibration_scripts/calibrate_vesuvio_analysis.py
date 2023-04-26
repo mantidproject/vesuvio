@@ -35,14 +35,20 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self.declareProperty('Mass', sys.float_info.max,
                              doc="Mass of the sample in amu to be used when calculating energy. Default is Pb: 207.19")
 
-        greaterThanZero = FloatArrayBoundedValidator()
-        greaterThanZero.setLower(0)
-        self.declareProperty(FloatArrayProperty('DSpacings', [], greaterThanZero, Direction.Input),
+        greater_than_zero_float = FloatArrayBoundedValidator()
+        greater_than_zero_float.setLower(0)
+        self.declareProperty(FloatArrayProperty('DSpacings', [], greater_than_zero_float, Direction.Input),
                              doc="List of d-spacings used to estimate the positions of peaks in TOF.")
 
-        self.declareProperty(FloatArrayProperty('E1FixedValueAndError', [], greaterThanZero, Direction.Input),
+        self.declareProperty(FloatArrayProperty('E1FixedValueAndError', [], greater_than_zero_float, Direction.Input),
                              doc="Value at which to fix E1 and E1 error (form: E1 value, E1 Error). If no input is provided,"
                                  "values will be calculated.")
+
+        detector_validator = IntArrayBoundedValidator()
+        detector_validator.setLower(EVSGlobals.DETECTOR_RANGE[0])
+        detector_validator.setUpper(EVSGlobals.DETECTOR_RANGE[-1])
+        self.declareProperty(IntArrayProperty('InvalidDetectors', [], detector_validator, Direction.Input),
+                             doc="Detectors to be marked as invalid, to be excused from analysis calculations.")
 
         self.declareProperty('Iterations', 2, validator=IntBoundedValidator(lower=1),
                              doc="Number of iterations to perform. Default is 2.")
@@ -111,7 +117,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         # repeatedly fit L1, E1 and Theta parameters
         table_group = []
         for i in range(self._iterations):
-
             # calibrate theta for all detectors
             theta_fit = self._current_workspace + '_theta'
             self._run_calibration_fit(Samples=self._samples, Background=self._background, Function=self._theta_peak_function,
@@ -247,10 +252,23 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
         peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
-        invalid_spectra = EVSMiscFunctions.identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list)
-        peak_centres[invalid_spectra] = np.nan
 
-        print(f'Invalid Spectra Index Found and Marked NAN: {invalid_spectra.flatten()} from Spectra Index List:'
+        if spec_list == EVSGlobals.FRONTSCATTERING_RANGE:
+            if not self._invalid_detectors_front.any():
+                self._invalid_detectors_front = EVSMiscFunctions.identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
+                                                                                          spec_list)
+            invalid_detectors = self._invalid_detectors_front
+        elif spec_list == EVSGlobals.BACKSCATTERING_RANGE:
+            if not self._invalid_detectors_back.any():
+                self._invalid_detectors_back = EVSMiscFunctions.identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
+                                                                                         spec_list)
+            invalid_detectors = self._invalid_detectors_back
+        else:
+            raise AttributeError("Spec list invalid - must represent either front or back detectors.")
+
+        peak_centres[invalid_detectors] = np.nan
+
+        print(f'Invalid Spectra Index Found and Marked NAN: {invalid_detectors} from Spectra Index List:'
               f'{[ x -3 for x in spec_list]}')
 
         delta_t = (peak_centres - t0) / 1e+6
@@ -331,8 +349,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos', spec_list)
             peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos_Err', spec_list)
 
-            invalid_spectra = EVSMiscFunctions.identify_invalid_spectra(peak_table[0], peak_centres, peak_centres_errors, spec_list)
-            peak_centres[invalid_spectra] = np.nan
+            if not self._invalid_detectors_back.any():
+                self._invalid_detectors_back = EVSMiscFunctions.identify_invalid_spectra(peak_table[0], peak_centres, peak_centres_errors,
+                                                                                         spec_list)
+            peak_centres[self._invalid_detectors_back] = np.nan
 
             delta_t = (peak_centres - t0) / 1e+6
             v1 = (L0 * r_theta + L1) / delta_t
@@ -381,6 +401,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._sample_mass = self.getProperty("Mass").value
         self._d_spacings = self.getProperty("DSpacings").value.tolist()
         self._E1_value_and_error = self.getProperty("E1FixedValueAndError").value.tolist()
+        self._invalid_detectors_front = np.array([[x - EVSGlobals.FRONTSCATTERING_RANGE[0]] for x in self.getProperty("InvalidDetectors").value.tolist()
+                                                  if EVSGlobals.FRONTSCATTERING_RANGE[0] <= x <= EVSGlobals.FRONTSCATTERING_RANGE[-1]])
+        self._invalid_detectors_back = np.array([[x - EVSGlobals.BACKSCATTERING_RANGE[0]] for x in self.getProperty("InvalidDetectors").value.tolist()
+                                                if EVSGlobals.BACKSCATTERING_RANGE[0] <= x <= EVSGlobals.BACKSCATTERING_RANGE[-1]])
         self._shared_parameter_fit_type = self.getProperty("SharedParameterFitType").value
         self._calc_L0 = self.getProperty("CalculateL0").value
         self._make_IP_file = self.getProperty("CreateIPFile").value
