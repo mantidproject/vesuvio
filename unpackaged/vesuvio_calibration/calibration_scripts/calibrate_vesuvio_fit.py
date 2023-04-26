@@ -572,10 +572,11 @@ class EVSCalibrationFit(PythonAlgorithm):
                                                         output_parameter_table_headers)
                     self._peak_fit_workspaces_by_spec.append(fit_workspace_name)
 
-                    self._output_parameter_tables.append(output_parameter_table_name)
-                    self._peak_fit_workspaces.append(self._peak_fit_workspaces_by_spec)
+                self._output_parameter_tables.append(output_parameter_table_name)
+                self._peak_fit_workspaces.append(self._peak_fit_workspaces_by_spec)
 
-            GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
+            if self._shared_parameter_fit_type == 'Individual':
+                GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
         if self._shared_parameter_fit_type != "Individual":
             estimated_peak_position = np.mean(estimated_peak_positions_all_peaks)
@@ -586,7 +587,8 @@ class EVSCalibrationFit(PythonAlgorithm):
                                                         output_parameter_table_headers)
 
             if self._shared_parameter_fit_type == 'Both':
-                mtd[self._output_workspace_name + '_Peak_Parameters'].add(output_parameter_table_name)
+                self._output_parameter_tables.append(output_parameter_table_name)
+                GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
             else:
                 GroupWorkspaces(output_parameter_table_name, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
@@ -656,7 +658,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._del_fit_workspaces(ncm, fit_params, fws)
 
     def _find_peaks_and_output_params(self, spec_number, peak_position, peak_index=None, spec_index=None):
-        if spec_index and peak_index:
+        if spec_index is not None and peak_index is not None:
             peak_table_name = '__' + self._sample + '_peaks_table_%d_%d' % (peak_index, spec_index)
         else:
             peak_table_name = '__' + self._sample + '_peak_table'
