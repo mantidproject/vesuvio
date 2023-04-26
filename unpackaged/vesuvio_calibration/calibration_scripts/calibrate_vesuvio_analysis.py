@@ -137,7 +137,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._invalid_detectors.add_invalid_detectors(invalid_detectors)
 
             E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
-            self._calculate_final_energy(E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type != "Individual")
+            self._calculate_final_energy(E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type)
 
             # calibrate L1 for backscattering detectors based on the averaged E1 value  and calibrated theta values
             self._calculate_final_flight_path(E1_peak_fits_back[0], EVSGlobals.BACKSCATTERING_RANGE)
@@ -315,7 +315,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._set_table_column(self._current_workspace, 'theta', masked_theta, spec_list)
         self._set_table_column(self._current_workspace, 'theta_Err', theta_error, spec_list)
 
-    def _calculate_final_energy(self, peak_table, spec_list, calculate_global):
+    def _calculate_final_energy(self, peak_table, spec_list, fit_type):
         """
           Calculate the final energy using the fitted peak centres of a run.
 
@@ -324,12 +324,17 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         """
 
         spec_range = EVSGlobals.DETECTOR_RANGE[1] + 1 - EVSGlobals.DETECTOR_RANGE[0]
-        mean_E1 = np.empty(spec_range)
-        E1_error = np.empty(spec_range)
-        global_E1 = np.empty(spec_range)
-        global_E1_error = np.empty(spec_range)
 
         if not self._E1_value_and_error:
+
+            if fit_type == 'Both':
+                indv_peak_table = peak_table[0]
+                glob_peak_table = peak_table[1]
+            elif fit_type == 'Shared':
+                glob_peak_table = peak_table[0]
+            else:
+                indv_peak_table = peak_table[0]
+
             t0 = EVSMiscFunctions.read_table_column(self._current_workspace, 't0', spec_list)
             L0 = EVSMiscFunctions.read_table_column(self._current_workspace, 'L0', spec_list)
 
@@ -337,44 +342,59 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             theta = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
             r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
 
-            peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, peak_table[0])
+            if fit_type != 'Shared':
+                mean_E1 = np.empty(spec_range)
+                E1_error = np.empty(spec_range)
 
-            delta_t = (peak_centres - t0) / 1e+6
-            v1 = (L0 * r_theta + L1) / delta_t
+                peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, indv_peak_table)
 
-            E1 = 0.5 * scipy.constants.m_n * v1 ** 2
-            E1 /= EVSGlobals.MEV_CONVERSION
+                delta_t = (peak_centres - t0) / 1e+6
+                v1 = (L0 * r_theta + L1) / delta_t
 
-            mean_E1_val = np.nanmean(E1)
-            E1_error_val = np.nanstd(E1)
+                E1 = 0.5*scipy.constants.m_n*v1**2
+                E1 /= EVSGlobals.MEV_CONVERSION
 
-        else:
-            mean_E1_val = self._E1_value_and_error[0]
-            E1_error_val = self._E1_value_and_error[1]
+                mean_E1_val = np.nanmean(E1)
+                E1_error_val = np.nanstd(E1)
 
-        mean_E1.fill(mean_E1_val)
-        E1_error.fill(E1_error_val)
+                mean_E1.fill(mean_E1_val)
+                E1_error.fill(E1_error_val)
 
-        self._set_table_column(self._current_workspace, 'E1', mean_E1)
-        self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
+                self._set_table_column(self._current_workspace, 'E1', mean_E1)
+                self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
 
-        if calculate_global:  # This fn will need updating for the only global option
-            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(peak_table[1], 'f1.LorentzPos', [0])
-            peak_centre = [peak_centre] * len(peak_centres)
+            if fit_type != 'Individual':
+                global_E1 = np.empty(spec_range)
+                global_E1_error = np.empty(spec_range)
 
-            delta_t = (peak_centre - t0) / 1e+6
-            v1 = (L0 * r_theta + L1) / delta_t
-            E1 = 0.5 * scipy.constants.m_n * v1 ** 2
-            E1 /= EVSGlobals.MEV_CONVERSION
+                peak_centre = EVSMiscFunctions.read_fitting_result_table_column(glob_peak_table, 'f1.LorentzPos', [0])
+                peak_centre = [peak_centre] * spec_range
 
-            global_E1_val = np.nanmean(E1)
-            global_E1_error_val = np.nanstd(E1)
+                delta_t = (peak_centre - t0) / 1e+6
+                v1 = (L0 * r_theta + L1) / delta_t
+                E1 = 0.5*scipy.constants.m_n*v1**2
+                E1 /= EVSGlobals.MEV_CONVERSION
 
-            global_E1.fill(global_E1_val)
-            global_E1_error.fill(global_E1_error_val)
+                global_E1_val = np.nanmean(E1)
+                global_E1_error_val = np.nanstd(E1)
 
-            self._set_table_column(self._current_workspace, 'global_E1', global_E1)
-            self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
+                global_E1.fill(global_E1_val)
+                global_E1_error.fill(global_E1_error_val)
+
+                self._set_table_column(self._current_workspace, 'global_E1', global_E1)
+                self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
+            else:
+                mean_E1 = np.empty(spec_range)
+                E1_error = np.empty(spec_range)
+                
+                mean_E1_val = self._E1_value_and_error[0]
+                E1_error_val = self._E1_value_and_error[1]
+
+                mean_E1.fill(mean_E1_val)
+                E1_error.fill(E1_error_val)
+
+                self._set_table_column(self._current_workspace, 'E1', mean_E1)
+                self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
 
     def _setup(self):
         """
