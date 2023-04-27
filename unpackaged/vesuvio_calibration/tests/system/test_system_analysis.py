@@ -10,7 +10,7 @@ from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
 from tests.testhelpers.system_test_misc_functions import assert_allclose_excluding_bad_detectors
 from calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
 from calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
-from copy import copy
+from copy import copy, deepcopy
 from os import path
 
 
@@ -189,8 +189,11 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
 
         #  Specify detectors tolerances set by user, then update with those to mask as invalid.
         detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
-        detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [0, 2, 4, 138, 141, 146, 147, 156, 158, 160, 163,
+        detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163,
                                                                                            164, 165, 167, 168, 169, 170, 182, 191, 192]})
+        self.assertRaises(AssertionError, self._assert_parameters_match_expected, *[params_table, detector_specific_r_tols])
+
+        detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [0, 2, 4]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
     @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
@@ -244,7 +247,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
             self.assertAlmostEqual(global_E1, EVSGlobals.ENERGY_ESTIMATE, delta=EVSGlobals.ENERGY_ESTIMATE*rel_tolerance)
 
     def _assert_parameters_match_expected(self, params_table, tolerances=None):
-        rel_tol_theta, rel_tol_L1 = self._extract_tolerances(tolerances)
+        rel_tol_theta, rel_tol_L1 = self._extract_tolerances(deepcopy(tolerances))
         theta_errors = self._assert_theta_parameters_match_expected(params_table, rel_tol_theta)
         L1_errors = self._assert_L1_parameters_match_expected(params_table, rel_tol_L1)
 
