@@ -48,7 +48,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         detector_validator.setLower(EVSGlobals.DETECTOR_RANGE[0])
         detector_validator.setUpper(EVSGlobals.DETECTOR_RANGE[-1])
         self.declareProperty(IntArrayProperty('InvalidDetectors', [], detector_validator, Direction.Input),
-                             doc="Detectors to be marked as invalid, to be excused from analysis calculations.")
+                             doc="List of detectors to be marked as invalid (3-198), to be excluded from analysis calculations.")
 
         self.declareProperty('Iterations', 2, validator=IntBoundedValidator(lower=1),
                              doc="Number of iterations to perform. Default is 2.")
