@@ -140,7 +140,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._calculate_final_energy(E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type)
 
             # calibrate L1 for backscattering detectors based on the averaged E1 value  and calibrated theta values
-            self._calculate_final_flight_path(E1_peak_fits_back[0], EVSGlobals.BACKSCATTERING_RANGE)
+            self._calculate_final_flight_path(E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type)
 
             # calibrate L1 for frontscattering detectors based on the averaged E1 value  and calibrated theta values
             E1_fit_front = self._current_workspace + '_E1_front'
@@ -153,7 +153,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._invalid_detectors.add_invalid_detectors(invalid_detectors)
 
             E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
-            self._calculate_final_flight_path(E1_peak_fits_front[0], EVSGlobals.FRONTSCATTERING_RANGE)
+            self._calculate_final_flight_path(E1_peak_fits_front, EVSGlobals.FRONTSCATTERING_RANGE, self._shared_parameter_fit_type)
 
             # make the fitted parameters for this iteration the input to the next iteration.
             table_group.append(self._current_workspace)
@@ -245,33 +245,61 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         DeleteWorkspace(L0_param_table)
 
-    def _calculate_final_flight_path(self, peak_table, spec_list):
+    def _calculate_final_flight_path(self, peak_table, spec_list, fit_type):
         """
           Calculate the final flight path using the values for energy.
           This also uses the old value for L1 loaded from the parameter file.
 
           @param spec_list - spectrum range to calculate t0 for.
         """
+        if fit_type == 'Both':
+            indv_peak_table = peak_table[0]
+            glob_peak_table = peak_table[1]
+            E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'E1', spec_list)
+            E1 *= EVSGlobals.MEV_CONVERSION
+            global_E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'global_E1', spec_list)
+            global_E1 *= EVSGlobals.MEV_CONVERSION
+        elif fit_type == 'Shared':
+            glob_peak_table = peak_table[0]
+            global_E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'global_E1', spec_list)
+            global_E1 *= EVSGlobals.MEV_CONVERSION
+        else:
+            indv_peak_table = peak_table[0]
+            E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'E1', spec_list)
+            E1 *= EVSGlobals.MEV_CONVERSION
 
-        E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'E1', spec_list)
         t0 = EVSMiscFunctions.read_table_column(self._current_workspace, 't0', spec_list)
         t0_error = EVSMiscFunctions.read_table_column(self._current_workspace, 't0_Err', spec_list)
         L0 = EVSMiscFunctions.read_table_column(self._current_workspace, 'L0', spec_list)
         theta = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
         r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
 
-        peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, peak_table)
+        if fit_type != 'Shared':
 
-        delta_t = (peak_centres - t0) / 1e+6
-        delta_t_error = t0_error / 1e+6
+            peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, indv_peak_table)
 
-        E1 *= EVSGlobals.MEV_CONVERSION
-        v1 = np.sqrt( 2 * E1 /scipy.constants.m_n)
-        L1 = v1 * delta_t - L0 * r_theta
-        L1_error = v1 * delta_t_error
+            delta_t = (peak_centres - t0) / 1e+6
+            delta_t_error = t0_error / 1e+6
+            v1 = np.sqrt( 2 * E1 /scipy.constants.m_n)
+            L1 = v1 * delta_t - L0 * r_theta
+            L1_error = v1 * delta_t_error
 
-        self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
-        self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
+            self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
+            self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
+
+        if fit_type != 'Individual':
+            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(glob_peak_table, 'f1.LorentzPos', [0])
+            peak_centre_list = np.empty(spec_list[1] + 1 -spec_list[0])
+            peak_centre_list.fill(float(peak_centre))
+
+            delta_t = (peak_centre_list - t0) / 1e+6
+            delta_t_error = t0_error / 1e+6
+            global_v1 = np.sqrt( 2 * global_E1 /scipy.constants.m_n)
+            global_L1 = global_v1 * delta_t - L0 * r_theta
+            global_L1_error = global_v1 * delta_t_error
+
+            self._set_table_column(self._current_workspace, 'global_L1', global_L1, spec_list)
+            self._set_table_column(self._current_workspace, 'global_L1_Err', global_L1_error, spec_list)
 
     def _calculate_scattering_angle(self, table_name, spec_list):
         """
@@ -383,7 +411,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
                 self._set_table_column(self._current_workspace, 'global_E1', global_E1)
                 self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
-            else:
+        else:
                 mean_E1 = np.empty(spec_range)
                 E1_error = np.empty(spec_range)
                 

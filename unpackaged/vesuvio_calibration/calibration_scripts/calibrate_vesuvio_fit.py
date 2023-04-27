@@ -555,13 +555,12 @@ class EVSCalibrationFit(PythonAlgorithm):
         """
 
         estimated_peak_positions_all_peaks = self._estimate_peak_positions()
+        num_estimated_peaks, num_spectra = estimated_peak_positions_all_peaks.shape
+        self._output_parameter_tables = []
+        self._peak_fit_workspaces = []
         if self._shared_parameter_fit_type != "Shared":
-            num_estimated_peaks, num_spectra = estimated_peak_positions_all_peaks.shape
-
             self._prog_reporter = Progress(self, 0.0, 1.0, num_estimated_peaks*num_spectra)
 
-            self._output_parameter_tables = []
-            self._peak_fit_workspaces = []
             for peak_index, estimated_peak_positions in enumerate(estimated_peak_positions_all_peaks):
 
                 self._peak_fit_workspaces_by_spec = []
@@ -579,18 +578,21 @@ class EVSCalibrationFit(PythonAlgorithm):
                 GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
         if self._shared_parameter_fit_type != "Individual":
-            estimated_peak_position = np.mean(estimated_peak_positions_all_peaks)
-            output_parameter_table_name = self._output_workspace_name + '_Shared_Peak_Parameters'
-            output_parameter_table_headers = self._create_parameter_table_and_output_headers(output_parameter_table_name)
+            for peak_index, estimated_peak_position in enumerate(np.mean(estimated_peak_positions_all_peaks,1)):
 
-            self._fit_shared_peak(self._spec_list[0], estimated_peak_position, output_parameter_table_name,
-                                                        output_parameter_table_headers)
+                output_parameter_table_name = self._output_workspace_name + '_Shared_Peak_%d_Parameters' % peak_index
+                output_parameter_table_headers = self._create_parameter_table_and_output_headers(output_parameter_table_name)
+
+                fit_workspace_name = self._fit_shared_peak(peak_index, self._spec_list[0], estimated_peak_position, output_parameter_table_name,
+                                                           output_parameter_table_headers)
+
+                self._output_parameter_tables.append(output_parameter_table_name)
+                self._peak_fit_workspaces.append(fit_workspace_name)
 
             if self._shared_parameter_fit_type == 'Both':
-                self._output_parameter_tables.append(output_parameter_table_name)
                 GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
             else:
-                GroupWorkspaces(output_parameter_table_name, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
+                GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + '_Peak_Parameters')
 
     def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name,
                   output_parameter_table_headers):
@@ -614,8 +616,8 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         return fit_workspace_name
     
-    def _fit_shared_peak(self, spec_range, peak_position, output_parameter_table_name, output_parameter_table_headers):
-        peak_params = self._find_peaks_and_output_params(spec_range, peak_position)
+    def _fit_shared_peak(self, peak_index, spec_range, peak_position, output_parameter_table_name, output_parameter_table_headers):
+        peak_params = self._find_peaks_and_output_params(spec_range, peak_position, peak_index)
         fit_func = self._build_function_string(peak_params)
         start_str = 'composite=MultiDomainFunction, NumDeriv=1;'
         validSpecs = mtd[self._sample]
@@ -630,7 +632,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         ties = ','.join(f'f{i}.f1.{p}=f0.f1.{p}' for p in self._func_param_names.values() for i in range(1,n_valid_specs))
         func_string = composite_func + f';ties=({ties})' 
         xmin, xmax = self._find_fit_x_window(peak_params)
-        fit_output_name = '__' + self._output_workspace_name + '_Peak_0'
+        fit_output_name = '__' + self._output_workspace_name + '_Peak_%d' % peak_index
 
         # create new workspace for each spectra
         x = validSpecs.readX(0)
@@ -655,13 +657,17 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         self._output_fit_params_to_table_ws(0, fit_params, output_parameter_table_name,
                                             output_headers)
+
+        fit_workspace_name = fws.name()
         self._del_fit_workspaces(ncm, fit_params, fws)
 
-    def _find_peaks_and_output_params(self, spec_number, peak_position, peak_index=None, spec_index=None):
-        if spec_index is not None and peak_index is not None:
+        return fit_workspace_name
+
+    def _find_peaks_and_output_params(self, spec_number, peak_position, peak_index, spec_index=None):
+        if spec_index is not None:
             peak_table_name = '__' + self._sample + '_peaks_table_%d_%d' % (peak_index, spec_index)
         else:
-            peak_table_name = '__' + self._sample + '_peak_table'
+            peak_table_name = '__' + self._sample + '_peak_table_%d' % (peak_index)
         find_peak_params = self._get_find_peak_parameters(spec_number, [peak_position])
         FindPeaks(InputWorkspace=self._sample, WorkspaceIndex=spec_index, PeaksList=peak_table_name, **find_peak_params)
         if mtd[peak_table_name].rowCount() == 0:

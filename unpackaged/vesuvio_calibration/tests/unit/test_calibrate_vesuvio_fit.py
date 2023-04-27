@@ -660,29 +660,32 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters'],
                                                       OutputWorkspace='output_ws_name_Peak_Parameters')
 
-    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._fit_shared_peak')
     @patch('calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
-    def test_fit_peaks_shared(self, group_workspaces_mock, fit_shared_peak_mock):
+    def test_fit_peaks_shared(self, group_workspaces_mock):
         alg = EVSCalibrationFit()
         alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
-        alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
+        alg._fit_shared_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}')
         alg._output_workspace_name = 'output_ws_name'
         alg._shared_parameter_fit_type = 'Shared'
         alg._spec_list = [3,4,5]
         alg._fit_peaks()
-        alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Shared_Peak_Parameters')])
-        group_workspaces_mock.assert_called_once_with('output_ws_name_Shared_Peak_Parameters',
+        self.assertEqual(['fit_ws_0', 'fit_ws_1'],
+                         alg._peak_fit_workspaces)
+        alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Shared_Peak_0_Parameters'),
+                                                                         call('output_ws_name_Shared_Peak_1_Parameters')])
+        group_workspaces_mock.assert_called_once_with(['output_ws_name_Shared_Peak_0_Parameters','output_ws_name_Shared_Peak_1_Parameters'],
                                                       OutputWorkspace='output_ws_name_Peak_Parameters')
-        fit_shared_peak_mock.assert_called_once_with(3, np.mean(alg._estimate_peak_positions()), 'output_ws_name_Shared_Peak_Parameters', ['a', 'b', 'c'])
+        alg._fit_shared_peak.assert_has_calls([call(0, 3, 10, 'output_ws_name_Shared_Peak_0_Parameters', ['a', 'b', 'c']),
+                                               call(1, 3, 41/6, 'output_ws_name_Shared_Peak_1_Parameters', ['a', 'b', 'c'])])
 
-    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._fit_shared_peak')
     @patch('calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
-    def test_fit_peaks_both(self, group_workspaces_mock, fit_shared_peak_mock):
+    def test_fit_peaks_both(self, group_workspaces_mock):
         alg = EVSCalibrationFit()
         alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
+        alg._fit_shared_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}')
         alg._output_workspace_name = 'output_ws_name'
         alg._shared_parameter_fit_type = 'Both'
         alg._spec_list = [3,4,5]
@@ -695,11 +698,13 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                         call(1, 0, 2.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
                                         call(1, 1, 7.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c']),
                                         call(1, 2, 10.5, 'output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])])
-        self.assertEqual([['fit_ws_0_0', 'fit_ws_0_1', 'fit_ws_0_2'], ['fit_ws_1_0', 'fit_ws_1_1', 'fit_ws_1_2']],
+        self.assertEqual([['fit_ws_0_0', 'fit_ws_0_1', 'fit_ws_0_2'], ['fit_ws_1_0', 'fit_ws_1_1', 'fit_ws_1_2'], 'fit_ws_0', 'fit_ws_1'],
                          alg._peak_fit_workspaces)
         group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters',
-                                                       'output_ws_name_Shared_Peak_Parameters'], OutputWorkspace='output_ws_name_Peak_Parameters')
-        fit_shared_peak_mock.assert_called_once_with(3, np.mean(alg._estimate_peak_positions()), 'output_ws_name_Shared_Peak_Parameters', ['a', 'b', 'c'])
+                                                       'output_ws_name_Shared_Peak_0_Parameters','output_ws_name_Shared_Peak_1_Parameters'],
+                                                        OutputWorkspace='output_ws_name_Peak_Parameters')
+        alg._fit_shared_peak.assert_has_calls([call(0, 3, 10, 'output_ws_name_Shared_Peak_0_Parameters', ['a', 'b', 'c']),
+                                               call(1, 3, 41/6, 'output_ws_name_Shared_Peak_1_Parameters', ['a', 'b', 'c'])])
 
     @staticmethod
     def _setup_alg_mocks_fit_peak():
