@@ -250,6 +250,27 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         theta = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
         r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
 
+        peak_centres = self._filter_peak_centres_for_invalid_detectors(spec_list, peak_table)
+
+        delta_t = (peak_centres - t0) / 1e+6
+        delta_t_error = t0_error / 1e+6
+
+        E1 *= EVSGlobals.MEV_CONVERSION
+        v1 = np.sqrt( 2 * E1 /scipy.constants.m_n)
+        L1 = v1 * delta_t - L0 * r_theta
+        L1_error = v1 * delta_t_error
+
+        self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
+        self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
+
+    def _filter_peak_centres_for_invalid_detectors(self, spec_list, peak_table):
+        """
+          Finds invalid detectors and filters the peak centres. Caches the invalid detectors found to avoid repeat identification.
+          @param spec_list detectors to consider, must be either FRONT or BACKSCATTERING range.
+          @param peak_table - name of table containing fitted parameters each spectra.
+
+          @returns peak_centres - a list of peak fitted peak centres, with those that represent invalid detectors marked nan.
+        """
         peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
         peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
 
@@ -267,20 +288,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             raise AttributeError("Spec list invalid - must represent either front or back detectors.")
 
         peak_centres[invalid_detectors] = np.nan
-
         print(f'Invalid Spectra Index Found and Marked NAN: {invalid_detectors} from Spectra Index List:'
               f'{[ x -3 for x in spec_list]}')
 
-        delta_t = (peak_centres - t0) / 1e+6
-        delta_t_error = t0_error / 1e+6
-
-        E1 *= EVSGlobals.MEV_CONVERSION
-        v1 = np.sqrt( 2 * E1 /scipy.constants.m_n)
-        L1 = v1 * delta_t - L0 * r_theta
-        L1_error = v1 * delta_t_error
-
-        self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
-        self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
+        return peak_centres
 
     def _calculate_scattering_angle(self, table_name, spec_list):
         """
@@ -346,13 +357,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             theta = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
             r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
 
-            peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos', spec_list)
-            peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table[0], 'f1.LorentzPos_Err', spec_list)
-
-            if not self._invalid_detectors_back.any():
-                self._invalid_detectors_back = EVSMiscFunctions.identify_invalid_spectra(peak_table[0], peak_centres, peak_centres_errors,
-                                                                                         spec_list)
-            peak_centres[self._invalid_detectors_back] = np.nan
+            peak_centres = self._filter_peak_centres_for_invalid_detectors(spec_list, peak_table[0])
 
             delta_t = (peak_centres - t0) / 1e+6
             v1 = (L0 * r_theta + L1) / delta_t
