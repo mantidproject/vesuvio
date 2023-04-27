@@ -1,8 +1,8 @@
 from mantid.kernel import StringArrayProperty, Direction, StringListValidator, FloatArrayBoundedValidator, StringMandatoryValidator,\
      IntBoundedValidator, FloatArrayProperty
-from mantid.api import FileProperty, FileAction, PythonAlgorithm,AlgorithmManager
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, AlgorithmManager
 from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, ReplaceSpecialValues, GroupWorkspaces, mtd,\
-     ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue,RenameWorkspace
+     ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue, RenameWorkspace
 from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
 
 
@@ -128,10 +128,18 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
             # calibrate  E1 for backscattering detectors and use the backscattering averaged value for all detectors
             E1_fit_back = self._current_workspace + '_E1_back'
+            invalid_detectors = \
             self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference',
                                       SpectrumRange=EVSGlobals.BACKSCATTERING_RANGE, InstrumentParameterWorkspace=self._param_table,
                                       Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
-                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type)
+                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type,
+                                      InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors())
+
+            import pydevd_pycharm
+            pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
+
+            if invalid_detectors and not self._invalid_detectors.get_all_invalid_detectors():
+                self._invalid_detectors = InvalidDetectors(invalid_detectors)
 
             E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
             self._calculate_final_energy(E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type != "Individual")
@@ -144,7 +152,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference',
                                       SpectrumRange=EVSGlobals.FRONTSCATTERING_RANGE, InstrumentParameterWorkspace=self._param_table,
                                       Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
-                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type)
+                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type,
+                                      InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors())
 
             E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
             self._calculate_final_flight_path(E1_peak_fits_front[0], EVSGlobals.FRONTSCATTERING_RANGE)
@@ -183,13 +192,17 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
           @param args - positional arguments to the algorithm
           @param kwargs - key word arguments to the algorithm
+          @returns - returns list of invalid detectors so set in overarching alg
         """
         from mantid.simpleapi import set_properties
         alg = AlgorithmManager.create('EVSCalibrationFit')
         alg.initialize()
         alg.setRethrows(True)
+
         set_properties(alg, *args, **kwargs)
         alg.execute()
+
+        return alg.getProperty("InvalidDetectors").value.tolist()
 
     def _calculate_time_delay(self, table_name, spec_list):
         """

@@ -192,8 +192,12 @@ class EVSMiscFunctions:
 class InvalidDetectors:
 
     def __init__(self, invalid_detector_list):
+        self._invalid_detectors = invalid_detector_list
         self._invalid_detectors_front = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.FRONTSCATTERING_RANGE)
         self._invalid_detectors_back = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.BACKSCATTERING_RANGE)
+
+    def get_all_invalid_detectors(self):
+        return self._invalid_detectors
 
     @staticmethod
     def _preset_invalid_detectors(invalid_detector_list_full_range, desired_range):

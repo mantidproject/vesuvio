@@ -6,7 +6,7 @@ from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWor
      ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution, FindPeakBackground,\
      ExtractSingleSpectrum, SumSpectra, AppendSpectra, CloneWorkspace, Fit, MaskDetectors, ExtractUnmaskedSpectra, CreateWorkspace
 from functools import partial
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
 
 import os
 import sys
@@ -68,6 +68,14 @@ class EVSCalibrationFit(PythonAlgorithm):
                              doc='Calculate shared parameters using an individual and/or'
                                  'global fit.', validator=shared_fit_type_validator)
 
+        detector_validator = IntArrayBoundedValidator()
+        detector_validator.setLower(EVSGlobals.DETECTOR_RANGE[0])
+        detector_validator.setUpper(EVSGlobals.DETECTOR_RANGE[-1])
+        self.declareProperty(IntArrayProperty('InvalidDetectors', [], detector_validator, Direction.Input),
+                             doc="List of detectors to be marked as invalid (3-198), to be excluded from analysis calculations.")
+        self.declareProperty(IntArrayProperty('InvalidDetectorsOut', [], detector_validator, Direction.Output),
+                             doc="List of detectors found as invalid to be output.")
+
         self.declareProperty(
             ITableWorkspaceProperty("InstrumentParameterWorkspace", "", Direction.Input, PropertyMode.Optional),
             doc='Workspace contain instrument parameters.')
@@ -91,6 +99,9 @@ class EVSCalibrationFit(PythonAlgorithm):
         if self._create_output and not self._fitting_bragg_peaks:
             self._generate_fit_workspaces()
 
+        # set invalid detectors output param
+        self.setProperty("InvalidDetectorsOut", self._invalid_detectors.get_all_invalid_detectors())
+
         # clean up workspaces
         if self._param_file != "":
             DeleteWorkspace(self._param_table)
@@ -112,6 +123,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._sample_mass = self.getProperty("Mass").value
         self._create_output = self.getProperty("CreateOutput").value
         self._shared_parameter_fit_type = self.getProperty("SharedParameterFitType").value
+        self._invalid_detectors = InvalidDetectors(self.getProperty("InvalidDetectors").value.tolist())
 
     def _setup_spectra_list(self):
         self._spec_list = self.getProperty("SpectrumRange").value.tolist()
@@ -549,6 +561,10 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         self._output_parameter_tables = []
         self._peak_fit_workspaces = []
+
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
+
         for peak_index, estimated_peak_positions in enumerate(estimated_peak_positions_all_peaks):
 
             self._peak_fit_workspaces_by_spec = []
@@ -585,12 +601,14 @@ class EVSCalibrationFit(PythonAlgorithm):
         initial_params = {'A0': 0.0, 'A1': 0.0, 'LorentzAmp': init_Lorentz_Amp, 'LorentzPos': init_Lorentz_Pos,
                           'LorentzFWHM': init_Lorentz_FWHM, 'GaussianFWHM': init_Gaussian_FWHM}
 
-        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos', self._spec_list)
-        peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(output_parameter_table_name, 'f1.LorentzPos_Err',
-                                                                                self._spec_list)
-        invalid_spectra = EVSMiscFunctions.identify_invalid_spectra(output_parameter_table_name, peak_centres, peak_centres_errors,
-                                                                    self._spec_list)
-        self._fit_shared_parameter(invalid_spectra, initial_params, output_parameter_table_headers)
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
+
+        #This caches all the invalid spectra within self._invalid_detectors
+        self._invalid_detectors.filter_peak_centres_for_invalid_detectors(self._spec_list, output_parameter_table_name)
+
+        self._fit_shared_parameter([[x] for x in self._invalid_detectors.get_all_invalid_detectors()], initial_params,
+                                   output_parameter_table_headers)
 
     def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name,
                   output_parameter_table_headers):
