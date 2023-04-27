@@ -92,35 +92,6 @@ class EVSMiscFunctions:
 
         return r_theta
 
-    @staticmethod
-    def identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list):
-        """
-          Inspect fitting results, and identify the fits associated with invalid spectra. These are spectra associated with detectors
-          which have lost foil coverage following a recent reduction in distance from source to detectors.
-
-          @param peak_table - name of table containing fitted parameters each spectra.
-          @param spec_list - spectrum range to inspect.
-          @return a list of invalid spectra.
-        """
-        peak_Gaussian_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
-        peak_Gaussian_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
-        peak_Lorentz_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
-        peak_Lorentz_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
-        peak_Lorentz_Amp = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
-        peak_Lorentz_Amp_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
-
-        invalid_spectra = np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors)) | \
-                                      (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors)) | \
-                                      (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
-                                      (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
-                                      (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
-                                      (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
-                                      (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
-                                      (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
-                                      (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
-
-        return invalid_spectra
-
     # The IP text file load function skips the first 3 rows of the text file.
     # This assumes that there is one line for the file header and 2 lines for
     # parameters of monitor 1 and monitor 2, respectively.
@@ -216,3 +187,72 @@ class EVSMiscFunctions:
             raise ValueError("Unsupported fit function type: %s" % function_type)
 
         return {k: v + error_str for k, v in func_header.items()}
+
+
+class InvalidDetectors:
+
+    def __init__(self, invalid_detector_list):
+        self._invalid_detectors_front = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.FRONTSCATTERING_RANGE)
+        self._invalid_detectors_back = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.BACKSCATTERING_RANGE)
+
+    @staticmethod
+    def _preset_invalid_detectors(invalid_detector_list_full_range, desired_range):
+        return np.array([[x - desired_range[0]] for x in invalid_detector_list_full_range if desired_range[0] <= x <= desired_range[-1]])
+
+    def filter_peak_centres_for_invalid_detectors(self, spec_list, peak_table):
+        """
+          Finds invalid detectors and filters the peak centres. Caches the invalid detectors found to avoid repeat identification.
+          @param spec_list detectors to consider, must be either FRONT or BACKSCATTERING range.
+          @param peak_table - name of table containing fitted parameters each spectra.
+
+          @returns peak_centres - a list of peak fitted peak centres, with those that represent invalid detectors marked nan.
+        """
+        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
+        peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
+
+        if spec_list == EVSGlobals.FRONTSCATTERING_RANGE:
+            if not self._invalid_detectors_front.any():
+                self._invalid_detectors_front = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
+                                                                               spec_list)
+            invalid_detectors = self._invalid_detectors_front
+        elif spec_list == EVSGlobals.BACKSCATTERING_RANGE:
+            if not self._invalid_detectors_back.any():
+                self._invalid_detectors_back = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
+                                                                              spec_list)
+            invalid_detectors = self._invalid_detectors_back
+        else:
+            raise AttributeError("Spec list invalid - must represent either front or back detectors.")
+
+        peak_centres[invalid_detectors] = np.nan
+        print(f'Invalid Spectra Index Found and Marked NAN: {invalid_detectors} from Spectra Index List:'
+              f'{[ x -3 for x in spec_list]}')
+
+        return peak_centres
+
+    @staticmethod
+    def _identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list):
+        """
+          Inspect fitting results, and identify the fits associated with invalid spectra. These are spectra associated with detectors
+          which have lost foil coverage following a recent reduction in distance from source to detectors.
+
+          @param peak_table - name of table containing fitted parameters each spectra.
+          @param spec_list - spectrum range to inspect.
+          @return a list of invalid spectra.
+        """
+        peak_Gaussian_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM', spec_list)
+        peak_Gaussian_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.GaussianFWHM_Err', spec_list)
+        peak_Lorentz_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM', spec_list)
+        peak_Lorentz_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzFWHM_Err', spec_list)
+        peak_Lorentz_Amp = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzAmp', spec_list)
+        peak_Lorentz_Amp_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzAmp_Err', spec_list)
+
+        invalid_spectra = np.argwhere((np.isinf(peak_Lorentz_Amp_errors)) | (np.isnan(peak_Lorentz_Amp_errors)) | \
+                                      (np.isinf(peak_centres_errors)) | (np.isnan(peak_centres_errors)) | \
+                                      (np.isnan(peak_Gaussian_FWHM_errors)) | (np.isinf(peak_Gaussian_FWHM_errors)) | \
+                                      (np.isnan(peak_Lorentz_FWHM_errors)) | (np.isinf(peak_Lorentz_FWHM_errors)) | \
+                                      (np.isnan(peak_Lorentz_Amp_errors)) | (np.isinf(peak_Lorentz_Amp_errors)) | \
+                                      (np.absolute(peak_Gaussian_FWHM_errors) > np.absolute(peak_Gaussian_FWHM)) | \
+                                      (np.absolute(peak_Lorentz_FWHM_errors) > np.absolute(peak_Lorentz_FWHM)) | \
+                                      (np.absolute(peak_Lorentz_Amp_errors) > np.absolute(peak_Lorentz_Amp)) | \
+                                      (np.absolute(peak_centres_errors) > np.absolute(peak_centres)))
+        return invalid_spectra
