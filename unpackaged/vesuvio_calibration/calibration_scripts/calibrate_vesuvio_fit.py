@@ -648,7 +648,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         status, chi2, ncm, fit_params, fws, func, cost_func = Fit(Function=func_string, InputWorkspace=out_ws, IgnoreInvalidData=True,
                                                                 StartX=xmin, EndX=xmax,
                                                                 CalcErrors=True, Output=fit_output_name,
-                                                                Minimizer='SteepestDescent,RelError=1e-8', **added_args)
+                                                                Minimizer='Levenberg-Marquardt,RelError=1e-8', **added_args)
         [DeleteWorkspace(f"{self._sample}_Spec_{i}") for i in range(0,n_valid_specs)]
 
         output_headers = ['f0.'+ name for name in output_parameter_table_headers]
