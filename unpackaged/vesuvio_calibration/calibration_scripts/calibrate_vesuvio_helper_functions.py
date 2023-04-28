@@ -192,12 +192,30 @@ class EVSMiscFunctions:
 class InvalidDetectors:
 
     def __init__(self, invalid_detector_list):
-        self._invalid_detectors = invalid_detector_list
         self._invalid_detectors_front = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.FRONTSCATTERING_RANGE)
         self._invalid_detectors_back = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.BACKSCATTERING_RANGE)
 
+    def add_invalid_detectors(self, invalid_detector_list):
+        """
+          Takes a list of invalid spectra, adds unique entries to the stored np arrays.
+          @param invalid_detector_list - list of detectors to append to detector list, if unique.
+        """
+        self._invalid_detectors_front = np.array([[x] for x in sorted(set(self._invalid_detectors_front.ravel()).union(
+            set(self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.FRONTSCATTERING_RANGE).ravel())))])
+        self._invalid_detectors_back = np.array([[x] for x in sorted(set(self._invalid_detectors_back.ravel()).union(
+            set(self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.BACKSCATTERING_RANGE).ravel())))])
+
     def get_all_invalid_detectors(self):
-        return self._invalid_detectors
+        return [i + EVSGlobals.BACKSCATTERING_RANGE[0] for i in self._invalid_detectors_back.flatten().tolist()] + \
+               [j + EVSGlobals.FRONTSCATTERING_RANGE[0] for j in self._invalid_detectors_front.flatten().tolist()]
+
+    def get_invalid_detectors_index(self, desired_range):
+        if desired_range == EVSGlobals.FRONTSCATTERING_RANGE:
+            return self._invalid_detectors_front.flatten().tolist()
+        elif desired_range == EVSGlobals.BACKSCATTERING_RANGE:
+            return self._invalid_detectors_back.flatten().tolist()
+        else:
+            raise AttributeError("desired range invalid - must represent either front or back detectors.")
 
     @staticmethod
     def _preset_invalid_detectors(invalid_detector_list_full_range, desired_range):
@@ -229,7 +247,7 @@ class InvalidDetectors:
 
         peak_centres[invalid_detectors] = np.nan
         print(f'Invalid Spectra Index Found and Marked NAN: {invalid_detectors} from Spectra Index List:'
-              f'{[ x -3 for x in spec_list]}')
+              f'{[ x - EVSGlobals.DETECTOR_RANGE[0] for x in spec_list]}')
 
         return peak_centres
 

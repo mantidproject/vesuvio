@@ -562,9 +562,6 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._output_parameter_tables = []
         self._peak_fit_workspaces = []
 
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
-
         for peak_index, estimated_peak_positions in enumerate(estimated_peak_positions_all_peaks):
 
             self._peak_fit_workspaces_by_spec = []
@@ -601,13 +598,10 @@ class EVSCalibrationFit(PythonAlgorithm):
         initial_params = {'A0': 0.0, 'A1': 0.0, 'LorentzAmp': init_Lorentz_Amp, 'LorentzPos': init_Lorentz_Pos,
                           'LorentzFWHM': init_Lorentz_FWHM, 'GaussianFWHM': init_Gaussian_FWHM}
 
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
-
         #This caches all the invalid spectra within self._invalid_detectors
         self._invalid_detectors.filter_peak_centres_for_invalid_detectors(self._spec_list, output_parameter_table_name)
 
-        self._fit_shared_parameter([[x] for x in self._invalid_detectors.get_all_invalid_detectors()], initial_params,
+        self._fit_shared_parameter(self._invalid_detectors.get_invalid_detectors_index(self._spec_list), initial_params,
                                    output_parameter_table_headers)
 
     def _fit_peak(self, peak_index, spec_index, peak_position, output_parameter_table_name,

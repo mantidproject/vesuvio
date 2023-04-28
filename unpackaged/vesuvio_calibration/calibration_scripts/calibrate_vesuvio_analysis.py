@@ -134,12 +134,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                                       Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
                                       PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type,
                                       InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors())
-
-            import pydevd_pycharm
-            pydevd_pycharm.settrace('localhost', port=8080, stdoutToServer=True, stderrToServer=True)
-
-            if invalid_detectors and not self._invalid_detectors.get_all_invalid_detectors():
-                self._invalid_detectors = InvalidDetectors(invalid_detectors)
+            self._invalid_detectors.add_invalid_detectors(invalid_detectors)
 
             E1_peak_fits_back = mtd[self._current_workspace + '_E1_back_Peak_Parameters'].getNames()
             self._calculate_final_energy(E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type != "Individual")
@@ -149,11 +144,13 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
             # calibrate L1 for frontscattering detectors based on the averaged E1 value  and calibrated theta values
             E1_fit_front = self._current_workspace + '_E1_front'
+            invalid_detectors += \
             self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference',
                                       SpectrumRange=EVSGlobals.FRONTSCATTERING_RANGE, InstrumentParameterWorkspace=self._param_table,
                                       Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
                                       PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type,
                                       InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors())
+            self._invalid_detectors.add_invalid_detectors(invalid_detectors)
 
             E1_peak_fits_front = mtd[self._current_workspace + '_E1_front_Peak_Parameters'].getNames()
             self._calculate_final_flight_path(E1_peak_fits_front[0], EVSGlobals.FRONTSCATTERING_RANGE)
@@ -202,7 +199,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         set_properties(alg, *args, **kwargs)
         alg.execute()
 
-        return alg.getProperty("InvalidDetectors").value.tolist()
+        return alg.getProperty("InvalidDetectorsOut").value.tolist()
 
     def _calculate_time_delay(self, table_name, spec_list):
         """

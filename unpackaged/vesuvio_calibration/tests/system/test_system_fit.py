@@ -121,6 +121,22 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         params_table = self._run_evs_calibration_fit("Recoil")
         self._assert_fitted_positions_match_expected(expected_values, params_table, default_rel_tol=0.01)
 
+    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    def test_fit_peaks_copper_E1_invalid_detectors_specified(self, load_file_mock):
+        self._setup_copper_test()
+        self._E1_fit_active = True
+        self._E1_fit = [True]
+        self._output_workspace = "copper_peak_fit"
+        self._mode = ['SingleDifference']
+
+        load_file_mock.side_effect = self._load_file_side_effect
+        expected_values = self._calculate_energy_peak_positions()
+
+        self._create_evs_calibration_fit("Recoil")
+        self._alg.setProperty('InvalidDetectors', [10, 20, 30])
+        params_table = self._execute_evs_calibration_fit()
+        self._assert_fitted_positions_match_expected(expected_values, params_table, {38:  0.12})
+
     def _assert_fitted_positions_match_expected(self, expected_positions, params_table, rel_tolerance=None,
                                                 default_rel_tol=TestConstants.DEFAULT_RELATIVE_TOLERANCE):
         """
