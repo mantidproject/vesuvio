@@ -598,8 +598,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         initial_params = {'A0': 0.0, 'A1': 0.0, 'LorentzAmp': init_Lorentz_Amp, 'LorentzPos': init_Lorentz_Pos,
                           'LorentzFWHM': init_Lorentz_FWHM, 'GaussianFWHM': init_Gaussian_FWHM}
 
-        #This caches all the invalid spectra within self._invalid_detectors
-        self._invalid_detectors.filter_peak_centres_for_invalid_detectors(self._spec_list, output_parameter_table_name)
+        self._invalid_detectors.identify_and_set_invalid_detectors_from_range(self._spec_list, output_parameter_table_name)
 
         self._fit_shared_parameter(self._invalid_detectors.get_invalid_detectors_index(self._spec_list), initial_params,
                                    output_parameter_table_headers)

@@ -44,7 +44,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         mock_mtd.__getitem__.return_value = ws_mock
 
         np.testing.assert_equal(np.argwhere([]),
-                                EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
+                                InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
     @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_nan_in_errors(self, mock_mtd):
@@ -56,7 +56,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         mock_mtd.__getitem__.return_value = ws_mock
 
         np.testing.assert_equal(np.argwhere(np.array([True, False, True])),
-                                EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
+                                InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
     @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_inf_in_errors(self, mock_mtd):
@@ -68,7 +68,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         mock_mtd.__getitem__.return_value = ws_mock
 
         np.testing.assert_equal(np.argwhere(np.array([True, True, False])),
-                                EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
+                                InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
     @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_error_greater_than_peak(self, mock_mtd):
@@ -80,7 +80,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         mock_mtd.__getitem__.return_value = ws_mock
 
         np.testing.assert_equal(np.argwhere(np.array([False, True, True])),
-                                EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
+                                InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
     def test_create_empty_invalid_detectors(self):
         invalid_detectors = InvalidDetectors([])

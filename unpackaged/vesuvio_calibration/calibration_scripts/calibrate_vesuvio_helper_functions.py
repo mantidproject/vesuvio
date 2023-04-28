@@ -221,35 +221,43 @@ class InvalidDetectors:
     def _preset_invalid_detectors(invalid_detector_list_full_range, desired_range):
         return np.array([[x - desired_range[0]] for x in invalid_detector_list_full_range if desired_range[0] <= x <= desired_range[-1]])
 
-    def filter_peak_centres_for_invalid_detectors(self, spec_list, peak_table):
+    def filter_peak_centres_for_invalid_detectors(self, detector_range, peak_table):
         """
           Finds invalid detectors and filters the peak centres. Caches the invalid detectors found to avoid repeat identification.
-          @param spec_list detectors to consider, must be either FRONT or BACKSCATTERING range.
+          @param detector_range detectors to consider, must be either FRONT or BACKSCATTERING range.
           @param peak_table - name of table containing fitted parameters each spectra.
 
           @returns peak_centres - a list of peak fitted peak centres, with those that represent invalid detectors marked nan.
         """
-        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', spec_list)
-        peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', spec_list)
 
-        if spec_list == EVSGlobals.FRONTSCATTERING_RANGE:
+        invalid_detectors = self.identify_and_set_invalid_detectors_from_range(detector_range, peak_table)
+        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', detector_range)
+        peak_centres[invalid_detectors] = np.nan
+        return peak_centres
+
+    def identify_and_set_invalid_detectors_from_range(self, detector_range, peak_table):
+        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', detector_range)
+        peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', detector_range)
+
+        if detector_range == EVSGlobals.FRONTSCATTERING_RANGE:
             if not self._invalid_detectors_front.any():
                 self._invalid_detectors_front = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
-                                                                               spec_list)
-            invalid_detectors = self._invalid_detectors_front
-        elif spec_list == EVSGlobals.BACKSCATTERING_RANGE:
+                                                                               detector_range)
+                self._print_invalid_detectors(self._invalid_detectors_front, detector_range)
+            return self._invalid_detectors_front
+        elif detector_range == EVSGlobals.BACKSCATTERING_RANGE:
             if not self._invalid_detectors_back.any():
                 self._invalid_detectors_back = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
-                                                                              spec_list)
-            invalid_detectors = self._invalid_detectors_back
+                                                                              detector_range)
+                self._print_invalid_detectors(self._invalid_detectors_back, detector_range)
+            return self._invalid_detectors_back
         else:
             raise AttributeError("Spec list invalid - must represent either front or back detectors.")
 
-        peak_centres[invalid_detectors] = np.nan
+    @staticmethod
+    def _print_invalid_detectors(invalid_detectors, detector_range):
         print(f'Invalid Spectra Index Found and Marked NAN: {invalid_detectors} from Spectra Index List:'
-              f'{[ x - EVSGlobals.DETECTOR_RANGE[0] for x in spec_list]}')
-
-        return peak_centres
+              f'{[x - EVSGlobals.DETECTOR_RANGE[0] for x in detector_range]}')
 
     @staticmethod
     def _identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors, spec_list):
