@@ -236,6 +236,14 @@ class InvalidDetectors:
         return peak_centres
 
     def identify_and_set_invalid_detectors_from_range(self, detector_range, peak_table):
+        """
+          Finds invalid detectors and caches the invalid detectors. Will not look to calculate if invalid detectors already exist.
+          @param detector_range detectors to consider, must be either FRONT or BACKSCATTERING range.
+          @param peak_table - name of table containing fitted parameters each spectra.
+
+          @returns invalid_detectors - a list of the index's of invalid detector, in the context of the range they belong to.
+        """
+
         peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', detector_range)
         peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', detector_range)
 
