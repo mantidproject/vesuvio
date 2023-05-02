@@ -1,13 +1,8 @@
-from mantid.kernel import StringArrayProperty, Direction, StringListValidator, IntArrayBoundedValidator, IntArrayProperty,\
-     FloatArrayBoundedValidator, FloatArrayMandatoryValidator, StringMandatoryValidator, IntBoundedValidator,\
-     FloatArrayProperty
-from mantid.api import FileProperty, FileAction, ITableWorkspaceProperty, PropertyMode, Progress, TextAxis, PythonAlgorithm,\
-     AlgorithmManager
-from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWorkspace, RebinToWorkspace, Divide,\
-     ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution,\
-     FindPeakBackground, ExtractSingleSpectrum, SumSpectra, AppendSpectra, ConvertTableToMatrixWorkspace,\
-     ConjoinWorkspaces, Transpose, PlotPeakByLogValue, CloneWorkspace, MaskDetectors,\
-     ExtractUnmaskedSpectra, CreateWorkspace, RenameWorkspace
+from mantid.kernel import StringArrayProperty, Direction, StringListValidator, FloatArrayBoundedValidator, StringMandatoryValidator,\
+     IntBoundedValidator, FloatArrayProperty
+from mantid.api import FileProperty, FileAction, PythonAlgorithm,AlgorithmManager
+from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, ReplaceSpecialValues, GroupWorkspaces, mtd,\
+     ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue,RenameWorkspace
 from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions
 
 import os
@@ -280,7 +275,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         L0 = EVSMiscFunctions.read_table_column(self._current_workspace, 'L0', spec_list)
         L1 = EVSMiscFunctions.read_table_column(self._param_table, 'L1', spec_list)
         L1_nan_to_num = np.nan_to_num(L1)
-        spec = EVSMiscFunctions.read_table_column(self._current_workspace, 'Spectrum', spec_list)
 
         t0 /= 1e+6
 

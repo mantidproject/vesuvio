@@ -4,7 +4,7 @@ import scipy.constants
 import scipy.stats
 
 from mantid.api import WorkspaceGroup, AlgorithmFactory
-from mantid.simpleapi import LoadVesuvio, LoadRaw, mtd, ConvertToDistribution
+from mantid.simpleapi import mtd
 from mock import patch
 from unpackaged.vesuvio_calibration.tests.testhelpers.algorithms import create_algorithm
 from unpackaged.vesuvio_calibration.tests.testhelpers.system_test_base import EVSCalibrationTest, TestConstants

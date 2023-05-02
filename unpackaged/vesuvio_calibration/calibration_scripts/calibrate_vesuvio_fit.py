@@ -1,13 +1,10 @@
 from mantid.kernel import StringArrayProperty, Direction, StringListValidator, IntArrayBoundedValidator, IntArrayProperty,\
-     FloatArrayBoundedValidator, FloatArrayMandatoryValidator, StringMandatoryValidator, IntBoundedValidator,\
-     FloatArrayProperty, logger
+     FloatArrayBoundedValidator, FloatArrayMandatoryValidator, StringMandatoryValidator, FloatArrayProperty, logger
 from mantid.api import FileProperty, FileAction, ITableWorkspaceProperty, PropertyMode, Progress, TextAxis, PythonAlgorithm,\
      WorkspaceFactory, AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWorkspace, RebinToWorkspace, Divide,\
-     ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution,\
-     FindPeakBackground, ExtractSingleSpectrum, SumSpectra, AppendSpectra, ConvertTableToMatrixWorkspace,\
-     ConjoinWorkspaces, Transpose, PlotPeakByLogValue, CloneWorkspace, Fit, MaskDetectors,\
-     ExtractUnmaskedSpectra, CreateWorkspace
+     ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution, FindPeakBackground,\
+     ExtractSingleSpectrum, SumSpectra, AppendSpectra, CloneWorkspace, Fit, MaskDetectors, ExtractUnmaskedSpectra, CreateWorkspace
 from functools import partial
 from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions
 
