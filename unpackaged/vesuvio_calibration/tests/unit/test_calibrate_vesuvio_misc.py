@@ -107,7 +107,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), input_invalid_detectors)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions'
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions'
            '.EVSMiscFunctions.read_fitting_result_table_column')
     def test_filter_peak_centres_for_invalid_detectors_front(self, mock_read_fitting_result):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
@@ -117,7 +117,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         out_peak_centres = invalid_detectors.filter_peak_centres_for_invalid_detectors([3, 134], peak_table)
         self.assertEqual(list(np.argwhere(np.isnan(out_peak_centres)).transpose()[0]), [7, 17, 27])
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions'
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions'
            '.EVSMiscFunctions.read_fitting_result_table_column')
     def test_filter_peak_centres_for_invalid_detectors_back(self, mock_read_fitting_result):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
@@ -127,7 +127,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         out_peak_centres = invalid_detectors.filter_peak_centres_for_invalid_detectors([135, 198], peak_table)
         self.assertEqual(list(np.argwhere(np.isnan(out_peak_centres)).transpose()[0]), [15, 25, 35])
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions'
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions'
            '.EVSMiscFunctions.read_fitting_result_table_column')
     def test_filter_peak_centres_for_invalid_detectors_invalid_range(self, mock_read_fitting_result):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
