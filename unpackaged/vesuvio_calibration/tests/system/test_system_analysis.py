@@ -4,12 +4,12 @@ import numpy as np
 from mantid.api import AlgorithmFactory
 from mantid.simpleapi import mtd
 from mock import patch
-from unpackaged.vesuvio_calibration.tests.testhelpers.algorithms import create_algorithm
-from unpackaged.vesuvio_calibration.tests.testhelpers.system_test_base import EVSCalibrationTest, TestConstants
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
-from unpackaged.vesuvio_calibration.tests.testhelpers.system_test_misc_functions import assert_allclose_excluding_bad_detectors
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
+from tests.testhelpers.algorithms import create_algorithm
+from tests.testhelpers.system_test_base import EVSCalibrationTest, TestConstants
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
+from tests.testhelpers.system_test_misc_functions import assert_allclose_excluding_bad_detectors
+from calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
+from calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
 from copy import copy
 from os import path
 
@@ -40,7 +40,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._E1_fit = [False, True, True]
         self._L0_fit = [False]
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
@@ -55,7 +55,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_lead(self, load_file_mock):
         self._setup_lead_test()
         self._output_workspace = "lead_analysis_test"
@@ -70,7 +70,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            178, 180, 182, 183]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_niobium(self, load_file_mock):
         self._setup_niobium_test()
         self._output_workspace = "niobium_analysis_test"
@@ -88,7 +88,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            182, 186, 187, 189, 191]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_with_uranium(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
@@ -103,7 +103,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_lead_with_uranium(self, load_file_mock):
         self._setup_lead_test()
         self._output_workspace = "lead_analysis_test"
@@ -118,7 +118,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            178, 180, 182, 183]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_with_l0_calc(self, load_file_mock):
         self._setup_copper_test()
         self._L0_fit = [True, True, True, False, False, False]
@@ -138,7 +138,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_with_multiple_iterations(self, load_file_mock):
         self._setup_copper_test()
         self._iterations = 2
@@ -158,7 +158,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_create_output(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
@@ -175,7 +175,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_with_individual_and_global_fit(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"

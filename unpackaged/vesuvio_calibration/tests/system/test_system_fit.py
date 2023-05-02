@@ -6,11 +6,11 @@ import scipy.stats
 from mantid.api import WorkspaceGroup, AlgorithmFactory
 from mantid.simpleapi import mtd
 from mock import patch
-from unpackaged.vesuvio_calibration.tests.testhelpers.algorithms import create_algorithm
-from unpackaged.vesuvio_calibration.tests.testhelpers.system_test_base import EVSCalibrationTest, TestConstants
-from unpackaged.vesuvio_calibration.tests.testhelpers.system_test_misc_functions import assert_allclose_excluding_bad_detectors
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions import EVSMiscFunctions, EVSGlobals
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
+from tests.testhelpers.algorithms import create_algorithm
+from tests.testhelpers.system_test_base import EVSCalibrationTest, TestConstants
+from tests.testhelpers.system_test_misc_functions import assert_allclose_excluding_bad_detectors
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSMiscFunctions, EVSGlobals
+from calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
 from os import path
 
 
@@ -40,7 +40,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._E1_fit = [False]
         self._L0_fit = [False]
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_fit_bragg_peaks_copper(self, load_file_mock):
         self._setup_copper_test()
         self._spec_range = [EVSGlobals.DETECTOR_RANGE]
@@ -52,7 +52,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         params_table = self._run_evs_calibration_fit("Bragg")
         self._assert_fitted_positions_match_expected(expected_values, params_table, {15: TestConstants.IGNORE_DETECTOR})
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_fit_bragg_peaks_lead(self, load_file_mock):
         self._setup_lead_test()
         self._spec_range = [EVSGlobals.DETECTOR_RANGE]
@@ -65,7 +65,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._assert_fitted_positions_match_expected(expected_values, params_table, {145: 0.27, 158: 0.15, 190:
                                                                                     TestConstants.IGNORE_DETECTOR})
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_fit_peaks_copper_E1(self, load_file_mock):
         self._setup_copper_test()
         self._E1_fit_active = True
@@ -79,7 +79,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         params_table = self._run_evs_calibration_fit("Recoil")
         self._assert_fitted_positions_match_expected(expected_values, params_table, {38:  0.12})
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_fit_peaks_lead_E1(self, load_file_mock):
         self._setup_lead_test()
         self._E1_fit_active = True
@@ -93,7 +93,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         params_table = self._run_evs_calibration_fit("Recoil")
         self._assert_fitted_positions_match_expected(expected_values, params_table, {38:  0.12})
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_fit_frontscattering_uranium(self, load_file_mock):
         self._setup_uranium_test()
         self._run_range = EVSGlobals.U_FRONTSCATTERING_SAMPLE
@@ -107,7 +107,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         params_table = self._run_evs_calibration_fit("Recoil")
         self._assert_fitted_positions_match_expected(expected_values, params_table)
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_fit_backscattering_uranium(self, load_file_mock):
         self._setup_uranium_test()
         self._run_range = EVSGlobals.U_BACKSCATTERING_SAMPLE

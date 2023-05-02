@@ -1,4 +1,4 @@
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
+from calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
 
 import unittest
 

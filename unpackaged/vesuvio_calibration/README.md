@@ -47,10 +47,10 @@ Upon running the script, the two calibration algorithms will be registered under
 
 1. Actviate the conda environment using `conda activate vesuvio-env`.
 
-2. From the root of the repository run `python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit`
+2. From `<root of the repository>/unpackaged/vesuvio_calibration` run `python -m unittest discover -s ./tests/unit`
 
 ## Running the system tests from the command line.
 
 1. Actviate the conda environment using `conda activate vesuvio-env`.
 
-2. From the root of the repository run `python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/system`
+2. From `<root of the repository>/unpackaged/vesuvio_calibration`  run `python -m unittest discover -s ./tests/system`

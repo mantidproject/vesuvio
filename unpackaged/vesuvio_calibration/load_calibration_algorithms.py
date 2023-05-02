@@ -13,8 +13,8 @@
 """
 
 from mantid.api import AlgorithmFactory
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
+from calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
+from calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
 
 AlgorithmFactory.subscribe(EVSCalibrationFit)
 AlgorithmFactory.subscribe(EVSCalibrationAnalysis)

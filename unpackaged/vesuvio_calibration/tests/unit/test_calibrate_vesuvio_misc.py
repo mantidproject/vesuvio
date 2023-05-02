@@ -1,4 +1,4 @@
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions import EVSMiscFunctions
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSMiscFunctions
 from mock import MagicMock, patch
 
 import unittest
@@ -34,7 +34,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         with self.assertRaises(ValueError):
             EVSMiscFunctions.generate_fit_function_header("Invalid")
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_no_invalid(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [0.1, 0.2, 0.3],
@@ -46,7 +46,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         np.testing.assert_equal(np.argwhere([]),
                                 EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_nan_in_errors(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [np.nan, 0.2, 0.3],
@@ -58,7 +58,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         np.testing.assert_equal(np.argwhere(np.array([True, False, True])),
                                 EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_inf_in_errors(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [0.1, 0.2, 0.3],
@@ -70,7 +70,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         np.testing.assert_equal(np.argwhere(np.array([True, True, False])),
                                 EVSMiscFunctions.identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
     def test_identify_invalid_spectra_error_greater_than_peak(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [0.1, 0.2, 0.3],
