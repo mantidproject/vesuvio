@@ -1,25 +1,3 @@
-<<<<<<< HEAD
-from mantid.kernel import StringArrayProperty, Direction, StringListValidator, FloatArrayBoundedValidator, StringMandatoryValidator,\
-     IntBoundedValidator, FloatArrayProperty
-from mantid.api import FileProperty, FileAction, PythonAlgorithm, AlgorithmManager
-from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, ReplaceSpecialValues, GroupWorkspaces, mtd,\
-     ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue, RenameWorkspace
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-
-||||||| parent of 1fa741e (respond to pr review comments)
-from mantid.kernel import StringArrayProperty, Direction, StringListValidator, IntArrayBoundedValidator, IntArrayProperty,\
-     FloatArrayBoundedValidator, FloatArrayMandatoryValidator, StringMandatoryValidator, IntBoundedValidator,\
-     FloatArrayProperty
-from mantid.api import FileProperty, FileAction, ITableWorkspaceProperty, PropertyMode, Progress, TextAxis, PythonAlgorithm,\
-     AlgorithmManager
-from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWorkspace, RebinToWorkspace, Divide,\
-     ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution,\
-     FindPeakBackground, ExtractSingleSpectrum, SumSpectra, AppendSpectra, ConvertTableToMatrixWorkspace,\
-     ConjoinWorkspaces, Transpose, PlotPeakByLogValue, CloneWorkspace, MaskDetectors,\
-     ExtractUnmaskedSpectra, CreateWorkspace, RenameWorkspace
-from unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions,\
-     InvalidDetectors
-=======
 from mantid.kernel import StringArrayProperty, Direction, StringListValidator, IntArrayBoundedValidator, IntArrayProperty,\
      FloatArrayBoundedValidator, StringMandatoryValidator, IntBoundedValidator,FloatArrayProperty
 from mantid.api import FileProperty, FileAction, PythonAlgorithm,AlgorithmManager
@@ -27,7 +5,6 @@ from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, Replace
      ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue,RenameWorkspace
 from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions,\
      InvalidDetectors
->>>>>>> 1fa741e (respond to pr review comments)
 
 import os
 import sys
