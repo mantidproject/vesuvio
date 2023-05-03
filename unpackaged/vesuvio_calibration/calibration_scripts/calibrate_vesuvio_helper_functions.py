@@ -192,8 +192,14 @@ class EVSMiscFunctions:
 class InvalidDetectors:
 
     def __init__(self, invalid_detector_list):
-        self._invalid_detectors_front = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.FRONTSCATTERING_RANGE)
-        self._invalid_detectors_back = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.BACKSCATTERING_RANGE)
+        if invalid_detector_list:
+            self._invalid_detectors_front = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.FRONTSCATTERING_RANGE)
+            self._invalid_detectors_back = self._preset_invalid_detectors(invalid_detector_list, EVSGlobals.BACKSCATTERING_RANGE)
+            self._detectors_preset = True
+        else:
+            self._invalid_detectors_front = np.array([])
+            self._invalid_detectors_back = np.array([])
+            self._detectors_preset = False
 
     def add_invalid_detectors(self, invalid_detector_list):
         """
@@ -248,13 +254,13 @@ class InvalidDetectors:
         peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos_Err', detector_range)
 
         if detector_range == EVSGlobals.FRONTSCATTERING_RANGE:
-            if not self._invalid_detectors_front.any():
+            if not self._detectors_preset and not self._invalid_detectors_front.any():
                 self._invalid_detectors_front = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
                                                                                detector_range)
                 self._print_invalid_detectors(self._invalid_detectors_front, detector_range)
             return self._invalid_detectors_front
         elif detector_range == EVSGlobals.BACKSCATTERING_RANGE:
-            if not self._invalid_detectors_back.any():
+            if not self._detectors_preset and not self._invalid_detectors_back.any():
                 self._invalid_detectors_back = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
                                                                               detector_range)
                 self._print_invalid_detectors(self._invalid_detectors_back, detector_range)
