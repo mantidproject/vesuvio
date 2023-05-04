@@ -620,10 +620,13 @@ class EVSCalibrationFit(PythonAlgorithm):
         peak_params = self._find_peaks_and_output_params(spec_range, peak_position, peak_index)
         fit_func = self._build_function_string(peak_params)
         start_str = 'composite=MultiDomainFunction, NumDeriv=1;'
-        validSpecs = mtd[self._sample]
-        # need to decide how to remove invalid spectra from multifit
-        # MaskDetectors(Workspace=sample_ws, WorkspaceIndexList=invalid_spectra)
-        # validSpecs = ExtractUnmaskedSpectra(InputWorkspace=sample_ws, OutputWorkspace='valid_spectra')
+        sample_ws = mtd[self._sample]
+        if self._invalid_detectors._detectors_preset == True:
+            invalid_spectra = self._invalid_detectors.get_invalid_detectors_index(self._spec_list)
+            MaskDetectors(Workspace=sample_ws, WorkspaceIndexList=invalid_spectra)
+            validSpecs = ExtractUnmaskedSpectra(InputWorkspace=sample_ws, OutputWorkspace='valid_spectra')
+        else:
+            validSpecs = sample_ws
         n_valid_specs = validSpecs.getNumberHistograms()
         
         fit_func = ('(composite=CompositeFunction, NumDeriv=false, $domains=i;' + fit_func[:-1] + ');') * n_valid_specs

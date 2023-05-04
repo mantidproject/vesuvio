@@ -214,7 +214,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols, "Both")
         self._assert_E1_parameters_match_expected(params_table, 3e-3, "Both")
 
-    @patch('unpackaged.vesuvio_calibration.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
     def test_copper_with_global_fit(self, load_file_mock):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
