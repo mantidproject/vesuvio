@@ -257,19 +257,25 @@ class InvalidDetectors:
             if not self._detectors_preset and not self._invalid_detectors_front.any():
                 self._invalid_detectors_front = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
                                                                                detector_range)
-                self._print_invalid_detectors(self._invalid_detectors_front, detector_range)
+                self._print_invalid_detectors(front_detector_range=True)
             return self._invalid_detectors_front
         elif detector_range == EVSGlobals.BACKSCATTERING_RANGE:
             if not self._detectors_preset and not self._invalid_detectors_back.any():
                 self._invalid_detectors_back = self._identify_invalid_spectra(peak_table, peak_centres, peak_centres_errors,
                                                                               detector_range)
-                self._print_invalid_detectors(self._invalid_detectors_back, detector_range)
+                self._print_invalid_detectors(front_detector_range=False)
             return self._invalid_detectors_back
         else:
             raise AttributeError("Spec list invalid - must represent either front or back detectors.")
 
-    @staticmethod
-    def _print_invalid_detectors(invalid_detectors, detector_range):
+    def _print_invalid_detectors(self, front_detector_range):
+        if front_detector_range:
+            invalid_detectors = self._invalid_detectors_front
+            detector_range = EVSGlobals.FRONTSCATTERING_RANGE
+        else:
+            invalid_detectors = self._invalid_detectors_back
+            detector_range = EVSGlobals.BACKSCATTERING_RANGE
+
         print(f'Invalid Spectra Index Found and Marked NAN: {invalid_detectors} from Spectra Index List:'
               f'{[x - EVSGlobals.DETECTOR_RANGE[0] for x in detector_range]}')
 
