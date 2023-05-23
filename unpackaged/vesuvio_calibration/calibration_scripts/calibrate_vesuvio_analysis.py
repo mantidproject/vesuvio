@@ -255,25 +255,15 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
           @param fit_type - type of fitting, one of 'Individual', 'Shared', or 'Both'
         """
         if fit_type == 'Both':
-            indv_peak_table = peak_table[0]
-            global_peak_table = peak_table[1]
             params = self._read_calibration_params_from_table(spec_list, E1_col_names=['E1', 'global_E1'])
+            self._calculate_L1_from_table(spec_list, peak_table[0], params, 'L1')
+            self._calculate_L1_from_table(spec_list, peak_table[1], params, 'global_L1')
         elif fit_type == 'Shared':
-            global_peak_table = peak_table[0]
             params = self._read_calibration_params_from_table(spec_list, E1_col_names=['global_E1'])
+            self._calculate_L1_from_table(spec_list, peak_table[0], params, 'global_L1')
         else:
-            indv_peak_table = peak_table[0]
             params = self._read_calibration_params_from_table(spec_list, E1_col_names=['E1'])
-
-        if fit_type != 'Shared':
-            peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, indv_peak_table)
-            self._calculate_L1_from_table(spec_list, peak_centres, params, 'L1')
-
-        if fit_type != 'Individual':
-            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(global_peak_table, 'f1.LorentzPos', [0])
-            peak_centre_list = np.empty(spec_list[1] + 1 - spec_list[0])
-            peak_centre_list.fill(float(peak_centre))
-            self._calculate_L1_from_table(spec_list, peak_centre_list, params, 'global_L1')
+            self._calculate_L1_from_table(spec_list, peak_table[0], params, 'L1')
 
     def _read_calibration_params_from_table(self, spec_list, E1_col_names=[], L1_col_names=[]):
         """
@@ -300,15 +290,22 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         return param_dict
 
-    def _calculate_L1_from_table(self, spec_list, peak_centres, params, L1_col_name):
+    def _calculate_L1_from_table(self, spec_list, peak_table, params, L1_col_name):
         """
         Calculate L1 from fitted calibration parameters
 
         @param spec_list - spectrum range to calculate L1 for
-        @param peak_centres - list of peak centre values
+        @param peak_table - name of table to calculate L1 for
         @param params - dict of params required for calculation
         @param L1_col_name - either 'L1' or 'global_L1'
         """
+        if L1_col_name == 'L1':
+            peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, peak_table)
+        elif L1_col_name == 'global_L1':
+            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', [0])
+            peak_centres = np.empty(spec_list[1] + 1 - spec_list[0])
+            peak_centres.fill(float(peak_centre))
+
         delta_t = (peak_centres - params['t0']) / 1e+6
         delta_t_error = params['t0_error'] / 1e+6
         v1 = np.sqrt( 2 * params[L1_col_name.strip('L1') + 'E1'] /scipy.constants.m_n)
@@ -364,30 +361,21 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         """
           Calculate the final energy using the fitted peak centres of a run.
 
-          @param peak_table - name of table containing fitted parameters for the peak centres
+          @param peak_table - list of tables containing fitted parameters for the peak centres
           @param spec_list - spectrum range to calculate t0 for.
           @param fit_type - type of fitting, one of 'Individual', 'Shared', or 'Both'
         """
         spec_range = EVSGlobals.DETECTOR_RANGE[1] + 1 - EVSGlobals.DETECTOR_RANGE[0]
 
         if not self._E1_value_and_error:
-            if fit_type == 'Both':
-                indv_peak_table = peak_table[0]
-                global_peak_table = peak_table[1]
-            elif fit_type == 'Shared':
-                global_peak_table = peak_table[0]
-            else:
-                indv_peak_table = peak_table[0]
-                
             params = self._read_calibration_params_from_table(spec_list, L1_col_names=['L1'])
-
-            if fit_type != 'Shared':
-                peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, indv_peak_table)
-                self._calculate_E1(spec_list, spec_range, peak_centres, params, 'E1')
-            if fit_type != 'Individual':
-                peak_centre = EVSMiscFunctions.read_fitting_result_table_column(global_peak_table, 'f1.LorentzPos', [0])
-                peak_centre_list = [float(peak_centre)] * len(params['L0'])
-                self._calculate_E1(spec_list, spec_range, peak_centre_list, params, 'global_E1')    
+            if fit_type == 'Both':
+                self._calculate_E1(spec_list, spec_range, peak_table[0], params, 'E1')
+                self._calculate_E1(spec_list, spec_range, peak_table[1], params, 'global_E1')
+            elif fit_type == 'Shared':
+                self._calculate_E1(spec_list, spec_range, peak_table[0], params, 'global_E1')
+            else:
+                self._calculate_E1(spec_list, spec_range, peak_table[0], params, 'E1')  
         else:
                 mean_E1 = np.empty(spec_range)
                 E1_error = np.empty(spec_range)
@@ -401,16 +389,22 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 self._set_table_column(self._current_workspace, 'E1', mean_E1)
                 self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
 
-    def _calculate_E1(self, spec_list, spec_range, peak_centres, params, E1_col_name):
+    def _calculate_E1(self, spec_list, spec_range, peak_table, params, E1_col_name):
         """
         Calculate E1 value from fitted parameters
 
         @param spec_list - spectrum range to calculate E1 for
         @param spec_range - detector range
-        @param peak_centres - list of fitted peak centres
+        @param peak_table - name of table containing fitted parameters for the peak centres
         @param params - dict of params needed to calculate E1
         @param E1_col_name - either 'E1' or 'global_E1'
         """
+        if E1_col_name == 'E1':
+            peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, peak_table)
+        elif E1_col_name == 'global_E1':
+            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(peak_table, 'f1.LorentzPos', [0])
+            peak_centres = [float(peak_centre)] * len(params['L0'])
+
         E1_col = np.empty(spec_range)
         E1_col_error = np.empty(spec_range)
 
