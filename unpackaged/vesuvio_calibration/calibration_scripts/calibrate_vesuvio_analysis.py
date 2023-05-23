@@ -250,56 +250,73 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
           Calculate the final flight path using the values for energy.
           This also uses the old value for L1 loaded from the parameter file.
 
+          @param peak_table - names of tables containing fitted parameters
           @param spec_list - spectrum range to calculate t0 for.
+          @param fit_type - type of fitting, one of 'Individual', 'Shared', or 'Both'
         """
         if fit_type == 'Both':
             indv_peak_table = peak_table[0]
-            glob_peak_table = peak_table[1]
-            E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'E1', spec_list)
-            E1 *= EVSGlobals.MEV_CONVERSION
-            global_E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'global_E1', spec_list)
-            global_E1 *= EVSGlobals.MEV_CONVERSION
+            global_peak_table = peak_table[1]
+            params = self._read_calibration_params_from_table(spec_list, E1_col_names=['E1', 'global_E1'])
         elif fit_type == 'Shared':
-            glob_peak_table = peak_table[0]
-            global_E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'global_E1', spec_list)
-            global_E1 *= EVSGlobals.MEV_CONVERSION
+            global_peak_table = peak_table[0]
+            params = self._read_calibration_params_from_table(spec_list, E1_col_names=['global_E1'])
         else:
             indv_peak_table = peak_table[0]
-            E1 = EVSMiscFunctions.read_table_column(self._current_workspace, 'E1', spec_list)
-            E1 *= EVSGlobals.MEV_CONVERSION
-
-        t0 = EVSMiscFunctions.read_table_column(self._current_workspace, 't0', spec_list)
-        t0_error = EVSMiscFunctions.read_table_column(self._current_workspace, 't0_Err', spec_list)
-        L0 = EVSMiscFunctions.read_table_column(self._current_workspace, 'L0', spec_list)
-        theta = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
-        r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
+            params = self._read_calibration_params_from_table(spec_list, E1_col_names=['E1'])
 
         if fit_type != 'Shared':
-
             peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, indv_peak_table)
-
-            delta_t = (peak_centres - t0) / 1e+6
-            delta_t_error = t0_error / 1e+6
-            v1 = np.sqrt( 2 * E1 /scipy.constants.m_n)
-            L1 = v1 * delta_t - L0 * r_theta
-            L1_error = v1 * delta_t_error
-
-            self._set_table_column(self._current_workspace, 'L1', L1, spec_list)
-            self._set_table_column(self._current_workspace, 'L1_Err', L1_error, spec_list)
+            self._calculate_L1_from_table(spec_list, peak_centres, params, 'L1')
 
         if fit_type != 'Individual':
-            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(glob_peak_table, 'f1.LorentzPos', [0])
-            peak_centre_list = np.empty(spec_list[1] + 1 -spec_list[0])
+            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(global_peak_table, 'f1.LorentzPos', [0])
+            peak_centre_list = np.empty(spec_list[1] + 1 - spec_list[0])
             peak_centre_list.fill(float(peak_centre))
+            self._calculate_L1_from_table(spec_list, peak_centre_list, params, 'global_L1')
 
-            delta_t = (peak_centre_list - t0) / 1e+6
-            delta_t_error = t0_error / 1e+6
-            global_v1 = np.sqrt( 2 * global_E1 /scipy.constants.m_n)
-            global_L1 = global_v1 * delta_t - L0 * r_theta
-            global_L1_error = global_v1 * delta_t_error
+    def _read_calibration_params_from_table(self, spec_list, E1_col_names=[], L1_col_names=[]):
+        """
+        Retrieve calibration parameters and return dict of param values
 
-            self._set_table_column(self._current_workspace, 'global_L1', global_L1, spec_list)
-            self._set_table_column(self._current_workspace, 'global_L1_Err', global_L1_error, spec_list)
+        @param spec_list - spectrum range to retreive param values for
+        @param E1_col_names - E1 columns to read from
+        @param L1_col_names - L1 columns to read from
+        """
+        param_dict = {}
+        for col_name in E1_col_names:
+            if col_name == 'E1':
+                param_dict['E1'] = EVSMiscFunctions.read_table_column(self._current_workspace, col_name, spec_list) * EVSGlobals.MEV_CONVERSION
+            if col_name == 'global_E1':
+                param_dict['global_E1']  = EVSMiscFunctions.read_table_column(self._current_workspace, col_name, spec_list) * EVSGlobals.MEV_CONVERSION 
+        for col_name in L1_col_names:
+            if col_name == 'L1':
+                param_dict['L1'] = EVSMiscFunctions.read_table_column(self._param_table, col_name, spec_list)
+        param_dict['t0'] = EVSMiscFunctions.read_table_column(self._current_workspace, 't0', spec_list)
+        param_dict['t0_error'] = EVSMiscFunctions.read_table_column(self._current_workspace, 't0_Err', spec_list)
+        param_dict['L0'] = EVSMiscFunctions.read_table_column(self._current_workspace, 'L0', spec_list)
+        param_dict['theta'] = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
+        param_dict['r_theta'] = EVSMiscFunctions.calculate_r_theta(self._sample_mass, param_dict['theta'])
+
+        return param_dict
+
+    def _calculate_L1_from_table(self, spec_list, peak_centres, params, L1_col_name):
+        """
+        Calculate L1 from fitted calibration parameters
+
+        @param spec_list - spectrum range to calculate L1 for
+        @param peak_centres - list of peak centre values
+        @param params - dict of params required for calculation
+        @param L1_col_name - either 'L1' or 'global_L1'
+        """
+        delta_t = (peak_centres - params['t0']) / 1e+6
+        delta_t_error = params['t0_error'] / 1e+6
+        v1 = np.sqrt( 2 * params[L1_col_name.strip('L1') + 'E1'] /scipy.constants.m_n)
+        L1 = v1 * delta_t - params['L0'] * params['r_theta']
+        L1_error = v1 * delta_t_error
+
+        self._set_table_column(self._current_workspace, L1_col_name, L1, spec_list)
+        self._set_table_column(self._current_workspace, f'{L1_col_name}_Err', L1_error, spec_list)
 
     def _calculate_scattering_angle(self, table_name, spec_list):
         """
@@ -347,70 +364,30 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         """
           Calculate the final energy using the fitted peak centres of a run.
 
-          @param table_name - name of table containing fitted parameters for the peak centres
+          @param peak_table - name of table containing fitted parameters for the peak centres
           @param spec_list - spectrum range to calculate t0 for.
+          @param fit_type - type of fitting, one of 'Individual', 'Shared', or 'Both'
         """
-
         spec_range = EVSGlobals.DETECTOR_RANGE[1] + 1 - EVSGlobals.DETECTOR_RANGE[0]
 
         if not self._E1_value_and_error:
-
             if fit_type == 'Both':
                 indv_peak_table = peak_table[0]
-                glob_peak_table = peak_table[1]
+                global_peak_table = peak_table[1]
             elif fit_type == 'Shared':
-                glob_peak_table = peak_table[0]
+                global_peak_table = peak_table[0]
             else:
                 indv_peak_table = peak_table[0]
-
-            t0 = EVSMiscFunctions.read_table_column(self._current_workspace, 't0', spec_list)
-            L0 = EVSMiscFunctions.read_table_column(self._current_workspace, 'L0', spec_list)
-
-            L1 = EVSMiscFunctions.read_table_column(self._param_table, 'L1', spec_list)
-            theta = EVSMiscFunctions.read_table_column(self._current_workspace, 'theta', spec_list)
-            r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
+                
+            params = self._read_calibration_params_from_table(spec_list, L1_col_names=['L1'])
 
             if fit_type != 'Shared':
-                mean_E1 = np.empty(spec_range)
-                E1_error = np.empty(spec_range)
-
                 peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, indv_peak_table)
-
-                delta_t = (peak_centres - t0) / 1e+6
-                v1 = (L0 * r_theta + L1) / delta_t
-
-                E1 = 0.5*scipy.constants.m_n*v1**2
-                E1 /= EVSGlobals.MEV_CONVERSION
-
-                mean_E1_val = np.nanmean(E1)
-                E1_error_val = np.nanstd(E1)
-
-                mean_E1.fill(mean_E1_val)
-                E1_error.fill(E1_error_val)
-
-                self._set_table_column(self._current_workspace, 'E1', mean_E1)
-                self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
-
+                self._calculate_E1(spec_list, spec_range, peak_centres, params, 'E1')
             if fit_type != 'Individual':
-                global_E1 = np.empty(spec_range)
-                global_E1_error = np.empty(spec_range)
-
-                peak_centre = EVSMiscFunctions.read_fitting_result_table_column(glob_peak_table, 'f1.LorentzPos', [0])
-                peak_centre = [peak_centre] * spec_range
-
-                delta_t = (peak_centre - t0) / 1e+6
-                v1 = (L0 * r_theta + L1) / delta_t
-                E1 = 0.5*scipy.constants.m_n*v1**2
-                E1 /= EVSGlobals.MEV_CONVERSION
-
-                global_E1_val = np.nanmean(E1)
-                global_E1_error_val = np.nanstd(E1)
-
-                global_E1.fill(global_E1_val)
-                global_E1_error.fill(global_E1_error_val)
-
-                self._set_table_column(self._current_workspace, 'global_E1', global_E1)
-                self._set_table_column(self._current_workspace, 'global_E1_Err', global_E1_error)
+                peak_centre = EVSMiscFunctions.read_fitting_result_table_column(global_peak_table, 'f1.LorentzPos', [0])
+                peak_centre_list = [float(peak_centre)] * len(params['L0'])
+                self._calculate_E1(spec_list, spec_range, peak_centre_list, params, 'global_E1')    
         else:
                 mean_E1 = np.empty(spec_range)
                 E1_error = np.empty(spec_range)
@@ -423,6 +400,33 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
                 self._set_table_column(self._current_workspace, 'E1', mean_E1)
                 self._set_table_column(self._current_workspace, 'E1_Err', E1_error)
+
+    def _calculate_E1(self, spec_list, spec_range, peak_centres, params, E1_col_name):
+        """
+        Calculate E1 value from fitted parameters
+
+        @param spec_list - spectrum range to calculate E1 for
+        @param spec_range - detector range
+        @param peak_centres - list of fitted peak centres
+        @param params - dict of params needed to calculate E1
+        @param E1_col_name - either 'E1' or 'global_E1'
+        """
+        E1_col = np.empty(spec_range)
+        E1_col_error = np.empty(spec_range)
+
+        delta_t = (peak_centres - params['t0']) / 1e+6
+        v1 = (params['L0'] * params['r_theta'] + params['L1']) / delta_t
+        E1 = 0.5 * scipy.constants.m_n * v1 ** 2
+        E1 /= EVSGlobals.MEV_CONVERSION
+
+        E1_val = np.nanmean(E1)
+        E1_error_val = np.nanstd(E1)
+
+        E1_col.fill(E1_val)
+        E1_col_error.fill(E1_error_val)
+
+        self._set_table_column(self._current_workspace, E1_col_name, E1_col)
+        self._set_table_column(self._current_workspace, f'{E1_col_name}_Err', E1_col_error)
 
     def _setup(self):
         """
