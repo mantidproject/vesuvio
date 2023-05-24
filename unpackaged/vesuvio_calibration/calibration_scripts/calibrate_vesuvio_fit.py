@@ -6,7 +6,7 @@ from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWor
      ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution, FindPeakBackground,\
      ExtractSingleSpectrum, SumSpectra, AppendSpectra, CloneWorkspace, Fit, MaskDetectors, ExtractUnmaskedSpectra, CreateWorkspace
 from functools import partial
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors, FitTypes
 
 import os
 import sys
@@ -63,7 +63,7 @@ class EVSCalibrationFit(PythonAlgorithm):
                              doc='Choose the peak type that is being fitted.'
                                  'Note that supplying a set of dspacings overrides the setting here')
 
-        shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+        shared_fit_type_validator = StringListValidator([member.value for member in FitTypes])
         self.declareProperty('SharedParameterFitType', "Individual",
                              doc='Calculate shared parameters using an individual and/or'
                                  'global fit.', validator=shared_fit_type_validator)
@@ -122,7 +122,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._energy_estimates = self.getProperty("Energy").value
         self._sample_mass = self.getProperty("Mass").value
         self._create_output = self.getProperty("CreateOutput").value
-        self._shared_parameter_fit_type = self.getProperty("SharedParameterFitType").value
+        self._shared_parameter_fit_type = FitTypes(self.getProperty("SharedParameterFitType").value)
         self._invalid_detectors = InvalidDetectors(self.getProperty("InvalidDetectors").value.tolist())
 
     def _setup_spectra_list(self):
@@ -558,7 +558,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         num_estimated_peaks, num_spectra = estimated_peak_positions_all_peaks.shape
         self._output_parameter_tables = []
         self._peak_fit_workspaces = []
-        if self._shared_parameter_fit_type != "Shared":
+        if self._shared_parameter_fit_type is not FitTypes.SHARED:
             self._prog_reporter = Progress(self, 0.0, 1.0, num_estimated_peaks*num_spectra)
 
             for peak_index, estimated_peak_positions in enumerate(estimated_peak_positions_all_peaks):
@@ -574,7 +574,7 @@ class EVSCalibrationFit(PythonAlgorithm):
                 self._output_parameter_tables.append(output_parameter_table_name)
                 self._peak_fit_workspaces.append(self._peak_fit_workspaces_by_spec)
 
-        if self._shared_parameter_fit_type != "Individual":
+        if self._shared_parameter_fit_type is not FitTypes.INDIVIDUAL:
             for peak_index, estimated_peak_position in enumerate(np.mean(estimated_peak_positions_all_peaks,1)):
 
                 output_shared_parameter_table_name = self._output_workspace_name + '_Shared_Peak_%d_Parameters' % peak_index

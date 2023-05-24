@@ -4,7 +4,7 @@ from mantid.api import FileProperty, FileAction, PythonAlgorithm,AlgorithmManage
 from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, ReplaceSpecialValues, GroupWorkspaces, mtd,\
      ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue,RenameWorkspace
 from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions,\
-     InvalidDetectors
+     InvalidDetectors, FitTypes
 
 import os
 import sys
@@ -53,7 +53,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self.declareProperty('Iterations', 2, validator=IntBoundedValidator(lower=1),
                              doc="Number of iterations to perform. Default is 2.")
 
-        shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+        shared_fit_type_validator = StringListValidator([member.value for member in FitTypes])
         self.declareProperty('SharedParameterFitType', "Individual", doc='Calculate shared parameters using an individual and/or'
                                                                          'global fit.', validator=shared_fit_type_validator)
 
@@ -132,7 +132,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference',
                                       SpectrumRange=EVSGlobals.BACKSCATTERING_RANGE, InstrumentParameterWorkspace=self._param_table,
                                       Mass=self._sample_mass, OutputWorkspace=E1_fit_back, CreateOutput=self._create_output,
-                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type,
+                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type.value,
                                       InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors())
             self._invalid_detectors.add_invalid_detectors(invalid_detectors)
 
@@ -148,7 +148,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._run_calibration_fit(Samples=self._samples, Function='Voigt', Mode='SingleDifference',
                                       SpectrumRange=EVSGlobals.FRONTSCATTERING_RANGE, InstrumentParameterWorkspace=self._param_table,
                                       Mass=self._sample_mass, OutputWorkspace=E1_fit_front, CreateOutput=self._create_output,
-                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type,
+                                      PeakType='Recoil', SharedParameterFitType=self._shared_parameter_fit_type.value,
                                       InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors())
             self._invalid_detectors.add_invalid_detectors(invalid_detectors)
 
@@ -254,11 +254,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
           @param spec_list - spectrum range to calculate t0 for.
           @param fit_type - type of fitting, one of 'Individual', 'Shared', or 'Both'
         """
-        if fit_type == 'Both':
+        if fit_type is FitTypes.BOTH:
             params = self._read_calibration_params_from_table(spec_list, E1_col_names=['E1', 'global_E1'])
             self._calculate_L1_from_table(spec_list, peak_table[0], params, 'L1')
             self._calculate_L1_from_table(spec_list, peak_table[1], params, 'global_L1')
-        elif fit_type == 'Shared':
+        elif fit_type is FitTypes.SHARED:
             params = self._read_calibration_params_from_table(spec_list, E1_col_names=['global_E1'])
             self._calculate_L1_from_table(spec_list, peak_table[0], params, 'global_L1')
         else:
@@ -369,10 +369,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         if not self._E1_value_and_error:
             params = self._read_calibration_params_from_table(spec_list, L1_col_names=['L1'])
-            if fit_type == 'Both':
+            if fit_type is FitTypes.BOTH:
                 self._calculate_E1(spec_list, spec_range, peak_table[0], params, 'E1')
                 self._calculate_E1(spec_list, spec_range, peak_table[1], params, 'global_E1')
-            elif fit_type == 'Shared':
+            elif fit_type is FitTypes.SHARED:
                 self._calculate_E1(spec_list, spec_range, peak_table[0], params, 'global_E1')
             else:
                 self._calculate_E1(spec_list, spec_range, peak_table[0], params, 'E1')  
@@ -433,7 +433,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._d_spacings = self.getProperty("DSpacings").value.tolist()
         self._E1_value_and_error = self.getProperty("E1FixedValueAndError").value.tolist()
         self._invalid_detectors = InvalidDetectors(self.getProperty("InvalidDetectors").value.tolist())
-        self._shared_parameter_fit_type = self.getProperty("SharedParameterFitType").value
+        self._shared_parameter_fit_type = FitTypes(self.getProperty("SharedParameterFitType").value)
         self._calc_L0 = self.getProperty("CalculateL0").value
         self._make_IP_file = self.getProperty("CreateIPFile").value
         self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
