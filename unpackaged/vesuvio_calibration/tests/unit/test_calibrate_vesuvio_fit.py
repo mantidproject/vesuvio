@@ -1,5 +1,5 @@
 from calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, FitTypes
 from mock import MagicMock, patch, call
 from functools import partial
 from mantid.kernel import IntArrayProperty, StringArrayProperty, FloatArrayProperty
@@ -645,7 +645,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
         alg._output_workspace_name = 'output_ws_name'
-        alg._shared_parameter_fit_type = 'Individual'
+        alg._shared_parameter_fit_type = FitTypes.INDIVIDUAL
         alg._fit_peaks()
         alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
                                                                          call('output_ws_name_Peak_1_Parameters')])
@@ -667,7 +667,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_shared_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}')
         alg._output_workspace_name = 'output_ws_name'
-        alg._shared_parameter_fit_type = 'Shared'
+        alg._shared_parameter_fit_type = FitTypes.SHARED
         alg._spec_list = [3,4,5]
         alg._fit_peaks()
         self.assertEqual(['fit_ws_0', 'fit_ws_1'],
@@ -687,7 +687,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
         alg._fit_shared_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}')
         alg._output_workspace_name = 'output_ws_name'
-        alg._shared_parameter_fit_type = 'Both'
+        alg._shared_parameter_fit_type = FitTypes.BOTH
         alg._spec_list = [3,4,5]
         alg._fit_peaks()
         alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
