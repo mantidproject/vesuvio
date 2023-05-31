@@ -1,5 +1,5 @@
 from calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, FitTypes
+from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, FitTypes, InvalidDetectors
 from mock import MagicMock, patch, call
 from functools import partial
 from mantid.kernel import IntArrayProperty, StringArrayProperty, FloatArrayProperty
@@ -745,6 +745,83 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.assertEqual(fit_workspace_name, 'fws')
 
+    @staticmethod
+    def _setup_alg_mocks_fit_shared_peak():
+        alg = EVSCalibrationFit()
+        alg._find_peaks_and_output_params = MagicMock(return_value='peak_params')
+        alg._generate_multifit_func_string = MagicMock(return_value='function_string')
+        alg._find_fit_x_window = MagicMock(return_value=(0, 10))
+        alg._create_multifit_workspaces = MagicMock(return_value={'InputWorkspace_1': 'workspace'})
+        alg._output_fit_params_to_table_ws = MagicMock()
+        alg._sample = 'sample'
+        alg._output_workspace_name = 'output'
+        alg._spec_list = [30]
+        alg._prog_reporter = MagicMock()
+        alg._invalid_detectors = InvalidDetectors([])
+        alg._del_fit_workspaces = MagicMock()
+
+        return alg
+
+    @patch('calibration_scripts.calibrate_vesuvio_fit.Fit')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.InvalidDetectors.identify_and_set_invalid_detectors_from_range')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.MaskDetectors')
+    @patch('calibration_scripts.calibrate_vesuvio_fit.ExtractUnmaskedSpectra')
+    def test_fit_shared_peak(self, mock_extract, mock_mask, mock_mtd, mock_invalid, mock_fit):
+        alg = self._setup_alg_mocks_fit_shared_peak()
+
+        mock_mtd.__getitem__.return_value = 'sample'
+        mock_invalid.return_value = []
+        validSpecs = MagicMock()
+        validSpecs.getNumberHistograms.return_value = 1
+        mock_extract.return_value = validSpecs
+        fit_workspace = MagicMock()
+        fit_workspace.name.return_value = 'fws'
+        fit_results = ('success', 0.5, 'ncm', 'fit_params', fit_workspace, 'func', 'cost_func')
+        mock_fit.return_value = fit_results
+
+        fit_workspace_name = alg._fit_shared_peak(0, 30, 5, 'output_Peak_0_Parameters', ['a', 'b', 'c'])
+
+        alg._find_peaks_and_output_params.assert_called_once_with(30, 5, 0)
+        mock_invalid.assert_called_once_with([30], 'output_Peak_0_Parameters')
+        mock_mask.assert_called_once_with(Workspace='sample', WorkspaceIndexList=[])
+        mock_extract.assert_called_once_with(InputWorkspace='sample', OutputWorkspace='valid_spectra')
+        alg._generate_multifit_func_string.assert_called_once_with('peak_params', 1)
+        alg._find_fit_x_window.assert_called_once_with('peak_params')
+        mock_fit.assert_called_once_with(Function='function_string', InputWorkspace='sample_Spec_0',
+                                         IgnoreInvalidData=True, StartX=0, EndX=10,
+                                         CalcErrors=True, Output='__output_Peak_0',
+                                         Minimizer='Levenberg-Marquardt,RelError=1e-8',
+                                         InputWorkspace_1='workspace')
+        alg._output_fit_params_to_table_ws.assert_called_once_with(0, 'fit_params', 'output_Peak_0_Parameters',
+                                                                   ['f0.a', 'f0.b', 'f0.c'])
+        alg._del_fit_workspaces.assert_called_once_with('ncm', 'fit_params', fit_workspace, 1)
+
+        self.assertEqual(fit_workspace_name, 'fws')
+
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._build_function_string')
+    def test_generate_multifit_func_string(self, mock_build_func_string):
+        alg = EVSCalibrationFit()
+        alg._func_param_names = {'key1': 'val1', 'key2': 'val2', 'key3': 'val3'}
+        mock_build_func_string.return_value = 'function_string;'
+        func_string = alg._generate_multifit_func_string('peak_params', 2)
+        expected = ("composite=MultiDomainFunction, NumDeriv=1;(composite=CompositeFunction, "
+        "NumDeriv=false, $domains=i;function_string);(composite=CompositeFunction, NumDeriv=false, "
+        "$domains=i;function_string);ties=(f1.f1.val1=f0.f1.val1,f1.f1.val2=f0.f1.val2,f1.f1.val3=f0.f1.val3)")
+        self.assertEqual(func_string, expected)
+
+    
+    @patch('calibration_scripts.calibrate_vesuvio_fit.CreateWorkspace')
+    def test_create_multifit_workspaces(self, create_workspace_mock):
+        alg = EVSCalibrationFit()
+        alg._sample = 'sample'
+        validSpecs = MagicMock()
+        validSpecs.readX.return_value = 0
+        validSpecs.readY.return_value = 0
+        validSpecs.readE.return_value = 0
+        alg._create_multifit_workspaces(validSpecs, 1)
+        create_workspace_mock.assert_has_calls([call(DataX=0,DataY=0,DataE=0, OutputWorkspace='sample_Spec_0')])
+
     @patch('calibration_scripts.calibrate_vesuvio_fit.mtd')
     @patch('calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
     @patch('calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
@@ -849,6 +926,14 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._create_output = False
         alg._del_fit_workspaces('ncm', 'params', 'fws')
         del_ws_mock.assert_has_calls([call('ncm'), call('params'), call('fws')])
+
+    @patch('calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
+    def test_del_fit_workspace_shared_fit(self, del_ws_mock):
+        alg = EVSCalibrationFit()
+        alg._sample = 'sample'
+        alg._create_output = False
+        alg._del_fit_workspaces('ncm', 'params', 'fws', 1)
+        del_ws_mock.assert_has_calls([call('ncm'), call('params'), call('fws'), call('sample_Spec_0')])
 
     @patch('calibration_scripts.calibrate_vesuvio_fit.CreateEmptyTableWorkspace')
     @patch('calibration_scripts.calibrate_vesuvio_fit.AnalysisDataService')

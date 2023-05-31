@@ -612,7 +612,7 @@ class EVSCalibrationFit(PythonAlgorithm):
     
     def _fit_shared_peak(self, peak_index, spec_range, peak_position, output_parameter_table_name, output_parameter_table_headers):
         peak_params = self._find_peaks_and_output_params(spec_range, peak_position, peak_index)
-        
+
         sample_ws = mtd[self._sample]
         invalid_spectra = self._invalid_detectors.identify_and_set_invalid_detectors_from_range(self._spec_list, output_parameter_table_name)
         MaskDetectors(Workspace=sample_ws, WorkspaceIndexList=invalid_spectra)
@@ -630,15 +630,13 @@ class EVSCalibrationFit(PythonAlgorithm):
                                                                 StartX=xmin, EndX=xmax,
                                                                 CalcErrors=True, Output=fit_output_name,
                                                                 Minimizer='Levenberg-Marquardt,RelError=1e-8', **multifit_workspaces)
-        [DeleteWorkspace(f"{self._sample}_Spec_{i}") for i in range(0,n_valid_specs)]
-
         output_headers = ['f0.'+ name for name in output_parameter_table_headers]
 
         self._output_fit_params_to_table_ws(0, fit_params, output_parameter_table_name,
                                             output_headers)
 
         fit_workspace_name = fws.name()
-        self._del_fit_workspaces(ncm, fit_params, fws)
+        self._del_fit_workspaces(ncm, fit_params, fws, n_valid_specs)
 
         return fit_workspace_name
 
@@ -693,11 +691,13 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         mtd[output_table_name].addRow([spec_num] + row)
 
-    def _del_fit_workspaces(self, ncm, fit_params, fws):
+    def _del_fit_workspaces(self, ncm, fit_params, fws, n_valid_specs=None):
         DeleteWorkspace(ncm)
         DeleteWorkspace(fit_params)
         if not self._create_output:
             DeleteWorkspace(fws)
+        if n_valid_specs != None:
+            [DeleteWorkspace(f"{self._sample}_Spec_{i}") for i in range(0,n_valid_specs)]
 
     def _get_find_peak_parameters(self, spec_number, peak_centre, unconstrained=False):
         """
