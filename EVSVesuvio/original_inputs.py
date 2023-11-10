@@ -1,13 +1,14 @@
 import time
 import numpy as np
 from pathlib import Path
-from vesuvio_analysis.core_functions.bootstrap import runBootstrap
-from vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
-from vesuvio_analysis.core_functions.run_script import runScript
+from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap import runBootstrap
+from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
+from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
 from mantid.api import AnalysisDataService
+from EVSVesuvio.scripts import handle_config
 
-scriptName =  Path(__file__).name.split(".")[0]  # Take out .py
-experimentPath = Path(__file__).absolute().parent / "experiments" / scriptName  # Path to the repository
+scriptName =  handle_config.read_config_var('caching.experiment')
+experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments" / scriptName # Path to the repository
 ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
