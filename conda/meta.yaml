@@ -5,31 +5,31 @@
   {% set version = version_tag + version_number %}
 
 package:
-  name: EVSvesuvio
+  name: mvesuvio
   version: {{ version }}
 
 source:
-  git_url: ./
+  git_url: ../
+
+build:
+  noarch: python
+  script: python -m pip install --ignore-installed .
+  entry_points:
+    - mvesuvio = EVSVesuvio.scripts:main
 
 requirements:
-  host:
-    - python {{ python }}
-
   build:
+    - python {{ python }}
     - setuptools
 
   run:
     - python {{ python }}
-    - mantid>=6.4.0
+    - mantid==6.7.0
     - matplotlib
     - iminuit
     - h5py
     - mock
     - jacobi==0.4.2 #pinned untill 0.5.0 is proven
-
-test:
-  imports:
-    - EVSvesuvio
 
 about:
   home: https://github.com/mantidproject/vesuvio
