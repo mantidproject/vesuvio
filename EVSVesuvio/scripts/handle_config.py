@@ -5,6 +5,7 @@ VESUVIO_CONFIG_PATH = os.path.join(os.path.expanduser("~"), '.mvesuvio')
 VESUVIO_CONFIG_FILE = "vesuvio.user.properties"
 VESUVIO_INPUTS_FILE = "analysis_inputs.py"
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MANTID_CONFIG_FILE = "Mantid.user.properties"
 
 
 def __read_config(config_file_path, throw_on_not_found=True):
@@ -58,6 +59,7 @@ def setup_config_dir(config_dir):
     success = __mk_dir('config', config_dir)
     if success:
         copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_CONFIG_FILE), os.path.join(config_dir, VESUVIO_CONFIG_FILE))
+        copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", MANTID_CONFIG_FILE), os.path.join(config_dir, MANTID_CONFIG_FILE))
 
 
 def setup_expr_dir(cache_dir, experiment):

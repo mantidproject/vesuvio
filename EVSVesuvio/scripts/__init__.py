@@ -1,6 +1,7 @@
 """Package defining entry points.
 """
 import argparse
+from os import environ, path
 from EVSVesuvio.scripts import handle_config
 
 
@@ -43,6 +44,7 @@ def __setup_config(args):
 
 
 def __run_analysis():
+    environ['MANTIDPROPERTIES'] = path.join(handle_config.VESUVIO_CONFIG_PATH, "Mantid.user.properties")
     from EVSVesuvio import analysis_runner
     analysis_runner.run()
 
