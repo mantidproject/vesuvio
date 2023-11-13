@@ -1,23 +1,14 @@
-import time
 import numpy as np
-from pathlib import Path
-from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap import runBootstrap
-from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
-from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
-from mantid.api import AnalysisDataService
-from EVSVesuvio.scripts import handle_config
-
-scriptName =  handle_config.read_config_var('caching.experiment')
-experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments" / scriptName # Path to the repository
-ipFilesPath = Path(__file__).absolute().parent / "vesuvio_analysis" / "ip_files"
 
 
 class LoadVesuvioBackParameters:
+    def __init__(self, ipFilesPath):
+        self.ipfile=ipFilesPath / "ip2019.par"
+
     runs="43066-43076"         # 77K         # The numbers of the runs to be analysed
     empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
     spectra='3-134'                          # Spectra to be analysed
     mode='DoubleDifference'
-    ipfile=ipFilesPath / "ip2019.par"
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1       # None or scaling factor
@@ -25,11 +16,13 @@ class LoadVesuvioBackParameters:
 
 
 class LoadVesuvioFrontParameters:
+    def __init__(self, ipFilesPath):
+        self.ipfile=ipFilesPath / "ip2018_3.par"
+
     runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
     spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
-    ipfile=ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1       # None or scaling factor
@@ -46,7 +39,8 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par"
+    def __init__(self, ipFilesPath):
+        self.InstrParsPath=ipFilesPath / "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
     massIdx = 0
@@ -55,8 +49,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
     masses = np.array([12, 16, 27])
     # noOfMasses = len(masses)
 
-    initPars = np.array([
     # Intensities, NCP widths, NCP centers
+    initPars = np.array([
             1, 12, 0.,
             1, 12, 0.,
             1, 12.5, 0.
@@ -91,8 +85,8 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     masses = np.array([1.0079, 12, 16, 27])
 
-    initPars = np.array([
     # Intensities, NCP widths, NCP centers
+    initPars = np.array([
         1, 4.7, 0,
         1, 12.71, 0.,
         1, 8.76, 0.,
@@ -140,25 +134,3 @@ class UserScriptControls:
 
 class BootstrapInitialConditions:
     runBootstrap = False
-
-
-start_time = time.time()
-
-wsBackIC = LoadVesuvioBackParameters
-wsFrontIC = LoadVesuvioFrontParameters
-bckwdIC = BackwardInitialConditions
-fwdIC = ForwardInitialConditions
-yFitIC = YSpaceFitInitialConditions
-bootIC = BootstrapInitialConditions
-userCtr = UserScriptControls
-
-runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
-AnalysisDataService.clear()
-userCtr.procedure = "FORWARD"
-
-runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
-
-end_time = time.time()
-print("\nRunning time: ", end_time-start_time, " seconds")

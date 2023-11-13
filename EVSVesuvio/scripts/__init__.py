@@ -43,7 +43,8 @@ def __setup_config(args):
 
 
 def __run_analysis():
-    print("RUNNING ANALYSIS")
+    from EVSVesuvio import analysis_runner
+    analysis_runner.run()
 
 
 if __name__ == '__main__':

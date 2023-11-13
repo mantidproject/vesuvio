@@ -63,7 +63,7 @@ def setup_config_dir(config_dir):
 def setup_expr_dir(cache_dir, experiment):
     expr_path = os.path.join(cache_dir, "experiments", experiment)
     __mk_dir('experiment', expr_path)
-    copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), os.path.join(expr_path, VESUVIO_INPUTS_FILE))
+    copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), input_file_path(cache_dir, experiment))
 
 
 def __mk_dir(type, path):
@@ -78,7 +78,11 @@ def __mk_dir(type, path):
 
 
 def config_set():
-    if(not read_config_var('caching.location', False)):
-        return False
-    else:
+    if(read_config_var('caching.location', False)):
         return True
+    else:
+        return False
+
+
+def input_file_path(cache_dir, experiment):
+    return os.path.join(cache_dir, "experiments", experiment, VESUVIO_INPUTS_FILE)
