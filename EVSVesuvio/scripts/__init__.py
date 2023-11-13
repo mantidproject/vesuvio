@@ -1,54 +1,50 @@
 """Package defining entry points.
 """
 import argparse
-import os
-from shutil import copyfile
 from EVSVesuvio.scripts import handle_config
 
 
 def main():
     parser = __set_up_parser()
     args = parser.parse_args()
-    config_dir = handle_config.VESUVIO_CONFIG_PATH
-    cache_dir = config_dir if not args.set_cache else args.set_cache
-    experiment = "default" if not args.set_experiment else args.set_experiment
+    if args.command == "config":
+        __setup_config(args)
 
-    if __setup_config_dir(config_dir):
-        handle_config.set_config_vars({'caching.location': cache_dir,
-                                       'caching.experiment': experiment})
-    __setup_expr_dir(cache_dir, experiment)
+    if args.command == "run":
+        if not handle_config.config_set():
+            __setup_config(None)
+        __run_analysis()
 
 
 def __set_up_parser():
     parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
-    parser.add_argument("--set-cache", "-c", help="set the cache directory", default="", type=str)
-    parser.add_argument("--set-experiment", "-e", help="set the current experiment", default="", type=str)
+    subparsers = parser.add_subparsers(dest='command', required=True)
+    config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
+    config_parser.add_argument("--set-cache", "-c", help="set the cache directory", default="", type=str)
+    config_parser.add_argument("--set-experiment", "-e", help="set the current experiment", default="", type=str)
+
+    config_parser = subparsers.add_parser("run", help="run mvesuvio analysis")
     return parser
 
 
-def __setup_config_dir(config_dir):
-    success = __mk_dir('config', config_dir)
-    if success:
-        copyfile('EVSVesuvio/config/vesuvio.user.properties', f'{config_dir}/{handle_config.VESUVIO_CONFIG_FILE}')
-    return success
+def __setup_config(args):
+    config_dir = handle_config.VESUVIO_CONFIG_PATH
+    handle_config.setup_config_dir(config_dir)
+
+    if handle_config.config_set():
+        cache_dir = handle_config.read_config_var('caching.location') if not args or not args.set_cache else args.set_cache
+        experiment = handle_config.read_config_var('caching.experiment') if not args or not args.set_experiment else args.set_experiment
+    else:
+        cache_dir = config_dir if not args or not args.set_cache else args.set_cache
+        experiment = "default" if not args or not args.set_experiment else args.set_experiment
+    handle_config.set_config_vars({'caching.location': cache_dir,
+                                   'caching.experiment': experiment})
+    handle_config.setup_expr_dir(cache_dir, experiment)
 
 
-def __setup_expr_dir(cache_dir, experiment):
-    expr_path = os.path.join(cache_dir, "experiments", experiment)
-    __mk_dir('experiment', expr_path)
-
-
-def __mk_dir(type, path):
-    success = False
-    if not os.path.isdir(path):
-        try:
-            os.makedirs(path)
-            success = True
-        except:
-            print(f'Unable to make {type} directory at location: {path}')
-    return success
+def __run_analysis():
+    print("RUNNING ANALYSIS")
 
 
 if __name__ == '__main__':
-    print("test")
     main()

@@ -17,10 +17,10 @@ class LoadVesuvioBackParameters:
     empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
     spectra='3-134'                          # Spectra to be analysed
     mode='DoubleDifference'
-    ipfile=ipFilesPath / "ip2019.par"   
+    ipfile=ipFilesPath / "ip2019.par"
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       # None or scaling factor 
+    scaleEmpty = 1       # None or scaling factor
     scaleRaw = 1
 
 
@@ -29,16 +29,16 @@ class LoadVesuvioFrontParameters:
     empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
     spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
-    ipfile=ipFilesPath / "ip2018_3.par" 
+    ipfile=ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1       # None or scaling factor 
+    scaleEmpty = 1       # None or scaling factor
     scaleRaw = 1
 
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
-    
+
     transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.e5
     # Sample slab parameters
@@ -46,7 +46,7 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    InstrParsPath = ipFilesPath / "ip2018_3.par" 
+    InstrParsPath = ipFilesPath / "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
     massIdx = 0
@@ -55,11 +55,11 @@ class BackwardInitialConditions(GeneralInitialConditions):
     masses = np.array([12, 16, 27])
     # noOfMasses = len(masses)
 
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers   
-            1, 12, 0.,    
-            1, 12, 0.,   
-            1, 12.5, 0.    
+    initPars = np.array([
+    # Intensities, NCP widths, NCP centers
+            1, 12, 0.,
+            1, 12, 0.,
+            1, 12.5, 0.
         ])
     bounds = np.array([
             [0, np.nan], [8, 16], [-3, 1],
@@ -81,7 +81,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     # # Parameters of workspaces in input_ws
     tofBinning='275.,1.,420'                    # Binning of ToF spectra
     maskTOFRange = None
-    
+
     # Original data uses histogram data instead of point data
     runHistData = True
     normVoigt = False
@@ -89,14 +89,14 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 class ForwardInitialConditions(GeneralInitialConditions):
 
-    masses = np.array([1.0079, 12, 16, 27]) 
+    masses = np.array([1.0079, 12, 16, 27])
 
-    initPars = np.array([ 
-    # Intensities, NCP widths, NCP centers  
-        1, 4.7, 0, 
-        1, 12.71, 0.,    
-        1, 8.76, 0.,   
-        1, 13.897, 0.    
+    initPars = np.array([
+    # Intensities, NCP widths, NCP centers
+        1, 4.7, 0,
+        1, 12.71, 0.,
+        1, 8.76, 0.,
+        1, 13.897, 0.
     ])
     bounds = np.array([
         [0, np.nan], [3, 6], [-3, 1],
@@ -118,7 +118,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     tofBinning="110,1,430"                 # Binning of ToF spectra
     maskTOFRange = None
-  
+
     # Original data uses histogram data instead of point data
     runHistData = True
     normVoigt = False
@@ -130,7 +130,7 @@ class YSpaceFitInitialConditions:
 
 class UserScriptControls:
     runRoutine = True
-    
+
     # Choose main procedure to run
     procedure = "BACKWARD"   # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
@@ -145,7 +145,7 @@ class BootstrapInitialConditions:
 start_time = time.time()
 
 wsBackIC = LoadVesuvioBackParameters
-wsFrontIC = LoadVesuvioFrontParameters  
+wsFrontIC = LoadVesuvioFrontParameters
 bckwdIC = BackwardInitialConditions
 fwdIC = ForwardInitialConditions
 yFitIC = YSpaceFitInitialConditions
