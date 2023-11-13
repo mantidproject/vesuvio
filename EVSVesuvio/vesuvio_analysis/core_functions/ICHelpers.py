@@ -1,8 +1,8 @@
 from mantid.simpleapi import LoadVesuvio, SaveNexus
 from pathlib import Path
+from EVSVesuvio.scripts import handle_config
 
-currentPath = Path(__file__).absolute().parent
-experimentsPath = currentPath / ".."/ ".." / "experiments"
+experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments"
 
 
 def completeICFromInputs(IC, scriptName, wsIC):
@@ -163,7 +163,6 @@ def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
 
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName   # Name of sample currently running
-    experimentsPath = currentPath/".."/".."/"experiments"
 
     # Used to store running times required to estimate Bootstrap total run time.
     bootIC.runTimesPath = experimentsPath / sampleName / "running_times.txt"

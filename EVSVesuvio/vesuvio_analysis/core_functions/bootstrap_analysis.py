@@ -4,12 +4,7 @@ from EVSVesuvio.vesuvio_analysis.core_functions.ICHelpers import setBootstrapDir
 from EVSVesuvio.vesuvio_analysis.core_functions.fit_in_yspace import selectModelAndPars
 import numpy as np
 import matplotlib .pyplot as plt
-from pathlib import Path
 from scipy import stats
-
-currentPath = Path(__file__).parent.absolute()
-experimentsPath = currentPath / ".." / ".. " / "experiments"
-IPFilesPath = currentPath / ".." / "ip_files"
 
 
 def runAnalysisOfStoredBootstrap(bckwdIC, fwdIC, yFitIC, bootIC, analysisIC, userCtr):
