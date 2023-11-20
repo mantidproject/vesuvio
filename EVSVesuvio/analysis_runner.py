@@ -30,11 +30,6 @@ def run():
 
     runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 
-    AnalysisDataService.clear()
-    userCtr.procedure = "FORWARD"
-
-    runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
     end_time = time.time()
     print("\nRunning time: ", end_time-start_time, " seconds")
 
