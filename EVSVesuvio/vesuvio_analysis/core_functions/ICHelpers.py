@@ -99,7 +99,7 @@ def inputDirsForSample(wsIC, sampleName):
 
 
 def setOutputDirsForSample(IC, sampleName):
-    outputPath = experimentsPath / sampleName / "output_npz_for_testing"
+    outputPath = experimentsPath / sampleName / "output_files"
     outputPath.mkdir(parents=True, exist_ok=True)
 
     # Build Filename based on ic
