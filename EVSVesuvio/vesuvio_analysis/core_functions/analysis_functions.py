@@ -323,7 +323,8 @@ def fitNcpToArray(ic, dataY, dataE, resolutionPars, instrPars, kinematicArrays, 
         if np.all(specFitPars==0):
             print("Skipped spectra.")
         else:
-            print(specFitPars)
+            with np.printoptions(suppress=True, precision=4, linewidth=200, threshold=sys.maxsize):
+                print(specFitPars)
 
     assert ~np.all(arrFitPars==0), "Either Fits are all zero or assignment of fitting not working"
     return arrFitPars
