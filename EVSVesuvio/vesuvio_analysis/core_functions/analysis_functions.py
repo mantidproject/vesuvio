@@ -40,13 +40,14 @@ def iterativeFitForDataReduction(ic):
 
         CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
 
+        if ic.GammaCorrectionFlag:
+            wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios, wsNCPM)
+            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
+
         if ic.MSCorrectionFlag:
             wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs")
 
-        if ic.GammaCorrectionFlag:
-            wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios, wsNCPM)
-            Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs")
 
         remaskValues(ic.name, "tmpNameWS")    # Masks cols in the same place as in ic.name
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
