@@ -1,7 +1,7 @@
-from EVSVesuvio.vesuvio_analysis.core_functions.ICHelpers import buildFinalWSName, completeICFromInputs, completeBootIC, completeYFitIC
-from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap import runBootstrap
-from EVSVesuvio.vesuvio_analysis.core_functions.fit_in_yspace import fitInYSpaceProcedure
-from EVSVesuvio.vesuvio_analysis.core_functions.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, \
+from EVSVesuvio.vesuvio_analysis.ICHelpers import buildFinalWSName, completeICFromInputs, completeBootIC, completeYFitIC
+from EVSVesuvio.vesuvio_analysis.bootstrap import runBootstrap
+from EVSVesuvio.vesuvio_analysis.fit_in_yspace import fitInYSpaceProcedure
+from EVSVesuvio.vesuvio_analysis.procedures import runIndependentIterativeProcedure, runJointBackAndForwardProcedure, \
      runPreProcToEstHRatio, createTableWSHRatios, isHPresent
 from mantid.api import mtd
 

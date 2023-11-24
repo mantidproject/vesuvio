@@ -1,7 +1,8 @@
 import numpy as np
 from pathlib import Path
+from EVSVesuvio.scripts import handle_config
 
-ipFilesPath = Path(__file__).absolute().parent.parent / "vesuvio_analysis" / "ip_files"
+ipFilesPath = Path(handle_config.read_config_var('caching.ipfolder'))
 ipFilePath = ipFilesPath / "ip2018_3.par"
 
 

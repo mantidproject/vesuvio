@@ -3,7 +3,7 @@ from pathlib import Path
 import importlib
 import sys
 from os import path
-from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
+from EVSVesuvio.vesuvio_analysis.run_script import runScript
 from EVSVesuvio.scripts import handle_config
 
 

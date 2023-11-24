@@ -1,7 +1,7 @@
 from xml.dom import NotFoundErr
-from EVSVesuvio.vesuvio_analysis.core_functions.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
-from EVSVesuvio.vesuvio_analysis.core_functions.ICHelpers import setBootstrapDirs
-from EVSVesuvio.vesuvio_analysis.core_functions.fit_in_yspace import selectModelAndPars
+from EVSVesuvio.vesuvio_analysis.analysis_functions import calculateMeansAndStds, filterWidthsAndIntensities
+from EVSVesuvio.vesuvio_analysis.ICHelpers import setBootstrapDirs
+from EVSVesuvio.vesuvio_analysis.fit_in_yspace import selectModelAndPars
 import numpy as np
 import matplotlib .pyplot as plt
 from scipy import stats
