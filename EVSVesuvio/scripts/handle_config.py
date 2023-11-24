@@ -1,11 +1,12 @@
 import os
-from shutil import copyfile
+from shutil import copyfile, copytree
 
 VESUVIO_CONFIG_PATH = os.path.join(os.path.expanduser("~"), '.mvesuvio')
 VESUVIO_CONFIG_FILE = "vesuvio.user.properties"
 VESUVIO_INPUTS_FILE = "analysis_inputs.py"
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANTID_CONFIG_FILE = "Mantid.user.properties"
+VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
 
 
 def __read_config(config_file_path, throw_on_not_found=True):
@@ -67,6 +68,11 @@ def setup_expr_dir(cache_dir, experiment):
     if not os.path.isdir(expr_path):
         __mk_dir('experiment', expr_path)
         copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), input_file_path(cache_dir, experiment))
+
+
+def setup_default_ipfile_dir():
+    if not os.path.isdir(VESUVIO_IPFOLDER_PATH):
+        copytree(os.path.join(VESUVIO_PACKAGE_PATH, "config", "ip_files"), VESUVIO_IPFOLDER_PATH)
 
 
 def __mk_dir(type, path):

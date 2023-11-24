@@ -37,7 +37,7 @@ scriptName = handle_config.read_config_var('caching.experiment')
 experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments" / scriptName # Path to the repository
 inputs_path = experimentsPath / "analysis_inputs.py"
 ai = import_from_path(inputs_path, "analysis_inputs")
-ipFilesPath = Path(path.dirname(path.dirname(handle_config.__file__))) / "vesuvio_analysis" / "ip_files"
+ipFilesPath = Path(handle_config.read_config_var('caching.ipfolder'))
 
 bckwdIC = ai.BackwardInitialConditions(ipFilesPath)
 
