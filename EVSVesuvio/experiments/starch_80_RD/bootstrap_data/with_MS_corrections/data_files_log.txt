@@ -1,3 +1,0 @@
-This file contains some information about each data file in the folder:
-
-spec_3-134_iter_4_MS_nsampl_650.npz : BOOT_RESIDUALS | JOINT | 275.,1.,420 | None
