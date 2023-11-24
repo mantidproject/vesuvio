@@ -104,10 +104,10 @@ def setOutputDirsForSample(IC, sampleName):
 
     # Build Filename based on ic
     corr = ""
-    if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
-        corr+="_MS"
     if IC.GammaCorrectionFlag & (IC.noOfMSIterations>0):
         corr+="_GC"
+    if IC.MSCorrectionFlag & (IC.noOfMSIterations>0):
+        corr+="_MS"
 
     fileName = f"spec_{IC.firstSpec}-{IC.lastSpec}_iter_{IC.noOfMSIterations}{corr}"+".npz"
     fileNameYSpace = fileName + "_ySpaceFit"+".npz"

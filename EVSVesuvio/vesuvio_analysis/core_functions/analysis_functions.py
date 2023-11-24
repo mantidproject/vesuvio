@@ -841,20 +841,22 @@ def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios, wsNC
 
     inputWS = wsNCPM.name()
 
-    # I do not know why, but setting these instrument parameters is required
-    SetInstrumentParameter(inputWS, ParameterName='hwhm_lorentz',
-                           ParameterType='Number', Value='24.0')
-    SetInstrumentParameter(inputWS, ParameterName='sigma_gauss',
-                           ParameterType='Number', Value='73.0')
-
     profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
 
-    background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
+    # Approach below not currently suitable for current versions of Mantid, but will be in the future
+    # background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
+    # DeleteWorkspace(corrected)
+    # RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS+"_Gamma_Background")
 
-    RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS+"_Gamma_Background")
-    Scale(InputWorkspace = inputWS+"_Gamma_Background", OutputWorkspace = inputWS+"_Gamma_Background",
-          Factor=0.9, Operation="Multiply")
+    ws = CloneWorkspace(InputWorkspace=inputWS, OutputWorkspace="tmpGC")
+    for spec in range(ws.getNumberHistograms()):
+        background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles, WorkspaceIndexList=spec)
+        ws.dataY(spec)[:], ws.dataE(spec)[:] = background.dataY(0)[:], background.dataE(0)[:]
+    DeleteWorkspace(background)
     DeleteWorkspace(corrected)
+    RenameWorkspace(InputWorkspace="tmpGC", OutputWorkspace=inputWS+"_Gamma_Background")
+
+    Scale(InputWorkspace = inputWS+"_Gamma_Background", OutputWorkspace = inputWS+"_Gamma_Background", Factor=0.9, Operation="Multiply")
     return mtd[inputWS+"_Gamma_Background"]
 
 
@@ -865,8 +867,7 @@ def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
         profiles += "name=GaussianComptonProfile,Mass="   \
                     + str(mass) + ",Width=" + str(width)  \
                     + ",Intensity=" + str(intensity) + ';'
-    print("\n The sample properties for Gamma Correction are:\n",
-          profiles)
+    print("\n The sample properties for Gamma Correction are:\n", profiles)
     return profiles
 
 
