@@ -47,7 +47,7 @@ include = ["EVSVesuvio*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"EVSVesuvio.vesuvio_analysis.ip_files" = ["*.OPJ", "*.par", "*.DAT", "*.DAT3", "*.DAT6", "*.txt"]
+"EVSVesuvio.config.ip_files" = ["*.par"]
 "EVSVesuvio.config" = ["*.properties"]
 
 [tool.pytest.ini_options]
