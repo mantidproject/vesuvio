@@ -1,5 +1,5 @@
 import os
-from shutil import copyfile, copytree
+from shutil import copyfile, copytree, ignore_patterns
 
 VESUVIO_CONFIG_PATH = os.path.join(os.path.expanduser("~"), '.mvesuvio')
 VESUVIO_CONFIG_FILE = "vesuvio.user.properties"
@@ -72,7 +72,7 @@ def setup_expr_dir(cache_dir, experiment):
 
 def setup_default_ipfile_dir():
     if not os.path.isdir(VESUVIO_IPFOLDER_PATH):
-        copytree(os.path.join(VESUVIO_PACKAGE_PATH, "config", "ip_files"), VESUVIO_IPFOLDER_PATH)
+        copytree(os.path.join(VESUVIO_PACKAGE_PATH, "config", "ip_files"), VESUVIO_IPFOLDER_PATH, ignore=ignore_patterns('__*'))
 
 
 def __mk_dir(type, path):
