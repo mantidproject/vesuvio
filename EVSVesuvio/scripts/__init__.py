@@ -30,25 +30,18 @@ def __set_up_parser():
 
 
 def __setup_config(args):
-    config_dir = handle_config.VESUVIO_CONFIG_PATH
-    handle_config.setup_config_dir(config_dir)
-    ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
+    handle_config.setup_default_config()
 
-    if handle_config.config_set():
-        cache_dir = handle_config.read_config_var('caching.location') if not args or not args.set_cache else args.set_cache
-        experiment = handle_config.read_config_var('caching.experiment') if not args or not args.set_experiment else args.set_experiment
-        ipfolder_dir = handle_config.read_config_var('caching.ipfolder') if not args or not args.set_ipfolder else args.set_ipfolder
-    else:
-        cache_dir = config_dir if not args or not args.set_cache else args.set_cache
-        experiment = "default" if not args or not args.set_experiment else args.set_experiment
-        ipfolder_dir = ipfolder_dir if not args or not args.set_ipfolder else args.set_ipfolder
-
-        handle_config.setup_default_ipfile_dir()
+    cache_dir = handle_config.read_config_var('caching.location') if not args or not args.set_cache else args.set_cache
+    experiment = handle_config.read_config_var('caching.experiment') if not args or not args.set_experiment else args.set_experiment
+    ipfolder_dir = handle_config.read_config_var('caching.ipfolder') if not args or not args.set_ipfolder else args.set_ipfolder
 
     handle_config.set_config_vars({'caching.location': cache_dir,
                                    'caching.experiment': experiment,
                                    'caching.ipfolder': ipfolder_dir})
-    handle_config.setup_expr_dir(cache_dir, experiment)
+
+    handle_config.check_dir_exists("IP folder", ipfolder_dir)
+    handle_config.set_expr_dir(cache_dir, experiment)
 
 
 def __run_analysis():
