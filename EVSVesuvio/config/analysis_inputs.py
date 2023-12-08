@@ -31,9 +31,6 @@ class LoadVesuvioFrontParameters:
 
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
-
-    transmission_guess =  0.8537        # Experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.e5
     # Sample slab parameters
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
@@ -76,6 +73,10 @@ class BackwardInitialConditions(GeneralInitialConditions):
     tofBinning='275.,1.,420'                    # Binning of ToF spectra
     maskTOFRange = None
 
+    transmission_guess = 0.8537        # Experimental value from VesuvioTransmission
+    multiple_scattering_order = 2
+    number_of_events = 1.e5
+
     # Original data uses histogram data instead of point data
     runHistData = True
     normVoigt = False
@@ -112,6 +113,10 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
     tofBinning="110,1,430"                 # Binning of ToF spectra
     maskTOFRange = None
+
+    transmission_guess = 0.8537        # Experimental value from VesuvioTransmission
+    multiple_scattering_order = 2
+    number_of_events = 1.e5
 
     # Original data uses histogram data instead of point data
     runHistData = True
