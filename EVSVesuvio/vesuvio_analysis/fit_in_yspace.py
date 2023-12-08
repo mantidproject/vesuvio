@@ -617,6 +617,31 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A":1, "sig1":3, "sig2":5}
         sharedPars = ["sig1", "sig2"]
 
+    elif modelFlag=="Gaussian3D":
+        def model(x, A, sig_x, sig_y, sig_z):
+
+            y = x[:, np.newaxis, np.newaxis]
+            n_steps = 50       # Low number of integration steps because otherwise too slow
+            theta = np.linspace(0, np.pi / 2, n_steps)[np.newaxis, :, np.newaxis]
+            phi = np.linspace(0, np.pi / 2, n_steps)[np.newaxis, np.newaxis, :]
+
+
+            S2_inv = np.sin(theta)**2 * np.cos(phi)**2 / sig_x**2     \
+                   + np.sin(theta)**2 * np.sin(phi)**2 / sig_y**2   \
+                   + np.cos(theta)**2 / sig_z**2
+
+            J = np.sin(theta) / S2_inv * np.exp(- y**2 / 2 * S2_inv)
+
+            J = np.trapz(J, x=phi, axis=2)[:, :, np.newaxis]    # Keep shape
+            J = np.trapz(J, x=theta, axis=1)
+
+            J *= A * 2 / np.pi * 1 / np.sqrt(2 * np.pi) * 1 / (sig_x * sig_y * sig_z)    # Normalisation 
+            J = J.squeeze()
+            return J
+
+        defaultPars = {"A": 1, "sig_x": 5, "sig_y": 5, "sig_z": 5}
+        sharedPars = ["sig_x", "sig_y", "sig_z"]
+
     else:
         raise ValueError("Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4'")
 
@@ -1018,7 +1043,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c6/384*(64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
-        elif (yFitIC.fitModel=="DOUBLE_WELL") | (yFitIC.fitModel=="ANSIO_GAUSSIAN"):
+        elif (yFitIC.fitModel=="DOUBLE_WELL") | (yFitIC.fitModel=="ANSIO_GAUSSIAN") | (yFitIC.fitModel=="Gaussian3D"):
             return
         else:
             raise ValueError("fitmodel not recognized.")
