@@ -1,4 +1,4 @@
-from mantid.simpleapi import LoadVesuvio, SaveNexus
+from mantid.simpleapi import Load, LoadVesuvio, SaveNexus
 from pathlib import Path
 from EVSVesuvio.scripts import handle_config
 
@@ -40,10 +40,7 @@ def completeICFromInputs(IC, scriptName, wsIC):
         IC.InstrParsPath = wsIC.ipfile
 
     # Sort out input and output paths
-    rawPath, emptyPath = inputDirsForSample(wsIC, scriptName)
-    if not(rawPath.is_file()) or not(emptyPath.is_file()):
-        print(f"\nWorkspaces not found.\nSaving Workspaces:\n{rawPath.name}\n{emptyPath.name}")
-        saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath)
+    rawPath, emptyPath = setInputWSForSample(wsIC, scriptName)
 
     IC.userWsRawPath = rawPath
     IC.userWsEmptyPath = emptyPath
@@ -79,23 +76,35 @@ def completeICFromInputs(IC, scriptName, wsIC):
     return
 
 
-def inputDirsForSample(wsIC, sampleName):
+def setInputWSForSample(wsIC, sampleName):
     inputWSPath = experimentsPath / sampleName / "input_ws"
     inputWSPath.mkdir(parents=True, exist_ok=True)
 
-    if int(wsIC.spectra.split("-")[1])<135:
-        runningMode = "backward"
-    elif int(wsIC.spectra.split("-")[0])>=135:
-        runningMode = "forward"
-    else:
-        print("Problem in loading workspaces: invalid range of spectra.")
+    runningMode = getRunningMode(wsIC)
 
     rawWSName = sampleName + "_" + "raw" + "_" + runningMode + ".nxs"
     emptyWSName = sampleName + "_" + "empty" + "_" + runningMode + ".nxs"
 
     rawPath = inputWSPath / rawWSName
     emptyPath = inputWSPath / emptyWSName
+
+    if not wsHistoryMatchesInputs(wsIC.runs, wsIC.mode, wsIC.ipfile, rawPath):
+        saveWSFromLoadVesuvio(wsIC.runs, wsIC.mode, wsIC.ipfile, rawPath)
+
+    if not wsHistoryMatchesInputs(wsIC.empty_runs, wsIC.mode, wsIC.ipfile, emptyPath):
+        saveWSFromLoadVesuvio(wsIC.empty_runs, wsIC.mode, wsIC.ipfile, emptyPath)
+
     return rawPath, emptyPath
+
+
+def getRunningMode(wsIC):
+    if wsIC.__class__.__name__ == "LoadVesuvioBackParameters":
+        runningMode = "backward"
+    elif wsIC.__class__.__name__ == "LoadVesuvioFrontParameters":
+        runningMode = "forward"
+    else:
+        raise ValueError(f"Input class for loading workspace not valid: {wsIC.__class__.__name__}")
+    return runningMode
 
 
 def setOutputDirsForSample(IC, sampleName):
@@ -117,31 +126,53 @@ def setOutputDirsForSample(IC, sampleName):
     return
 
 
-def saveWSFromLoadVesuvio(wsIC, rawPath, emptyPath):
+def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
 
-    print(f"\nLoading and storing workspace sample runs: {wsIC.runs}\n")
+    if not(localPath.is_file()):
+        return False
 
-    rawVesuvio = LoadVesuvio(
-        Filename=wsIC.runs,
-        SpectrumList=wsIC.spectra,
-        Mode=wsIC.mode,
-        InstrumentParFile=str(wsIC.ipfile),
-        OutputWorkspace=rawPath.name
+    local_ws = Load(Filename=str(localPath))
+    ws_history = local_ws.getHistory()
+    metadata = ws_history.getAlgorithmHistory(0)
+    
+    saved_runs = metadata.getPropertyValue("Filename")
+    if saved_runs != runs:
+        print(f"Filename in saved workspace did not match: {saved_runs} and {runs}")
+        return False
+
+    saved_mode = metadata.getPropertyValue("Mode")
+    if saved_mode != mode:
+        print(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
+        return False
+
+    saved_ipfile_name = Path(metadata.getPropertyValue("InstrumentParFile")).name
+    if saved_ipfile_name != ipfile.name:
+        print(f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile.name}")
+        return False
+
+    return True
+
+
+def saveWSFromLoadVesuvio(runs, mode, ipfile, localPath):
+
+    if "backward" in localPath.name:
+        spectra = '3-134'
+    elif "forward" in localPath.name:
+        spectra = '135-198'
+    else:
+        raise ValueError(f"Invalid name to save workspace: {localPath.name}")
+
+    vesuvio_ws = LoadVesuvio(
+        Filename=runs,
+        SpectrumList=spectra,
+        Mode=mode,
+        InstrumentParFile=str(ipfile),
+        OutputWorkspace=localPath.name,
+        LoadLogFiles=False
         )
 
-    SaveNexus(rawVesuvio, str(rawPath))
-    print("\nRaw workspace stored locally.\n")
-
-    emptyVesuvio = LoadVesuvio(
-        Filename=wsIC.empty_runs,
-        SpectrumList=wsIC.spectra,
-        Mode=wsIC.mode,
-        InstrumentParFile=str(wsIC.ipfile),
-        OutputWorkspace=emptyPath.name
-        )
-
-    SaveNexus(emptyVesuvio, str(emptyPath))
-    print("\nEmpty workspace stored locally.\n")
+    SaveNexus(vesuvio_ws, str(localPath))
+    print(f"Workspace saved locally at: {localPath}")
     return
 
 
