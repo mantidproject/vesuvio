@@ -49,6 +49,7 @@ def __setup_config(args):
                                    'caching.experiment': experiment,
                                    'caching.ipfolder': ipfolder_dir})
     handle_config.setup_expr_dir(cache_dir, experiment)
+    handle_config.check_dir_exists("IP folder", ipfolder_dir)
 
 
 def __run_analysis():
