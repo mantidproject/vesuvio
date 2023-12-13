@@ -65,10 +65,9 @@ def setup_config_dir(config_dir):
 
 def setup_expr_dir(cache_dir, experiment):
     expr_path = os.path.join(cache_dir, "experiments", experiment)
-    if os.path.isdir(expr_path):
-        return   # Avoids overwriting
-    __mk_dir('experiment', expr_path)
-    copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), input_file_path(cache_dir, experiment))
+    success = __mk_dir('experiment', expr_path)
+    if success:
+        copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), input_file_path(cache_dir, experiment))
 
 
 def setup_default_ipfile_dir():
