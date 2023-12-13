@@ -96,3 +96,10 @@ def config_set():
 
 def input_file_path(cache_dir, experiment):
     return os.path.join(cache_dir, "experiments", experiment, VESUVIO_INPUTS_FILE)
+
+
+def check_dir_exists(type, path):
+    if not os.path.isdir(path):
+        print(f"Directory of {type} could not be found at location: {path}")
+        return False
+    return True
