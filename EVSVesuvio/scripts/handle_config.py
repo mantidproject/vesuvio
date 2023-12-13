@@ -1,11 +1,12 @@
 import os
-from shutil import copyfile
+from shutil import copyfile, copytree, ignore_patterns
 
 VESUVIO_CONFIG_PATH = os.path.join(os.path.expanduser("~"), '.mvesuvio')
 VESUVIO_CONFIG_FILE = "vesuvio.user.properties"
 VESUVIO_INPUTS_FILE = "analysis_inputs.py"
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANTID_CONFIG_FILE = "Mantid.user.properties"
+VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
 
 
 def __read_config(config_file_path, throw_on_not_found=True):
@@ -64,8 +65,14 @@ def setup_config_dir(config_dir):
 
 def setup_expr_dir(cache_dir, experiment):
     expr_path = os.path.join(cache_dir, "experiments", experiment)
-    __mk_dir('experiment', expr_path)
-    copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), input_file_path(cache_dir, experiment))
+    success = __mk_dir('experiment', expr_path)
+    if success:
+        copyfile(os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE), input_file_path(cache_dir, experiment))
+
+
+def setup_default_ipfile_dir():
+    if not os.path.isdir(VESUVIO_IPFOLDER_PATH):
+        copytree(os.path.join(VESUVIO_PACKAGE_PATH, "config", "ip_files"), VESUVIO_IPFOLDER_PATH, ignore=ignore_patterns('__*'))
 
 
 def __mk_dir(type, path):
@@ -88,3 +95,10 @@ def config_set():
 
 def input_file_path(cache_dir, experiment):
     return os.path.join(cache_dir, "experiments", experiment, VESUVIO_INPUTS_FILE)
+
+
+def check_dir_exists(type, path):
+    if not os.path.isdir(path):
+        print(f"Directory of {type} could not be found at location: {path}")
+        return False
+    return True

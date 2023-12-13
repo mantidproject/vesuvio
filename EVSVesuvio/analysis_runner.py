@@ -3,20 +3,16 @@ from pathlib import Path
 import importlib
 import sys
 from os import path
-#from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap import runBootstrap
-#from EVSVesuvio.vesuvio_analysis.core_functions.bootstrap_analysis import runAnalysisOfStoredBootstrap
-from EVSVesuvio.vesuvio_analysis.core_functions.run_script import runScript
-from mantid.api import AnalysisDataService
+from EVSVesuvio.vesuvio_analysis.run_script import runScript
 from EVSVesuvio.scripts import handle_config
 
 
 def run():
-    scriptName =  handle_config.read_config_var('caching.experiment')
+    scriptName = handle_config.read_config_var('caching.experiment')
     experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments" / scriptName # Path to the repository
     inputs_path = experimentsPath / "analysis_inputs.py"
+    ipFilesPath = Path(handle_config.read_config_var('caching.ipfolder'))
     ai = import_from_path(inputs_path, "analysis_inputs")
-
-    ipFilesPath = Path(path.dirname(path.dirname(handle_config.__file__))) / "vesuvio_analysis" / "ip_files"
 
     start_time = time.time()
 
@@ -27,11 +23,6 @@ def run():
     yFitIC = ai.YSpaceFitInitialConditions
     bootIC = ai.BootstrapInitialConditions
     userCtr = ai.UserScriptControls
-
-    runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
-
-    AnalysisDataService.clear()
-    userCtr.procedure = "FORWARD"
 
     runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
 

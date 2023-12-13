@@ -82,6 +82,8 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
+    def __init__(self, ipFilesPath):
+        self.InstrParsPath=ipFilesPath / "ip2018_3.par"
 
     masses = np.array([1.0079, 12, 16, 27])
 
