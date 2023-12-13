@@ -48,7 +48,6 @@ def iterativeFitForDataReduction(ic):
             wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios, wsNCPM)
             Minus(LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs")
 
-
         remaskValues(ic.name, "tmpNameWS")    # Masks cols in the same place as in ic.name
         RenameWorkspace(InputWorkspace="tmpNameWs", OutputWorkspace=ic.name+str(iteration+1))
 
