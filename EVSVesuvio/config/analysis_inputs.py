@@ -7,7 +7,6 @@ class LoadVesuvioBackParameters:
 
     runs="43066-43076"         # 77K         # The numbers of the runs to be analysed
     empty_runs="41876-41923"   # 77K         # The numbers of the empty runs to be subtracted
-    spectra='3-134'                          # Spectra to be analysed
     mode='DoubleDifference'
 
     subEmptyFromRaw = True         # Flag to control wether empty ws gets subtracted from raw
@@ -21,7 +20,6 @@ class LoadVesuvioFrontParameters:
 
     runs='43066-43076'         # 100K        # The numbers of the runs to be analysed
     empty_runs='43868-43911'   # 100K        # The numbers of the empty runs to be subtracted
-    spectra='144-182'                        # Spectra to be analysed
     mode='SingleDifference'
 
     subEmptyFromRaw = False         # Flag to control wether empty ws gets subtracted from raw
