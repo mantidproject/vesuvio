@@ -13,7 +13,7 @@
 - name: Build docker image
   community.docker.docker_image:
     build:
-      path: /tmp/runner.Dockerfile
+      path: /tmp/
     name: vesuvio-runner
     source: build
 
