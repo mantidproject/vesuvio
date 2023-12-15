@@ -779,7 +779,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         minosAutoErr = list(np.zeros(np.array(minosManErr).shape))
 
         if yFitIC.showPlots:
-            fig.canvas.set_window_title(wsName+"_Manual_Implementation_MINOS")
+            fig.canvas.manager.set_window_title(wsName+"_Manual_Implementation_MINOS")
             fig.show()
 
     return    parameters, values, errors, minosAutoErr, minosManErr
@@ -801,7 +801,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={
                             'projection':'mantid'})  #subplot_kw={'projection':'mantid'}
-    # fig.canvas.set_window_title("Plot of Manual Implementation MINOS")
+    # fig.canvas.manager.set_window_title("Plot of Manual Implementation MINOS")
 
     merrors = {}
     for p, ax in zip(minuitObj.parameters, axs.flat):
@@ -926,7 +926,7 @@ def plotAutoMinos(minuitObj, wsName):
     figsize = (12, 7)
     # Output plot to Mantid
     fig, axs = plt.subplots(height, width, tight_layout=True, figsize=figsize, subplot_kw={'projection':'mantid'})
-    fig.canvas.set_window_title(wsName+"_Plot_Automatic_MINOS")
+    fig.canvas.manager.set_window_title(wsName+"_Plot_Automatic_MINOS")
 
     for p, ax in zip(minuitObj.parameters, axs.flat):
         loc, fvals, status = minuitObj.mnprofile(p, bound=2)
@@ -1314,7 +1314,7 @@ def groupDetectors(ipData, yFitIC):
 
     if yFitIC.showPlots:
         fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})
-        fig.canvas.set_window_title("Grouping of detectors")
+        fig.canvas.manager.set_window_title("Grouping of detectors")
         plotFinalGroups(ax, ipData, idxList)
         fig.show()
     return idxList
@@ -1420,7 +1420,7 @@ def formIdxList(clusters):
 def plotDetsAndInitialCenters(L1, theta, centers):
     """Used in debugging."""
     fig, ax = plt.subplots(tight_layout=True, subplot_kw={'projection':'mantid'})
-    fig.canvas.set_window_title("Starting centroids for groupings")
+    fig.canvas.manager.set_window_title("Starting centroids for groupings")
     ax.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
     ax.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
     ax.axes.xaxis.set_ticks([])  # Numbers plotted do not correspond to real numbers, so hide them
@@ -1591,7 +1591,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
         tight_layout=True,
         subplot_kw={'projection':'mantid'}
     )
-    fig.canvas.set_window_title(wsName+"_Plot_of_Global_Fit")
+    fig.canvas.manager.set_window_title(wsName+"_Plot_of_Global_Fit")
 
     # Data used in Global Fit
     for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
