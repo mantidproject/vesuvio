@@ -1,9 +1,8 @@
 - name: Copy setup script to host
   copy: 
     src: setup/setup.sh
-    dest: /tmp/setup/setup.sh
+    dest: /tmp/setup.sh
     mode: '0755'
-
 
 - name: Deploy dockerized github runner
   community.docker.docker_container:
@@ -18,3 +17,8 @@
     volumes:
       - /tmp/setup/setup.sh:/home/setup.sh
     command: /home/setup.sh
+
+- name: Remove setup script
+  ansible.builtin.file:
+    path: setup/setup.sh
+    state: absent
