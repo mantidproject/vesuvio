@@ -1,3 +1,10 @@
+- name: Copy setup script to host
+  copy: 
+    src: setup/setup.sh
+    dest: /tmp/setup/setup.sh
+    mode: '0755'
+
+
 - name: Deploy dockerized github runner
   community.docker.docker_container:
     name: "{{ runner_name }}"
@@ -8,3 +15,6 @@
     recreate: yes
     pull: yes
     shm_size: 512M
+    volumes:
+      - /tmp/setup/setup.sh:/home/setup.sh
+    command: /home/setup.sh
