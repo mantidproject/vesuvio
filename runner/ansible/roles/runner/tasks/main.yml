@@ -1,6 +1,6 @@
 - name: Deploy dockerized github runner
   community.docker.docker_container:
-    name: "{{ agent_name }}"
+    name: "{{ runnner_name }}"
     image: ubuntu:focal-20231128
     detach: yes
     init: yes
