@@ -7,10 +7,14 @@ from EVSVesuvio.scripts import handle_config
 
 
 def run(yes_to_all=False):
-    scriptName = handle_config.read_config_var('caching.experiment')
-    experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments" / scriptName # Path to the repository
+    scriptName = handle_config.read_config_var("caching.experiment")
+    experimentsPath = (
+        Path(handle_config.read_config_var("caching.location"))
+        / "experiments"
+        / scriptName
+    )  # Path to the repository
     inputs_path = experimentsPath / "analysis_inputs.py"
-    ipFilesPath = Path(handle_config.read_config_var('caching.ipfolder'))
+    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
     ai = import_from_path(inputs_path, "analysis_inputs")
 
     start_time = time.time()
@@ -23,10 +27,20 @@ def run(yes_to_all=False):
     bootIC = ai.BootstrapInitialConditions
     userCtr = ai.UserScriptControls
 
-    runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, yes_to_all)
+    runScript(
+        userCtr,
+        scriptName,
+        wsBackIC,
+        wsFrontIC,
+        bckwdIC,
+        fwdIC,
+        yFitIC,
+        bootIC,
+        yes_to_all,
+    )
 
     end_time = time.time()
-    print("\nRunning time: ", end_time-start_time, " seconds")
+    print("\nRunning time: ", end_time - start_time, " seconds")
 
 
 def import_from_path(path, name):
@@ -37,5 +51,5 @@ def import_from_path(path, name):
     return module
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

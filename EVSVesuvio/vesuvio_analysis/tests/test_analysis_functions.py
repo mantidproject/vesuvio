@@ -21,5 +21,5 @@ class TestAnalysisFunctions(unittest.TestCase):
         self.ws.extractE.assert_called_once()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

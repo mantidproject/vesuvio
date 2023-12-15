@@ -5,12 +5,19 @@ from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from EVSVesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from EVSVesuvio.system_tests.tests_IC import (
+    scriptName,
+    wsBackIC,
+    wsFrontIC,
+    bckwdIC,
+    fwdIC,
+    yFitIC,
+)
 
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 
-class BootstrapInitialConditions: # Not used, but still need to pass as arg
+class BootstrapInitialConditions:  # Not used, but still need to pass as arg
     runBootstrap = False
 
 
@@ -47,10 +54,16 @@ class AnalysisRunner:
     @classmethod
     def _load_workspaces(cls):
         AnalysisDataService.clear()
-        wsFinal = Load(str(cls._test_path / "wsFinal.nxs"), OutputWorkspace=scriptName + "_FORWARD_1")
+        wsFinal = Load(
+            str(cls._test_path / "wsFinal.nxs"),
+            OutputWorkspace=scriptName + "_FORWARD_1",
+        )
         for i in range(len(fwdIC.masses)):
             fileName = "wsFinal_ncp_" + str(i) + ".nxs"
-            Load(str(cls._test_path / fileName), OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profile_" + str(i))
+            Load(
+                str(cls._test_path / fileName),
+                OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profile_" + str(i),
+            )
 
     @classmethod
     def _run(cls):
@@ -58,12 +71,16 @@ class AnalysisRunner:
         userCtr = UserScriptControls
         yFitIC.fitModel = "GC_C4_C6"
 
-        scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+        scattRes, yfitRes = runScript(
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+        )
         cls._currentResults = yfitRes
 
     @classmethod
     def _load_benchmark_results(cls):
-        cls._benchmarkResults = np.load(str(cls._test_path / "stored_yspace_fit_GC.npz"))
+        cls._benchmarkResults = np.load(
+            str(cls._test_path / "stored_yspace_fit_GC.npz")
+        )
 
 
 class TestSymSumYSpace(unittest.TestCase):
@@ -159,7 +176,7 @@ class Testperr(unittest.TestCase):
 
     def test_perr(self):
         # print("\norierr:\n", self.oriperr, "\nopterr:\n", self.optperr)
-        nptest.assert_array_equal( self.oriperr, self.optperr)
+        nptest.assert_array_equal(self.oriperr, self.optperr)
 
 
 if __name__ == "__main__":
