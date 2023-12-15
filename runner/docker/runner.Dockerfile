@@ -5,4 +5,4 @@ RUN apt-get update && apt-get install -y \
     tar \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /actions-runner
+RUN useradd -m nonroot
