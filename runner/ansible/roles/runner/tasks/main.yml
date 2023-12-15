@@ -4,10 +4,16 @@
     dest: /tmp/setup.sh
     mode: '0755'
 
+- name: Copy dockerfile to host
+  copy: 
+    src: ../docker/runner.Dockerfile
+    dest: /tmp/runner.Dockerfile
+    mode: '0755'
+
 - name: Build docker image
   community.docker.docker_image:
     build:
-      path: ../docker
+      path: /tmp/runner.Dockerfile
     name: vesuvio-runner
     source: build
 
@@ -29,3 +35,9 @@
   ansible.builtin.file:
     path: /tmp/setup.sh
     state: absent
+
+- name: Remove dockerfile
+  ansible.builtin.file:
+    path: /tmp/runner.Dockerfile
+    state: absent
+  
