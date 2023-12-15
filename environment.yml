@@ -5,11 +5,12 @@ channels:
   - mantid
 
 dependencies:
+  - python==3.8 #Upgrade to python 3.10
   - flake8
   - conda-wrappers
   - pre-commit==2.15 #review this
   - coverage
-  - mantid==6.7.0 #review this
+  - mantid
   - matplotlib
   - iminuit
   - h5py
