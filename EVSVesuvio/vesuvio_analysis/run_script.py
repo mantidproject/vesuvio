@@ -6,7 +6,7 @@ from EVSVesuvio.vesuvio_analysis.procedures import runIndependentIterativeProced
 from mantid.api import mtd
 
 
-def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC):
+def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, yes_to_all=False):
 
     # Set extra attributes from user attributes
     completeICFromInputs(fwdIC, scriptName, wsFrontIC)
@@ -66,7 +66,7 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
                 resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
             return None, resYFit       # To match return below.
 
-        checkUserClearWS()      # Check if user is OK with cleaning all workspaces
+        checkUserClearWS(yes_to_all)      # Check if user is OK with cleaning all workspaces
         res = runProcedure()
 
         resYFit = None
@@ -76,10 +76,10 @@ def runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, 
         return res, resYFit   # Return results used only in tests
 
 
-def checkUserClearWS():
+def checkUserClearWS(yes_to_all=False):
     """If any workspace is loaded, check if user is sure to start new procedure."""
 
-    if len(mtd) != 0:
+    if not yes_to_all and len(mtd) != 0:
         userInput = input("This action will clean all current workspaces to start anew. Proceed? (y/n): ")
         if (userInput == "y") | (userInput == "Y"):
             pass
