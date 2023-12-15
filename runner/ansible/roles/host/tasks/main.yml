@@ -11,3 +11,5 @@
     mode: '0755'
   notify:
     - Remove docker image
+
+- meta: flush_handlers
