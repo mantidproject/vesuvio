@@ -11,6 +11,9 @@
     - role: geerlingguy.docker
       become: yes
       tags: "initial-setup"      
+    - role: host
+      become: yes
+      tags: runner
     - role: runner
       become: yes
       tags: runner

@@ -1,0 +1,13 @@
+- name: Copy setup script to host
+  copy: 
+    src: setup/setup.sh
+    dest: /tmp/setup.sh
+    mode: '0755'
+
+- name: Copy dockerfile to host
+  copy: 
+    src: ../docker/runner.Dockerfile
+    dest: /tmp/runner.Dockerfile
+    mode: '0755'
+  notify:
+    - Remove docker image
