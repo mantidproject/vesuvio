@@ -15,10 +15,10 @@
     pull: yes
     shm_size: 512M
     volumes:
-      - /tmp/setup/setup.sh:/home/setup.sh
+      - /tmp/setup.sh:/home/setup.sh
     command: /home/setup.sh
 
 - name: Remove setup script
   ansible.builtin.file:
-    path: setup/setup.sh
+    path: /tmp/setup.sh
     state: absent
