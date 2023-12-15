@@ -6,7 +6,7 @@ from EVSVesuvio.vesuvio_analysis.run_script import runScript
 from EVSVesuvio.scripts import handle_config
 
 
-def run():
+def run(yes_to_all=False):
     scriptName = handle_config.read_config_var('caching.experiment')
     experimentsPath = Path(handle_config.read_config_var('caching.location')) / "experiments" / scriptName # Path to the repository
     inputs_path = experimentsPath / "analysis_inputs.py"
@@ -23,7 +23,7 @@ def run():
     bootIC = ai.BootstrapInitialConditions
     userCtr = ai.UserScriptControls
 
-    runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+    runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, yes_to_all)
 
     end_time = time.time()
     print("\nRunning time: ", end_time-start_time, " seconds")

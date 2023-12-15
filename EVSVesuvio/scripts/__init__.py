@@ -14,7 +14,7 @@ def main():
     if args.command == "run":
         if not handle_config.config_set():
             __setup_config(None)
-        __run_analysis()
+        __run_analysis(args.yes)
 
 
 def __set_up_parser():
@@ -25,7 +25,8 @@ def __set_up_parser():
     config_parser.add_argument("--set-ipfolder", "-p", help="set the intrument parameters directory", default="", type=str)
     config_parser.add_argument("--set-experiment", "-e", help="set the current experiment", default="", type=str)
 
-    config_parser = subparsers.add_parser("run", help="run mvesuvio analysis")
+    run_parser = subparsers.add_parser("run", help="run mvesuvio analysis")
+    run_parser.add_argument("--yes", "-y", help="Say yes to all input prompts", action='store_true')
     return parser
 
 
@@ -52,10 +53,10 @@ def __setup_config(args):
     handle_config.check_dir_exists("IP folder", ipfolder_dir)
 
 
-def __run_analysis():
+def __run_analysis(yes_to_all):
     environ['MANTIDPROPERTIES'] = path.join(handle_config.VESUVIO_CONFIG_PATH, "Mantid.user.properties")
     from EVSVesuvio import analysis_runner
-    analysis_runner.run()
+    analysis_runner.run(yes_to_all)
 
 
 if __name__ == '__main__':
