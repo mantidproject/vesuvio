@@ -25,6 +25,9 @@ jobs:
           python-version: 3.8
           auto-activate-base: false
 
+      - name: debug pwd
+        run: pwd
+
       - name: Flake8
         run: python -m flake8 --config=config.flake8
 
