@@ -4,15 +4,22 @@
     dest: /tmp/setup.sh
     mode: '0755'
 
+- name: Build docker image
+  community.docker.docker_image:
+    build:
+      path: ../docker
+    name: vesuvio-runner
+    source: build
+
 - name: Deploy dockerized github runner
   community.docker.docker_container:
     name: "{{ runner_name }}"
-    image: ubuntu:focal-20231128
+    image: vesuvio-runner
     detach: yes
     init: yes
     network_mode: host
     recreate: yes
-    pull: yes
+    pull: no
     shm_size: 512M
     volumes:
       - /tmp/setup.sh:/home/setup.sh
