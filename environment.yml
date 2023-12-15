@@ -10,7 +10,7 @@ dependencies:
   - conda-wrappers
   - pre-commit==2.15 #review this
   - coverage
-  - mantid
+  - mantid>=6.7
   - matplotlib
   - iminuit
   - h5py
