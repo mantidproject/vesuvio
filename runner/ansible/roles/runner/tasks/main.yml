@@ -31,6 +31,7 @@
     volumes:
       - /tmp/setup.sh:/home/setup.sh
     command: /home/setup.sh
+      become: no
 
 - name: Remove setup script
   ansible.builtin.file:
