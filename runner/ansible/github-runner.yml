@@ -1,7 +1,7 @@
 - name: Deploy self-hosted github runner for vesuvio repository
   hosts: all
- # vars:
- #   package_updates_reboot: true
+  vars:
+    package_updates_reboot: true # dannixon.system.package_updates
  #   pip_install_packages:
  #     - name: docker
 

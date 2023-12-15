@@ -1,3 +1,10 @@
 - name: Deploy dockerized github runner
-  ansible.builtin.debug:
-    msg: Placeholder message
+  community.docker.docker_container:
+    name: "{{ agent_name }}"
+    image: ubuntu:focal-20231128
+    detach: yes
+    init: yes
+    network_mode: host
+    recreate: yes
+    pull: yes
+    shm_size: 512M
