@@ -24,7 +24,7 @@ requirements:
 
   run:
     - python {{ python }}
-    - mantid==6.7.0
+    - mantid>=6.7
     - matplotlib
     - iminuit
     - h5py
