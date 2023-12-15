@@ -9,6 +9,8 @@
     src: ../docker/runner.Dockerfile
     dest: /tmp/runner.Dockerfile
     mode: '0755'
+  notify:
+    - Remove docker image
 
 - name: Build docker image
   community.docker.docker_image:
@@ -37,9 +39,3 @@
   ansible.builtin.file:
     path: /tmp/setup.sh
     state: absent
-
-- name: Remove dockerfile
-  ansible.builtin.file:
-    path: /tmp/runner.Dockerfile
-    state: absent
-  
