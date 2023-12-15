@@ -1,0 +1,3 @@
+- name: Deploy dockerized github runner
+  ansible.builtin.debug:
+    msg: Placeholder message
