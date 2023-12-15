@@ -3,7 +3,14 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from EVSVesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from EVSVesuvio.system_tests.tests_IC import (
+    scriptName,
+    wsBackIC,
+    wsFrontIC,
+    bckwdIC,
+    fwdIC,
+    yFitIC,
+)
 
 
 class BootstrapInitialConditions:
@@ -13,7 +20,7 @@ class BootstrapInitialConditions:
     fitInYSpace = None
 
     bootstrapType = "JACKKNIFE"
-    nSamples = 3   # Overwritten by running Jackknife
+    nSamples = 3  # Overwritten by running Jackknife
     skipMSIterations = False
     runningTest = True
     userConfirmation = False
@@ -34,7 +41,9 @@ class TestJointBootstrap(unittest.TestCase):
         bootIC = BootstrapInitialConditions
         userCtr = UserScriptControls
 
-        bootRes, noneRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+        bootRes, noneRes = runScript(
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+        )
 
         cls._jackBackSamples = bootRes["bckwdScat"].bootSamples
         cls._jackFrontSamples = bootRes["fwdScat"].bootSamples
@@ -50,8 +59,12 @@ class TestJointBootstrap(unittest.TestCase):
     @classmethod
     def _load_benchmark_results(cls):
         testPath = Path(__file__).absolute().parent
-        cls._oriJointBack = np.load(str(testPath / "stored_joint_jack_back.npz"))["boot_samples"]
-        cls._oriJointFront = np.load(str(testPath / "stored_joint_jack_front.npz"))["boot_samples"]
+        cls._oriJointBack = np.load(str(testPath / "stored_joint_jack_back.npz"))[
+            "boot_samples"
+        ]
+        cls._oriJointFront = np.load(str(testPath / "stored_joint_jack_front.npz"))[
+            "boot_samples"
+        ]
 
     @classmethod
     def setUpClass(cls):
@@ -65,5 +78,5 @@ class TestJointBootstrap(unittest.TestCase):
         nptest.assert_array_almost_equal(self._jackFrontSamples, self._oriJointFront)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

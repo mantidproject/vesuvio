@@ -4,9 +4,6 @@ exclude =
     .git,
     build,
     buildconfig,
-    EVSVesuvio/vesuvio_analysis/scribles,
-    EVSVesuvio/experiments/original_inputs,
-    EVSVesuvio/original_inputs.py,
     unpackaged
 max-complexity = 20
 max-line-length = 140

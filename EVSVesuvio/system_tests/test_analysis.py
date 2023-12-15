@@ -3,7 +3,14 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from EVSVesuvio.system_tests.tests_IC import scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC
+from EVSVesuvio.system_tests.tests_IC import (
+    scriptName,
+    wsBackIC,
+    wsFrontIC,
+    bckwdIC,
+    fwdIC,
+    yFitIC,
+)
 
 
 class BootstrapInitialConditions:  # Not used, but still need to pass as arg
@@ -37,7 +44,9 @@ class AnalysisRunner:
         bootIC = BootstrapInitialConditions
         userCtr = UserScriptControls
 
-        scattRes, yfitRes = runScript(userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC)
+        scattRes, yfitRes = runScript(
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+        )
 
         wsFinal, forwardScatteringResults = scattRes
 
@@ -57,9 +66,13 @@ class AnalysisRunner:
 def displayMask(mask, rtol, string):
     noDiff = np.sum(mask)
     maskSize = mask.size
-    print("\nNo of different "+string+f", rtol={rtol}:\n",
-          noDiff, " out of ", maskSize,
-          f"ie {100*noDiff/maskSize:.1f} %")
+    print(
+        "\nNo of different " + string + f", rtol={rtol}:\n",
+        noDiff,
+        " out of ",
+        maskSize,
+        f"ie {100*noDiff/maskSize:.1f} %",
+    )
 
 
 class TestFitParameters(unittest.TestCase):
@@ -181,5 +194,5 @@ class TestFitWorkspaces(unittest.TestCase):
         nptest.assert_array_equal(self.optws, self.oriws)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
