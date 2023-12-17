@@ -6,7 +6,7 @@
     name: vesuvio-runner
     source: build
 
-- name: Deploy dockerized github runner
+- name: Deploy dockerized github runner - setup
   community.docker.docker_container:
     name: "{{ runner_name }}"
     image: vesuvio-runner
@@ -20,8 +20,32 @@
       - /tmp/setup.sh:/home/setup.sh
     command: /home/setup.sh
     user: nonroot
+  when: "'run' not in ansible_run_tags"
 
 - name: Remove setup script
   ansible.builtin.file:
     path: /tmp/setup.sh
     state: absent
+  when: "'run' not in ansible_run_tags"
+
+- name: Deploy dockerized github runner - run
+  community.docker.docker_container:
+    name: "{{ runner_name }}"
+    image: vesuvio-runner
+    detach: yes
+    init: yes
+    network_mode: host
+    recreate: yes
+    pull: no
+    shm_size: 512M
+    volumes:
+      - /tmp/run.sh:/home/run.sh
+    command: /home/run.sh
+    user: nonroot
+  when: "'run' in ansible_run_tags"
+
+- name: Remove run script
+  ansible.builtin.file:
+    path: /tmp/run.sh
+    state: absent
+  when: "'run' in ansible_run_tags"
