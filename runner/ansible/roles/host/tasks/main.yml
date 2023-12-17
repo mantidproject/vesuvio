@@ -3,17 +3,9 @@
     src: setup/setup.sh
     dest: /tmp/setup.sh
     mode: '0755'
-  when: "'run' not in ansible_run_tags"
-
-- name: Copy run script to host
-  copy: 
-    src: setup/run.sh
-    dest: /tmp/run.sh
-    mode: '0755'
-  when: "'run' in ansible_run_tags"
 
 - name: Copy dockerfile to host
-  copy:
+  copy: 
     src: ../docker/runner.Dockerfile
     dest: /tmp/runner.Dockerfile
     mode: '0755'
