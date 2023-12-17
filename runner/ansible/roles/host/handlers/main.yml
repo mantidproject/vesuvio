@@ -1,0 +1,5 @@
+- name: Remove docker image
+  community.docker.docker_image:
+    state: absent
+    force_absent: true
+    name: vesuvio-runner

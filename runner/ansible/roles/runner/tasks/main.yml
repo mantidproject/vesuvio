@@ -1,0 +1,27 @@
+- name: Build docker image
+  community.docker.docker_image:
+    build:
+      path: /tmp/
+      dockerfile: runner.Dockerfile
+    name: vesuvio-runner
+    source: build
+
+- name: Deploy dockerized github runner
+  community.docker.docker_container:
+    name: "{{ runner_name }}"
+    image: vesuvio-runner
+    detach: yes
+    init: yes
+    network_mode: host
+    recreate: yes
+    pull: no
+    shm_size: 512M
+    volumes:
+      - /tmp/setup.sh:/home/setup.sh
+    command: /home/setup.sh
+    user: nonroot
+
+- name: Remove setup script
+  ansible.builtin.file:
+    path: /tmp/setup.sh
+    state: absent

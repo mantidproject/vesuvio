@@ -1,0 +1,2 @@
+[all]
+172.16.110.198 runner_name=vesuvio-runner

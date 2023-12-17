@@ -1,0 +1,19 @@
+- name: Deploy self-hosted github runner for vesuvio repository
+  hosts: all
+  vars:
+    package_updates_reboot: true # dannixon.system.package_updates
+
+  roles:
+    - role: dannixon.system.package_updates
+      tags: "initial-setup"
+    - role: dannixon.system.interactive_users
+      tags: "initial-setup"           
+    - role: geerlingguy.docker
+      become: yes
+      tags: "initial-setup"      
+    - role: host
+      become: yes
+      tags: runner
+    - role: runner
+      become: yes
+      tags: runner
