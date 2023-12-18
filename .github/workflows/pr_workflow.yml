@@ -45,7 +45,7 @@ jobs:
       - name: Run Vesuvio Calibration System Tests
         run: |
           cd unpackaged/vesuvio_calibration
-          python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/system
+          python -m unittest discover -s ./tests/system
 
       # Report coverage
       #- name: Report Coverage
