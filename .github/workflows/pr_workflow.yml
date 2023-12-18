@@ -29,18 +29,20 @@ jobs:
         run: python -m flake8 --config=config.flake8
 
       # Runs Unit tests
-      #- name: Run EVSVesuvio Analysis Unit Tests
-      #  run: coverage run -m unittest discover -s ./EVSvesuvio/vesuvio_analysis
+      - name: Run EVSVesuvio Analysis Unit Tests
+        run: coverage run -m unittest discover -s ./EVSvesuvio/vesuvio_analysis/tests
 
       # Runs System tests
-      #- name: Run EVSVesuvio Analysis System Tests
-      #  run: python -m unittest discover -s ./EVSVesuvio/system_tests
+      - name: Run EVSVesuvio Analysis System Tests
+        run: |
+          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
+          python -m unittest discover -s ./EVSVesuvio/system_tests
 
       - name: Run EVSVesuvio Calibration Unit Tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           cd unpackaged/vesuvio_calibration
-          python -m unittest discover -s ./tests/unit
+          python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit
 
       #DISABLED AS THEY APPEAR TOO LARGE FOR GITHUB HOSTED RUNNERS
       #- name: Run Vesuvio Calibration System Tests
