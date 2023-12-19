@@ -1,12 +1,22 @@
 import os
 from shutil import copyfile, copytree, ignore_patterns
 
-VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE = __parse_properties_env_var()
+def __parse_config_env_var():
+    env_var = os.getenv('VESUVIOPROPERTIES')
+    if env_var:
+        config_path, config_file = os.path.split(env_var)
+    else:
+        config_path = os.path.join(os.path.expanduser("~"), ".mvesuvio")
+        config_file = "vesuvio.user.properties"
+    return config_path, config_file
+
+### PATH CONSTANTS ###
+VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE = __parse_config_env_var()
 VESUVIO_INPUTS_FILE = "analysis_inputs.py"
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANTID_CONFIG_FILE = "Mantid.user.properties"
 VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
-
+######################
 
 def __read_config(config_file_path, throw_on_not_found=True):
     lines = ""
@@ -116,13 +126,3 @@ def check_dir_exists(type, path):
         print(f"Directory of {type} could not be found at location: {path}")
         return False
     return True
-
-
-def __parse_properties_env_var():
-    env_var = os.getenv('VESUVIOPROPERTIES')
-    if env_var:
-        config_path, config_file = os.path.split(env_var)
-    else:
-        config_path = os.path.join(os.path.expanduser("~"), ".mvesuvio")
-	config_file = "vesuvio.user.properties"
-    return config_path, config_file
