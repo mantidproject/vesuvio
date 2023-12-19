@@ -57,7 +57,7 @@ def set_config_vars(var_dict):
 
 
 def read_config_var(var, throw_on_not_found=True):
-    file_path = f"{VESUVIO_CONFIG_PATH}/{VESUVIO_CONFIG_FILE}"
+    file_path = f"{VESUVIO_CONFIG_PATH}{os.path.sep}{VESUVIO_CONFIG_FILE}"
     lines = __read_config(file_path, throw_on_not_found)
 
     result = ""
