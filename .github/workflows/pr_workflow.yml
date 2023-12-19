@@ -39,7 +39,7 @@ jobs:
       # Runs System tests
       - name: Run EVSVesuvio Analysis System Tests
         run: |
-          export VESUVIOPROPERTIES=$(pwd)/EVSVesuvio/config/vesuvio.user.properties
+          export VESUVIOPROPERTIES=$(pwd)/EVSVesuvio/config/test_dir/vesuvio.user.properties
           python -m unittest discover -s ./EVSVesuvio/system_tests
 
       - name: Run EVSVesuvio Calibration Unit Tests
