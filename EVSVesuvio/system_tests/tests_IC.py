@@ -178,6 +178,6 @@ wsBackIC = LoadVesuvioBackParameters()  # THIS WAS SET TO FRONT
 
 fwdIC = ForwardInitialConditions()
 bckwdIC = BackwardInitialConditions()
-yFitIC = YSpaceFitInitialCondition()
+yFitIC = YSpaceFitInitialConditions()
 
 scriptName = "tests"
