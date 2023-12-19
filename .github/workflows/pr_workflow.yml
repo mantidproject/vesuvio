@@ -38,8 +38,7 @@ jobs:
 
       # Runs System tests
       - name: Run EVSVesuvio Analysis System Tests
-          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          python -m unittest discover -s ./EVSVesuvio/system_tests
+        run: python -m unittest discover -s ./EVSVesuvio/system_tests
 
       - name: Run EVSVesuvio Calibration Unit Tests
         run: |
