@@ -139,23 +139,27 @@ def setOutputDirsForSample(IC, sampleName):
 
 def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
     if not (localPath.is_file()):
+        print("FILE NOT FOUND")
         return False
-
+    print("FILE FOUND")
     local_ws = Load(Filename=str(localPath))
     ws_history = local_ws.getHistory()
     metadata = ws_history.getAlgorithmHistory(0)
 
     saved_runs = metadata.getPropertyValue("Filename")
+    print(f"{saved_runs} v {runs}")
     if saved_runs != runs:
         print(f"Filename in saved workspace did not match: {saved_runs} and {runs}")
         return False
 
     saved_mode = metadata.getPropertyValue("Mode")
+    print(f"{saved_mode} v {mode}")
     if saved_mode != mode:
         print(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
         return False
 
     saved_ipfile_name = Path(metadata.getPropertyValue("InstrumentParFile")).name
+    print(f"{saved_ipfile_name} v {ipfile.name}")
     if saved_ipfile_name != ipfile.name:
         print(
             f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile.name}"
