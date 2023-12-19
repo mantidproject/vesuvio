@@ -162,6 +162,7 @@ def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
         return False
 
     saved_ipfile_name = Path(metadata.getPropertyValue("InstrumentParFile")).name
+    logger.notice(f"{metadata.getPropertyValue('InstrumentParFile')}")
     logger.notice(f"{saved_ipfile_name} v {ipfile.name}")
     if saved_ipfile_name != ipfile.name:
         logger.notice(
