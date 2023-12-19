@@ -173,11 +173,11 @@ class YSpaceFitInitialConditions:
 # userControls and bootIC defined in corresponding test scripts
 
 
-wsFrontIC = LoadVesuvioFrontParameters
-wsBackIC = LoadVesuvioBackParameters  # THIS WAS SET TO FRONT
+wsFrontIC = LoadVesuvioFrontParameters()
+wsBackIC = LoadVesuvioBackParameters()  # THIS WAS SET TO FRONT
 
-fwdIC = ForwardInitialConditions
-bckwdIC = BackwardInitialConditions
-yFitIC = YSpaceFitInitialConditions
+fwdIC = ForwardInitialConditions()
+bckwdIC = BackwardInitialConditions()
+yFitIC = YSpaceFitInitialCondition()
 
 scriptName = "tests"
