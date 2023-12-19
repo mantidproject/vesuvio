@@ -180,4 +180,4 @@ fwdIC = ForwardInitialConditions()
 bckwdIC = BackwardInitialConditions()
 yFitIC = YSpaceFitInitialConditions()
 
-scriptName = "tests"
+scriptName = "test_expr"

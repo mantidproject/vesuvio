@@ -182,8 +182,8 @@ def saveWSFromLoadVesuvio(runs, mode, ipfile, localPath):
         LoadLogFiles=False,
     )
 
-    SaveNexus(vesuvio_ws, str(localPath))
-    print(f"Workspace saved locally at: {localPath}")
+    SaveNexus(vesuvio_ws, str(localPath.absolute()))
+    print(f"Workspace saved locally at: {localPath.absolute()}")
     return
 
 
