@@ -46,7 +46,7 @@ jobs:
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           cd unpackaged/vesuvio_calibration
-          python -m unittest discover -s ./unpackaged/vesuvio_calibration/tests/unit
+          python -m unittest discover -s ./tests/unit
 
       - name: Run Vesuvio Calibration System Tests
         run: |
