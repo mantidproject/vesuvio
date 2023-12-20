@@ -72,7 +72,7 @@ class AnalysisRunner:
         yFitIC.fitModel = "SINGLE_GAUSSIAN"
 
         scattRes, yfitRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
         cls._currentResults = yfitRes
 

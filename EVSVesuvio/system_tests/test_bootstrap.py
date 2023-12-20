@@ -45,7 +45,7 @@ class TestJointBootstrap(unittest.TestCase):
         yFitIC.symmetrisationFlag = True
 
         bootRes, noneRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
 
         # TODO: Figure out why doing the two tests simultaneously fails the testing

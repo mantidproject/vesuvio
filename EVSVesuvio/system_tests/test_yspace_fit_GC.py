@@ -72,7 +72,7 @@ class AnalysisRunner:
         yFitIC.fitModel = "GC_C4_C6"
 
         scattRes, yfitRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
         cls._currentResults = yfitRes
 

@@ -42,7 +42,7 @@ class TestJointBootstrap(unittest.TestCase):
         userCtr = UserScriptControls
 
         bootRes, noneRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
 
         cls._jackBackSamples = bootRes["bckwdScat"].bootSamples
