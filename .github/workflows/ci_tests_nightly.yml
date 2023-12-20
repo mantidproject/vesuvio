@@ -1,0 +1,37 @@
+name: mvesuvio nightly build
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  test:
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout mvesuvio
+        uses: actions/checkout@v3
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          miniforge-version: latest
+          miniforge-variant: Mambaforge
+          activate-environment: mvesuvio-env
+          environment-file: environment.yml
+          auto-activate-base: false
+
+      # Runs Unit tests
+      - name: Run mvesuvio analysis unit tests
+        run: |
+          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
+          python -m unittest discover -s ./EVSVesuvio/vesuvio_analysis/tests
+
+      # Runs System tests
+      - name: Run mvesuvio analysis system tests
+        run: |
+          export VESUVIOPROPERTIES=$(pwd)/EVSVesuvio/system_tests/test_config/vesuvio.user.properties
+          python -m unittest discover -s ./EVSVesuvio/system_tests
