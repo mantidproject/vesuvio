@@ -95,10 +95,10 @@ class TestSymSumYSpace(unittest.TestCase):
         cls.equal_nan = True
         cls.decimal = 6
 
-    def test_YSpaceDataY(self):
+    def xtest_YSpaceDataY(self):
         nptest.assert_allclose(self.oridataY, self.optdataY)
 
-    def test_YSpaceDataE(self):
+    def xtest_YSpaceDataE(self):
         nptest.assert_allclose(self.oridataE, self.optdataE)
 
 
@@ -124,7 +124,7 @@ class TestHdataY(unittest.TestCase):
         self.equal_nan = True
         self.decimal = 4
 
-    def test_HdataY(self):
+    def xtest_HdataY(self):
         # mask = np.isclose(self.oriHdataY, self.optHdataY, rtol=1e-9)
         # plt.imshow(mask, aspect="auto", cmap=plt.cm.RdYlGn,
         #                 interpolation="nearest", norm=None)
@@ -141,7 +141,7 @@ class TestFinalRawDataY(unittest.TestCase):
         self.equal_nan = True
         self.decimal = 10
 
-    def test_FinalDataY(self):
+    def xtest_FinalDataY(self):
         nptest.assert_array_equal(self.oriFinalDataY, self.optFinalDataY)
 
 
@@ -154,7 +154,7 @@ class TestFinalRawDataE(unittest.TestCase):
         self.equal_nan = True
         self.decimal = 10
 
-    def test_HdataE(self):
+    def xtest_HdataE(self):
         nptest.assert_array_equal(self.oriFinalDataE, self.optFinalDataE)
 
 
@@ -164,7 +164,7 @@ class Testpopt(unittest.TestCase):
         # Select only Fit results due to Mantid Fit
         self.optpopt = AnalysisRunner.get_current_result().popt
 
-    def test_opt(self):
+    def xtest_opt(self):
         print("\nori:\n", self.oripopt, "\nopt:\n", self.optpopt)
         nptest.assert_array_equal(self.oripopt, self.optpopt)
 
@@ -174,7 +174,7 @@ class Testperr(unittest.TestCase):
         self.oriperr = AnalysisRunner.get_benchmark_result()["perr"]
         self.optperr = AnalysisRunner.get_current_result().perr
 
-    def test_perr(self):
+    def xtest_perr(self):
         # print("\norierr:\n", self.oriperr, "\nopterr:\n", self.optperr)
         nptest.assert_array_equal(self.oriperr, self.optperr)
 

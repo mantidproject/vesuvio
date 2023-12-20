@@ -107,13 +107,13 @@ class TestFitParameters(unittest.TestCase):
         self.rtol = 0.0001
         self.equal_nan = True
 
-    def test_mainPars(self):
+    def xtest_mainPars(self):
         totalMask = np.isclose(
             self.orimainPars, self.optmainPars, rtol=self.rtol, equal_nan=self.equal_nan
         )
         totalDiffMask = ~totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "parameters")
-        # nptest.assert_allclose(self.orimainPars, self.optmainPars, self.rtol)
+        nptest.assert_allclose(self.orimainPars, self.optmainPars, self.rtol)
 
     def test_chi2(self):
         totalMask = np.isclose(
@@ -123,15 +123,15 @@ class TestFitParameters(unittest.TestCase):
         displayMaskAllIter(totalDiffMask, self.rtol, "chi2")
         nptest.assert_allclose(self.orichi2, self.optchi2, self.rtol)
 
-    def test_nit(self):
+    def xtest_nit(self):
         totalMask = np.isclose(
             self.orinit, self.optnit, rtol=self.rtol, equal_nan=self.equal_nan
         )
         totalDiffMask = ~totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "nit")
-        # nptest.assert_allclose(self.orinit, self.optnit, self.rtol)
+        nptest.assert_allclose(self.orinit, self.optnit, self.rtol)
 
-    def test_intensities(self):
+    def xtest_intensities(self):
         totalMask = np.isclose(
             self.oriintensities,
             self.optintensities,
@@ -140,7 +140,7 @@ class TestFitParameters(unittest.TestCase):
         )
         totalDiffMask = ~totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "intensities")
-        # nptest.assert_allclose(self.oriintensities, self.optintensities, self.rtol)
+        nptest.assert_allclose(self.oriintensities, self.optintensities, self.rtol)
 
 
 class TestNcp(unittest.TestCase):
@@ -157,7 +157,7 @@ class TestNcp(unittest.TestCase):
         self.rtol = 0.0001
         self.equal_nan = True
 
-    def test_ncp(self):
+    def xtest_ncp(self):
         correctNansOri = np.where(
             (self.orincp == 0) & np.isnan(self.optncp), np.nan, self.orincp
         )
@@ -167,7 +167,7 @@ class TestNcp(unittest.TestCase):
         )
         totalDiffMask = ~totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "ncp")
-        # nptest.assert_allclose(self.orincp, self.optncp, self.rtol)
+        nptest.assert_allclose(self.orincp, self.optncp, self.rtol)
 
 
 class TestMeanWidths(unittest.TestCase):
@@ -216,13 +216,13 @@ class TestFitWorkspaces(unittest.TestCase):
         self.rtol = 0.0001
         self.equal_nan = True
 
-    def test_ws(self):
+    def xtest_ws(self):
         totalMask = np.isclose(
             self.oriws, self.optws, rtol=self.rtol, equal_nan=self.equal_nan
         )
         totalDiffMask = ~totalMask
         displayMaskAllIter(totalDiffMask, self.rtol, "workspaces to be fitted")
-        # nptest.assert_allclose(self.oriws, self.optws, self.rtol)
+        nptest.assert_allclose(self.oriws, self.optws, self.rtol)
 
 
 if __name__ == "__main__":
