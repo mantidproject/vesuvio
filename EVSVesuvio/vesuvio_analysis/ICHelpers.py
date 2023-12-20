@@ -1,6 +1,8 @@
 from mantid.simpleapi import Load, LoadVesuvio, SaveNexus
 from pathlib import Path
 from EVSVesuvio.scripts import handle_config
+from mantid.kernel import logger
+import ntpath
 
 experimentsPath = (
     Path(handle_config.read_config_var("caching.location")) / "experiments"
@@ -139,25 +141,27 @@ def setOutputDirsForSample(IC, sampleName):
 
 def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
     if not (localPath.is_file()):
+        logger.notice("IP FILE NOT FOUND")
         return False
-
     local_ws = Load(Filename=str(localPath))
     ws_history = local_ws.getHistory()
     metadata = ws_history.getAlgorithmHistory(0)
 
     saved_runs = metadata.getPropertyValue("Filename")
     if saved_runs != runs:
-        print(f"Filename in saved workspace did not match: {saved_runs} and {runs}")
+        logger.notice(
+            f"Filename in saved workspace did not match: {saved_runs} and {runs}"
+        )
         return False
 
     saved_mode = metadata.getPropertyValue("Mode")
     if saved_mode != mode:
-        print(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
+        logger.notice(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
         return False
 
-    saved_ipfile_name = Path(metadata.getPropertyValue("InstrumentParFile")).name
+    saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
     if saved_ipfile_name != ipfile.name:
-        print(
+        logger.notice(
             f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile.name}"
         )
         return False
@@ -182,8 +186,8 @@ def saveWSFromLoadVesuvio(runs, mode, ipfile, localPath):
         LoadLogFiles=False,
     )
 
-    SaveNexus(vesuvio_ws, str(localPath))
-    print(f"Workspace saved locally at: {localPath}")
+    SaveNexus(vesuvio_ws, str(localPath.absolute()))
+    print(f"Workspace saved locally at: {localPath.absolute()}")
     return
 
 

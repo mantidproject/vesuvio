@@ -13,7 +13,7 @@ class LoadVesuvioBackParameters:
     )
     spectra = "3-134"  # Spectra to be analysed
     mode = "DoubleDifference"
-    ipfile = str(ipFilesPath / "ip2019.par")
+    ipfile = ipFilesPath / "ip2019.par"
 
     subEmptyFromRaw = True  # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1
@@ -27,7 +27,7 @@ class LoadVesuvioFrontParameters:
     )
     spectra = "144-182"  # Spectra to be analysed
     mode = "SingleDifference"
-    ipfile = str(ipFilesPath / "ip2018_3.par")
+    ipfile = ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = False  # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1
@@ -173,11 +173,11 @@ class YSpaceFitInitialConditions:
 # userControls and bootIC defined in corresponding test scripts
 
 
-wsFrontIC = LoadVesuvioFrontParameters
-wsBackIC = LoadVesuvioBackParameters  # THIS WAS SET TO FRONT
+wsFrontIC = LoadVesuvioFrontParameters()
+wsBackIC = LoadVesuvioBackParameters()  # THIS WAS SET TO FRONT
 
-fwdIC = ForwardInitialConditions
-bckwdIC = BackwardInitialConditions
-yFitIC = YSpaceFitInitialConditions
+fwdIC = ForwardInitialConditions()
+bckwdIC = BackwardInitialConditions()
+yFitIC = YSpaceFitInitialConditions()
 
-scriptName = "tests"
+scriptName = "test_expr"

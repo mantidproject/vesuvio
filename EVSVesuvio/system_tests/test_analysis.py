@@ -45,7 +45,7 @@ class AnalysisRunner:
         userCtr = UserScriptControls
 
         scattRes, yfitRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC
+            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
 
         wsFinal, forwardScatteringResults = scattRes
