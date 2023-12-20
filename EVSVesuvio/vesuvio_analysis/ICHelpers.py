@@ -2,7 +2,7 @@ from mantid.simpleapi import Load, LoadVesuvio, SaveNexus
 from pathlib import Path
 from EVSVesuvio.scripts import handle_config
 from mantid.kernel import logger
-from os import path
+import ntpath
 
 experimentsPath = (
     Path(handle_config.read_config_var("caching.location")) / "experiments"
@@ -159,7 +159,7 @@ def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
         logger.notice(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
         return False
 
-    _, saved_ipfile_name = path.split(metadata.getPropertyValue("InstrumentParFile"))
+    saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
     if saved_ipfile_name != ipfile.name:
         logger.notice(
             f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile.name}"
