@@ -1,0 +1,42 @@
+name: Deploy mvesuvio nightly
+
+on:
+  workflow_run:
+    workflows: ["mvesuvio nightly build"]
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  build_conda_and_upload:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout mvesuvio
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Check for changes since last build
+        run: |
+          echo "recentCommits=$(test -z $(git log --since="yesterday" -1 --format=%h) && echo false || echo true)" >> $GITHUB_ENV
+      - name: Setup Miniconda
+        if: ${{ env.recentCommits == 'true'}}
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          miniforge-version: latest
+          miniforge-variant: Mambaforge
+          activate-environment: vesuvio-env
+          environment-file: environment.yml
+          auto-activate-base: false
+
+      - name: Build mvesuvio nightly conda package
+        if: ${{ env.recentCommits == 'true'}}
+        uses: ./.github/actions/publish-package
+        with:
+          label: nightly
+          token: ${{ secrets.ANACONDA_API_TOKEN }}
