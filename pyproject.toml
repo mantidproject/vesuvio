@@ -40,24 +40,24 @@ tests_require = [
 "Bug Tracker" = "https://github.com/mantidproject/vesuvio/issues"
 
 [project.entry-points]
-console_scripts = { mvesuvio = "EVSVesuvio.scripts:main" }
+console_scripts = { mvesuvio = "mvesuvio.scripts:main" }
 
 [tool.setuptools.packages.find]
-include = ["EVSVesuvio*"]
+include = ["mvesuvio*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"EVSVesuvio.config.ip_files" = ["*.par"]
-"EVSVesuvio.config" = ["*.properties"]
+"mvesuvio.config.ip_files" = ["*.par"]
+"mvesuvio.config" = ["*.properties"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["EVSVesuvio/system_tests"]
+testpaths = ["mvesuvio/system_tests"]
 filterwarnings = ["error"]
 
 [tool.coverage.report]
 include = [
-    "*/EVSVesuvio/vesuvio_analysis/*",
+    "*/mvesuvio/vesuvio_analysis/*",
 ]
 
 omit = [
@@ -82,4 +82,4 @@ dirty = "{version}+uncommitted"
 distance-dirty = "{version}.dev{distance}+uncommitted"
 
 [tool.versioningit.write]
-file = "EVSVesuvio/__init__.py"
+file = "mvesuvio/__init__.py"

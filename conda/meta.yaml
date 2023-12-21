@@ -15,7 +15,7 @@ build:
   noarch: python
   script: python -m pip install --ignore-installed .
   entry_points:
-    - mvesuvio = EVSVesuvio.scripts:main
+    - mvesuvio = mvesuvio.scripts:main
 
 requirements:
   build:
@@ -32,7 +32,7 @@ requirements:
 
 test:
   imports:
-    - EVSVesuvio
+    - mvesuvio
 
 about:
   home: https://github.com/mantidproject/vesuvio

@@ -1,4 +1,4 @@
-name: EVSVesuvio pull request workflow
+name: mvesuvio pull request workflow
 
 on: push
 
@@ -30,18 +30,18 @@ jobs:
       # Remove `export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties` when updated to mantid > 6.8.0
 
       # Runs Unit tests
-      - name: Run EVSVesuvio Analysis Unit Tests
+      - name: Run mvesuvio Analysis Unit Tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          python -m unittest discover -s ./EVSVesuvio/vesuvio_analysis/tests
+          python -m unittest discover -s ./mvesuvio/vesuvio_analysis/tests
 
       # Runs System tests
-      - name: Run EVSVesuvio Analysis System Tests
+      - name: Run mvesuvio Analysis System Tests
         run: |
-          export VESUVIOPROPERTIES=$(pwd)/EVSVesuvio/system_tests/test_config/vesuvio.user.properties
-          python -m unittest discover -s ./EVSVesuvio/system_tests
+          export VESUVIOPROPERTIES=$(pwd)/mvesuvio/system_tests/test_config/vesuvio.user.properties
+          python -m unittest discover -s ./mvesuvio/system_tests
 
-      - name: Run EVSVesuvio Calibration Unit Tests
+      - name: Run mvesuvio Calibration Unit Tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           cd unpackaged/vesuvio_calibration

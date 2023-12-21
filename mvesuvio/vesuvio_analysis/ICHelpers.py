@@ -1,6 +1,6 @@
 from mantid.simpleapi import Load, LoadVesuvio, SaveNexus
 from pathlib import Path
-from EVSVesuvio.scripts import handle_config
+from mvesuvio.scripts import handle_config
 from mantid.kernel import logger
 import ntpath
 

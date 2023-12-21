@@ -1,12 +1,12 @@
-from EVSVesuvio.vesuvio_analysis.ICHelpers import (
+from mvesuvio.vesuvio_analysis.ICHelpers import (
     buildFinalWSName,
     completeICFromInputs,
     completeBootIC,
     completeYFitIC,
 )
-from EVSVesuvio.vesuvio_analysis.bootstrap import runBootstrap
-from EVSVesuvio.vesuvio_analysis.fit_in_yspace import fitInYSpaceProcedure
-from EVSVesuvio.vesuvio_analysis.procedures import (
+from mvesuvio.vesuvio_analysis.bootstrap import runBootstrap
+from mvesuvio.vesuvio_analysis.fit_in_yspace import fitInYSpaceProcedure
+from mvesuvio.vesuvio_analysis.procedures import (
     runIndependentIterativeProcedure,
     runJointBackAndForwardProcedure,
     runPreProcToEstHRatio,

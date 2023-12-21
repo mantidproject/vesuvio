@@ -2,8 +2,8 @@ import time
 from pathlib import Path
 import importlib
 import sys
-from EVSVesuvio.vesuvio_analysis.run_script import runScript
-from EVSVesuvio.scripts import handle_config
+from mvesuvio.vesuvio_analysis.run_script import runScript
+from mvesuvio.scripts import handle_config
 
 
 def run(yes_to_all=False):

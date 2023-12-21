@@ -1,10 +1,10 @@
-from EVSVesuvio.vesuvio_analysis.run_script import runScript
+from mvesuvio.vesuvio_analysis.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from EVSVesuvio.scripts import handle_config
-from EVSVesuvio.system_tests.old_new_comparison_inputs import (
+from mvesuvio.scripts import handle_config
+from mvesuvio.system_tests.old_new_comparison_inputs import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,

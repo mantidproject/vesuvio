@@ -1,9 +1,9 @@
-from EVSVesuvio.vesuvio_analysis.fit_in_yspace import fitInYSpaceProcedure
-from EVSVesuvio.vesuvio_analysis.procedures import (
+from mvesuvio.vesuvio_analysis.fit_in_yspace import fitInYSpaceProcedure
+from mvesuvio.vesuvio_analysis.procedures import (
     runJointBackAndForwardProcedure,
     runIndependentIterativeProcedure,
 )
-from EVSVesuvio.vesuvio_analysis.ICHelpers import (
+from mvesuvio.vesuvio_analysis.ICHelpers import (
     buildFinalWSName,
     noOfHistsFromTOFBinning,
 )

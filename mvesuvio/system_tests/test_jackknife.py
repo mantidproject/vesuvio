@@ -1,9 +1,9 @@
-from EVSVesuvio.vesuvio_analysis.run_script import runScript
+from mvesuvio.vesuvio_analysis.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from EVSVesuvio.system_tests.tests_IC import (
+from mvesuvio.system_tests.tests_IC import (
     scriptName,
     wsBackIC,
     wsFrontIC,
