@@ -24,12 +24,15 @@ requirements:
 
   run:
     - python {{ python }}
-    - mantid>=6.7
+    - mantid {{ mantid }}
     - matplotlib
     - iminuit
     - h5py
-    - mock
-    - jacobi==0.4.2 #pinned untill 0.5.0 is proven
+    - jacobi {{ jacobi }}
+
+test:
+  imports:
+    - EVSVesuvio
 
 about:
   home: https://github.com/mantidproject/vesuvio
