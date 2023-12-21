@@ -1,6 +1,6 @@
 # Vesuvio Calibration Scripts
 
-In this subdirectory of the EVSVesuvio repository the following is provided:
+In this subdirectory of the mvesuvio repository the following is provided:
 - Vesuvio calibration scripts, composed of 3 python modules:
     1. `calibration_scripts.calibrate_vesuvio_fit`
     2. `calibration_scripts.calibrate_vesuvio_analysis`

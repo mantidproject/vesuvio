@@ -28,8 +28,8 @@ import time
 from pathlib import Path
 
 # ------------ sort out paths
-from EVSVesuvio.scripts import handle_config
-from EVSVesuvio.analysis_runner import import_from_path
+from mvesuvio.scripts import handle_config
+from mvesuvio.analysis_runner import import_from_path
 from pathlib import Path
 from os import path
 

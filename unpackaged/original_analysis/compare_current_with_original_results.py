@@ -13,8 +13,8 @@ plt.rcParams.update({"axes.grid" : True, "grid.color": "white"})
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 # plt.style.use('dark_background')
 
-from EVSVesuvio.scripts import handle_config
-from EVSVesuvio.analysis_runner import import_from_path
+from mvesuvio.scripts import handle_config
+from mvesuvio.analysis_runner import import_from_path
 from pathlib import Path
 from os import path
 

@@ -28,10 +28,10 @@ jobs:
       - name: Run mvesuvio analysis unit tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          python -m unittest discover -s ./EVSVesuvio/vesuvio_analysis/tests
+          python -m unittest discover -s ./mvesuvio/vesuvio_analysis/tests
 
       # Runs System tests
       - name: Run mvesuvio analysis system tests
         run: |
-          export VESUVIOPROPERTIES=$(pwd)/EVSVesuvio/system_tests/test_config/vesuvio.user.properties
-          python -m unittest discover -s ./EVSVesuvio/system_tests
+          export VESUVIOPROPERTIES=$(pwd)/mvesuvio/system_tests/test_config/vesuvio.user.properties
+          python -m unittest discover -s ./mvesuvio/system_tests
