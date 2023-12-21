@@ -30,6 +30,10 @@ requirements:
     - h5py
     - jacobi {{ jacobi }}
 
+test:
+  imports:
+    - EVSVesuvio
+
 about:
   home: https://github.com/mantidproject/vesuvio
   license: GPL-3.0-or-later
