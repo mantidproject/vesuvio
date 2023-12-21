@@ -50,8 +50,8 @@ class RunArgInputs(ArgInputs):
         return self.__yes
 
 
-def set_config(cache_directory="", experiment_id="", ip_folder_dirctory=""):
-    config_args = ConfigArgInputs(cache_directory, experiment_id, ip_folder_dirctory)
+def set_config(cache_directory="", experiment_id="", ip_folder=""):
+    config_args = ConfigArgInputs(cache_directory, experiment_id, ip_folder)
     main(config_args)
     
 def run(yes_to_all=False):
