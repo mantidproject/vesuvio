@@ -141,7 +141,7 @@ def setOutputDirsForSample(IC, sampleName):
 
 def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
     if not (localPath.is_file()):
-        logger.notice("IP FILE NOT FOUND")
+        logger.notice("Cached workspace not found")
         return False
     local_ws = Load(Filename=str(localPath))
     ws_history = local_ws.getHistory()
