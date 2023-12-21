@@ -5,9 +5,8 @@ from os import environ, path
 from EVSVesuvio.scripts import handle_config
 
 
-def main():
-    parser = __set_up_parser()
-    args = parser.parse_args()
+def main(manual_args=None):
+    args = __setup_and_parse_args() if not manual_args else manual_args
     if args.command == "config":
         __setup_config(args)
 
@@ -16,6 +15,10 @@ def main():
             __setup_config(None)
         __run_analysis(args.yes)
 
+def __setup_and_parse_args():
+    parser = __set_up_parser()
+    args = parser.parse_args()
+    return args
 
 def __set_up_parser():
     parser = argparse.ArgumentParser(
