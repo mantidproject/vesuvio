@@ -1,0 +1,8 @@
+---
+roles:
+  - src: geerlingguy.docker
+
+collections:
+  - git+https://github.com/DanNixon/ansible-system.git
+  - name: community.docker
+    source: https://galaxy.ansible.com
