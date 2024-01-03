@@ -27,7 +27,7 @@ def run(yes_to_all=False):
     bootIC = ai.BootstrapInitialConditions
     userCtr = ai.UserScriptControls
 
-    runScript(
+    scattResults, yFitResults = runScript(
         userCtr,
         scriptName,
         wsBackIC,
@@ -41,6 +41,7 @@ def run(yes_to_all=False):
 
     end_time = time.time()
     print("\nRunning time: ", end_time - start_time, " seconds")
+    return scattResults, yFitResults
 
 
 def import_from_path(path, name):
