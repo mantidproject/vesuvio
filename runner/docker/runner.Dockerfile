@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y  \
     apt-transport-https \
     libicu66 \
     libglu1-mesa \
+    libtiff5 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m nonroot
