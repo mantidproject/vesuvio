@@ -33,6 +33,7 @@ jobs:
       - name: Run mvesuvio Analysis Unit Tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
+          dpkg -L libtiff6
           python -m unittest discover -s ./mvesuvio/vesuvio_analysis/tests
 
       # Runs System tests
