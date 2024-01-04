@@ -1,4 +1,4 @@
-FROM ubuntu:focal-20231128
+FROM ubuntu:jammy-20231211.1
 
 RUN apt-get update && apt-get install -y  \
     curl \
@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y  \
     apt-transport-https \
     libicu66 \
     libglu1-mesa \
-    libtiff5 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m nonroot
