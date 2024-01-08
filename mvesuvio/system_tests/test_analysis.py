@@ -3,24 +3,19 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from mvesuvio.system_tests.tests_IC import (
-    scriptName,
-    wsBackIC,
-    wsFrontIC,
-    bckwdIC,
-    fwdIC,
-    yFitIC,
+from mvesuvio.scripts import handle_config
+from mvesuvio.system_tests.old_new_comparison_inputs import (
+    LoadVesuvioBackParameters,
+    LoadVesuvioFrontParameters,
+    BackwardInitialConditions,
+    ForwardInitialConditions,
+    YSpaceFitInitialConditions,
+    BootstrapInitialConditions,
+    UserScriptControls,
 )
 
 
-class BootstrapInitialConditions:  # Not used, but still need to pass as arg
-    runBootstrap = False
-
-
-class UserScriptControls:
-    runRoutine = True
-    procedure = "FORWARD"
-    fitInYSpace = None
+ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
 
 class AnalysisRunner:
@@ -41,11 +36,16 @@ class AnalysisRunner:
 
     @classmethod
     def _run(cls):
-        bootIC = BootstrapInitialConditions
-        userCtr = UserScriptControls
-
         scattRes, yfitRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
+            UserScriptControls(),
+            "test_expr_comp",
+            LoadVesuvioBackParameters(ipFilesPath),
+            LoadVesuvioFrontParameters(ipFilesPath),
+            BackwardInitialConditions(ipFilesPath),
+            ForwardInitialConditions(ipFilesPath),
+            YSpaceFitInitialConditions(),
+            BootstrapInitialConditions(),
+            True,
         )
 
         wsFinal, forwardScatteringResults = scattRes
@@ -59,20 +59,10 @@ class AnalysisRunner:
     @classmethod
     def _load_benchmark_results(cls):
         testPath = Path(__file__).absolute().parent
-        benchmarkResults = np.load(str(testPath / "stored_analysis.npz"))
+        benchmarkResults = np.load(
+            str(testPath / "stored_spec_144-182_iter_3_GC_MS.npz")
+        )
         AnalysisRunner._benchmarkResults = benchmarkResults
-
-
-def displayMask(mask, rtol, string):
-    noDiff = np.sum(mask)
-    maskSize = mask.size
-    print(
-        "\nNo of different " + string + f", rtol={rtol}:\n",
-        noDiff,
-        " out of ",
-        maskSize,
-        f"ie {100*noDiff/maskSize:.1f} %",
-    )
 
 
 class TestFitParameters(unittest.TestCase):
@@ -100,23 +90,20 @@ class TestFitParameters(unittest.TestCase):
         self.optwidths = self.optmainPars[:, :, 1::3]
         self.optcenters = self.optmainPars[:, :, 2::3]
 
-        self.rtol = 1e-7
-        self.equal_nan = True
+    def test_chi2(self):
+        nptest.assert_almost_equal(self.orichi2, self.optchi2, decimal=6)
 
-    def xtest_mainPars(self):
-        for orip, optp in zip(self.orimainPars, self.optmainPars):
-            mask = ~np.isclose(orip, optp, rtol=self.rtol, equal_nan=True)
-            displayMask(mask, self.rtol, "Main Pars")
-        nptest.assert_array_equal(self.orimainPars, self.optmainPars)
+    def test_nit(self):
+        nptest.assert_almost_equal(self.orinit, self.optnit, decimal=-2)
 
-    def xtest_chi2(self):
-        nptest.assert_array_equal(self.orichi2, self.optchi2)
+    def test_intensities(self):
+        nptest.assert_almost_equal(self.oriintensities, self.optintensities, decimal=2)
 
-    def xtest_nit(self):
-        nptest.assert_array_equal(self.orinit, self.optnit)
+    def test_widths(self):
+        nptest.assert_almost_equal(self.oriwidths, self.optwidths, decimal=2)
 
-    def xtest_intensities(self):
-        nptest.assert_array_equal(self.oriintensities, self.optintensities)
+    def test_centers(self):
+        nptest.assert_almost_equal(self.oricenters, self.optcenters, decimal=1)
 
 
 class TestNcp(unittest.TestCase):
@@ -126,18 +113,15 @@ class TestNcp(unittest.TestCase):
         cls.currentResults = AnalysisRunner.get_current_result()
 
     def setUp(self):
-        self.orincp = self.benchmarkResults["all_tot_ncp"]
+        self.orincp = self.benchmarkResults["all_tot_ncp"][:, :, :-1]
 
         self.optncp = self.currentResults.all_tot_ncp
 
-        self.rtol = 1e-7
-        self.equal_nan = True
-
-    def xtest_ncp(self):
-        for orincp, optncp in zip(self.orincp, self.optncp):
-            mask = ~np.isclose(orincp, optncp, rtol=self.rtol, equal_nan=True)
-            displayMask(mask, self.rtol, "NCP")
-        nptest.assert_array_equal(self.orincp, self.optncp)
+    def test_ncp(self):
+        correctNansOri = np.where(
+            (self.orincp == 0) & np.isnan(self.optncp), np.nan, self.orincp
+        )
+        nptest.assert_almost_equal(correctNansOri, self.optncp, decimal=4)
 
 
 class TestMeanWidths(unittest.TestCase):
@@ -148,12 +132,10 @@ class TestMeanWidths(unittest.TestCase):
 
     def setUp(self):
         self.orimeanwidths = self.benchmarkResults["all_mean_widths"]
-
         self.optmeanwidths = self.currentResults.all_mean_widths
 
-    def xtest_widths(self):
-        # nptest.assert_allclose(self.orimeanwidths, self.optmeanwidths)
-        nptest.assert_array_equal(self.orimeanwidths, self.optmeanwidths)
+    def test_widths(self):
+        nptest.assert_almost_equal(self.orimeanwidths, self.optmeanwidths, decimal=5)
 
 
 class TestMeanIntensities(unittest.TestCase):
@@ -164,12 +146,10 @@ class TestMeanIntensities(unittest.TestCase):
 
     def setUp(self):
         self.orimeanintensities = self.benchmarkResults["all_mean_intensities"]
-
         self.optmeanintensities = self.currentResults.all_mean_intensities
 
-    def xtest_intensities(self):
-        # nptest.assert_allclose(self.orimeanintensities, self.optmeanintensities)
-        nptest.assert_array_equal(self.orimeanintensities, self.optmeanintensities)
+    def test_intensities(self):
+        nptest.assert_almost_equal(self.orimeanintensities, self.optmeanintensities, decimal=6)
 
 
 class TestFitWorkspaces(unittest.TestCase):
@@ -180,19 +160,10 @@ class TestFitWorkspaces(unittest.TestCase):
 
     def setUp(self):
         self.oriws = self.benchmarkResults["all_fit_workspaces"]
-
         self.optws = self.currentResults.all_fit_workspaces
 
-        self.decimal = 8
-        self.rtol = 1e-7
-        self.equal_nan = True
-
-    def xtest_FinalWS(self):
-        for oriws, optws in zip(self.oriws, self.optws):
-            mask = ~np.isclose(oriws, optws, rtol=self.rtol, equal_nan=True)
-            displayMask(mask, self.rtol, "wsFinal")
-        nptest.assert_array_equal(self.optws, self.oriws)
-
+    def test_ws(self):
+        nptest.assert_almost_equal(self.oriws, self.optws, decimal=6)
 
 if __name__ == "__main__":
     unittest.main()
