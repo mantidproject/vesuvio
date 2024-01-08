@@ -4,7 +4,7 @@ import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.scripts import handle_config
-from mvesuvio.system_tests.old_new_comparison_inputs import (
+from mvesuvio.system_tests.test_analysis_inputs import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,
