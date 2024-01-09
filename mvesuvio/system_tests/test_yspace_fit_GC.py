@@ -144,7 +144,6 @@ class Testpopt(unittest.TestCase):
         self.optpopt = AnalysisRunner.get_current_result().popt[:, :-1]
 
     def test_opt(self):
-        print(self.oripopt, self.optpopt)
         nptest.assert_almost_equal(self.oripopt, self.optpopt)
 
 
