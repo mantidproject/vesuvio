@@ -1,4 +1,4 @@
-FROM ubuntu:focal-20231128
+FROM ubuntu:jammy-20231211.1
 
 RUN apt-get update && apt-get install -y  \
     curl \

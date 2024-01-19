@@ -71,6 +71,8 @@ class AnalysisRunner:
         userCtr = UserScriptControls
         yFitIC.fitModel = "SINGLE_GAUSSIAN"
 
+        cls.load_workspaces()   # Load data to skip run of routine
+
         scattRes, yfitRes = runScript(
             userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
@@ -89,15 +91,12 @@ class TestSymSumYSpace(unittest.TestCase):
 
         cls.optdataY = AnalysisRunner.get_current_result().YSpaceSymSumDataY
         cls.optdataE = AnalysisRunner.get_current_result().YSpaceSymSumDataE
-        cls.rtol = 0.000001
-        cls.equal_nan = True
-        cls.decimal = 6
 
-    def xtest_YSpaceDataY(self):
-        nptest.assert_allclose(self.oridataY, self.optdataY)
+    def test_YSpaceDataY(self):
+        nptest.assert_almost_equal(self.oridataY, self.optdataY)
 
-    def xtest_YSpaceDataE(self):
-        nptest.assert_allclose(self.oridataE, self.optdataE)
+    def test_YSpaceDataE(self):
+        nptest.assert_almost_equal(self.oridataE, self.optdataE)
 
 
 class TestResolution(unittest.TestCase):
@@ -105,12 +104,8 @@ class TestResolution(unittest.TestCase):
         self.orires = AnalysisRunner.get_benchmark_result()["resolution"]
         self.optres = AnalysisRunner.get_current_result().resolution
 
-        self.rtol = 0.0001
-        self.equal_nan = True
-        self.decimal = 8
-
-    def xtest_resolution(self):
-        nptest.assert_array_equal(self.orires, self.optres)
+    def test_resolution(self):
+        nptest.assert_almost_equal(self.orires, self.optres)
 
 
 class TestHdataY(unittest.TestCase):
@@ -118,16 +113,8 @@ class TestHdataY(unittest.TestCase):
         self.oriHdataY = AnalysisRunner.get_benchmark_result()["HdataY"]
         self.optHdataY = AnalysisRunner.get_current_result().HdataY
 
-        self.rtol = 0.0001
-        self.equal_nan = True
-        self.decimal = 4
-
-    def xtest_HdataY(self):
-        # mask = np.isclose(self.oriHdataY, self.optHdataY, rtol=1e-9)
-        # plt.imshow(mask, aspect="auto", cmap=plt.cm.RdYlGn,
-        #                 interpolation="nearest", norm=None)
-        # plt.show()
-        nptest.assert_array_equal(self.oriHdataY, self.optHdataY)
+    def test_HdataY(self):
+        nptest.assert_almost_equal(self.oriHdataY, self.optHdataY)
 
 
 class TestFinalRawDataY(unittest.TestCase):
@@ -135,12 +122,8 @@ class TestFinalRawDataY(unittest.TestCase):
         self.oriFinalDataY = AnalysisRunner.get_benchmark_result()["finalRawDataY"]
         self.optFinalDataY = AnalysisRunner.get_current_result().finalRawDataY
 
-        self.rtol = 1e-6
-        self.equal_nan = True
-        self.decimal = 10
-
-    def xtest_FinalDataY(self):
-        nptest.assert_array_equal(self.oriFinalDataY, self.optFinalDataY)
+    def test_FinalDataY(self):
+        nptest.assert_almost_equal(self.oriFinalDataY, self.optFinalDataY)
 
 
 class TestFinalRawDataE(unittest.TestCase):
@@ -148,23 +131,18 @@ class TestFinalRawDataE(unittest.TestCase):
         self.oriFinalDataE = AnalysisRunner.get_benchmark_result()["finalRawDataE"]
         self.optFinalDataE = AnalysisRunner.get_current_result().finalRawDataE
 
-        self.rtol = 1e-6
-        self.equal_nan = True
-        self.decimal = 10
-
-    def xtest_HdataE(self):
-        nptest.assert_array_equal(self.oriFinalDataE, self.optFinalDataE)
+    def test_HdataE(self):
+        nptest.assert_almost_equal(self.oriFinalDataE, self.optFinalDataE)
 
 
 class Testpopt(unittest.TestCase):
     def setUp(self):
         self.oripopt = AnalysisRunner.get_benchmark_result()["popt"]
-        # Select only Fit results due to Mantid Fit
         self.optpopt = AnalysisRunner.get_current_result().popt
 
-    def xtest_opt(self):
+    def test_opt(self):
         print("\nori:\n", self.oripopt, "\nopt:\n", self.optpopt)
-        nptest.assert_array_equal(self.oripopt, self.optpopt)
+        nptest.assert_almost_equal(self.oripopt, self.optpopt)
 
 
 class Testperr(unittest.TestCase):
@@ -172,9 +150,8 @@ class Testperr(unittest.TestCase):
         self.oriperr = AnalysisRunner.get_benchmark_result()["perr"]
         self.optperr = AnalysisRunner.get_current_result().perr
 
-    def xtest_perr(self):
-        # print("\norierr:\n", self.oriperr, "\nopterr:\n", self.optperr)
-        nptest.assert_array_equal(self.oriperr, self.optperr)
+    def test_perr(self):
+        nptest.assert_almost_equal(self.oriperr, self.optperr)
 
 
 if __name__ == "__main__":
