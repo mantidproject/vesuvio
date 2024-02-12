@@ -1,7 +1,7 @@
 [build-system]
 requires = ["setuptools >= 65.0.0",
             "wheel",
-            "versioningit",]
+            "versioningit"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -14,9 +14,9 @@ authors = [
 ]
 description = "Analyse Vesuvio instrument data"
 readme = "README.md"
-requires-python = "==3.8.*"
+requires-python = "==3.10.*"
 classifiers = [
-    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.10",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
@@ -72,6 +72,7 @@ skip_empty = true
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.0"
+match = ["v*"]
 
 [tool.versioningit.next-version]
 method = "minor"
@@ -82,4 +83,4 @@ dirty = "{version}+uncommitted"
 distance-dirty = "{version}.dev{distance}+uncommitted"
 
 [tool.versioningit.write]
-file = "mvesuvio/__init__.py"
+file = "mvesuvio/_version.py"
