@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.constants
+from enum import Enum
 
 from mantid.simpleapi import CreateEmptyTableWorkspace, mtd
 
@@ -73,6 +74,11 @@ class EVSGlobals:
     # 1 meV in Joules
     MEV_CONVERSION = 1.602176487e-22
 
+class FitTypes(Enum):
+
+    INDIVIDUAL = "Individual"
+    SHARED = "Shared"
+    BOTH = "Both"
 
 class EVSMiscFunctions:
 

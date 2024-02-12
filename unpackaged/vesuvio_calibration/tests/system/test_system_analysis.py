@@ -211,8 +211,26 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
         detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
-        self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
+        self._assert_parameters_match_expected(params_table, detector_specific_r_tols, "Both")
         self._assert_E1_parameters_match_expected(params_table, 3e-3, "Both")
+
+    @patch('calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    def test_copper_with_global_fit(self, load_file_mock):
+        self._setup_copper_test()
+        self._output_workspace = "copper_analysis_test"
+
+        load_file_mock.side_effect = self._load_file_side_effect
+
+        self._create_evs_calibration_alg()
+        self._alg.setProperty("SharedParameterFitType", "Shared")
+        params_table = self._execute_evs_calibration_analysis()
+
+        #  Specify detectors tolerances set by user, then update with those to mask as invalid.
+        detector_specific_r_tols = {"L1": {116: 0.65, 170: 0.75}}
+        detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [138, 141, 146, 147, 156, 158, 160, 163, 164,
+                                                                                           165, 167, 168, 169, 170, 182, 191, 192]})
+        self._assert_parameters_match_expected(params_table, detector_specific_r_tols, "Shared")
+        self._assert_E1_parameters_match_expected(params_table, 3e-3, "Shared")
 
     def _assert_theta_parameters_match_expected(self, params_table, rel_tolerance):
         thetas = params_table.column('theta')
@@ -246,10 +264,12 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
             global_E1 = params_table.column('global_E1')[0]
             self.assertAlmostEqual(global_E1, EVSGlobals.ENERGY_ESTIMATE, delta=EVSGlobals.ENERGY_ESTIMATE*rel_tolerance)
 
-    def _assert_parameters_match_expected(self, params_table, tolerances=None):
+    def _assert_parameters_match_expected(self, params_table, tolerances=None, fit_type="Individual"):
         rel_tol_theta, rel_tol_L1 = self._extract_tolerances(deepcopy(tolerances))
         theta_errors = self._assert_theta_parameters_match_expected(params_table, rel_tol_theta)
-        L1_errors = self._assert_L1_parameters_match_expected(params_table, rel_tol_L1)
+        L1_errors = None
+        if fit_type != 'Shared':
+            L1_errors = self._assert_L1_parameters_match_expected(params_table, rel_tol_L1)
 
         if theta_errors or L1_errors:
             raise AssertionError(f"Theta: {theta_errors})\n L1: {L1_errors}")
