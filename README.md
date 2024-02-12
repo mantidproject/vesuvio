@@ -15,13 +15,16 @@ This is also the recommended best practice way of using the mantid packages.
 To download and install mamba:
 - https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html
 
-### Create and activate an environment
+### Create and activate an environment for mvesuvio
 
-To create a conda environment for `mvesuvio`:
-- `mamba env create -n <environment_name> -c mantid/label/nightly mvesuvio`
+Firstly create a conda environment where `mvesuvio` is going to be installed:
+- `mamba create -n <environment_name>`
 
-To activate the conda environment:
-- `conda activate <environment_name>`
+Next activate the environment you created:
+- `mamba activate <environment_name>`
+
+Finally, install `mvesuvio` through the mantid channel:
+- `mamba install -c mantid/label/nightly mvesuvio`
 
 ### Using mvesuvio via the command line
 
