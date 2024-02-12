@@ -1,4 +1,4 @@
-from mantid.simpleapi import Load, LoadVesuvio, SaveNexus
+from mantid.simpleapi import Load, LoadVesuvio, SaveNexus, DeleteWorkspace
 from pathlib import Path
 from mvesuvio.scripts import handle_config
 from mantid.kernel import logger
@@ -166,6 +166,8 @@ def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
         )
         return False
 
+    print("\nLocally saved workspace metadata matched with analysis inputs.\n")
+    DeleteWorkspace(local_ws)
     return True
 
 
