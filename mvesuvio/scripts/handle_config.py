@@ -15,6 +15,7 @@ def __parse_config_env_var():
 ### PATH CONSTANTS ###
 VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE = __parse_config_env_var()
 VESUVIO_INPUTS_FILE = "analysis_inputs.py"
+VESUVIO_INPUTS_PATH = os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_INPUTS_FILE)
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANTID_CONFIG_FILE = "Mantid.user.properties"
 VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
@@ -83,13 +84,11 @@ def setup_config_dir(config_dir):
         )
 
 
-def setup_expr_dir(cache_dir, experiment):
-    expr_path = os.path.join(cache_dir, "experiments", experiment)
-    success = __mk_dir("experiment", expr_path)
-    if success:
+def setup_default_inputs():
+    if not os.path.isfile(VESUVIO_INPUTS_PATH):
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE),
-            input_file_path(cache_dir, experiment),
+            os.path.join(VESUVIO_INPUTS_PATH),
         )
 
 
@@ -114,14 +113,10 @@ def __mk_dir(type, path):
 
 
 def config_set():
-    if read_config_var("caching.location", False):
+    if read_config_var("caching.inputs", False):
         return True
     else:
         return False
-
-
-def input_file_path(cache_dir, experiment):
-    return os.path.join(cache_dir, "experiments", experiment, VESUVIO_INPUTS_FILE)
 
 
 def check_dir_exists(type, path):

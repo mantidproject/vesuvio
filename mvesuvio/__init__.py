@@ -21,19 +21,14 @@ class ArgInputs:
         return self.__command
 
 class ConfigArgInputs(ArgInputs):
-    def __init__(self, set_cache, set_experiment, set_ipfolder):
+    def __init__(self, set_inputs, set_ipfolder):
         super().__init__("config")
-        self.__set_cache = set_cache
-        self.__set_experiment = set_experiment
+        self.__set_inputs = set_inputs
         self.__set_ipfolder = set_ipfolder
     
     @property
-    def set_cache(self):
-        return self.__set_cache
-    
-    @property
-    def set_experiment(self):
-        return self.__set_experiment
+    def set_inputs(self):
+        return self.__set_inputs
 
     @property
     def set_ipfolder(self):
@@ -50,8 +45,8 @@ class RunArgInputs(ArgInputs):
         return self.__yes
 
 
-def set_config(cache_directory="", experiment_id="", ip_folder=""):
-    config_args = ConfigArgInputs(cache_directory, experiment_id, ip_folder)
+def set_config(inputs_file="", ip_folder=""):
+    config_args = ConfigArgInputs(inputs_file, ip_folder)
     main(config_args)
     
 def run(yes_to_all=False):

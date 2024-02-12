@@ -7,13 +7,8 @@ from mvesuvio.scripts import handle_config
 
 
 def run(yes_to_all=False):
-    scriptName = handle_config.read_config_var("caching.experiment")
-    experimentsPath = (
-        Path(handle_config.read_config_var("caching.location"))
-        / "experiments"
-        / scriptName
-    )  # Path to the repository
-    inputs_path = experimentsPath / "analysis_inputs.py"
+    inputs_path = Path(handle_config.read_config_var("caching.inputs"))
+    scriptName = inputs_path.name
     ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
     ai = import_from_path(inputs_path, "analysis_inputs")
 
