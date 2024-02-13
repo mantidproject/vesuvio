@@ -4,13 +4,27 @@ from mvesuvio.scripts import handle_config
 from mantid.kernel import logger
 import ntpath
 
-inputsPath = Path(handle_config.read_config_var("caching.inputs"))
-scriptName = inputsPath.name.removesuffix(".py")
-experimentPath = inputsPath.parent / scriptName
+
+def _get_expr_path():
+    inputsPath = Path(handle_config.read_config_var("caching.inputs"))
+    scriptName = _get_script_name()
+    experimentPath = inputsPath.parent / scriptName
+    return experimentPath
+
+
+def _get_script_name():
+    inputsPath = Path(handle_config.read_config_var("caching.inputs"))
+    scriptName = inputsPath.name.removesuffix(".py")
+    return scriptName
+
+# inputsPath = Path(handle_config.read_config_var("caching.inputs"))
+# scriptName = inputsPath.name.removesuffix(".py")
+# experimentPath = inputsPath.parent / scriptName
 
 
 def completeICFromInputs(IC, wsIC):
     """Assigns new methods to the initial conditions class from the inputs of that class"""
+    scriptName = _get_script_name()
 
     assert (
         IC.lastSpec > IC.firstSpec
@@ -81,6 +95,10 @@ def completeICFromInputs(IC, wsIC):
 
 
 def setInputWSForSample(wsIC):
+    experimentPath = _get_expr_path()
+    scriptName = _get_script_name()
+    print(scriptName.upper())
+
     inputWSPath = experimentPath / "input_ws"
     inputWSPath.mkdir(parents=True, exist_ok=True)
 
@@ -114,6 +132,7 @@ def getRunningMode(wsIC):
 
 
 def setOutputDirsForSample(IC):
+    experimentPath = _get_expr_path()
     outputPath = experimentPath / "output_files"
     outputPath.mkdir(parents=True, exist_ok=True)
 
@@ -208,6 +227,8 @@ def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
 
 def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     """Form bootstrap output data paths"""
+    experimentPath = _get_expr_path()
+    scriptName = _get_script_name()
 
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName  # Name of sample currently running
@@ -318,12 +339,14 @@ def noOfHistsFromTOFBinning(IC):
 
 
 def buildFinalWSName(procedure: str, IC):
+    scriptName = _get_script_name()
     # Format of corrected ws from last iteration
     name = scriptName + "_" + procedure + "_" + str(IC.noOfMSIterations)
     return name
 
 
 def completeYFitIC(yFitIC):
+    experimentPath = _get_expr_path()
     # Set directories for figures
     figSavePath = experimentPath / "figures"
     figSavePath.mkdir(exist_ok=True)
