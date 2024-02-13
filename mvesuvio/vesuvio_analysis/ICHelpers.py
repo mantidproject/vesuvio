@@ -4,13 +4,12 @@ from mvesuvio.scripts import handle_config
 from mantid.kernel import logger
 import ntpath
 
-inputsPath = (
-    Path(handle_config.read_config_var("caching.inputs"))
-)
-experimentPath = inputsPath.parent / inputsPath.name.strip(".py")
+inputsPath = Path(handle_config.read_config_var("caching.inputs"))
+scriptName = inputsPath.name.removesuffix(".py")
+experimentPath = inputsPath.parent / scriptName
 
 
-def completeICFromInputs(IC, scriptName, wsIC):
+def completeICFromInputs(IC, wsIC):
     """Assigns new methods to the initial conditions class from the inputs of that class"""
 
     assert (
@@ -50,12 +49,12 @@ def completeICFromInputs(IC, scriptName, wsIC):
         IC.InstrParsPath = wsIC.ipfile
 
     # Sort out input and output paths
-    rawPath, emptyPath = setInputWSForSample(wsIC, scriptName)
+    rawPath, emptyPath = setInputWSForSample(wsIC)
 
     IC.userWsRawPath = rawPath
     IC.userWsEmptyPath = emptyPath
 
-    setOutputDirsForSample(IC, scriptName)
+    setOutputDirsForSample(IC)
 
     # Do not run bootstrap sample, by default
     IC.runningSampleWS = False
@@ -81,14 +80,14 @@ def completeICFromInputs(IC, scriptName, wsIC):
     return
 
 
-def setInputWSForSample(wsIC, sampleName):
+def setInputWSForSample(wsIC):
     inputWSPath = experimentPath / "input_ws"
     inputWSPath.mkdir(parents=True, exist_ok=True)
 
     runningMode = getRunningMode(wsIC)
 
-    rawWSName = sampleName + "_" + "raw" + "_" + runningMode + ".nxs"
-    emptyWSName = sampleName + "_" + "empty" + "_" + runningMode + ".nxs"
+    rawWSName = scriptName + "_" + "raw" + "_" + runningMode + ".nxs"
+    emptyWSName = scriptName + "_" + "empty" + "_" + runningMode + ".nxs"
 
     rawPath = inputWSPath / rawWSName
     emptyPath = inputWSPath / emptyWSName
@@ -114,7 +113,7 @@ def getRunningMode(wsIC):
     return runningMode
 
 
-def setOutputDirsForSample(IC, sampleName):
+def setOutputDirsForSample(IC):
     outputPath = experimentPath / "output_files"
     outputPath.mkdir(parents=True, exist_ok=True)
 
@@ -318,15 +317,14 @@ def noOfHistsFromTOFBinning(IC):
     return int((end - start) / spacing) - 1  # To account for last column being ignored
 
 
-def buildFinalWSName(scriptName: str, procedure: str, IC):
+def buildFinalWSName(procedure: str, IC):
     # Format of corrected ws from last iteration
     name = scriptName + "_" + procedure + "_" + str(IC.noOfMSIterations)
     return name
 
 
-def completeYFitIC(yFitIC, sampleName):
+def completeYFitIC(yFitIC):
     # Set directories for figures
-
     figSavePath = experimentPath / "figures"
     figSavePath.mkdir(exist_ok=True)
     yFitIC.figSavePath = figSavePath

@@ -8,8 +8,8 @@ from mvesuvio.scripts import handle_config
 
 def run(yes_to_all=False):
     inputs_path = Path(handle_config.read_config_var("caching.inputs"))
-    scriptName = inputs_path.name
     ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+
     ai = import_from_path(inputs_path, "analysis_inputs")
 
     start_time = time.time()
@@ -24,7 +24,6 @@ def run(yes_to_all=False):
 
     runScript(
         userCtr,
-        scriptName,
         wsBackIC,
         wsFrontIC,
         bckwdIC,
