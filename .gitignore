@@ -8,3 +8,4 @@ vesuvio_analysis/core_functions/bootstrap_ws/
 running_times.txt
 figures/
 mvesuvio/system_tests/test_config/expr_for_tests/output_files
+mvesuvio/_version.py
