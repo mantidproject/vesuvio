@@ -6,7 +6,8 @@ Vesuvio is an instrument that performs Neuton Compton Scattering, based at ISIS,
 nuclear kinetic energies and moment distributions.
 """
 
-from mvesuvio._version import __version__
+version_info = (0, 0, 0)
+__version__ = ".".join(map(str, version_info))
 __project_url__ = "https://github.com/mantidproject/vesuvio"
 
 from mvesuvio.scripts import main
