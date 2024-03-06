@@ -71,6 +71,12 @@ def read_config_var(var, throw_on_not_found=True):
     return result
 
 
+def get_script_name():
+    filename = os.path.basename(read_config_var("caching.inputs"))
+    scriptName = filename.removesuffix(".py")
+    return scriptName
+
+
 def setup_config_dir(config_dir):
     success = __mk_dir("config", config_dir)
     if success:

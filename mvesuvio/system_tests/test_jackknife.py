@@ -1,10 +1,13 @@
+
+# This file needs updating once the bootstrap functunality is properly
+# implemented in the mvesuvio package
+
 from mvesuvio.vesuvio_analysis.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.system_tests.tests_IC import (
-    scriptName,
     wsBackIC,
     wsFrontIC,
     bckwdIC,
@@ -42,7 +45,7 @@ class TestJointBootstrap(unittest.TestCase):
         userCtr = UserScriptControls
 
         bootRes, noneRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
+            userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
 
         cls._jackBackSamples = bootRes["bckwdScat"].bootSamples

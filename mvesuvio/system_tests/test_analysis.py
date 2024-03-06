@@ -4,7 +4,7 @@ import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.scripts import handle_config
-from mvesuvio.system_tests.analysis_inputs import (
+from mvesuvio.system_tests.test_config.expr_for_tests import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,
@@ -13,6 +13,9 @@ from mvesuvio.system_tests.analysis_inputs import (
     BootstrapInitialConditions,
     UserScriptControls,
 )
+import mvesuvio
+mvesuvio.set_config(ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")))
+mvesuvio.set_config(inputs_file=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("system_tests", "test_config", "expr_for_tests.py")))
 
 
 ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
@@ -38,7 +41,6 @@ class AnalysisRunner:
     def _run(cls):
         scattRes, yfitRes = runScript(
             UserScriptControls(),
-            "test_expr",
             LoadVesuvioBackParameters(ipFilesPath),
             LoadVesuvioFrontParameters(ipFilesPath),
             BackwardInitialConditions(ipFilesPath),
