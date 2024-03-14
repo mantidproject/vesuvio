@@ -71,16 +71,19 @@ skip_empty = true
 
 [tool.versioningit.vcs]
 method = "git"
-default-tag = "0.0.0"
+default-tag = "0.0.1"
 match = ["v*"]
 
 [tool.versioningit.next-version]
 method = "minor"
 
 [tool.versioningit.format]
-distance = "{version}.dev{distance}"
-dirty = "{version}+uncommitted"
-distance-dirty = "{version}.dev{distance}+uncommitted"
+# distance = "{version}.dev{distance}"
+# dirty = "{version}+uncommitted"
+# distance-dirty = "{version}.dev{distance}+uncommitted"
+distance = "{version}"
+dirty = "{version}"
+distance-dirty = "{version}"
 
 [tool.versioningit.write]
 file = "mvesuvio/_version.py"
