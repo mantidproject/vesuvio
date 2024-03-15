@@ -23,6 +23,4 @@ runs:
     run: |
       conda activate build-env-pypi
       python -m build
-      twine upload -r testpypi -u __token__ -p ${{ inputs.token }} dist/* |& tee upload-pypi.log
-      # conda build --user ${{ inputs.repository }} --token ${{ inputs.token }} --label ${{ inputs.label }} $GITHUB_WORKSPACE/conda |& tee upload.log
-      grep "Upload to PyPI complete" upload-pypi.log
+      twine upload -r testpypi -u __token__ -p ${{ inputs.token }} dist/*
