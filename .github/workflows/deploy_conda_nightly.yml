@@ -46,4 +46,4 @@ jobs:
         # if: ${{ env.recentCommits == 'true'}}
         uses: ./.github/actions/publish-pypi-package
         with:
-          token: ${{ secrets.PYPI_TOKEN }}
+          token: ${{ secrets.PYPI_API_TOKEN }}
