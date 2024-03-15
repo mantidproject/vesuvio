@@ -4,13 +4,17 @@ from mvesuvio.scripts import handle_config
 from mantid.kernel import logger
 import ntpath
 
-experimentsPath = (
-    Path(handle_config.read_config_var("caching.location")) / "experiments"
-)
+
+def _get_expr_path():
+    inputsPath = Path(handle_config.read_config_var("caching.inputs"))
+    scriptName = handle_config.get_script_name()
+    experimentPath = inputsPath.parent / scriptName
+    return experimentPath
 
 
-def completeICFromInputs(IC, scriptName, wsIC):
+def completeICFromInputs(IC, wsIC):
     """Assigns new methods to the initial conditions class from the inputs of that class"""
+    scriptName = handle_config.get_script_name()
 
     assert (
         IC.lastSpec > IC.firstSpec
@@ -49,12 +53,12 @@ def completeICFromInputs(IC, scriptName, wsIC):
         IC.InstrParsPath = wsIC.ipfile
 
     # Sort out input and output paths
-    rawPath, emptyPath = setInputWSForSample(wsIC, scriptName)
+    rawPath, emptyPath = setInputWSForSample(wsIC)
 
     IC.userWsRawPath = rawPath
     IC.userWsEmptyPath = emptyPath
 
-    setOutputDirsForSample(IC, scriptName)
+    setOutputDirsForSample(IC)
 
     # Do not run bootstrap sample, by default
     IC.runningSampleWS = False
@@ -64,11 +68,6 @@ def completeICFromInputs(IC, scriptName, wsIC):
 
     # Default not running preliminary procedure to estimate HToMass0Ratio
     IC.runningPreliminary = False
-
-    # Set directories for figures
-    figSavePath = experimentsPath / scriptName / "figures"
-    figSavePath.mkdir(exist_ok=True)
-    IC.figSavePath = figSavePath
 
     # Create default of not running original version with histogram data
     try:
@@ -85,14 +84,17 @@ def completeICFromInputs(IC, scriptName, wsIC):
     return
 
 
-def setInputWSForSample(wsIC, sampleName):
-    inputWSPath = experimentsPath / sampleName / "input_ws"
+def setInputWSForSample(wsIC):
+    experimentPath = _get_expr_path()
+    scriptName = handle_config.get_script_name()
+
+    inputWSPath = experimentPath / "input_ws"
     inputWSPath.mkdir(parents=True, exist_ok=True)
 
     runningMode = getRunningMode(wsIC)
 
-    rawWSName = sampleName + "_" + "raw" + "_" + runningMode + ".nxs"
-    emptyWSName = sampleName + "_" + "empty" + "_" + runningMode + ".nxs"
+    rawWSName = scriptName + "_" + "raw" + "_" + runningMode + ".nxs"
+    emptyWSName = scriptName + "_" + "empty" + "_" + runningMode + ".nxs"
 
     rawPath = inputWSPath / rawWSName
     emptyPath = inputWSPath / emptyWSName
@@ -118,8 +120,9 @@ def getRunningMode(wsIC):
     return runningMode
 
 
-def setOutputDirsForSample(IC, sampleName):
-    outputPath = experimentsPath / sampleName / "output_files"
+def setOutputDirsForSample(IC):
+    experimentPath = _get_expr_path()
+    outputPath = experimentPath / "output_files"
     outputPath.mkdir(parents=True, exist_ok=True)
 
     # Build Filename based on ic
@@ -136,6 +139,11 @@ def setOutputDirsForSample(IC, sampleName):
 
     IC.resultsSavePath = outputPath / fileName
     IC.ySpaceFitSavePath = outputPath / fileNameYSpace
+
+    # Set directories for figures
+    figSavePath = experimentPath / "figures"
+    figSavePath.mkdir(exist_ok=True)
+    IC.figSavePath = figSavePath
     return
 
 
@@ -208,18 +216,20 @@ def completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC):
 
 def setBootstrapDirs(bckwdIC, fwdIC, bootIC, yFitIC):
     """Form bootstrap output data paths"""
+    experimentPath = _get_expr_path()
+    scriptName = handle_config.get_script_name()
 
     # Select script name and experiments path
     sampleName = bckwdIC.scriptName  # Name of sample currently running
 
     # Used to store running times required to estimate Bootstrap total run time.
-    bootIC.runTimesPath = experimentsPath / sampleName / "running_times.txt"
+    bootIC.runTimesPath = experimentPath / "running_times.txt"
 
     # Make bootstrap and jackknife data directories
     if bootIC.bootstrapType == "JACKKNIFE":
-        bootPath = experimentsPath / sampleName / "jackknife_data"
+        bootPath = experimentPath / "jackknife_data"
     else:
-        bootPath = experimentsPath / sampleName / "bootstrap_data"
+        bootPath = experimentPath / "bootstrap_data"
     bootPath.mkdir(exist_ok=True)
 
     # Folders for skipped and unskipped MS
@@ -317,16 +327,17 @@ def noOfHistsFromTOFBinning(IC):
     return int((end - start) / spacing) - 1  # To account for last column being ignored
 
 
-def buildFinalWSName(scriptName: str, procedure: str, IC):
+def buildFinalWSName(procedure: str, IC):
+    scriptName = handle_config.get_script_name()
     # Format of corrected ws from last iteration
     name = scriptName + "_" + procedure + "_" + str(IC.noOfMSIterations)
     return name
 
 
-def completeYFitIC(yFitIC, sampleName):
+def completeYFitIC(yFitIC):
+    experimentPath = _get_expr_path()
     # Set directories for figures
-
-    figSavePath = experimentsPath / sampleName / "figures"
+    figSavePath = experimentPath / "figures"
     figSavePath.mkdir(exist_ok=True)
     yFitIC.figSavePath = figSavePath
     return

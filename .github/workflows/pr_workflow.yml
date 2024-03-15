@@ -38,7 +38,6 @@ jobs:
       # Runs System tests
       - name: Run mvesuvio Analysis System Tests
         run: |
-          export VESUVIOPROPERTIES=$(pwd)/mvesuvio/system_tests/test_config/vesuvio.user.properties
           python -m unittest discover -s ./mvesuvio/system_tests
 
       - name: Run mvesuvio Calibration Unit Tests

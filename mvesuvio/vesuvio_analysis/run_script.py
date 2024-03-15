@@ -18,7 +18,6 @@ from mantid.api import mtd
 
 def runScript(
     userCtr,
-    scriptName,
     wsBackIC,
     wsFrontIC,
     bckwdIC,
@@ -28,10 +27,10 @@ def runScript(
     yes_to_all=False,
 ):
     # Set extra attributes from user attributes
-    completeICFromInputs(fwdIC, scriptName, wsFrontIC)
-    completeICFromInputs(bckwdIC, scriptName, wsBackIC)
+    completeICFromInputs(fwdIC, wsFrontIC)
+    completeICFromInputs(bckwdIC, wsBackIC)
     completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC)
-    completeYFitIC(yFitIC, scriptName)
+    completeYFitIC(yFitIC)
 
     checkInputs(userCtr)
     checkInputs(bootIC)
@@ -73,7 +72,7 @@ def runScript(
     ICs = []
     for mode, IC in zip(["BACKWARD", "FORWARD"], [bckwdIC, fwdIC]):
         if (userCtr.fitInYSpace == mode) | (userCtr.fitInYSpace == "JOINT"):
-            wsNames.append(buildFinalWSName(scriptName, mode, IC))
+            wsNames.append(buildFinalWSName(mode, IC))
             ICs.append(IC)
 
     # If bootstrap is not None, run bootstrap procedure and finish

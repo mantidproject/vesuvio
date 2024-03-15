@@ -5,15 +5,19 @@ from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from mvesuvio.system_tests.tests_IC import (
-    scriptName,
-    wsBackIC,
-    wsFrontIC,
-    bckwdIC,
-    fwdIC,
-    yFitIC,
+from mvesuvio.scripts import handle_config
+from mvesuvio.system_tests.test_config.expr_for_tests import (
+    LoadVesuvioBackParameters,
+    LoadVesuvioFrontParameters,
+    BackwardInitialConditions,
+    ForwardInitialConditions,
+    YSpaceFitInitialConditions,
 )
-
+import mvesuvio
+mvesuvio.set_config(
+    ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
+    inputs_file=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("system_tests", "test_config", "expr_for_tests.py"))
+)
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 
@@ -25,6 +29,23 @@ class UserScriptControls:
     runRoutine = True
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"
+
+
+bootIC = BootstrapInitialConditions
+userCtr = UserScriptControls
+ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+wsBackIC = LoadVesuvioBackParameters(ipFilesPath)
+wsFrontIC = LoadVesuvioFrontParameters(ipFilesPath)
+bckwdIC = BackwardInitialConditions(ipFilesPath)
+fwdIC = ForwardInitialConditions(ipFilesPath)
+yFitIC = YSpaceFitInitialConditions()
+scriptName = handle_config.get_script_name()
+
+fwdIC.noOfMSIterations = 1
+fwdIC.firstSpec = 164
+fwdIC.lastSpec = 175
+yFitIC.fitModel = "GC_C4_C6"
+yFitIC.symmetrisationFlag = False
 
 
 class AnalysisRunner:
@@ -67,15 +88,10 @@ class AnalysisRunner:
 
     @classmethod
     def _run(cls):
-        bootIC = BootstrapInitialConditions
-        userCtr = UserScriptControls
-        yFitIC.fitModel = "GC_C4_C6"
-        yFitIC.symmetrisationFlag = False
-
         cls.load_workspaces()
         
         scattRes, yfitRes = runScript(
-            userCtr, scriptName, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
+            userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
         )
         cls._currentResults = yfitRes
 

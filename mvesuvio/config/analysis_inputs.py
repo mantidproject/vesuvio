@@ -141,7 +141,7 @@ class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"  # Needs to be symetric
-    fitModel = "Gaussian3D"  # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'ANSIO_GAUSSIAN', 'Gaussian3D'
+    fitModel = "SINGLE_GAUSSIAN"  # Options: 'SINGLE_GAUSSIAN', 'GC_C4', 'GC_C6', 'GC_C4_C6', 'DOUBLE_WELL', 'ANSIO_GAUSSIAN', 'Gaussian3D'
     runMinos = True
     globalFit = True  # Performs global fit with Minuit by default
     nGlobalFitGroups = 4  # Number or string "ALL"
@@ -160,3 +160,14 @@ class UserScriptControls:
 
 class BootstrapInitialConditions:
     runBootstrap = False
+
+
+####################
+### RUN ANALYSIS ###
+####################
+
+if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
+    import mvesuvio
+    from pathlib import Path
+    mvesuvio.set_config(inputs_file=Path(__file__))
+    mvesuvio.run()
