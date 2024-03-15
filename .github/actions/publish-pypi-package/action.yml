@@ -23,4 +23,4 @@ runs:
     run: |
       conda activate build-env-pypi
       python -m build
-      twine upload -r testpypi -u __token__ -p ${{ inputs.token }} dist/*
+      twine upload -u __token__ -p ${{ inputs.token }} dist/*
