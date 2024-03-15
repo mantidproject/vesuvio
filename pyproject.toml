@@ -6,8 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mvesuvio"
-# dynamic = ["version"]
-version = "0.0.1"
+dynamic = ["version"]
 authors = [
   {name = "The Mantid Project", email = "mantid-help@mantidproject.org"},
   {name = "Guilherme Pereira", email = "gui.maciel-pereira@stfc.ac.uk"},
@@ -70,21 +69,18 @@ fail_under = 0
 show_missing = true
 skip_empty = true
 
-# [tool.versioningit.vcs]
-# method = "git"
-# default-tag = "0.0.1"
-# match = ["v*"]
-#
-# [tool.versioningit.next-version]
-# method = "minor"
-#
-# [tool.versioningit.format]
-# distance = "{version}.dev{distance}"
-# dirty = "{version}+uncommitted"
-# distance-dirty = "{version}.dev{distance}+uncommitted"
-# # distance = "{version}"
-# # dirty = "{version}"
-# # distance-dirty = "{version}"
-#
-# [tool.versioningit.write]
-# file = "mvesuvio/_version.py"
+[tool.versioningit.vcs]
+method = "git"
+default-tag = "0.0.0"
+match = ["v*"]
+
+[tool.versioningit.next-version]
+method = "minor"
+
+[tool.versioningit.format]
+distance = "{version}.dev{distance}"
+dirty = "{version}+uncommitted"
+distance-dirty = "{version}.dev{distance}+uncommitted"
+
+[tool.versioningit.write]
+file = "mvesuvio/_version.py"
