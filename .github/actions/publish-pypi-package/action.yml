@@ -1,0 +1,26 @@
+name: Build and upload pypi package
+
+inputs:
+  token:
+    description: 'PyPI API Token'
+    required: true
+
+description: Build and upload pypi package
+runs:
+  using: "composite"
+
+  steps:
+  - name: Make build-env-pypi
+    shell: bash -l {0}
+    run: |
+      conda config --set always_yes yes --set changeps1 no
+      conda create -n build-env-pypi python=3.10.*
+      conda activate build-env-pypi
+      mamba install -c conda-forge python-build twine 
+
+  - name: Build package
+    shell: bash -l {0}
+    run: |
+      conda activate build-env-pypi
+      python -m build
+      twine upload -u __token__ -p ${{ inputs.token }} dist/*

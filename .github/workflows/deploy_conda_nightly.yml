@@ -36,7 +36,13 @@ jobs:
 
       - name: Build mvesuvio nightly conda package
         if: ${{ env.recentCommits == 'true'}}
-        uses: ./.github/actions/publish-package
+        uses: ./.github/actions/publish-conda-package
         with:
           label: nightly
           token: ${{ secrets.ANACONDA_API_TOKEN }}
+
+      - name: Build mvesuvio nightly PyPI package
+        if: ${{ env.recentCommits == 'true'}}
+        uses: ./.github/actions/publish-pypi-package
+        with:
+          token: ${{ secrets.PYPI_API_TOKEN }}

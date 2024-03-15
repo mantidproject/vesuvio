@@ -14,7 +14,7 @@ authors = [
 ]
 description = "Analyse Vesuvio instrument data"
 readme = "README.md"
-requires-python = "==3.10.*"
+requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3.10",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -79,8 +79,8 @@ method = "minor"
 
 [tool.versioningit.format]
 distance = "{version}.dev{distance}"
-dirty = "{version}+uncommitted"
-distance-dirty = "{version}.dev{distance}+uncommitted"
+dirty = "{version}.dev{distance}"
+distance-dirty = "{version}.dev{distance}"
 
 [tool.versioningit.write]
 file = "mvesuvio/_version.py"
