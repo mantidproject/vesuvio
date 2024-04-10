@@ -107,7 +107,14 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 
 class YSpaceFitInitialConditions:
-    anything = True
+    showPlots = False
+    symmetrisationFlag = True
+    rebinParametersForYSpaceFit = "-20, 0.5, 20"  # Needs to be symetric
+    fitModel = "SINGLE_GAUSSIAN"
+    runMinos = True
+    globalFit = None
+    nGlobalFitGroups = 4
+    maskTypeProcedure = None
 
 
 class UserScriptControls:
