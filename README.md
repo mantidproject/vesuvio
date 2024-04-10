@@ -1,4 +1,4 @@
-# VESUIVO REPOSITORY
+# VESUVIO REPOSITORY
 
 This repository contains:
 - `mvesuvio` package containing the Optimized NCP analysis procedures, published nightly.
