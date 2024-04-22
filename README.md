@@ -9,24 +9,21 @@ This repository contains:
 ### For stand-alone (non-conda) Mantid installation
 Currently this method is tested up until Mantid 6.8. 
 
-The easiest way to install the package is to navigate to the installation folder of mantid on your desktop and go to the `bin` folder.
+The easiest way to install the package is to install it through pip.
+To pip install mvesuvio, follow these [instructions](https://docs.mantidproject.org/nightly/concepts/PipInstall.html) and replace `<insert_package_name>` with `mvesuvio`.
 
-You'll see that this folder has a `python` executable. Open up a terminal window from this directory and run the following command:
+Then open mantid workbench and in the editor run the following script:
 
-- `./python -m pip install mvesuvio`
-
-Please make sure that you're writing `./python` and not just `python`, as for the installation to work it needs to use the python executable 
-from this particular mantid installation.
-
-If the installation is successful, you should see that a new executable called `mvesuvio` has appeared in the `bin` folder.
-
-Then type the following command:
-
-- `./mvesuvio config`
+```
+import mvesuvio as mv
+mv.set_config()
+```
 
 You will see that the output shows two directories: one for the inputs file and another for the instrument parameters (IP) file.
 
 Both of these directories sit inside a default location of a `.mvesuvio` folder.
+
+The `.` in front of the directory name means this folder might be hidden by your OS, so you might have to turn on the option of showing hidden folders.
 
 You should place of your IP files inside this IP directory, you will notice that I have placed some example files in there already.
 
