@@ -13,14 +13,11 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
-    ncpForEachMass = extractNCPFromWorkspaces(wsTOF, IC)
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
+    wsTOFMass0 = subtractAllMassesExceptFirst(IC, wsTOF)
 
-    wsTOFMass0 = subtractAllMassesExceptFirst(IC, wsTOF, ncpForEachMass)
-
-    wsJoY, wsJoYAvg = ySpaceReduction(
-        wsTOFMass0, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :]
-    )
+    ncpFirstMass = mtd[wsTOF.name()+"_TOF_Fitted_Profile_0"].extractY()
+    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC.masses[0], yFitIC, ncpFirstMass)
 
     if yFitIC.symmetrisationFlag:
         wsJoYAvg = symmetrizeWs(wsJoYAvg)
@@ -62,6 +59,23 @@ def extractNCPFromWorkspaces(wsFinal, ic):
     print("\nExtracted NCP profiles from workspaces.\n")
     return ncpForEachMass
 
+def subtractAllMassesExceptFirst(ic, ws):
+    """
+    Isolates TOF data from first mass only.
+    Input: ws containing TOF values, NCP for all mass profiles.
+    Output: ws with all profiles except first subtracted.
+    """
+    if len(ic.masses) == 1:
+        return
+
+    wsNcpExceptFirst = Minus(mtd[ws.name()+"_TOF_Fitted_Profiles"], mtd[ws.name()+"_TOF_Fitted_Profile_0"], 
+                             OutputWorkspace=ws.name()+"_TOF_Fitted_Profiles_Except_First")
+    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_Sum")
+
+    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_Mass0")
+    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_Sum")
+    return wsFirstMass
+
 
 def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
     mass = IC.masses[0]
@@ -90,37 +104,6 @@ def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
     return wsResSum, mtd[resName]
 
 
-def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
-    """
-    Isolates TOF data from first mass only.
-    Input: ws containing TOF values, NCP for all mass profiles.
-    Output: ws with all profiles except first subtracted.
-    """
-
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    # Select all masses other than the first one
-    ncpForEachMassExceptFirst = ncpForEachMass[1:, :, :]
-    # Sum the ncpTotal for remaining masses
-    ncpTotalExceptFirst = np.sum(ncpForEachMassExceptFirst, axis=0)
-
-    dataX, dataY, dataE = extractWS(ws)
-
-    # Adjust for last column missing or not
-    dataY[:, : ncpTotalExceptFirst.shape[1]] -= ncpTotalExceptFirst
-
-    # Ignore any masked bins (columns) from initial ws
-    mask = np.all(ws.extractY() == 0, axis=0)
-    dataY[:, mask] = 0
-
-    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name() + "_Mass0")
-    passDataIntoWS(dataX, dataY, dataE, wsSubMass)
-    MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)
-    SumSpectra(
-        InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name() + "_Sum"
-    )
-    return wsSubMass
-
-
 def switchFirstTwoAxis(A):
     """Exchanges the first two indices of an array A,
     rearranges matrices per spectrum for iteration of main fitting procedure
@@ -128,7 +111,7 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
+def ySpaceReduction(wsTOF, mass0, yFitIC, ncpFirstMass):
     """Seperate procedures depending on masking specified."""
 
     rebinPars = yFitIC.rebinParametersForYSpaceFit
@@ -143,7 +126,7 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
             )  # Unusual ws with several dataY points per each dataX point
 
             # Need normalisation values from NCP masked workspace
-            wsTOFNCP = replaceZerosWithNCP(wsTOF, ncp)
+            wsTOFNCP = replaceZerosWithNCP(wsTOF, ncpFirstMass)
             wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
             wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
 
@@ -155,7 +138,7 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
             return wsJoYN, wsJoYAvg
 
         elif yFitIC.maskTypeProcedure == "NCP":
-            wsTOF = replaceZerosWithNCP(wsTOF, ncp)
+            wsTOF = replaceZerosWithNCP(wsTOF, ncpFirstMass)
 
         else:
             raise ValueError(

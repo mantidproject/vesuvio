@@ -483,9 +483,9 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
         ncpTotal.shape == dataX.shape
     ), "DataX and DataY in ws need to be the same shape."
 
-    ncpTotWS = createWS(
-        dataX, ncpTotal, np.zeros(dataX.shape), ws.name() + "_TOF_Fitted_Profiles"
-    )
+    ncpTotWS = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_TOF_Fitted_Profiles")
+    passDataIntoWS(dataX, ncpTotal, np.zeros_like(dataX), ncpTotWS)
+
     MaskDetectors(Workspace=ncpTotWS, WorkspaceIndexList=ic.maskedDetectorIdx)
     wsTotNCPSum = SumSpectra(
         InputWorkspace=ncpTotWS, OutputWorkspace=ncpTotWS.name() + "_Sum"
@@ -494,12 +494,8 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
     # Individual ncp workspaces
     wsMNCPSum = []
     for i, ncp_m in enumerate(ncpForEachMass):
-        ncpMWS = createWS(
-            dataX,
-            ncp_m,
-            np.zeros(dataX.shape),
-            ws.name() + "_TOF_Fitted_Profile_" + str(i),
-        )
+        ncpMWS = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_TOF_Fitted_Profile_" + str(i))
+        passDataIntoWS(dataX, ncp_m, np.zeros_like(dataX), ncpMWS)
         MaskDetectors(Workspace=ncpMWS, WorkspaceIndexList=ic.maskedDetectorIdx)
         wsNCPSum = SumSpectra(
             InputWorkspace=ncpMWS, OutputWorkspace=ncpMWS.name() + "_Sum"
