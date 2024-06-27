@@ -79,12 +79,14 @@ class AnalysisRunner:
             str(cls._test_path / "wsFinal.nxs"),
             OutputWorkspace=scriptName + "_FORWARD_1",
         )
-        for i in range(len(fwdIC.masses)):
-            fileName = "wsFinal_ncp_" + str(i) + ".nxs"
-            Load(
-                str(cls._test_path / fileName),
-                OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profile_" + str(i),
-            )
+        Load(
+            str(cls._test_path / "wsFinal_ncp_sum_cloned.nxs"),
+            OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profiles",
+        )
+        Load(
+            str(cls._test_path / "wsFinal_ncp_0_cloned.nxs"),
+            OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profile_0",
+        )
 
     @classmethod
     def _run(cls):
