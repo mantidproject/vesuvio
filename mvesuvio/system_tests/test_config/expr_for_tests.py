@@ -108,6 +108,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
 
 class YSpaceFitInitialConditions:
     showPlots = False
+    subtractFSE = False
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-20, 0.5, 20"  # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"

@@ -249,7 +249,7 @@ def fitNcpToWorkspace(IC, ws):
     )
     createTableWSForFitPars(ws.name(), IC.noOfMasses, arrFitPars)
     arrBestFitPars = arrFitPars[:, 1:-2]
-    ncpForEachMass, ncpTotal = calculateNcpArr(
+    ncpForEachMass, ncpTotal, fseForEachMass = calculateNcpArr(
         IC,
         arrBestFitPars,
         resolutionPars,
@@ -258,6 +258,7 @@ def fitNcpToWorkspace(IC, ws):
         ySpacesForEachMass,
     )
     ncpSumWSs = createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, IC)
+    createFseWorkspaces(fseForEachMass, ws, IC)
 
     wsDataSum = SumSpectra(InputWorkspace=ws, OutputWorkspace=ws.name() + "_Sum")
     plotSumNCPFits(wsDataSum, *ncpSumWSs, IC)
@@ -437,8 +438,9 @@ def calculateNcpArr(
     """Calculates the matrix of NCP from matrix of best fit parameters"""
 
     allNcpForEachMass = []
+    allFseForEachMass = []
     for i in range(len(arrBestFitPars)):
-        ncpForEachMass = calculateNcpRow(
+        ncpForEachMass, fseForEachMass = calculateNcpRow(
             arrBestFitPars[i],
             ySpacesForEachMass[i],
             resolutionPars[i],
@@ -448,10 +450,12 @@ def calculateNcpArr(
         )
 
         allNcpForEachMass.append(ncpForEachMass)
+        allFseForEachMass.append(fseForEachMass)
 
     allNcpForEachMass = np.array(allNcpForEachMass)
     allNcpTotal = np.sum(allNcpForEachMass, axis=1)
-    return allNcpForEachMass, allNcpTotal
+    allFseForEachMass = np.array(allFseForEachMass)
+    return allNcpForEachMass, allNcpTotal, allFseForEachMass
 
 
 def calculateNcpRow(
@@ -461,12 +465,12 @@ def calculateNcpRow(
     output: row shape with the ncpTotal for each mass"""
 
     if np.all(initPars == 0):
-        return np.zeros(ySpacesForEachMass.shape)
+        return np.zeros(ySpacesForEachMass.shape), np.zeros(ySpacesForEachMass.shape)
 
-    ncpForEachMass, ncpTotal = calculateNcpSpec(
+    ncpForEachMass, ncpTotal, fseForEachMass = calculateNcpSpec(
         ic, initPars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )
-    return ncpForEachMass
+    return ncpForEachMass, fseForEachMass
 
 
 def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
@@ -507,6 +511,31 @@ def createNcpWorkspaces(ncpForEachMass, ncpTotal, ws, ic):
         wsMNCPSum.append(wsNCPSum)
 
     return wsTotNCPSum, wsMNCPSum
+
+def createFseWorkspaces(fseForEachMass, ws, ic):
+    # Need to rearrage array of yspaces into seperate arrays for each mass
+    fseForEachMass = switchFirstTwoAxis(fseForEachMass)
+
+    # Use ws dataX to match with histogram data
+    dataX = ws.extractX()[
+        :, : fseForEachMass.shape[2]
+    ]  # Make dataX match ncp shape automatically
+    assert (
+        fseForEachMass[0].shape == dataX.shape
+    ), "DataX and DataY in ws need to be the same shape."
+
+    # Individual ncp workspaces
+    wsMFSESum = []
+    for i, fse_m in enumerate(fseForEachMass):
+        ws_m = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_TOF_FSE_" + str(i))
+        passDataIntoWS(dataX, fse_m, np.zeros_like(dataX), ws_m)
+        MaskDetectors(Workspace=ws_m, WorkspaceIndexList=ic.maskedDetectorIdx)
+        ws_m_sum = SumSpectra(
+            InputWorkspace=ws_m, OutputWorkspace=ws_m.name() + "_Sum"
+        )
+        wsMFSESum.append(ws_m_sum)
+
+    return wsMFSESum
 
 
 def createWS(dataX, dataY, dataE, wsName):
@@ -710,7 +739,7 @@ def errorFunction(
 ):
     """Error function to be minimized, operates in TOF space"""
 
-    ncpForEachMass, ncpTotal = calculateNcpSpec(
+    ncpForEachMass, ncpTotal, fseForEachMass = calculateNcpSpec(
         ic, pars, ySpacesForEachMass, resolutionPars, instrPars, kinematicArrays
     )
 
@@ -752,7 +781,7 @@ def calculateNcpSpec(
 
     ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
     ncpTotal = np.sum(ncpForEachMass, axis=0)
-    return ncpForEachMass, ncpTotal
+    return ncpForEachMass, ncpTotal, FSE
 
 
 def prepareArraysFromPars(ic, initPars):

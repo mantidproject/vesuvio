@@ -18,6 +18,9 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
 
     wsTOFMass0 = subtractAllMassesExceptFirst(IC, wsTOF, ncpForEachMass)
 
+    if yFitIC.subtractFSE:
+        wsTOFMass0 = Minus(wsTOFMass0, wsTOF.name() + "_TOF_FSE_0", OutputWorkspace=wsTOFMass0.name() + "_FSE")
+
     wsJoY, wsJoYAvg = ySpaceReduction(
         wsTOFMass0, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :]
     )
