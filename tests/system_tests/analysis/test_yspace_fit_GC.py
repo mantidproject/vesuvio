@@ -1,4 +1,4 @@
-from mvesuvio.vesuvio_analysis.run_script import runScript
+from mvesuvio.run_script import runScript
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
@@ -6,7 +6,7 @@ import numpy as np
 import unittest
 import numpy.testing as nptest
 from mvesuvio.scripts import handle_config
-from mvesuvio.system_tests.test_config.expr_for_tests import (
+from test_config.expr_for_tests import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,
@@ -21,17 +21,12 @@ mvesuvio.set_config(
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
 
-class BootstrapInitialConditions:  # Not used, but still need to pass as arg
-    runBootstrap = False
-
-
 class UserScriptControls:
     runRoutine = True
     procedure = "FORWARD"
     fitInYSpace = "FORWARD"
 
 
-bootIC = BootstrapInitialConditions
 userCtr = UserScriptControls
 ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 wsBackIC = LoadVesuvioBackParameters(ipFilesPath)
@@ -91,7 +86,7 @@ class AnalysisRunner:
         cls.load_workspaces()
         
         scattRes, yfitRes = runScript(
-            userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, bootIC, True
+            userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, True
         )
         cls._currentResults = yfitRes
 

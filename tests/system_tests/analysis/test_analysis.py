@@ -1,16 +1,15 @@
-from mvesuvio.vesuvio_analysis.run_script import runScript
+from mvesuvio.run_script import runScript
 import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.scripts import handle_config
-from mvesuvio.system_tests.test_config.expr_for_tests import (
+from test_config.expr_for_tests import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,
     ForwardInitialConditions,
     YSpaceFitInitialConditions,
-    BootstrapInitialConditions,
     UserScriptControls,
 )
 import mvesuvio
@@ -47,7 +46,6 @@ class AnalysisRunner:
             BackwardInitialConditions(ipFilesPath),
             ForwardInitialConditions(ipFilesPath),
             YSpaceFitInitialConditions(),
-            BootstrapInitialConditions(),
             True,
         )
 
