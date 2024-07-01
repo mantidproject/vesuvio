@@ -4,7 +4,7 @@ __pycache__/
 output_npz_for_testing
 !experiments/original_inputs/output_npz_for_testing
 
-vesuvio_analysis/core_functions/bootstrap_ws/
+src/vesuvio_analysis/core_functions/bootstrap_ws/
 running_times.txt
 figures/
-mvesuvio/system_tests/test_config/expr_for_tests/output_files
+mvesuvio/tests/analysis/system/data/input/sample_input

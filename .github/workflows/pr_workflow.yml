@@ -28,28 +28,28 @@ jobs:
         run: python -m flake8 --config=config.flake8
 
       # Remove `export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties` when updated to mantid > 6.8.0
+      - name: Install mvesuvio package
+        run: pip install .
 
       # Runs Unit tests
       - name: Run mvesuvio Analysis Unit Tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          python -m unittest discover -s ./mvesuvio/vesuvio_analysis/tests
+          python -m unittest discover -s ./tests/analysis/unit
 
       # Runs System tests
       - name: Run mvesuvio Analysis System Tests
         run: |
-          python -m unittest discover -s ./mvesuvio/system_tests
+          python -m unittest discover -s ./tests/analysis/system
 
       - name: Run mvesuvio Calibration Unit Tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          cd unpackaged/vesuvio_calibration
-          python -m unittest discover -s ./tests/unit
+          python -m unittest discover -s ./tests/calibration/unit
 
       - name: Run Vesuvio Calibration System Tests
         run: |
-          cd unpackaged/vesuvio_calibration
-          python -m unittest discover -s ./tests/system
+          python -m unittest discover -s ./tests/calibration/system
 
       # Report coverage
       #- name: Report Coverage

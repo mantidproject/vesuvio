@@ -70,6 +70,9 @@ fail_under = 0
 show_missing = true
 skip_empty = true
 
+[tool.versioningit]
+default-version = "0.0.0"
+
 [tool.versioningit.vcs]
 method = "git"
 default-tag = "0.0.0"
