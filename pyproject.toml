@@ -43,7 +43,7 @@ tests_require = [
 console_scripts = { mvesuvio = "mvesuvio.scripts:main" }
 
 [tool.setuptools.packages.find]
-include = ["mvesuvio*"]
+where = ["src"]
 namespaces = false
 
 [tool.setuptools.package-data]
@@ -52,17 +52,18 @@ namespaces = false
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-testpaths = ["mvesuvio/system_tests"]
+testpaths = ["tests/system_tests"]
 filterwarnings = ["error"]
 
 [tool.coverage.report]
 include = [
-    "*/mvesuvio/vesuvio_analysis/*",
+    "*/src/mvesuvio/*",
 ]
 
 omit = [
     "*tests*",
     "*unpackaged*",
+    "*legacy"
 ]
 
 fail_under = 0
@@ -83,4 +84,4 @@ dirty = "{version}.dev{distance}"
 distance-dirty = "{version}.dev{distance}"
 
 [tool.versioningit.write]
-file = "mvesuvio/_version.py"
+file = "src/mvesuvio/_version.py"
