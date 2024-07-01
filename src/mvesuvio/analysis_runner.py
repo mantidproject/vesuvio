@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 import importlib
 import sys
-from mvesuvio.vesuvio_analysis.run_script import runScript
+from mvesuvio.run_script import runScript
 from mvesuvio.scripts import handle_config
 
 
@@ -19,7 +19,6 @@ def run(yes_to_all=False):
     bckwdIC = ai.BackwardInitialConditions(ipFilesPath)
     fwdIC = ai.ForwardInitialConditions
     yFitIC = ai.YSpaceFitInitialConditions
-    bootIC = ai.BootstrapInitialConditions
     userCtr = ai.UserScriptControls
 
     runScript(
@@ -29,7 +28,6 @@ def run(yes_to_all=False):
         bckwdIC,
         fwdIC,
         yFitIC,
-        bootIC,
         yes_to_all,
     )
 

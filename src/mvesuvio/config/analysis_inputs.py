@@ -158,10 +158,6 @@ class UserScriptControls:
     fitInYSpace = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
-class BootstrapInitialConditions:
-    runBootstrap = False
-
-
 ####################
 ### RUN ANALYSIS ###
 ####################

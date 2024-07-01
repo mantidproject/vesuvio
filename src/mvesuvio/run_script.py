@@ -1,12 +1,10 @@
-from mvesuvio.vesuvio_analysis.ICHelpers import (
+from mvesuvio.ICHelpers import (
     buildFinalWSName,
     completeICFromInputs,
-    completeBootIC,
     completeYFitIC,
 )
-from mvesuvio.vesuvio_analysis.bootstrap import runBootstrap
-from mvesuvio.vesuvio_analysis.fit_in_yspace import fitInYSpaceProcedure
-from mvesuvio.vesuvio_analysis.procedures import (
+from mvesuvio.fit_in_yspace import fitInYSpaceProcedure
+from mvesuvio.procedures import (
     runIndependentIterativeProcedure,
     runJointBackAndForwardProcedure,
     runPreProcToEstHRatio,
@@ -15,7 +13,6 @@ from mvesuvio.vesuvio_analysis.procedures import (
 )
 from mantid.api import mtd
 
-
 def runScript(
     userCtr,
     wsBackIC,
@@ -23,20 +20,13 @@ def runScript(
     bckwdIC,
     fwdIC,
     yFitIC,
-    bootIC,
     yes_to_all=False,
 ):
     # Set extra attributes from user attributes
     completeICFromInputs(fwdIC, wsFrontIC)
     completeICFromInputs(bckwdIC, wsBackIC)
-    completeBootIC(bootIC, bckwdIC, fwdIC, yFitIC)
     completeYFitIC(yFitIC)
-
     checkInputs(userCtr)
-    checkInputs(bootIC)
-    assert not (
-        userCtr.runRoutine & bootIC.runBootstrap
-    ), "Main routine and bootstrap both set to run!"
 
     def runProcedure():
         proc = userCtr.procedure  # Shorthad to make it easier to read
@@ -74,15 +64,6 @@ def runScript(
         if (userCtr.fitInYSpace == mode) | (userCtr.fitInYSpace == "JOINT"):
             wsNames.append(buildFinalWSName(mode, IC))
             ICs.append(IC)
-
-    # If bootstrap is not None, run bootstrap procedure and finish
-    if bootIC.runBootstrap:
-        assert (
-            (bootIC.procedure == "FORWARD")
-            | (bootIC.procedure == "BACKWARD")
-            | (bootIC.procedure == "JOINT")
-        ), "Invalid Bootstrap procedure."
-        return runBootstrap(bckwdIC, fwdIC, bootIC, yFitIC), None
 
     # Default workflow for procedure + fit in y space
     if userCtr.runRoutine:
