@@ -6,7 +6,7 @@ from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, CropWor
      ReplaceSpecialValues, FindPeaks, GroupWorkspaces, mtd, Plus, LoadVesuvio, LoadRaw, ConvertToDistribution, FindPeakBackground,\
      ExtractSingleSpectrum, SumSpectra, AppendSpectra, CloneWorkspace, Fit, MaskDetectors, ExtractUnmaskedSpectra, CreateWorkspace
 from functools import partial
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
+from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
 
 import os
 import sys
