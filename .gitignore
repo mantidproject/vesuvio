@@ -1,10 +1,7 @@
 # Ignore cache files
 __pycache__/
 *.py[cod]
-output_npz_for_testing
-!experiments/original_inputs/output_npz_for_testing
 
 src/vesuvio_analysis/core_functions/bootstrap_ws/
-running_times.txt
 figures/
-mvesuvio/tests/analysis/system/data/input/sample_test/output_files/
+tests/analysis/system/data/input/sample_test/output_files/
