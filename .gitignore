@@ -4,4 +4,4 @@ __pycache__/
 
 src/vesuvio_analysis/core_functions/bootstrap_ws/
 figures/
-tests/analysis/system/data/input/sample_test/output_files/
+tests/analysis/data/inputs/sample_test/output_files/

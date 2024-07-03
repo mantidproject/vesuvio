@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from mvesuvio.run_script import runScript
-from mvesuvio.scripts import handle_config
+from mvesuvio.run_routine import runRoutine
+from mvesuvio.util import handle_config
 from tests.analysis.data.inputs.sample_test import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
@@ -39,7 +39,7 @@ class AnalysisRunner:
 
     @classmethod
     def _run(cls):
-        scattRes, yfitRes = runScript(
+        scattRes, yfitRes = runRoutine(
             UserScriptControls(),
             LoadVesuvioBackParameters(ipFilesPath),
             LoadVesuvioFrontParameters(ipFilesPath),

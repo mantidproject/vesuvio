@@ -1,4 +1,4 @@
-from .analysis_functions import iterativeFitForDataReduction
+from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace
 import numpy as np

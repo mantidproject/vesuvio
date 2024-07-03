@@ -1,11 +1,11 @@
-from mvesuvio.run_script import runScript
+from mvesuvio.run_routine import runRoutine
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from mvesuvio.scripts import handle_config
+from mvesuvio.util import handle_config
 from tests.analysis.data.inputs.sample_test import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
@@ -86,7 +86,7 @@ class AnalysisRunner:
     def _run(cls):
         cls.load_workspaces()
         
-        scattRes, yfitRes = runScript(
+        scattRes, yfitRes = runRoutine(
             userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, True
         )
         cls._currentResults = yfitRes
