@@ -10,9 +10,10 @@ dependencies:
   - conda-wrappers
   - pre-commit==2.15 #review this
   - coverage
-  - mantid==6.8
+  - mantid
   - matplotlib
   - iminuit
   - h5py
   - mock
+  - pytest
   - jacobi==0.4.2 #pinned until newer versions functionality confirmed
