@@ -24,13 +24,16 @@ jobs:
           environment-file: environment.yml
           auto-activate-base: false
 
+      - name: Install mvesuvio package
+        run: pip install .
+
       # Runs Unit tests
       - name: Run mvesuvio analysis unit tests
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          python -m unittest discover -s ./mvesuvio/vesuvio_analysis/tests
+          python -m unittest discover -s ./tests/analysis/unit
 
       # Runs System tests
       - name: Run mvesuvio analysis system tests
         run: |
-          python -m unittest discover -s ./mvesuvio/system_tests
+          python -m unittest discover -s ./tests/analysis/system

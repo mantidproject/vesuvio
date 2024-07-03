@@ -3,7 +3,7 @@ from mantid.kernel import StringArrayProperty, Direction, StringListValidator, I
 from mantid.api import FileProperty, FileAction, PythonAlgorithm,AlgorithmManager
 from mantid.simpleapi import CreateEmptyTableWorkspace, DeleteWorkspace, ReplaceSpecialValues, GroupWorkspaces, mtd,\
      ConvertTableToMatrixWorkspace, ConjoinWorkspaces, Transpose, PlotPeakByLogValue,RenameWorkspace
-from calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions,\
+from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions,\
      InvalidDetectors
 
 import os
