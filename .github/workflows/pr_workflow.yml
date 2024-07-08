@@ -14,6 +14,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check for analysis files changed 
+        run: |
+          if git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/'; then
+            echo "analysis-changed=true" >> $GITHUB_ENV
+          else
+            echo "analysis-changed=false" >> $GITHUB_ENV
+          fi
+
+      - name: Check for calibration files changed 
+        run: |
+          if git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/'; then
+            echo "calibration-changed=true" >> $GITHUB_ENV
+          else
+            echo "calibration-changed=false" >> $GITHUB_ENV
+          fi
+
       # Set up conda environnment
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
@@ -33,21 +49,25 @@ jobs:
 
       # Runs Unit tests
       - name: Run mvesuvio Analysis Unit Tests
+        if: ${{ env.analysis-changed == 'true'}}
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           python -m unittest discover -s ./tests/analysis/unit
 
       # Runs System tests
       - name: Run mvesuvio Analysis System Tests
+        if: ${{ env.analysis-changed == 'true'}}
         run: |
           python -m unittest discover -s ./tests/analysis/system
 
       - name: Run mvesuvio Calibration Unit Tests
+        if: ${{ env.calibration-changed == 'true'}}
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           python -m unittest discover -s ./tests/calibration/unit
 
       - name: Run Vesuvio Calibration System Tests
+        if: ${{ env.calibration-changed == 'true'}}
         run: |
           python -m unittest discover -s ./tests/calibration/system
 
