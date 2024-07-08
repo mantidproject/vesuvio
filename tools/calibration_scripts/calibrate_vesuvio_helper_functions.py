@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.constants
-
 from mantid.simpleapi import CreateEmptyTableWorkspace, mtd
 
 
