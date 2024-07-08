@@ -1,11 +1,11 @@
-from mvesuvio.run_script import runScript
+from mvesuvio.run_routine import runRoutine
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
 import numpy as np
 import unittest
 import numpy.testing as nptest
-from mvesuvio.scripts import handle_config
+from mvesuvio.util import handle_config
 from tests.analysis.data.inputs.sample_test import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
@@ -14,10 +14,9 @@ from tests.analysis.data.inputs.sample_test import (
     YSpaceFitInitialConditions,
 )
 import mvesuvio
-sample_test_dir = Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py" 
 mvesuvio.set_config(
     ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-    inputs_file=str(sample_test_dir)
+    inputs_file=str(Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py")
 )
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
@@ -48,7 +47,7 @@ class AnalysisRunner:
     _benchmarkResults = None
     _currentResults = None
     _input_data_path = Path(__file__).absolute().parent.parent / "data" / "inputs"
-    _output_data_path = Path(__file__).absolute().parent.parent / "data" / "outputs"
+    _benchmark_path = Path(__file__).absolute().parent.parent / "data" / "benchmark"
     _workspaces_loaded = False
 
     @classmethod
@@ -87,7 +86,7 @@ class AnalysisRunner:
     def _run(cls):
         cls.load_workspaces()
         
-        scattRes, yfitRes = runScript(
+        scattRes, yfitRes = runRoutine(
             userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, True
         )
         cls._currentResults = yfitRes
@@ -95,7 +94,7 @@ class AnalysisRunner:
     @classmethod
     def _load_benchmark_results(cls):
         cls._benchmarkResults = np.load(
-            str(cls._output_data_path / "stored_yspace_fit_GC.npz")
+            str(cls._benchmark_path / "stored_yspace_fit_GC.npz")
         )
 
 

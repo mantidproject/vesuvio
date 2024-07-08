@@ -3,7 +3,7 @@ import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
 
-from .fit_in_yspace import passDataIntoWS, replaceZerosWithNCP
+from .analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 
 # Format print output of arrays
 np.set_printoptions(suppress=True, precision=4, linewidth=100, threshold=sys.maxsize)

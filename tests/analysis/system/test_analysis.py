@@ -2,8 +2,8 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from mvesuvio.run_script import runScript
-from mvesuvio.scripts import handle_config
+from mvesuvio.run_routine import runRoutine
+from mvesuvio.util import handle_config
 from tests.analysis.data.inputs.sample_test import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
@@ -13,10 +13,9 @@ from tests.analysis.data.inputs.sample_test import (
     UserScriptControls,
 )
 import mvesuvio
-sample_test_dir = Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py" 
 mvesuvio.set_config(
     ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-    inputs_file=str(sample_test_dir)
+    inputs_file=str(Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py")
 )
 
 ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
@@ -40,7 +39,7 @@ class AnalysisRunner:
 
     @classmethod
     def _run(cls):
-        scattRes, yfitRes = runScript(
+        scattRes, yfitRes = runRoutine(
             UserScriptControls(),
             LoadVesuvioBackParameters(ipFilesPath),
             LoadVesuvioFrontParameters(ipFilesPath),
@@ -60,9 +59,9 @@ class AnalysisRunner:
 
     @classmethod
     def _load_benchmark_results(cls):
-        testPath = Path(__file__).absolute().parent.parent / "data" / "outputs"
+        benchmarkPath = Path(__file__).absolute().parent.parent / "data" / "benchmark"
         benchmarkResults = np.load(
-            str(testPath / "stored_spec_144-182_iter_3_GC_MS.npz")
+            str(benchmarkPath / "stored_spec_144-182_iter_3_GC_MS.npz")
         )
         AnalysisRunner._benchmarkResults = benchmarkResults
 

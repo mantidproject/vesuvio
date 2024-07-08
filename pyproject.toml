@@ -40,7 +40,7 @@ tests_require = [
 "Bug Tracker" = "https://github.com/mantidproject/vesuvio/issues"
 
 [project.entry-points]
-console_scripts = { mvesuvio = "mvesuvio.scripts:main" }
+console_scripts = { mvesuvio = "mvesuvio.main:main" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -51,19 +51,23 @@ namespaces = false
 "mvesuvio.config" = ["*.properties"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
-testpaths = ["tests/system_tests"]
+pythonpath = [
+    ".",
+    "./src"
+]
+testpaths = ["tests"]
 filterwarnings = ["error"]
 
 [tool.coverage.report]
 include = [
     "*/src/mvesuvio/*",
+    "*/tools/calibration_scripts/*"
 ]
 
 omit = [
     "*tests*",
     "*unpackaged*",
-    "*legacy"
+    "*legacy*"
 ]
 
 fail_under = 0

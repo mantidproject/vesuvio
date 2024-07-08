@@ -2,7 +2,7 @@
 """
 import argparse
 from os import environ, path
-from mvesuvio.scripts import handle_config
+from mvesuvio.util import handle_config
 
 
 def main(manual_args=None):
@@ -87,7 +87,7 @@ def __run_analysis(yes_to_all):
     environ["MANTIDPROPERTIES"] = path.join(
         handle_config.VESUVIO_CONFIG_PATH, "Mantid.user.properties"
     )
-    from mvesuvio import analysis_runner
+    from mvesuvio.main import analysis_runner
 
     analysis_runner.run(yes_to_all)
 

@@ -1,10 +1,10 @@
-from mvesuvio.ICHelpers import (
+from mvesuvio.util.process_inputs import (
     buildFinalWSName,
     completeICFromInputs,
     completeYFitIC,
 )
-from mvesuvio.fit_in_yspace import fitInYSpaceProcedure
-from mvesuvio.procedures import (
+from mvesuvio.analysis_fitting import fitInYSpaceProcedure
+from mvesuvio.analysis_routines import (
     runIndependentIterativeProcedure,
     runJointBackAndForwardProcedure,
     runPreProcToEstHRatio,
@@ -13,7 +13,7 @@ from mvesuvio.procedures import (
 )
 from mantid.api import mtd
 
-def runScript(
+def runRoutine(
     userCtr,
     wsBackIC,
     wsFrontIC,

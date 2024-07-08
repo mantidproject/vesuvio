@@ -2,8 +2,8 @@ import time
 from pathlib import Path
 import importlib
 import sys
-from mvesuvio.run_script import runScript
-from mvesuvio.scripts import handle_config
+from mvesuvio.run_routine import runRoutine
+from mvesuvio.util import handle_config
 
 
 def run(yes_to_all=False):
@@ -21,7 +21,7 @@ def run(yes_to_all=False):
     yFitIC = ai.YSpaceFitInitialConditions
     userCtr = ai.UserScriptControls
 
-    runScript(
+    runRoutine(
         userCtr,
         wsBackIC,
         wsFrontIC,
