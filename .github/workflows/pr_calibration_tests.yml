@@ -1,0 +1,49 @@
+name: mvesuvio pull request workflow
+
+on: 
+  push:
+    paths:
+      - 'tools/calibration_scripts/**'
+
+jobs:
+
+  test:
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Set up conda environnment
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2.2.0
+        with:
+          miniforge-version: latest
+          miniforge-variant: Mambaforge
+          activate-environment: vesuvio-env
+          environment-file: environment.yml
+          auto-activate-base: false
+
+      - name: Flake8
+        run: python -m flake8 --config=config.flake8
+
+      # Remove `export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties` when updated to mantid > 6.8.0
+      - name: Install mvesuvio package
+        run: pip install .
+
+      - name: Run mvesuvio Calibration Unit Tests
+        run: |
+          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
+          python -m unittest discover -s ./tests/calibration/unit
+
+      - name: Run Vesuvio Calibration System Tests
+        run: |
+          python -m unittest discover -s ./tests/calibration/system
+
+      # Report coverage
+      #- name: Report Coverage
+      #  run: coverage report

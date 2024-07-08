@@ -1,8 +1,12 @@
 name: mvesuvio pull request workflow
 
-on: push
+on: 
+  push:
+    paths:
+      - 'src/**'
 
 jobs:
+
   test:
     runs-on: self-hosted
     defaults:
@@ -41,15 +45,6 @@ jobs:
       - name: Run mvesuvio Analysis System Tests
         run: |
           python -m unittest discover -s ./tests/analysis/system
-
-      - name: Run mvesuvio Calibration Unit Tests
-        run: |
-          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
-          python -m unittest discover -s ./tests/calibration/unit
-
-      - name: Run Vesuvio Calibration System Tests
-        run: |
-          python -m unittest discover -s ./tests/calibration/system
 
       # Report coverage
       #- name: Report Coverage
