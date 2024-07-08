@@ -2,8 +2,7 @@ import numpy as np
 
 
 class LoadVesuvioBackParameters:
-    def __init__(self, ipFilesPath):
-        self.ipfile = ipFilesPath / "ip2019.par"
+    ipfile = "ip2019.par"
 
     runs = "43066-43076"  # 77K         # The numbers of the runs to be analysed
     empty_runs = (
@@ -17,8 +16,7 @@ class LoadVesuvioBackParameters:
 
 
 class LoadVesuvioFrontParameters:
-    def __init__(self, ipFilesPath):
-        self.ipfile = ipFilesPath / "ip2018_3.par"
+    ipfile = "ip2018_3.par"
 
     runs = "43066-43076"  # 100K        # The numbers of the runs to be analysed
     empty_runs = (
@@ -39,8 +37,7 @@ class GeneralInitialConditions:
 
 
 class BackwardInitialConditions(GeneralInitialConditions):
-    def __init__(self, ipFilesPath):
-        self.InstrParsPath = ipFilesPath / "ip2018_3.par"
+    ipfile = "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
     massIdx = 0

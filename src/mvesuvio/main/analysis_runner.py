@@ -14,9 +14,13 @@ def run(yes_to_all=False):
 
     start_time = time.time()
 
-    wsBackIC = ai.LoadVesuvioBackParameters(ipFilesPath)
-    wsFrontIC = ai.LoadVesuvioFrontParameters(ipFilesPath)
-    bckwdIC = ai.BackwardInitialConditions(ipFilesPath)
+    wsBackIC = ai.LoadVesuvioBackParameters
+    wsBackIC.ipfile = ipFilesPath / wsBackIC.ipfile
+    wsFrontIC = ai.LoadVesuvioFrontParameters
+    wsFrontIC.ipfile = ipFilesPath / wsFrontIC.ipfile
+    bckwdIC = ai.BackwardInitialConditions
+    bckwdIC.InstrParsPath = ipFilesPath / bckwdIC.ipfile 
+
     fwdIC = ai.ForwardInitialConditions
     yFitIC = ai.YSpaceFitInitialConditions
     userCtr = ai.UserScriptControls
