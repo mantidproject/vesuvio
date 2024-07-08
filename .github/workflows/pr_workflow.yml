@@ -33,21 +33,25 @@ jobs:
 
       # Runs Unit tests
       - name: Run mvesuvio Analysis Unit Tests
+        if: "contains(github.event.pull_request.changed_files, 'src/mvesuvio/**')"
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           python -m unittest discover -s ./tests/analysis/unit
 
       # Runs System tests
       - name: Run mvesuvio Analysis System Tests
+        if: "contains(github.event.pull_request.changed_files, 'src/mvesuvio/**')"
         run: |
           python -m unittest discover -s ./tests/analysis/system
 
       - name: Run mvesuvio Calibration Unit Tests
+        if: "contains(github.event.pull_request.changed_files, 'tools/calibration_scripts/**')"
         run: |
           export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           python -m unittest discover -s ./tests/calibration/unit
 
       - name: Run Vesuvio Calibration System Tests
+        if: "contains(github.event.pull_request.changed_files, 'tools/calibration_scripts/**')"
         run: |
           python -m unittest discover -s ./tests/calibration/system
 
