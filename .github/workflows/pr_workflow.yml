@@ -16,19 +16,11 @@ jobs:
 
       - name: Check for analysis files changed 
         run: |
-          if git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/'; then
-            echo "analysis-changed=true" >> $GITHUB_ENV
-          else
-            echo "analysis-changed=false" >> $GITHUB_ENV
-          fi
+          echo "analysis-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/' && echo true || echo false)" >> $GITHUB_ENV
 
       - name: Check for calibration files changed 
         run: |
-          if git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/'; then
-            echo "calibration-changed=true" >> $GITHUB_ENV
-          else
-            echo "calibration-changed=false" >> $GITHUB_ENV
-          fi
+          echo "calibration-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/' && echo true || echo false)" >> $GITHUB_ENV
 
       # Set up conda environnment
       - name: Setup Miniconda
