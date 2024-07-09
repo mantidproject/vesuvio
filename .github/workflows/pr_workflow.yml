@@ -4,7 +4,7 @@ on: push
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash -l {0}
@@ -16,18 +16,16 @@ jobs:
           ref: main
 
       - name: Check for analysis files changed 
-        shell: bash
         run: |
           echo "analysis-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/' && echo true || echo false)" >> $GITHUB_ENV
 
       - name: Check for calibration files changed 
-        shell: bash
         run: |
           echo "calibration-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/' && echo true || echo false)" >> $GITHUB_ENV
 
       # Set up conda environnment
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.2.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
           miniforge-variant: Mambaforge
