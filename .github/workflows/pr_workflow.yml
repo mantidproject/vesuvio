@@ -16,10 +16,12 @@ jobs:
           ref: main
 
       - name: Check for analysis files changed 
+        shell: bash
         run: |
           echo "analysis-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/' && echo true || echo false)" >> $GITHUB_ENV
 
       - name: Check for calibration files changed 
+        shell: bash
         run: |
           echo "calibration-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/' && echo true || echo false)" >> $GITHUB_ENV
 
