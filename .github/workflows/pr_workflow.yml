@@ -14,14 +14,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for analysis files changed 
-        run: |
-          echo "analysis-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/' && echo true || echo false)" >> $GITHUB_ENV
-
-      - name: Check for calibration files changed 
-        run: |
-          echo "calibration-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/' && echo true || echo false)" >> $GITHUB_ENV
-
       # Set up conda environnment
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v2.2.0
@@ -38,6 +30,14 @@ jobs:
       # Remove `export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties` when updated to mantid > 6.8.0
       - name: Install mvesuvio package
         run: pip install .
+
+      - name: Check for analysis files changed 
+        run: |
+          echo "analysis-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^src/' && echo true || echo false)" >> $GITHUB_ENV
+
+      - name: Check for calibration files changed 
+        run: |
+          echo "calibration-changed=$(git diff --name-only ${{ github.sha }} ${{ github.event.before }} | grep -q '^tools/calibration_scripts/' && echo true || echo false)" >> $GITHUB_ENV
 
       # Runs Unit tests
       - name: Run mvesuvio Analysis Unit Tests
