@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mantid.simpleapi import *
 from scipy import optimize
-
 from .analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 
 # Format print output of arrays
