@@ -4,7 +4,7 @@ on: push
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest 
     defaults:
       run:
         shell: bash -l {0}
@@ -16,7 +16,7 @@ jobs:
 
       # Set up conda environnment
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2.2.0
+        uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
           miniforge-variant: Mambaforge
@@ -27,27 +27,37 @@ jobs:
       - name: Flake8
         run: python -m flake8 --config=config.flake8
 
-      # Remove `export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties` when updated to mantid > 6.8.0
+      - name: Install Git 
+        run: mamba install -y git
+
       - name: Install mvesuvio package
         run: pip install .
 
-      # Runs Unit tests
-      - name: Run mvesuvio Analysis Unit Tests
+      - name: Check for analysis files changed 
         run: |
-          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
+          echo "analysis-changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q '^src/' && echo true || echo false)" >> $GITHUB_ENV
+
+      - name: Check for calibration files changed 
+        run: |
+          echo "calibration-changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q '^tools/calibration_scripts/' && echo true || echo false)" >> $GITHUB_ENV
+
+      - name: Run mvesuvio Analysis Unit Tests
+        if: ${{ env.analysis-changed == 'true'}}
+        run: |
           python -m unittest discover -s ./tests/analysis/unit
 
-      # Runs System tests
       - name: Run mvesuvio Analysis System Tests
+        if: ${{ env.analysis-changed == 'true'}}
         run: |
           python -m unittest discover -s ./tests/analysis/system
 
       - name: Run mvesuvio Calibration Unit Tests
+        if: ${{ env.calibration-changed == 'true'}}
         run: |
-          export MANTIDPROPERTIES=$(pwd)/Mantid.user.properties
           python -m unittest discover -s ./tests/calibration/unit
 
       - name: Run Vesuvio Calibration System Tests
+        if: ${{ env.calibration-changed == 'true'}}
         run: |
           python -m unittest discover -s ./tests/calibration/system
 
