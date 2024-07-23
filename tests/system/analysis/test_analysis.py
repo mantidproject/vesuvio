@@ -17,7 +17,6 @@ mvesuvio.set_config(
     ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
     inputs_file=str(Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py")
 )
-
 ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
 
