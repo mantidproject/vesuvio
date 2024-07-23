@@ -4,7 +4,7 @@ import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.run_routine import runRoutine
 from mvesuvio.util import handle_config
-from tests.analysis.data.inputs.sample_test import (
+from tests.data.analysis.inputs.sample_test import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,

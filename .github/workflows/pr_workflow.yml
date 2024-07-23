@@ -44,22 +44,22 @@ jobs:
       - name: Run mvesuvio Analysis Unit Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/analysis/unit
+          python -m unittest discover -s ./tests/unit/analysis
 
       - name: Run mvesuvio Analysis System Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/analysis/system
+          python -m unittest discover -s ./tests/system/analysis
 
       - name: Run mvesuvio Calibration Unit Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/calibration/unit
+          python -m unittest discover -s ./tests/unit/calibration
 
       - name: Run Vesuvio Calibration System Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/calibration/system
+          python -m unittest discover -s ./tests/system/calibration
 
       # Report coverage
       #- name: Report Coverage

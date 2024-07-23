@@ -4,9 +4,9 @@ import numpy as np
 from mantid.api import AlgorithmFactory
 from mantid.simpleapi import mtd
 from mock import patch
-from tests.calibration.testhelpers.algorithms import create_algorithm
-from tests.calibration.testhelpers.system_test_base import EVSCalibrationTest, TestConstants
-from tests.calibration.testhelpers.system_test_misc_functions import assert_allclose_excluding_bad_detectors
+from tests.testhelpers.calibration.algorithms import create_algorithm
+from tests.testhelpers.calibration.system_test_base import EVSCalibrationTest, TestConstants
+from tests.testhelpers.calibration.system_test_misc_functions import assert_allclose_excluding_bad_detectors
 from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
 from tools.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
 from tools.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
@@ -23,8 +23,8 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
 
     def setUp(self):
-        test_directory = path.dirname(path.dirname(__file__))
-        self._parameter_file = path.join(test_directory, 'data', 'IP0005.par')
+        test_directory = path.dirname(path.dirname(path.dirname(__file__)))
+        self._parameter_file = path.join(test_directory, 'data', 'calibration', 'IP0005.par')
         self._calibrated_params = self.load_ip_file()
         self._iterations = 1
         self._alg = None

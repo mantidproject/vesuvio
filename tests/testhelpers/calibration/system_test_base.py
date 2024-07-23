@@ -138,32 +138,32 @@ class EVSCalibrationTest(unittest.TestCase):
 
     def _load_file_vesuvio(self, sample_no, output_name):
         print("Attempting LoadVesuvio")
-        test_directory = path.dirname(path.dirname(__file__))
+        test_directory = path.dirname(path.dirname(path.dirname(__file__)))
         try:
             prefix = 'EVS'
-            filename = str(path.join(test_directory, 'data', f'{prefix}{sample_no}.raw'))
+            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
             LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
                         SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
                         EnableLogging=False)
         except RuntimeError:
             prefix = 'VESUVIO000'
-            filename = str(path.join(test_directory, 'data', f'{prefix}{sample_no}.raw'))
+            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
             LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
                         SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
                         EnableLogging=False)
 
     def _load_file_raw(self, sample_no, output_name):
         print("Attempting LoadRaw")
-        test_directory = path.dirname(path.dirname(__file__))
+        test_directory = path.dirname(path.dirname(path.dirname(__file__)))
         try:
             prefix = 'EVS'
-            filename = str(path.join(test_directory, 'data', f'{prefix}{sample_no}.raw'))
+            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
             LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=self._selected_spec_range[0],
                     SpectrumMax=self._selected_spec_range[-1], EnableLogging=False)
         except RuntimeError as err:
             print(err)
             prefix = 'VESUVIO000'
-            filename = str(path.join(test_directory, 'data', f'{prefix}{sample_no}.raw'))
+            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
             LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=self._selected_spec_range[0],
                     SpectrumMax=self._selected_spec_range[-1], EnableLogging=False)
         ConvertToDistribution(output_name, EnableLogging=False)

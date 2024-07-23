@@ -6,7 +6,7 @@ import numpy as np
 import unittest
 import numpy.testing as nptest
 from mvesuvio.util import handle_config
-from tests.analysis.data.inputs.sample_test import (
+from tests.data.analysis.inputs.sample_test import (
     LoadVesuvioBackParameters,
     LoadVesuvioFrontParameters,
     BackwardInitialConditions,
