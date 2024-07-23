@@ -16,7 +16,7 @@ from tests.data.analysis.inputs.sample_test import (
 import mvesuvio
 mvesuvio.set_config(
     ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-    inputs_file=str(Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py")
+    inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "sample_test.py")
 )
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
@@ -45,8 +45,8 @@ yFitIC.fitModel = "SINGLE_GAUSSIAN"
 class AnalysisRunner:
     _benchmarkResults = None
     _currentResults = None
-    _input_data_path = Path(__file__).absolute().parent.parent / "data" / "inputs"
-    _benchmark_path = Path(__file__).absolute().parent.parent / "data" / "benchmark"
+    _input_data_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs"
+    _benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark"
     _workspaces_loaded = False
 
     @classmethod

@@ -15,7 +15,7 @@ from tests.data.analysis.inputs.sample_test import (
 import mvesuvio
 mvesuvio.set_config(
     ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-    inputs_file=str(Path(__file__).absolute().parent.parent / "data" / "inputs" / "sample_test.py")
+    inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "sample_test.py")
 )
 ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
@@ -58,7 +58,7 @@ class AnalysisRunner:
 
     @classmethod
     def _load_benchmark_results(cls):
-        benchmarkPath = Path(__file__).absolute().parent.parent / "data" / "benchmark"
+        benchmarkPath = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark"
         benchmarkResults = np.load(
             str(benchmarkPath / "stored_spec_144-182_iter_3_GC_MS.npz")
         )
