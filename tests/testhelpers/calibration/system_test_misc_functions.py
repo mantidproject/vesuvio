@@ -1,6 +1,6 @@
 import numpy as np
 from sys import maxsize
-from tests.calibration.testhelpers.system_test_base import TestConstants
+from tests.testhelpers.calibration.system_test_base import TestConstants
 
 
 def assert_allclose_excluding_bad_detectors(expected_position, position, rtol, default_rtol=TestConstants.DEFAULT_RELATIVE_TOLERANCE):

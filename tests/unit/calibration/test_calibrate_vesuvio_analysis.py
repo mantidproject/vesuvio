@@ -1,5 +1,3 @@
-from tools.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationAnalysis
-
 import unittest
 
 
