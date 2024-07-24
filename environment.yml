@@ -9,7 +9,7 @@ dependencies:
   - flake8
   - conda-wrappers
   - pre-commit==2.15 #review this
-  - coverage
+  - coveralls
   - mantid
   - matplotlib
   - iminuit
@@ -17,3 +17,4 @@ dependencies:
   - mock
   - pytest
   - jacobi==0.4.2 #pinned until newer versions functionality confirmed
+  - coverage
