@@ -1,6 +1,6 @@
 # Mantid VESUVIO
 
-[![Coverage Status](https://coveralls.io/repos/github/mantidproject/vesuvio/badge.svg?branch=add-coverage-tests)](https://coveralls.io/github/mantidproject/vesuvio?branch=add-coverage-tests)
+[![Coverage Status](https://coveralls.io/repos/github/mantidproject/vesuvio/badge.svg?branch=main)](https://coveralls.io/github/mantidproject/vesuvio?branch=main)
 
 This repository contains:
 - `mvesuvio` package containing the Optimized NCP analysis procedures, published nightly.
