@@ -58,7 +58,7 @@ pythonpath = [
 testpaths = ["tests"]
 filterwarnings = ["error"]
 
-[tool.coverage.report]
+[tool.coverage.run]
 include = [
     "*/src/mvesuvio/*",
     "*/tools/calibration_scripts/*"
@@ -70,6 +70,7 @@ omit = [
     "*legacy*"
 ]
 
+[tool.coverage.report]
 fail_under = 0
 show_missing = true
 skip_empty = true

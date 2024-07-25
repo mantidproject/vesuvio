@@ -60,7 +60,3 @@ jobs:
         if: ${{ env.calibration-changed == 'true'}}
         run: |
           python -m unittest discover -s ./tests/system/calibration
-
-      # Report coverage
-      #- name: Report Coverage
-      #  run: coverage report
