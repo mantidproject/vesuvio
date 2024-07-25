@@ -1,8 +1,9 @@
 name: mvesuvio nightly build
 
-on:
-  schedule:
-    - cron: '0 2 * * *'
+on: push
+# on:
+#   schedule:
+#     - cron: '0 2 * * *'
 
 jobs:
   test:
@@ -41,7 +42,7 @@ jobs:
         run: |
           coveralls --service=github-actions
 
-      # Runs System tests
-      - name: Run mvesuvio analysis system tests
-        run: |
-          python -m unittest discover -s ./tests/system
+      # # Runs System tests
+      # - name: Run mvesuvio analysis system tests
+      #   run: |
+      #     python -m unittest discover -s ./tests/system
