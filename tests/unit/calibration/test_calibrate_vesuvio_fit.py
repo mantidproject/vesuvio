@@ -18,10 +18,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
     @staticmethod
     def setup_mtd_mock(mock_obj, mock_dict):
-        d = {}
-        for key, return_obj in mock_dict.items():
-            d[key] = return_obj
-            mock_obj.__getitem__.side_effect = d.__getitem__
+        mock_obj.__getitem__.side_effect = mock_dict.__getitem__
 
     def side_effect_set_cell(self, arg1, arg2, value):
         self.set_cell_list.append((arg1, arg2, value))
