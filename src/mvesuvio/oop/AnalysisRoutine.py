@@ -3,7 +3,9 @@ from mvesuvio.oop.analysis_helpers import extractWS, histToPointData, loadConsta
                                             gaussian, lorentizian, numericalThirdDerivative, \
                                             switchFirstTwoAxis, createWS
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, MaskDetectors, SumSpectra, \
-                            CloneWorkspace
+                            CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
+                            VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
+                            VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces
 from mvesuvio.analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 import numpy as np 
 from scipy import optimize
@@ -12,8 +14,9 @@ import sys
 class AnalysisRoutine:
 
     def __init__(self, workspace, ip_file, number_of_iterations, mask_spectra,
-                 multiple_scattering_correction, gamma_correction,
-                 transmission_guess=None, multiple_scattering_order=None, number_of_events=None):
+                 multiple_scattering_correction, vertical_width, horizontal_width, thickness,
+                 gamma_correction, transmission_guess=None, multiple_scattering_order=None, 
+                 number_of_events=None, results_path=None):
 
         self._workspace_to_fit = workspace
         self._name = workspace.name()
@@ -26,9 +29,14 @@ class AnalysisRoutine:
         self._transmission_guess = transmission_guess
         self._multiple_scattering_order = multiple_scattering_order
         self._number_of_events = number_of_events
+        self._vertical_width = vertical_width
+        self._horizontal_width = horizontal_width
+        self._thickness = thickness
 
         self._multiple_scattering_correction = multiple_scattering_correction
         self._gamma_correction = gamma_correction
+
+        self._save_results_path = results_path
 
         self._h_ratio = None
         self._constraints = [] 
@@ -151,33 +159,34 @@ class AnalysisRoutine:
             # Replace zero columns (bins) with ncp total fit
             # If ws has no zero column, then remains unchanged
             if iteration == 0:
-                wsNCPM = replaceZerosWithNCP(mtd[ic.name], ncpTotal)
+                wsNCPM = replaceZerosWithNCP(mtd[self._name], ncpTotal)
 
-            CloneWorkspace(InputWorkspace=ic.name, OutputWorkspace="tmpNameWs")
+            CloneWorkspace(InputWorkspace=self._name, OutputWorkspace="tmpNameWs")
 
-            if ic.GammaCorrectionFlag:
-                wsGC = createWorkspacesForGammaCorrection(ic, mWidths, mIntRatios, wsNCPM)
+            if self._gamma_correction:
+                wsGC = self.createWorkspacesForGammaCorrection(mWidths, mIntRatios, wsNCPM)
                 Minus(
                     LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs"
                 )
 
-            if ic.MSCorrectionFlag:
-                wsMS = createWorkspacesForMSCorrection(ic, mWidths, mIntRatios, wsNCPM)
+            if self._multiple_scattering_correction:
+                wsMS = self.createWorkspacesForMSCorrection(mWidths, mIntRatios, wsNCPM)
                 Minus(
                     LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs"
                 )
 
-            remaskValues(ic.name, "tmpNameWS")  # Masks cols in the same place as in ic.name
+            self.remaskValues(self._name, "tmpNameWS")  # Masks cols in the same place as in ic.name
             RenameWorkspace(
-                InputWorkspace="tmpNameWs", OutputWorkspace=ic.name + str(iteration + 1)
+                InputWorkspace="tmpNameWs", OutputWorkspace=self._name + str(iteration + 1)
             )
 
-        wsFinal = mtd[ic.name + str(ic.noOfMSIterations)]
-        fittingResults = resultsObject(ic)
-        fittingResults.save()
-        return wsFinal, fittingResults
+        wsFinal = mtd[self._name + str(self._number_of_iterations)]
+        self._create_results_mehtods()
+        self.save_results()
+        return wsFinal, self 
 
 
+    @staticmethod
     def remaskValues(wsName, wsToMaskName):
         """
         Uses the ws before the MS correction to look for masked columns or dataE
@@ -787,28 +796,26 @@ class AnalysisRoutine:
         return pseudo_voigt / norm
 
 
-    def createWorkspacesForMSCorrection(ic, meanWidths, meanIntensityRatios, wsNCPM):
+    def createWorkspacesForMSCorrection(self, meanWidths, meanIntensityRatios, wsNCPM):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
 
-        createSlabGeometry(ic, wsNCPM)  # Sample properties for MS correction
+        self.createSlabGeometry(wsNCPM)  # Sample properties for MS correction
 
-        sampleProperties = calcMSCorrectionSampleProperties(
-            ic, meanWidths, meanIntensityRatios
-        )
+        sampleProperties = self.calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios)
         print(
             "\nThe sample properties for Multiple Scattering correction are:\n\n",
             sampleProperties,
             "\n",
         )
 
-        return createMulScatWorkspaces(ic, wsNCPM, sampleProperties)
+        return self.createMulScatWorkspaces(wsNCPM, sampleProperties)
 
 
-    def createSlabGeometry(ic, wsNCPM):
+    def createSlabGeometry(self, wsNCPM):
         half_height, half_width, half_thick = (
-            0.5 * ic.vertical_width,
-            0.5 * ic.horizontal_width,
-            0.5 * ic.thickness,
+            0.5 * self._vertical_width,
+            0.5 * self._horizontal_width,
+            0.5 * self._thickness,
         )
         xml_str = (
             ' <cuboid id="sample-shape"> '
@@ -826,16 +833,16 @@ class AnalysisRoutine:
         CreateSampleShape(wsNCPM, xml_str)
 
 
-    def calcMSCorrectionSampleProperties(ic, meanWidths, meanIntensityRatios):
-        masses = ic.masses.flatten()
+    def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
+        masses = self._masses.flatten()
 
         # If Backsscattering mode and H is present in the sample, add H to MS properties
-        if ic.modeRunning == "BACKWARD":
-            if ic.HToMassIdxRatio is not None:  # If H is present, ratio is a number
+        if self._mode_running == "BACKWARD":
+            if self._h_ratio is not None:  # If H is present, ratio is a number
                 masses = np.append(masses, 1.0079)
                 meanWidths = np.append(meanWidths, 5.0)
 
-                HIntensity = ic.HToMassIdxRatio * meanIntensityRatios[ic.massIdx]
+                HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(self._masses)]
                 meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
                 meanIntensityRatios /= np.sum(meanIntensityRatios)
 
@@ -848,7 +855,7 @@ class AnalysisRoutine:
         return sampleProperties
 
 
-    def createMulScatWorkspaces(ic, ws, sampleProperties):
+    def createMulScatWorkspaces(self, ws, sampleProperties):
         """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
 
         print("\nEvaluating the Multiple Scattering Correction...\n")
@@ -860,7 +867,7 @@ class AnalysisRoutine:
         dens, trans = VesuvioThickness(
             Masses=MS_masses,
             Amplitudes=MS_amplitudes,
-            TransmissionGuess=ic.transmission_guess,
+            TransmissionGuess=self._transmission_guess,
             Thickness=0.1,
         )
 
@@ -870,8 +877,8 @@ class AnalysisRoutine:
             SampleDensity=dens.cell(9, 1),
             AtomicProperties=sampleProperties,
             BeamRadius=2.5,
-            NumScatters=ic.multiple_scattering_order,
-            NumEventsPerRun=int(ic.number_of_events),
+            NumScatters=self._multiple_scattering_order,
+            NumEventsPerRun=int(self._number_of_events),
         )
 
         data_normalisation = Integration(ws)
@@ -897,12 +904,12 @@ class AnalysisRoutine:
         return mtd[ws.name() + "_MulScattering"]
 
 
-    def createWorkspacesForGammaCorrection(ic, meanWidths, meanIntensityRatios, wsNCPM):
+    def createWorkspacesForGammaCorrection(self, meanWidths, meanIntensityRatios, wsNCPM):
         """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
         inputWS = wsNCPM.name()
 
-        profiles = calcGammaCorrectionProfiles(ic.masses, meanWidths, meanIntensityRatios)
+        profiles = self.calcGammaCorrectionProfiles(meanWidths, meanIntensityRatios)
 
         # Approach below not currently suitable for current versions of Mantid, but will be in the future
         # background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
@@ -933,8 +940,8 @@ class AnalysisRoutine:
         return mtd[inputWS + "_Gamma_Background"]
 
 
-    def calcGammaCorrectionProfiles(masses, meanWidths, meanIntensityRatios):
-        masses = masses.flatten()
+    def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
+        masses = self._masses.flatten()
         profiles = ""
         for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
             profiles += (
@@ -950,99 +957,96 @@ class AnalysisRoutine:
         return profiles
 
 
-    class resultsObject:
+    def _create_results_mehtods(self):
         """Used to collect results from workspaces and store them in .npz files for testing."""
 
-        def __init__(self, ic):
-            allIterNcp = []
-            allFitWs = []
-            allTotNcp = []
-            allBestPar = []
-            allMeanWidhts = []
-            allMeanIntensities = []
-            allStdWidths = []
-            allStdIntensities = []
-            j = 0
-            while True:
-                try:
-                    wsIterName = ic.name + str(j)
+        allIterNcp = []
+        allFitWs = []
+        allTotNcp = []
+        allBestPar = []
+        allMeanWidhts = []
+        allMeanIntensities = []
+        allStdWidths = []
+        allStdIntensities = []
+        j = 0
+        while True:
+            try:
+                wsIterName = self._name + str(j)
 
-                    # Extract ws that were fitted
-                    ws = mtd[wsIterName]
-                    allFitWs.append(ws.extractY())
+                # Extract ws that were fitted
+                ws = mtd[wsIterName]
+                allFitWs.append(ws.extractY())
 
-                    # Extract total ncp
-                    totNcpWs = mtd[wsIterName + "_TOF_Fitted_Profiles"]
-                    allTotNcp.append(totNcpWs.extractY())
+                # Extract total ncp
+                totNcpWs = mtd[wsIterName + "_TOF_Fitted_Profiles"]
+                allTotNcp.append(totNcpWs.extractY())
 
-                    # Extract best fit parameters
-                    fitParTable = mtd[wsIterName + "_Best_Fit_NCP_Parameters"]
-                    bestFitPars = []
-                    for key in fitParTable.keys():
-                        bestFitPars.append(fitParTable.column(key))
-                    allBestPar.append(np.array(bestFitPars).T)
+                # Extract best fit parameters
+                fitParTable = mtd[wsIterName + "_Best_Fit_NCP_Parameters"]
+                bestFitPars = []
+                for key in fitParTable.keys():
+                    bestFitPars.append(fitParTable.column(key))
+                allBestPar.append(np.array(bestFitPars).T)
 
-                    # Extract individual ncp
-                    allNCP = []
-                    i = 0
-                    while True:  # By default, looks for all ncp ws until it breaks
-                        try:
-                            ncpWsToAppend = mtd[
-                                wsIterName + "_TOF_Fitted_Profile_" + str(i)
-                            ]
-                            allNCP.append(ncpWsToAppend.extractY())
-                            i += 1
-                        except KeyError:
-                            break
-                    allNCP = switchFirstTwoAxis(np.array(allNCP))
-                    allIterNcp.append(allNCP)
+                # Extract individual ncp
+                allNCP = []
+                i = 0
+                while True:  # By default, looks for all ncp ws until it breaks
+                    try:
+                        ncpWsToAppend = mtd[
+                            wsIterName + "_TOF_Fitted_Profile_" + str(i)
+                        ]
+                        allNCP.append(ncpWsToAppend.extractY())
+                        i += 1
+                    except KeyError:
+                        break
+                allNCP = switchFirstTwoAxis(np.array(allNCP))
+                allIterNcp.append(allNCP)
 
-                    # Extract Mean and Std Widths, Intensities
-                    meansTable = mtd[wsIterName + "_Mean_Widths_And_Intensities"]
-                    allMeanWidhts.append(meansTable.column("Mean Widths"))
-                    allStdWidths.append(meansTable.column("Std Widths"))
-                    allMeanIntensities.append(meansTable.column("Mean Intensities"))
-                    allStdIntensities.append(meansTable.column("Std Intensities"))
+                # Extract Mean and Std Widths, Intensities
+                meansTable = mtd[wsIterName + "_Mean_Widths_And_Intensities"]
+                allMeanWidhts.append(meansTable.column("Mean Widths"))
+                allStdWidths.append(meansTable.column("Std Widths"))
+                allMeanIntensities.append(meansTable.column("Mean Intensities"))
+                allStdIntensities.append(meansTable.column("Std Intensities"))
 
-                    j += 1
-                except KeyError:
-                    break
+                j += 1
+            except KeyError:
+                break
 
-            self.all_fit_workspaces = np.array(allFitWs)
-            self.all_spec_best_par_chi_nit = np.array(allBestPar)
-            self.all_tot_ncp = np.array(allTotNcp)
-            self.all_ncp_for_each_mass = np.array(allIterNcp)
+        self.all_fit_workspaces = np.array(allFitWs)
+        self.all_spec_best_par_chi_nit = np.array(allBestPar)
+        self.all_tot_ncp = np.array(allTotNcp)
+        self.all_ncp_for_each_mass = np.array(allIterNcp)
 
-            self.all_mean_widths = np.array(allMeanWidhts)
-            self.all_mean_intensities = np.array(allMeanIntensities)
-            self.all_std_widths = np.array(allStdWidths)
-            self.all_std_intensities = np.array(allStdIntensities)
+        self.all_mean_widths = np.array(allMeanWidhts)
+        self.all_mean_intensities = np.array(allMeanIntensities)
+        self.all_std_widths = np.array(allStdWidths)
+        self.all_std_intensities = np.array(allStdIntensities)
 
-            # Pass all attributes of ic into attributes to be used whithin this object
-            self.maskedDetectorIdx = ic.maskedDetectorIdx
-            self.masses = ic.masses
-            self.noOfMasses = ic.noOfMasses
-            self.resultsSavePath = ic.resultsSavePath
+    def save_results(self):
+        """Saves all of the arrays stored in this object"""
 
-        def save(self):
-            """Saves all of the arrays stored in this object"""
+        maskedDetectorIdx = np.array(self._mask_spectra) - self._firstSpec
 
-            # TODO: Take out nans next time when running original results
-            # Because original results were recently saved with nans, mask spectra with nans
-            self.all_spec_best_par_chi_nit[:, self.maskedDetectorIdx, :] = np.nan
-            self.all_ncp_for_each_mass[:, self.maskedDetectorIdx, :, :] = np.nan
-            self.all_tot_ncp[:, self.maskedDetectorIdx, :] = np.nan
+        # TODO: Take out nans next time when running original results
+        # Because original results were recently saved with nans, mask spectra with nans
+        self.all_spec_best_par_chi_nit[:, maskedDetectorIdx, :] = np.nan
+        self.all_ncp_for_each_mass[:, maskedDetectorIdx, :, :] = np.nan
+        self.all_tot_ncp[:, maskedDetectorIdx, :] = np.nan
 
-            savePath = self.resultsSavePath
-            np.savez(
-                savePath,
-                all_fit_workspaces=self.all_fit_workspaces,
-                all_spec_best_par_chi_nit=self.all_spec_best_par_chi_nit,
-                all_mean_widths=self.all_mean_widths,
-                all_mean_intensities=self.all_mean_intensities,
-                all_std_widths=self.all_std_widths,
-                all_std_intensities=self.all_std_intensities,
-                all_tot_ncp=self.all_tot_ncp,
-                all_ncp_for_each_mass=self.all_ncp_for_each_mass,
-            )
+        if not self._save_results_path:
+            return 
+
+        np.savez(
+            self._save_results_path,
+            all_fit_workspaces=self.all_fit_workspaces,
+            all_spec_best_par_chi_nit=self.all_spec_best_par_chi_nit,
+            all_mean_widths=self.all_mean_widths,
+            all_mean_intensities=self.all_mean_intensities,
+            all_std_widths=self.all_std_widths,
+            all_std_intensities=self.all_std_intensities,
+            all_tot_ncp=self.all_tot_ncp,
+            all_ncp_for_each_mass=self.all_ncp_for_each_mass,
+        )
 

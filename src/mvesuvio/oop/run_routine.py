@@ -27,6 +27,7 @@ def run_analysis():
                          number_of_iterations=0,
                          mask_spectra=[173, 174, 179],
                          multiple_scattering_correction=False,
+                         vertical_width=0.1, horizontal_width=0.1, thickness=0.001,
                          gamma_correction=False)
         
     H = NeutronComptonProfile('H', mass=1.0079, intensity=1, width=4.7, center=0,
