@@ -2,22 +2,27 @@ from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile
 from mvesuvio.oop.analysis_helpers import extractWS, histToPointData, loadConstants, \
                                             gaussian, lorentizian, numericalThirdDerivative, \
                                             switchFirstTwoAxis, createWS
-from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, MaskDetectors, SumSpectra
+from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, MaskDetectors, SumSpectra, \
+                            CloneWorkspace
+from mvesuvio.analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 import numpy as np 
 from scipy import optimize
+import sys
 
 class AnalysisRoutine:
 
-    def __init__(self, workspace, ip_file, number_of_iterations, spectrum_range, mask_spectra,
+    def __init__(self, workspace, ip_file, number_of_iterations, mask_spectra,
                  multiple_scattering_correction, gamma_correction,
-                 transmission_guess, multiple_scattering_order, number_of_events):
+                 transmission_guess=None, multiple_scattering_order=None, number_of_events=None):
 
         self._workspace_to_fit = workspace
+        self._name = workspace.name()
         self._ip_file = ip_file
         self._number_of_iterations = number_of_iterations
-        self._spectrum_range = spectrum_range
+        spectrum_list = workspace.getSpectrumNumbers()
+        self._firstSpec = min(spectrum_list)
+        self._lastSpec = max(spectrum_list)
         self._mask_spectra = mask_spectra
-        self._mask_detector_index = 
         self._transmission_guess = transmission_guess
         self._multiple_scattering_order = multiple_scattering_order
         self._number_of_events = number_of_events
@@ -29,41 +34,16 @@ class AnalysisRoutine:
         self._constraints = [] 
         self._profiles = {} 
 
-        self._masses = [p.mass for p in self._profiles]
-
         # Only used for system tests, remove once tests are updated
-        self._run_hist_data = True
+        self._run_hist_data = False #True
         self._run_norm_voigt = False
 
         # Links to another AnalysisRoutine object:
         self._profiles_destination = None
         self._h_ratio_destination = None
 
-        # Variables used during fitting
 
-        self._dataX, self._dataY, self._dataE = extractWS(self._workspace_to_fit)
-        resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = self.prepareFitArgs(self._dataX)
-        self._resolution_params = resolutionPars
-        self._instrument_params = instrPars
-        self._kinematic_arrays = kinematicArrays
-        self._y_space_arrays = ySpacesForEachMass
-
-        self._initial_fit_parameters = []
-        for p in self._profiles:
-            self._initial_fit_parameters.append(p.intensity)
-            self._initial_fit_parameters.append(p.width)
-            self._initial_fit_parameters.append(p.center)
-
-        self._intensities = np.array([p.intensity for p in self._profiles])[:, np.newaxis]
-        self._widths = np.array([p.width for p in self._profiles])[:, np.newaxis]
-        self._centesr = np.array([p.center for p in self._profiles])[:, np.newaxis]
-        self._fit_parameters = np.zeros((len(self._dataY), 3 * len(self._profiles) + 3))
-
-        self._fig_save_path = None
-        
-
-
-    def add_profiles(self, **args: NeutronComptonProfile):
+    def add_profiles(self, *args: NeutronComptonProfile):
         for profile in args:
             self._profiles[profile.label] = profile
 
@@ -103,7 +83,39 @@ class AnalysisRoutine:
         self._profiles = {**self._profiles, **common_keys_profiles}
 
 
+    def _preprocess(self):
+        # Set up variables used during fitting
+        self._masses = np.array([p.mass for p in self._profiles.values()])
+        self._dataX, self._dataY, self._dataE = extractWS(self._workspace_to_fit)
+        resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = self.prepareFitArgs()
+        self._resolution_params = resolutionPars
+        self._instrument_params = instrPars
+        self._kinematic_arrays = kinematicArrays
+        self._y_space_arrays = ySpacesForEachMass
+
+        self._initial_fit_parameters = []
+        self._bounds = []
+        for p in self._profiles.values():
+            self._initial_fit_parameters.append(p.intensity)
+            self._initial_fit_parameters.append(p.width)
+            self._initial_fit_parameters.append(p.center)
+            self._bounds.append(p._intensity_bounds)
+            self._bounds.append(p._width_bounds)
+            self._bounds.append(p._center_bounds)
+
+        # self._intensities = np.array([p.intensity for p in self._profiles.values()])[:, np.newaxis]
+        # self._widths = np.array([p.width for p in self._profiles.values()])[:, np.newaxis]
+        # self._centers = np.array([p.center for p in self._profiles.values()])[:, np.newaxis]
+        self._fit_parameters = np.zeros((len(self._dataY), 3 * len(self._profiles) + 3))
+
+        self._fig_save_path = None
+        
+
     def run(self):
+
+        assert len(self.profiles) > 0, "Add profiles before atempting to run the routine!"
+
+        self._preprocess()
 
         self.createTableInitialParameters()
 
@@ -186,12 +198,12 @@ class AnalysisRoutine:
 
 
     def createTableInitialParameters(self):
-        print("\nRUNNING ", self.modeRunning, " SCATTERING.\n")
-        if self.modeRunning == "BACKWARD":
-            print(f"\nH ratio to next lowest mass = {self._h_ratio}\n")
+        # print("\nRUNNING ", self.modeRunning, " SCATTERING.\n")
+        # if self.modeRunning == "BACKWARD":
+        #     print(f"\nH ratio to next lowest mass = {self._h_ratio}\n")
 
         meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self.name + "_Initial_Parameters"
+            OutputWorkspace=self._name + "_Initial_Parameters"
         )
         meansTableWS.addColumn(type="float", name="Mass")
         meansTableWS.addColumn(type="float", name="Initial Widths")
@@ -202,7 +214,7 @@ class AnalysisRoutine:
         meansTableWS.addColumn(type="str", name="Bounds Centers")
 
         print("\nCreated Table with Initial Parameters:")
-        for p in self._profiles:
+        for p in self._profiles.values():
             meansTableWS.addRow([p.mass, p.width, str(p.width_bounds), 
                                  p.intensity, str(p.intensity_bounds), 
                                  p.center, str(p.center_bounds)])
@@ -220,9 +232,8 @@ class AnalysisRoutine:
         on a spectrum by spectrum basis.
         """
 
-        if self._runHistData:  # Converts point data from workspaces to histogram data
+        if self._run_hist_data:  # Converts point data from workspaces to histogram data
             self._dataY, self._dataX, self._dataE = histToPointData(self._dataY, self._dataX, self._dataE)
-
 
         print("\nFitting NCP:\n")
 
@@ -240,16 +251,15 @@ class AnalysisRoutine:
         return ncpTotal
 
 
-    def prepareFitArgs(self, dataX):
-        instrPars = self.loadInstrParsFileIntoArray(self._ip_file, self._firstSpec, self._lastSpec)
+    def prepareFitArgs(self):
+        instrPars = self.loadInstrParsFileIntoArray()
         resolutionPars = self.loadResolutionPars(instrPars)
 
-        v0, E0, delta_E, delta_Q = self.calculateKinematicsArrays(dataX, instrPars)
+        v0, E0, delta_E, delta_Q = self.calculateKinematicsArrays(instrPars)
         kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
         ySpacesForEachMass = self.convertDataXToYSpacesForEachMass(
-            dataX, delta_Q, delta_E
+            self._dataX, delta_Q, delta_E
         )
-
         kinematicArrays = self.reshapeArrayPerSpectrum(kinematicArrays)
         ySpacesForEachMass = self.reshapeArrayPerSpectrum(ySpacesForEachMass)
         return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
@@ -285,9 +295,10 @@ class AnalysisRoutine:
         return resolutionPars
 
 
-    @staticmethod
-    def calculateKinematicsArrays(dataX, instrPars):
+    def calculateKinematicsArrays(self, instrPars):
         """Kinematics quantities calculated from TOF data"""
+
+        dataX = self._dataX
 
         mN, Ef, en_to_vel, vf, hbar = loadConstants()
         det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)  # each is of len(dataX)
@@ -338,11 +349,11 @@ class AnalysisRoutine:
     def fitNcpToArray(self):
         """Takes dataY as a 2D array and returns the 2D array best fit parameters."""
 
-        for index in range(len(self._dataY)):
+        for row in range(len(self._dataY)):
 
-            specFitPars = self.fitNcpToSingleSpec(index)
+            specFitPars = self.fitNcpToSingleSpec(row)
 
-            self._fit_parameters[index] = specFitPars
+            self._fit_parameters[row] = specFitPars
 
             if np.all(specFitPars == 0):
                 print("Skipped spectra.")
@@ -380,8 +391,8 @@ class AnalysisRoutine:
         """Calculates the matrix of NCP from matrix of best fit parameters"""
 
         allNcpForEachMass = []
-        for index in range(len(arrBestFitPars)):
-            ncpForEachMass = self.calculateNcpRow(arrBestFitPars[index], index)
+        for row in range(len(arrBestFitPars)):
+            ncpForEachMass = self.calculateNcpRow(arrBestFitPars[row], row)
 
             allNcpForEachMass.append(ncpForEachMass)
 
@@ -390,14 +401,15 @@ class AnalysisRoutine:
         return allNcpForEachMass, allNcpTotal
 
 
-    def calculateNcpRow(self, initPars, index):
+    def calculateNcpRow(self, initPars, row):
         """input: all row shape
         output: row shape with the ncpTotal for each mass"""
 
         if np.all(initPars == 0):
-            return np.zeros(self._y_space_arrays.shape)
+            # return np.zeros(self._y_space_arrays.shape)
+            return np.zeros_like(self._y_space_arrays[row])
 
-        ncpForEachMass, ncpTotal = self.calculateNcpSpec(initPars, index) 
+        ncpForEachMass, ncpTotal = self.calculateNcpSpec(initPars, row) 
         return ncpForEachMass
 
 
@@ -415,10 +427,13 @@ class AnalysisRoutine:
             ncpTotal.shape == dataX.shape
         ), "DataX and DataY in ws need to be the same shape."
 
-        ncpTotWS = createWS(
-            dataX, ncpTotal, np.zeros(dataX.shape), ws.name() + "_TOF_Fitted_Profiles"
-        )
-        MaskDetectors(Workspace=ncpTotWS, WorkspaceIndexList=ic.maskedDetectorIdx)
+        ncpTotWS = CloneWorkspace(InputWorkspace=ws.name(), OutputWorkspace=ws.name() + "_TOF_Fitted_Profiles")
+        passDataIntoWS(dataX, ncpTotal, np.zeros_like(dataX), ncpTotWS)
+        # ncpTotWS = createWS(
+        #     dataX, ncpTotal, np.zeros(dataX.shape), ws.name() + "_TOF_Fitted_Profiles"
+        # )
+        # MaskDetectors(Workspace=ncpTotWS, WorkspaceIndexList=ic.maskedDetectorIdx)
+        MaskDetectors(Workspace=ncpTotWS, SpectraList=self._mask_spectra)
         wsTotNCPSum = SumSpectra(
             InputWorkspace=ncpTotWS, OutputWorkspace=ncpTotWS.name() + "_Sum"
         )
@@ -426,13 +441,15 @@ class AnalysisRoutine:
         # Individual ncp workspaces
         wsMNCPSum = []
         for i, ncp_m in enumerate(ncpForEachMass):
-            ncpMWS = createWS(
-                dataX,
-                ncp_m,
-                np.zeros(dataX.shape),
-                ws.name() + "_TOF_Fitted_Profile_" + str(i),
-            )
-            MaskDetectors(Workspace=ncpMWS, WorkspaceIndexList=self._mask_detector_index)
+            ncpMWS =  CloneWorkspace(InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_" + str(i))
+            passDataIntoWS(dataX, ncp_m, np.zeros_like(dataX), ncpMWS)
+            # ncpMWS = createWS(
+            #     dataX,
+            #     ncp_m,
+            #     np.zeros(dataX.shape),
+            #     ws.name() + "_TOF_Fitted_Profile_" + str(i),
+            # )
+            MaskDetectors(Workspace=ncpMWS, SpectraList=self._mask_spectra)
             wsNCPSum = SumSpectra(
                 InputWorkspace=ncpMWS, OutputWorkspace=ncpMWS.name() + "_Sum"
             )
@@ -445,7 +462,7 @@ class AnalysisRoutine:
         # if IC.runningSampleWS:  # Skip saving figure if running bootstrap
         #     return
 
-        if ~self._fig_save_path:
+        if not self._fig_save_path:
             return
         lw = 2
 
@@ -472,7 +489,7 @@ class AnalysisRoutine:
         """Extract widths and intensities from tableWorkspace"""
 
         fitParsTable = mtd[wsName + "_Best_Fit_NCP_Parameters"]
-        widths = np.zeros(self._masses.size, fitParsTable.rowCount())
+        widths = np.zeros((self._masses.size, fitParsTable.rowCount()))
         intensities = np.zeros(widths.shape)
         for i in range(self._masses.size):
             widths[i] = fitParsTable.column(f"Width {i}")
@@ -581,17 +598,16 @@ class AnalysisRoutine:
         return betterWidths, betterIntensities
 
 
-    def fitNcpToSingleSpec(
-            self, index):
+    def fitNcpToSingleSpec(self, row):
         """Fits the NCP and returns the best fit parameters for one spectrum"""
 
-        if np.all(self._dataY == 0):
+        if np.all(self._dataY[row] == 0):
             return np.zeros(len(self._initial_fit_parameters) + 3)
 
         result = optimize.minimize(
             self.errorFunction,
             self._initial_fit_parameters,
-            args=(index),
+            args=(row),
             method="SLSQP",
             bounds=self._bounds,
             constraints=self._constraints,
@@ -599,42 +615,42 @@ class AnalysisRoutine:
         fitPars = result["x"]
 
         noDegreesOfFreedom = len(self._dataY) - len(fitPars)
-        specFitPars = np.append(self._instrument_params[0], fitPars)
+        specFitPars = np.append(self._instrument_params[row, 0], fitPars)
         return np.append(specFitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
 
 
-    def errorFunction(self, pars, index):
+    def errorFunction(self, pars, row):
         """Error function to be minimized, operates in TOF space"""
 
-        ncpForEachMass, ncpTotal = self.calculateNcpSpec(pars, index)
+        ncpForEachMass, ncpTotal = self.calculateNcpSpec(pars, row)
 
         # Ignore any masked values from Jackknife or masked tof range
-        zerosMask = self._dataY[index] == 0
+        zerosMask = self._dataY[row] == 0
         ncpTotal = ncpTotal[~zerosMask]
-        dataYf = self._dataY[index, ~zerosMask]
-        dataEf = self._dataE[index, ~zerosMask]
+        dataYf = self._dataY[row, ~zerosMask]
+        dataEf = self._dataE[row, ~zerosMask]
 
-        if np.all(self._dataE[index] == 0):  # When errors not present
+        if np.all(self._dataE[row] == 0):  # When errors not present
             return np.sum((ncpTotal - dataYf) ** 2)
 
         return np.sum((ncpTotal - dataYf) ** 2 / dataEf**2)
 
 
-    def calculateNcpSpec(self, pars, index):
+    def calculateNcpSpec(self, pars, row):
         """Creates a synthetic C(t) to be fitted to TOF values of a single spectrum, from J(y) and resolution functions
         Shapes: datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n),
         where n is no of bins"""
 
         masses, intensities, widths, centers = self.prepareArraysFromPars(pars)
-        v0, E0, deltaE, deltaQ = self._kinematic_arrays[index]
+        v0, E0, deltaE, deltaQ = self._kinematic_arrays[row]
 
-        gaussRes, lorzRes = self.caculateResolutionForEachMass(centers, index)
+        gaussRes, lorzRes = self.caculateResolutionForEachMass(centers, row)
         totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
 
-        JOfY = self.pseudoVoigt(self._y_space_arrays[index] - self._centers[index], totalGaussWidth, lorzRes)
+        JOfY = self.pseudoVoigt(self._y_space_arrays[row] - centers, totalGaussWidth, lorzRes)
 
         FSE = (
-            -numericalThirdDerivative(self._y_space_arrays[index], JOfY)
+            -numericalThirdDerivative(self._y_space_arrays[row], JOfY)
             * widths**4
             / deltaQ
             * 0.72
@@ -655,25 +671,24 @@ class AnalysisRoutine:
         return masses, intensities, widths, centers
 
 
-    def caculateResolutionForEachMass(self, centers, index):
+    def caculateResolutionForEachMass(self, centers, row):
         """Calculates the gaussian and lorentzian resolution
         output: two column vectors, each row corresponds to each mass"""
 
-        gaussianResWidth = self.calcGaussianResolution(centers, index)
-        lorentzianResWidth = self.calcLorentzianResolution(centers, index)
+        gaussianResWidth = self.calcGaussianResolution(centers, row)
+        lorentzianResWidth = self.calcLorentzianResolution(centers, row)
         return gaussianResWidth, lorentzianResWidth
 
 
-    @staticmethod
-    def kinematicsAtYCenters(self, centers, index):
+    def kinematicsAtYCenters(self, centers, row):
         """v0, E0, deltaE, deltaQ at the peak of the ncpTotal for each mass"""
 
         shapeOfArrays = centers.shape
-        proximityToYCenters = np.abs(self._y_space_arrays[index] - centers)
+        proximityToYCenters = np.abs(self._y_space_arrays[row] - centers)
         yClosestToCenters = proximityToYCenters.min(axis=1).reshape(shapeOfArrays)
         yCentersMask = proximityToYCenters == yClosestToCenters
 
-        v0, E0, deltaE, deltaQ = self._kinematic_arrays[index]
+        v0, E0, deltaE, deltaQ = self._kinematic_arrays[row]
 
         # Expand arrays to match shape of yCentersMask
         v0 = v0 * np.ones(shapeOfArrays)
@@ -688,11 +703,11 @@ class AnalysisRoutine:
         return v0, E0, deltaE, deltaQ
 
 
-    def calcGaussianResolution(self, centers, index):
+    def calcGaussianResolution(self, centers, row):
         masses = self._masses.reshape((self._masses.size, 1))
-        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers, index)
-        det, plick, angle, T0, L0, L1 = self._instrument_params[index]
-        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[index]
+        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers, row)
+        det, plick, angle, T0, L0, L1 = self._instrument_params[row]
+        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[row]
         mN, Ef, en_to_vel, vf, hbar = loadConstants()
 
         angle = angle * np.pi / 180
@@ -734,11 +749,11 @@ class AnalysisRoutine:
         return gaussianResWidth
 
 
-    def calcLorentzianResolution(self, centers, index):
+    def calcLorentzianResolution(self, centers, row):
         masses = self._masses.reshape((self._masses.size, 1))
-        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers, index)
-        det, plick, angle, T0, L0, L1 = self._instrument_params[index]
-        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[index]
+        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers, row)
+        det, plick, angle, T0, L0, L1 = self._instrument_params[row]
+        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[row]
         mN, Ef, en_to_vel, vf, hbar = loadConstants()
 
         angle = angle * np.pi / 180
@@ -767,7 +782,7 @@ class AnalysisRoutine:
         pseudo_voigt = eta * lorentizian(x, gamma_v) + (1.0 - eta) * gaussian(x, sigma_v)
 
         norm = (
-            np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if self._normVoigt else 1
+            np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if self._run_norm_voigt else 1
         )
         return pseudo_voigt / norm
 

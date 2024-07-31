@@ -59,7 +59,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
     return wsToBeFitted
 
 
-def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectorIdx, maskTOFRange):
+def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectors, maskTOFRange):
     """Returns cloned and cropped workspace with modified name"""
     # Read initial Spectrum number
     wsFirstSpec = ws.getSpectrumNumbers()[0]
@@ -80,7 +80,7 @@ def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectorIdx, maskTOFRang
 
     maskBinsWithZeros(wsCrop, maskTOFRange)  # Used to mask resonance peaks
 
-    MaskDetectors(Workspace=wsCrop, WorkspaceIndexList=maskedDetectorIdx)
+    MaskDetectors(Workspace=wsCrop, SpectraList=maskedDetectors)
     return wsCrop
 
 

@@ -3,7 +3,7 @@
 
 class NeutronComptonProfile:
 
-    def __init__(self, mass, label, intensity, width, center,
+    def __init__(self, label, mass, intensity, width, center,
                  intensity_bounds, width_bounds, center_bounds):
         self._mass = mass 
         self._label = label 
@@ -12,7 +12,7 @@ class NeutronComptonProfile:
         self._center = center
         self._intensity_bounds = intensity_bounds
         self._width_bounds = width_bounds
-        self.center_bounds = center_bounds 
+        self._center_bounds = center_bounds 
 
     @property
     def label(self):
