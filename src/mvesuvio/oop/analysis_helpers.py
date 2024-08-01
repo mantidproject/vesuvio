@@ -180,12 +180,13 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def createWS(dataX, dataY, dataE, wsName):
+def createWS(dataX, dataY, dataE, wsName, parentWorkspace=None):
     ws = CreateWorkspace(
         DataX=dataX.flatten(),
         DataY=dataY.flatten(),
         DataE=dataE.flatten(),
         Nspec=len(dataY),
         OutputWorkspace=wsName,
+        ParentWorkspace=parentWorkspace
     )
     return ws

@@ -15,10 +15,10 @@ class AnalysisRoutine:
 
     def __init__(self, workspace, ip_file, number_of_iterations, mask_spectra,
                  multiple_scattering_correction, vertical_width, horizontal_width, thickness,
-                 gamma_correction, transmission_guess=None, multiple_scattering_order=None, 
+                 gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
                  number_of_events=None, results_path=None):
 
-        self._workspace_to_fit = workspace
+        self._workspace_being_fit = workspace
         self._name = workspace.name()
         self._ip_file = ip_file
         self._number_of_iterations = number_of_iterations
@@ -32,6 +32,7 @@ class AnalysisRoutine:
         self._vertical_width = vertical_width
         self._horizontal_width = horizontal_width
         self._thickness = thickness
+        self._mode_running = mode_running
 
         self._multiple_scattering_correction = multiple_scattering_correction
         self._gamma_correction = gamma_correction
@@ -39,11 +40,11 @@ class AnalysisRoutine:
         self._save_results_path = results_path
 
         self._h_ratio = None
-        self._constraints = [] 
+        self._constraints = () 
         self._profiles = {} 
 
         # Only used for system tests, remove once tests are updated
-        self._run_hist_data = False #True
+        self._run_hist_data = True
         self._run_norm_voigt = False
 
         # Links to another AnalysisRoutine object:
@@ -91,15 +92,9 @@ class AnalysisRoutine:
         self._profiles = {**self._profiles, **common_keys_profiles}
 
 
-    def _preprocess(self):
+    def _set_const_methods(self):
         # Set up variables used during fitting
         self._masses = np.array([p.mass for p in self._profiles.values()])
-        self._dataX, self._dataY, self._dataE = extractWS(self._workspace_to_fit)
-        resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = self.prepareFitArgs()
-        self._resolution_params = resolutionPars
-        self._instrument_params = instrPars
-        self._kinematic_arrays = kinematicArrays
-        self._y_space_arrays = ySpacesForEachMass
 
         self._initial_fit_parameters = []
         self._bounds = []
@@ -111,19 +106,33 @@ class AnalysisRoutine:
             self._bounds.append(p._width_bounds)
             self._bounds.append(p._center_bounds)
 
-        # self._intensities = np.array([p.intensity for p in self._profiles.values()])[:, np.newaxis]
-        # self._widths = np.array([p.width for p in self._profiles.values()])[:, np.newaxis]
-        # self._centers = np.array([p.center for p in self._profiles.values()])[:, np.newaxis]
+        self._fig_save_path = None
+
+
+    def _update_workspace_data(self):
+        self._dataX, self._dataY, self._dataE = extractWS(self._workspace_being_fit)
+
+        if self._run_hist_data:  # Converts point data from workspaces to histogram data
+            self._dataY, self._dataX, self._dataE = histToPointData(self._dataY, self._dataX, self._dataE)
+
+        self._set_up_kinematic_arrays()
+
         self._fit_parameters = np.zeros((len(self._dataY), 3 * len(self._profiles) + 3))
 
-        self._fig_save_path = None
-        
+
+    def _set_up_kinematic_arrays(self):
+        resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = self.prepareFitArgs()
+        self._resolution_params = resolutionPars
+        self._instrument_params = instrPars
+        self._kinematic_arrays = kinematicArrays
+        self._y_space_arrays = ySpacesForEachMass
+
 
     def run(self):
 
         assert len(self.profiles) > 0, "Add profiles before atempting to run the routine!"
 
-        self._preprocess()
+        self._set_const_methods()
 
         self.createTableInitialParameters()
 
@@ -133,21 +142,23 @@ class AnalysisRoutine:
         #         InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name()
         #     )
 
-        self._workspace_to_fit = CloneWorkspace(
-            InputWorkspace=self._workspace_to_fit, 
+        CloneWorkspace(
+            InputWorkspace=self._workspace_being_fit, 
             OutputWorkspace=self._name + "0"
         )
 
         for iteration in range(self._number_of_iterations + 1):
             # Workspace from previous iteration
-            wsToBeFitted = mtd[self._name + str(iteration)]
+            self._workspace_being_fit = mtd[self._name + str(iteration)]
 
-            ncpTotal = self.fitNcpToWorkspace(wsToBeFitted)
+            self._update_workspace_data()
 
-            mWidths, stdWidths, mIntRatios, stdIntRatios = self.extractMeans(wsToBeFitted.name())
+            ncpTotal = self.fitNcpToWorkspace()
+
+            mWidths, stdWidths, mIntRatios, stdIntRatios = self.extractMeans(self._workspace_being_fit.name())
 
             self.createMeansAndStdTableWS(
-                wsToBeFitted.name(), mWidths, stdWidths, mIntRatios, stdIntRatios
+                self._workspace_being_fit.name(), mWidths, stdWidths, mIntRatios, stdIntRatios
             )
 
             # When last iteration, skip MS and GC
@@ -180,10 +191,9 @@ class AnalysisRoutine:
                 InputWorkspace="tmpNameWs", OutputWorkspace=self._name + str(iteration + 1)
             )
 
-        wsFinal = mtd[self._name + str(self._number_of_iterations)]
-        self._create_results_mehtods()
+        self._set_up_results_mehtods()
         self.save_results()
-        return wsFinal, self 
+        return self 
 
 
     @staticmethod
@@ -234,28 +244,27 @@ class AnalysisRoutine:
         print("\n")
 
 
-    def fitNcpToWorkspace(self, ws):
+    def fitNcpToWorkspace(self):
         """
         Performs the fit of ncp to the workspace.
         Firtly the arrays required for the fit are prepared and then the fit is performed iteratively
         on a spectrum by spectrum basis.
         """
 
-        if self._run_hist_data:  # Converts point data from workspaces to histogram data
-            self._dataY, self._dataX, self._dataE = histToPointData(self._dataY, self._dataX, self._dataE)
-
         print("\nFitting NCP:\n")
 
         arrFitPars = self.fitNcpToArray()
 
-        self.createTableWSForFitPars(ws.name(), len(self._profiles), arrFitPars)
+        self.createTableWSForFitPars(len(self._profiles), arrFitPars)
 
         arrBestFitPars = arrFitPars[:, 1:-2]
 
         ncpForEachMass, ncpTotal = self.calculateNcpArr(arrBestFitPars)
-        ncpSumWSs = self.createNcpWorkspaces(ncpForEachMass, ncpTotal, ws)
+        ncpSumWSs = self.createNcpWorkspaces(ncpForEachMass, ncpTotal)
 
-        wsDataSum = SumSpectra(InputWorkspace=ws, OutputWorkspace=ws.name() + "_Sum")
+        wsDataSum = SumSpectra(
+            InputWorkspace=self._workspace_being_fit.name(), 
+            OutputWorkspace=self._workspace_being_fit.name() + "_Sum")
         self.plotSumNCPFits(wsDataSum, *ncpSumWSs)
         return ncpTotal
 
@@ -378,9 +387,9 @@ class AnalysisRoutine:
         return self._fit_parameters
 
 
-    def createTableWSForFitPars(self, wsName, noOfMasses, arrFitPars):
+    def createTableWSForFitPars(self, noOfMasses, arrFitPars):
         tableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=wsName + "_Best_Fit_NCP_Parameters"
+            OutputWorkspace=self._workspace_being_fit.name()+ "_Best_Fit_NCP_Parameters"
         )
         tableWS.setTitle("SCIPY Fit")
         tableWS.addColumn(type="float", name="Spec Idx")
@@ -422,25 +431,27 @@ class AnalysisRoutine:
         return ncpForEachMass
 
 
-    def createNcpWorkspaces(self, ncpForEachMass, ncpTotal, ws):
+    def createNcpWorkspaces(self, ncpForEachMass, ncpTotal):
         """Creates workspaces from ncp array data"""
 
         # Need to rearrage array of yspaces into seperate arrays for each mass
         ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
 
         # Use ws dataX to match with histogram data
-        dataX = ws.extractX()[
-            :, : ncpTotal.shape[1]
-        ]  # Make dataX match ncp shape automatically
+        dataX = self._dataX
+        # dataX = ws.extractX()[
+        #     :, : ncpTotal.shape[1]
+        # ]  # Make dataX match ncp shape automatically
         assert (
             ncpTotal.shape == dataX.shape
         ), "DataX and DataY in ws need to be the same shape."
 
-        ncpTotWS = CloneWorkspace(InputWorkspace=ws.name(), OutputWorkspace=ws.name() + "_TOF_Fitted_Profiles")
-        passDataIntoWS(dataX, ncpTotal, np.zeros_like(dataX), ncpTotWS)
-        # ncpTotWS = createWS(
-        #     dataX, ncpTotal, np.zeros(dataX.shape), ws.name() + "_TOF_Fitted_Profiles"
-        # )
+        # ncpTotWS = CloneWorkspace(InputWorkspace=ws.name(), OutputWorkspace=ws.name() + "_TOF_Fitted_Profiles")
+        # passDataIntoWS(dataX, ncpTotal, np.zeros_like(dataX), ncpTotWS)
+        ncpTotWS = createWS(
+            dataX, ncpTotal, np.zeros(dataX.shape), self._workspace_being_fit.name() + "_TOF_Fitted_Profiles",
+            parentWorkspace=self._workspace_being_fit
+        )
         # MaskDetectors(Workspace=ncpTotWS, WorkspaceIndexList=ic.maskedDetectorIdx)
         MaskDetectors(Workspace=ncpTotWS, SpectraList=self._mask_spectra)
         wsTotNCPSum = SumSpectra(
@@ -450,14 +461,15 @@ class AnalysisRoutine:
         # Individual ncp workspaces
         wsMNCPSum = []
         for i, ncp_m in enumerate(ncpForEachMass):
-            ncpMWS =  CloneWorkspace(InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_" + str(i))
-            passDataIntoWS(dataX, ncp_m, np.zeros_like(dataX), ncpMWS)
-            # ncpMWS = createWS(
-            #     dataX,
-            #     ncp_m,
-            #     np.zeros(dataX.shape),
-            #     ws.name() + "_TOF_Fitted_Profile_" + str(i),
-            # )
+            # ncpMWS =  CloneWorkspace(InputWorkspace=ws.name(), OutputWorkspace=ws.name()+"_TOF_Fitted_Profile_" + str(i))
+            # passDataIntoWS(dataX, ncp_m, np.zeros_like(dataX), ncpMWS)
+            ncpMWS = createWS(
+                dataX,
+                ncp_m,
+                np.zeros(dataX.shape),
+                self._workspace_being_fit.name() + "_TOF_Fitted_Profile_" + str(i),
+                parentWorkspace=self._workspace_being_fit
+            )
             MaskDetectors(Workspace=ncpMWS, SpectraList=self._mask_spectra)
             wsNCPSum = SumSpectra(
                 InputWorkspace=ncpMWS, OutputWorkspace=ncpMWS.name() + "_Sum"
@@ -623,7 +635,7 @@ class AnalysisRoutine:
         )
         fitPars = result["x"]
 
-        noDegreesOfFreedom = len(self._dataY) - len(fitPars)
+        noDegreesOfFreedom = len(self._dataY[row]) - len(fitPars)
         specFitPars = np.append(self._instrument_params[row, 0], fitPars)
         return np.append(specFitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
 
@@ -957,8 +969,10 @@ class AnalysisRoutine:
         return profiles
 
 
-    def _create_results_mehtods(self):
+    def _set_up_results_mehtods(self):
         """Used to collect results from workspaces and store them in .npz files for testing."""
+
+        self.wsFinal = mtd[self._name + str(self._number_of_iterations)]
 
         allIterNcp = []
         allFitWs = []

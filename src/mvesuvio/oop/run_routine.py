@@ -10,7 +10,7 @@ def run_analysis():
     ws = loadRawAndEmptyWsFromUserPath(
         userWsRawPath='/home/ljg28444/Documents/user_0/some_new_experiment/some_new_exp/input_ws/some_new_exp_raw_forward.nxs',
         userWsEmptyPath='/home/ljg28444/Documents/user_0/some_new_experiment/some_new_exp/input_ws/some_new_exp_empty_forward.nxs',
-        tofBinning = "275.,1.,420",
+        tofBinning = "110.,1.,420",
         name='exp',
         scaleRaw=1,
         scaleEmpty=1,
@@ -24,11 +24,15 @@ def run_analysis():
 
     AR = AnalysisRoutine(cropedWs,
                          ip_file='/home/ljg28444/.mvesuvio/ip_files/ip2018_3.par',
-                         number_of_iterations=0,
+                         number_of_iterations=1,
                          mask_spectra=[173, 174, 179],
-                         multiple_scattering_correction=False,
+                         multiple_scattering_correction=True,
                          vertical_width=0.1, horizontal_width=0.1, thickness=0.001,
-                         gamma_correction=False)
+                         gamma_correction=True,
+                         mode_running='FORWARD',
+                         transmission_guess=0.853,
+                         multiple_scattering_order=2,
+                         number_of_events=1.0e5)
         
     H = NeutronComptonProfile('H', mass=1.0079, intensity=1, width=4.7, center=0,
                               intensity_bounds=[0, np.nan], width_bounds=[3, 6], center_bounds=[-3, 1]) 
