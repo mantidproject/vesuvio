@@ -5,7 +5,8 @@ from mvesuvio.oop.analysis_helpers import extractWS, histToPointData, loadConsta
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, MaskDetectors, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
-                            VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces
+                            VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
+                            CreateWorkspace
 from mvesuvio.analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 import numpy as np 
 from scipy import optimize
@@ -18,7 +19,6 @@ class AnalysisRoutine:
                  gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
                  number_of_events=None, results_path=None):
 
-        self._workspace_being_fit = workspace
         self._name = workspace.name()
         self._ip_file = ip_file
         self._number_of_iterations = number_of_iterations
@@ -38,6 +38,12 @@ class AnalysisRoutine:
         self._gamma_correction = gamma_correction
 
         self._save_results_path = results_path
+
+        # Variables changing during fit
+        self._workspace_being_fit = workspace
+        self._row_being_fit = 0 
+        self._table_fit_results = None
+        self._fit_profiles_workspaces = {}
 
         self._h_ratio = None
         self._constraints = () 
@@ -96,15 +102,6 @@ class AnalysisRoutine:
         # Set up variables used during fitting
         self._masses = np.array([p.mass for p in self._profiles.values()])
 
-        self._initial_fit_parameters = []
-        self._bounds = []
-        for p in self._profiles.values():
-            self._initial_fit_parameters.append(p.intensity)
-            self._initial_fit_parameters.append(p.width)
-            self._initial_fit_parameters.append(p.center)
-            self._bounds.append(p._intensity_bounds)
-            self._bounds.append(p._width_bounds)
-            self._bounds.append(p._center_bounds)
 
         self._fig_save_path = None
 
@@ -118,6 +115,40 @@ class AnalysisRoutine:
         self._set_up_kinematic_arrays()
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * len(self._profiles) + 3))
+
+        self._row_being_fit = 0 
+
+        #Initialise Table for fit parameters
+        table = CreateEmptyTableWorkspace(
+            OutputWorkspace=self._workspace_being_fit.name()+ "_fit_results"
+        )
+        table.setTitle("SciPy Fit Parameters")
+        table.addColumn(type="float", name="Spectrum")
+        for p in self._profiles.values():
+            table.addColumn(type="float", name=f"{p.label} Intensity")
+            table.addColumn(type="float", name=f"{p.label} Width")
+            table.addColumn(type="float", name=f"{p.label} Center ")
+        table.addColumn(type="float", name="Normalised Chi2")
+        table.addColumn(type="float", name="Number of Iteraions")
+
+        self._table_fit_results = table 
+
+        #Initialise workspaces for fitted ncp 
+        self._fit_profiles_workspaces = {}
+        for element, p in self._profiles.items():
+            self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
+        self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
+
+
+    def _create_emtpy_ncp_workspace(self, suffix):
+        return CreateWorkspace(
+                DataX=np.zeros(self._dataX.size),
+                DataY=np.zeros(self._dataY.size),
+                DataE=np.zeros(self._dataE.size),
+                Nspec=self._workspace_being_fit.getNumberHistograms(),
+                OutputWorkspace=self._workspace_being_fit.name()+suffix,
+                ParentWorkspace=self._workspace_being_fit
+    )
 
 
     def _set_up_kinematic_arrays(self):
@@ -153,7 +184,7 @@ class AnalysisRoutine:
 
             self._update_workspace_data()
 
-            ncpTotal = self.fitNcpToWorkspace()
+            self.fitNcpToWorkspace()
 
             mWidths, stdWidths, mIntRatios, stdIntRatios = self.extractMeans(self._workspace_being_fit.name())
 
@@ -170,7 +201,7 @@ class AnalysisRoutine:
             # Replace zero columns (bins) with ncp total fit
             # If ws has no zero column, then remains unchanged
             if iteration == 0:
-                wsNCPM = replaceZerosWithNCP(mtd[self._name], ncpTotal)
+                wsNCPM = replaceZerosWithNCP(mtd[self._name], self._fit_profiles_workspaces['total'].extractY())
 
             CloneWorkspace(InputWorkspace=self._name, OutputWorkspace="tmpNameWs")
 
@@ -253,20 +284,17 @@ class AnalysisRoutine:
 
         print("\nFitting NCP:\n")
 
-        arrFitPars = self.fitNcpToArray()
+        self.fitNcpToArray()
 
-        self.createTableWSForFitPars(len(self._profiles), arrFitPars)
+        # self.createTableWSForFitPars(len(self._profiles), arrFitPars)
 
-        arrBestFitPars = arrFitPars[:, 1:-2]
-
-        ncpForEachMass, ncpTotal = self.calculateNcpArr(arrBestFitPars)
-        ncpSumWSs = self.createNcpWorkspaces(ncpForEachMass, ncpTotal)
+        # ncpForEachMass, ncpTotal = self.calculateNcpArr(arrBestFitPars)
+        # ncpSumWSs = self.createNcpWorkspaces(ncpForEachMass, ncpTotal)
 
         wsDataSum = SumSpectra(
             InputWorkspace=self._workspace_being_fit.name(), 
             OutputWorkspace=self._workspace_being_fit.name() + "_Sum")
-        self.plotSumNCPFits(wsDataSum, *ncpSumWSs)
-        return ncpTotal
+        # self.plotSumNCPFits(wsDataSum, *ncpSumWSs)
 
 
     def prepareFitArgs(self):
@@ -367,19 +395,13 @@ class AnalysisRoutine:
     def fitNcpToArray(self):
         """Takes dataY as a 2D array and returns the 2D array best fit parameters."""
 
-        for row in range(len(self._dataY)):
+        self._row_being_fit = 0
+        while self._row_being_fit != len(self._dataY):
+        # for row in range(len(self._dataY)):
 
-            specFitPars = self.fitNcpToSingleSpec(row)
+            self.fitNcpToSingleSpec(self._row_being_fit)
 
-            self._fit_parameters[row] = specFitPars
-
-            if np.all(specFitPars == 0):
-                print("Skipped spectra.")
-            else:
-                with np.printoptions(
-                    suppress=True, precision=4, linewidth=200, threshold=sys.maxsize
-                ):
-                    print(specFitPars)
+            self._row_being_fit += 1
 
         assert ~np.all(
             self._fit_parameters == 0
@@ -387,22 +409,6 @@ class AnalysisRoutine:
         return self._fit_parameters
 
 
-    def createTableWSForFitPars(self, noOfMasses, arrFitPars):
-        tableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._workspace_being_fit.name()+ "_Best_Fit_NCP_Parameters"
-        )
-        tableWS.setTitle("SCIPY Fit")
-        tableWS.addColumn(type="float", name="Spec Idx")
-        for i in range(int(noOfMasses)):
-            tableWS.addColumn(type="float", name=f"Intensity {i}")
-            tableWS.addColumn(type="float", name=f"Width {i}")
-            tableWS.addColumn(type="float", name=f"Center {i}")
-        tableWS.addColumn(type="float", name="Norm Chi2")
-        tableWS.addColumn(type="float", name="No Iter")
-
-        for row in arrFitPars:  # Pass array onto table ws
-            tableWS.addRow(row)
-        return
 
 
     def calculateNcpArr(self, arrBestFitPars):
@@ -427,7 +433,7 @@ class AnalysisRoutine:
             # return np.zeros(self._y_space_arrays.shape)
             return np.zeros_like(self._y_space_arrays[row])
 
-        ncpForEachMass, ncpTotal = self.calculateNcpSpec(initPars, row) 
+        ncpForEachMass = self.calculateNcpSpec(initPars, row) 
         return ncpForEachMass
 
 
@@ -509,12 +515,12 @@ class AnalysisRoutine:
     def extractMeans(self, wsName):
         """Extract widths and intensities from tableWorkspace"""
 
-        fitParsTable = mtd[wsName + "_Best_Fit_NCP_Parameters"]
+        fitParsTable = self._table_fit_results
         widths = np.zeros((self._masses.size, fitParsTable.rowCount()))
         intensities = np.zeros(widths.shape)
-        for i in range(self._masses.size):
-            widths[i] = fitParsTable.column(f"Width {i}")
-            intensities[i] = fitParsTable.column(f"Intensity {i}")
+        for i, p in enumerate(self._profiles.values()):
+            widths[i] = fitParsTable.column(f"{p.label} Width")
+            intensities[i] = fitParsTable.column(f"{p.label} Intensity")
 
         (
             meanWidths,
@@ -623,38 +629,67 @@ class AnalysisRoutine:
         """Fits the NCP and returns the best fit parameters for one spectrum"""
 
         if np.all(self._dataY[row] == 0):
-            return np.zeros(len(self._initial_fit_parameters) + 3)
+            self._table_fit_results.addRow(np.zeros(3*len(self._profiles)+3))
+            return
+
+        # Pack profile parameters
+        initial_parameters = []
+        bounds = []
+        for p in self._profiles.values():
+            for attr in ['intensity', 'width', 'center']:
+                initial_parameters.append(getattr(p, attr))
+            for attr in ['_intensity_bounds', '_width_bounds', '_center_bounds']:
+                bounds.append(getattr(p, attr))
 
         result = optimize.minimize(
             self.errorFunction,
-            self._initial_fit_parameters,
+            initial_parameters,
             args=(row),
             method="SLSQP",
-            bounds=self._bounds,
+            bounds=bounds,
             constraints=self._constraints,
         )
         fitPars = result["x"]
 
+        # Pass results to table
         noDegreesOfFreedom = len(self._dataY[row]) - len(fitPars)
-        specFitPars = np.append(self._instrument_params[row, 0], fitPars)
-        return np.append(specFitPars, [result["fun"] / noDegreesOfFreedom, result["nit"]])
+        normalised_chi2 = result["fun"] / noDegreesOfFreedom
+        number_iterations = result["nit"]
+        spectrum_number = self._instrument_params[row, 0]
+        tableRow = np.hstack((spectrum_number, fitPars, normalised_chi2, number_iterations))
+        self._table_fit_results.addRow(tableRow)
+        self._fit_parameters[self._row_being_fit] = tableRow 
+
+        with np.printoptions(
+            suppress=True, precision=4, linewidth=200, threshold=sys.maxsize
+        ):
+            print(tableRow)
+
+        # Pass fit profiles into workspaces
+        individual_ncps = self.calculateNcpSpec(fitPars, row)
+        for ncp, element in zip(individual_ncps, self._profiles.keys()):
+            self._fit_profiles_workspaces[element].dataY(row)[:] = ncp
+
+        self._fit_profiles_workspaces['total'].dataY(row)[:] = np.sum(individual_ncps, axis=0)
+        return
 
 
     def errorFunction(self, pars, row):
         """Error function to be minimized, operates in TOF space"""
 
-        ncpForEachMass, ncpTotal = self.calculateNcpSpec(pars, row)
+        ncpForEachMass = self.calculateNcpSpec(pars, row)
+        ncpTotal = np.sum(ncpForEachMass, axis=0)
 
         # Ignore any masked values from Jackknife or masked tof range
         zerosMask = self._dataY[row] == 0
         ncpTotal = ncpTotal[~zerosMask]
-        dataYf = self._dataY[row, ~zerosMask]
-        dataEf = self._dataE[row, ~zerosMask]
+        dataY = self._dataY[row, ~zerosMask]
+        dataE = self._dataE[row, ~zerosMask]
 
         if np.all(self._dataE[row] == 0):  # When errors not present
-            return np.sum((ncpTotal - dataYf) ** 2)
+            return np.sum((ncpTotal - dataY) ** 2)
 
-        return np.sum((ncpTotal - dataYf) ** 2 / dataEf**2)
+        return np.sum((ncpTotal - dataY) ** 2 / dataE**2)
 
 
     def calculateNcpSpec(self, pars, row):
@@ -662,7 +697,11 @@ class AnalysisRoutine:
         Shapes: datax (1, n), ySpacesForEachMass (4, n), res (4, 2), deltaQ (1, n), E0 (1,n),
         where n is no of bins"""
 
-        masses, intensities, widths, centers = self.prepareArraysFromPars(pars)
+        intensities = pars[::3].reshape(-1, 1)
+        widths = pars[1::3].reshape(-1, 1)
+        centers = pars[2::3].reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
+
         v0, E0, deltaE, deltaQ = self._kinematic_arrays[row]
 
         gaussRes, lorzRes = self.caculateResolutionForEachMass(centers, row)
@@ -677,19 +716,7 @@ class AnalysisRoutine:
             * 0.72
         )
         ncpForEachMass = intensities * (JOfY + FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
-        ncpTotal = np.sum(ncpForEachMass, axis=0)
-        return ncpForEachMass, ncpTotal
-
-
-    def prepareArraysFromPars(self, initPars):
-        """Extracts the intensities, widths and centers from the fitting parameters
-        Reshapes all of the arrays to collumns, for the calculation of the ncp,"""
-
-        masses = self._masses[:, np.newaxis]
-        intensities = initPars[::3].reshape(masses.shape)
-        widths = initPars[1::3].reshape(masses.shape)
-        centers = initPars[2::3].reshape(masses.shape)
-        return masses, intensities, widths, centers
+        return ncpForEachMass
 
 
     def caculateResolutionForEachMass(self, centers, row):
@@ -992,11 +1019,11 @@ class AnalysisRoutine:
                 allFitWs.append(ws.extractY())
 
                 # Extract total ncp
-                totNcpWs = mtd[wsIterName + "_TOF_Fitted_Profiles"]
+                totNcpWs = mtd[wsIterName + "_total_ncp"]
                 allTotNcp.append(totNcpWs.extractY())
 
                 # Extract best fit parameters
-                fitParTable = mtd[wsIterName + "_Best_Fit_NCP_Parameters"]
+                fitParTable = mtd[wsIterName + "_fit_results"]
                 bestFitPars = []
                 for key in fitParTable.keys():
                     bestFitPars.append(fitParTable.column(key))
@@ -1004,16 +1031,11 @@ class AnalysisRoutine:
 
                 # Extract individual ncp
                 allNCP = []
-                i = 0
-                while True:  # By default, looks for all ncp ws until it breaks
-                    try:
-                        ncpWsToAppend = mtd[
-                            wsIterName + "_TOF_Fitted_Profile_" + str(i)
-                        ]
-                        allNCP.append(ncpWsToAppend.extractY())
-                        i += 1
-                    except KeyError:
-                        break
+                for p in self._profiles.values():
+                    ncpWsToAppend = mtd[
+                        wsIterName + f"_{p.label}_ncp"
+                    ]
+                    allNCP.append(ncpWsToAppend.extractY())
                 allNCP = switchFirstTwoAxis(np.array(allNCP))
                 allIterNcp.append(allNCP)
 
