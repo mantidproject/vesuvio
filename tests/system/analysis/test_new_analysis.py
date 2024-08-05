@@ -3,7 +3,8 @@ import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.util import handle_config
-ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+
+ipFilesPath = Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")
 
 from mvesuvio.oop.AnalysisRoutine import AnalysisRoutine
 from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile
