@@ -40,6 +40,8 @@ class AnalysisRoutine:
         self._save_results_path = results_path
 
         # Variables changing during fit
+        self._workspace_for_corrections = workspace
+        self._zero_columns_mask = None
         self._workspace_being_fit = workspace
         self._row_being_fit = 0 
         self._table_fit_results = None
@@ -50,7 +52,7 @@ class AnalysisRoutine:
         self._profiles = {} 
 
         # Only used for system tests, remove once tests are updated
-        self._run_hist_data = True
+        self._run_hist_data = True 
         self._run_norm_voigt = False
 
         # Links to another AnalysisRoutine object:
@@ -174,8 +176,8 @@ class AnalysisRoutine:
         #     )
 
         CloneWorkspace(
-            InputWorkspace=self._workspace_being_fit, 
-            OutputWorkspace=self._name + "0"
+            InputWorkspace=self._workspace_being_fit.name(), 
+            OutputWorkspace=self._workspace_being_fit.name() + "0"
         )
 
         for iteration in range(self._number_of_iterations + 1):
@@ -188,36 +190,34 @@ class AnalysisRoutine:
 
             self._create_summed_workspaces()
 
-            mWidths, stdWidths, mIntRatios, stdIntRatios = self.extractMeans(self._workspace_being_fit.name())
+            mWidths, stdWidths, mIntRatios, stdIntRatios = self.extractMeans()
 
             self.createMeansAndStdTableWS(
-                self._workspace_being_fit.name(), mWidths, stdWidths, mIntRatios, stdIntRatios
+                mWidths, stdWidths, mIntRatios, stdIntRatios
             )
 
             # When last iteration, skip MS and GC
             if iteration == self._number_of_iterations:
                 break
 
-            # Replace zero columns (bins) with ncp total fit
-            # If ws has no zero column, then remains unchanged
-            if iteration == 0:
-                wsNCPM = replaceZerosWithNCP(mtd[self._name], self._fit_profiles_workspaces['total'].extractY())
+            if iteration==0:
+                self._replace_zero_columns_with_ncp_fit()
 
             CloneWorkspace(InputWorkspace=self._name, OutputWorkspace="tmpNameWs")
 
             if self._gamma_correction:
-                wsGC = self.createWorkspacesForGammaCorrection(mWidths, mIntRatios, wsNCPM)
+                wsGC = self.createWorkspacesForGammaCorrection(mWidths, mIntRatios)
                 Minus(
                     LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs"
                 )
 
             if self._multiple_scattering_correction:
-                wsMS = self.createWorkspacesForMSCorrection(mWidths, mIntRatios, wsNCPM)
+                wsMS = self.createWorkspacesForMSCorrection(mWidths, mIntRatios)
                 Minus(
                     LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs"
                 )
 
-            self.remaskValues(self._name, "tmpNameWS")  # Masks cols in the same place as in ic.name
+            self._remask_columns_with_zeros("tmpNameWS")
             RenameWorkspace(
                 InputWorkspace="tmpNameWs", OutputWorkspace=self._name + str(iteration + 1)
             )
@@ -227,24 +227,6 @@ class AnalysisRoutine:
         return self 
 
 
-    @staticmethod
-    def remaskValues(wsName, wsToMaskName):
-        """
-        Uses the ws before the MS correction to look for masked columns or dataE
-        and implement the same masked values after the correction.
-        """
-        ws = mtd[wsName]
-        dataX, dataY, dataE = extractWS(ws)
-        mask = np.all(dataY == 0, axis=0)
-
-        wsM = mtd[wsToMaskName]
-        dataXM, dataYM, dataEM = extractWS(wsM)
-        dataYM[:, mask] = 0
-        if np.all(dataE == 0):
-            dataEM = np.zeros(dataEM.shape)
-
-        passDataIntoWS(dataXM, dataYM, dataEM, wsM)
-        return
 
 
     def createTableInitialParameters(self):
@@ -414,7 +396,7 @@ class AnalysisRoutine:
                 OutputWorkspace=ws.name() + "_Sum"
             )
 
-    def extractMeans(self, wsName):
+    def extractMeans(self):
         """Extract widths and intensities from tableWorkspace"""
 
         fitParsTable = self._table_fit_results
@@ -437,10 +419,10 @@ class AnalysisRoutine:
 
 
     def createMeansAndStdTableWS(
-        self, wsName, meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
+        self, meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
     ):
         meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=wsName + "_Mean_Widths_And_Intensities"
+            OutputWorkspace=self._workspace_being_fit.name() + "_Mean_Widths_And_Intensities"
         )
         meansTableWS.addColumn(type="float", name="Mass")
         meansTableWS.addColumn(type="float", name="Mean Widths")
@@ -567,7 +549,7 @@ class AnalysisRoutine:
         self._fit_parameters[self._row_being_fit] = tableRow 
 
         with np.printoptions(
-            precision=4, linewidth=200, threshold=sys.maxsize
+            suppress=True, precision=4, linewidth=200, threshold=sys.maxsize
         ):
             print(tableRow)
 
@@ -741,10 +723,63 @@ class AnalysisRoutine:
         return pseudo_voigt / norm
 
 
-    def createWorkspacesForMSCorrection(self, meanWidths, meanIntensityRatios, wsNCPM):
+    def _replace_zero_columns_with_ncp_fit(self):
+        """
+        If the initial input contains columns with zeros 
+        (to mask resonance peaks) then these sections must be approximated 
+        by the total fitted function because multiple scattering and 
+        gamma correction algorithms do not accept columns with zeros.
+        If no masked columns are present then the input workspace 
+        for corrections is left unchanged.
+        """
+        dataY = self._workspace_for_corrections.extractY()
+        ncp = self._fit_profiles_workspaces['total'].extractY()
+
+        self._zero_columns_mask = np.all(dataY == 0, axis=0)  # Masked Cols
+
+        ws = CloneWorkspace(
+            InputWorkspace=self._workspace_for_corrections.name(), 
+            OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
+        )
+        for row in range(ws.getNumberHistograms()):
+            # TODO: Once the option to chage point to hist is removed, remove [:len(ncp)]
+            ws.dataY(row)[self._zero_columns_mask] = ncp[row, self._zero_columns_mask[:len(ncp[row])]]
+
+        self._workspace_for_corrections = ws
+        SumSpectra(
+            InputWorkspace=self._workspace_for_corrections.name(), 
+            OutputWorkspace=self._workspace_for_corrections.name() + "_Sum"
+        )
+        return
+
+
+    def _remask_columns_with_zeros(self, ws_to_remask_name):
+        """
+        Uses previously stored information on masked columns in the
+        initial workspace to set these columns again to zero on the
+        workspace resulting from the multiple scattering or gamma correction.
+        """
+        ws = mtd[ws_to_remask_name]
+        for row in range(ws.getNumberHistograms()):
+            ws.dataY(row)[self._zero_columns_mask] = 0
+            ws.dataE(row)[self._zero_columns_mask] = 0
+        # dataX, dataY, dataE = extractWS(ws)
+        # mask = np.all(dataY == 0, axis=0)
+        #
+        # wsM = mtd[wsToMaskName]
+        # dataXM, dataYM, dataEM = extractWS(wsM)
+        # dataYM[:, mask] = 0
+        # if np.all(dataE == 0):
+        #     dataEM = np.zeros(dataEM.shape)
+        #
+        # passDataIntoWS(dataXM, dataYM, dataEM, wsM)
+        return
+
+
+    def createWorkspacesForMSCorrection(self, meanWidths, meanIntensityRatios):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
 
-        self.createSlabGeometry(wsNCPM)  # Sample properties for MS correction
+        self.createSlabGeometry(self._workspace_for_corrections)  # Sample properties for MS correction
 
         sampleProperties = self.calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios)
         print(
@@ -753,7 +788,7 @@ class AnalysisRoutine:
             "\n",
         )
 
-        return self.createMulScatWorkspaces(wsNCPM, sampleProperties)
+        return self.createMulScatWorkspaces(self._workspace_for_corrections, sampleProperties)
 
 
     def createSlabGeometry(self, wsNCPM):
@@ -775,7 +810,7 @@ class AnalysisRoutine:
             + "</cuboid>"
         )
 
-        CreateSampleShape(wsNCPM, xml_str)
+        CreateSampleShape(self._workspace_for_corrections, xml_str)
 
 
     def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
@@ -849,10 +884,10 @@ class AnalysisRoutine:
         return mtd[ws.name() + "_MulScattering"]
 
 
-    def createWorkspacesForGammaCorrection(self, meanWidths, meanIntensityRatios, wsNCPM):
+    def createWorkspacesForGammaCorrection(self, meanWidths, meanIntensityRatios):
         """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
-        inputWS = wsNCPM.name()
+        inputWS = self._workspace_for_corrections.name()
 
         profiles = self.calcGammaCorrectionProfiles(meanWidths, meanIntensityRatios)
 

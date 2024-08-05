@@ -91,7 +91,7 @@ def maskBinsWithZeros(ws, maskTOFRange):
     Used to mask resonance peaks.
     """
 
-    if maskTOFRange is None:  # Masked TOF bins not found, skip
+    if maskTOFRange is None:
         return
 
     dataX, dataY, dataE = extractWS(ws)

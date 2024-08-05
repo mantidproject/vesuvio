@@ -19,7 +19,7 @@ def run_analysis():
 
     cropedWs = cropAndMaskWorkspace(ws, firstSpec=144, lastSpec=182,
                                     maskedDetectors=[173, 174, 179],
-                                    maskTOFRange=None)
+                                    maskTOFRange='120, 160')
 
 
     AR = AnalysisRoutine(cropedWs,
