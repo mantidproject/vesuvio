@@ -19,7 +19,7 @@ class AnalysisRoutine:
                  gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
                  number_of_events=None, results_path=None):
 
-        self._name = workspace.name()
+        self._name = workspace.name() + '_'
         self._ip_file = ip_file
         self._number_of_iterations = number_of_iterations
         spectrum_list = workspace.getSpectrumNumbers()
@@ -141,6 +141,11 @@ class AnalysisRoutine:
             self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
+        self._mean_widths = None 
+        self._std_widths = None 
+        self._mean_intensity_ratios = None 
+        self._std_intensity_ratios = None 
+
 
     def _create_emtpy_ncp_workspace(self, suffix):
         return CreateWorkspace(
@@ -175,58 +180,44 @@ class AnalysisRoutine:
         #         InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name()
         #     )
 
-        CloneWorkspace(
+        RenameWorkspace(
             InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._workspace_being_fit.name() + "0"
+            OutputWorkspace=self._name + '0' 
         )
 
         for iteration in range(self._number_of_iterations + 1):
-            # Workspace from previous iteration
-            self._workspace_being_fit = mtd[self._name + str(iteration)]
 
+            self._workspace_being_fit = mtd[self._name + str(iteration)]
             self._update_workspace_data()
 
             self._fit_neutron_compton_profiles()
 
             self._create_summed_workspaces()
-
-            mWidths, stdWidths, mIntRatios, stdIntRatios = self.extractMeans()
-
-            self.createMeansAndStdTableWS(
-                mWidths, stdWidths, mIntRatios, stdIntRatios
-            )
+            self._set_means_and_std()
 
             # When last iteration, skip MS and GC
             if iteration == self._number_of_iterations:
                 break
 
+            # Do this because MS and Gamma corrections do not accept zero columns 
             if iteration==0:
                 self._replace_zero_columns_with_ncp_fit()
 
-            CloneWorkspace(InputWorkspace=self._name, OutputWorkspace="tmpNameWs")
+            CloneWorkspace(
+                InputWorkspace=self._workspace_for_corrections.name(), 
+                OutputWorkspace="next_iteration"
+            )
+            self._correct_for_gamma_and_multiple_scattering("next_iteration")
+            self._remask_columns_with_zeros("next_iteration")
 
-            if self._gamma_correction:
-                wsGC = self.createWorkspacesForGammaCorrection(mWidths, mIntRatios)
-                Minus(
-                    LHSWorkspace="tmpNameWs", RHSWorkspace=wsGC, OutputWorkspace="tmpNameWs"
-                )
-
-            if self._multiple_scattering_correction:
-                wsMS = self.createWorkspacesForMSCorrection(mWidths, mIntRatios)
-                Minus(
-                    LHSWorkspace="tmpNameWs", RHSWorkspace=wsMS, OutputWorkspace="tmpNameWs"
-                )
-
-            self._remask_columns_with_zeros("tmpNameWS")
             RenameWorkspace(
-                InputWorkspace="tmpNameWs", OutputWorkspace=self._name + str(iteration + 1)
+                InputWorkspace="next_iteration", 
+                OutputWorkspace=self._name + str(iteration + 1)
             )
 
-        self._set_up_results_mehtods()
+        self._set_results()
         self.save_results()
         return self 
-
-
 
 
     def createTableInitialParameters(self):
@@ -265,9 +256,7 @@ class AnalysisRoutine:
             self._fit_neutron_compton_profiles_to_row()
             self._row_being_fit += 1
 
-        assert ~np.all(
-            self._fit_parameters == 0
-        ), "Fitting parameters cannot be zero for all spectra!"
+        assert np.any(self._fit_parameters), "Fitting parameters cannot be zero for all spectra!"
         return
 
 
@@ -396,8 +385,8 @@ class AnalysisRoutine:
                 OutputWorkspace=ws.name() + "_Sum"
             )
 
-    def extractMeans(self):
-        """Extract widths and intensities from tableWorkspace"""
+    def _set_means_and_std(self):
+        """Calculate mean widths and intensities from tableWorkspace"""
 
         fitParsTable = self._table_fit_results
         widths = np.zeros((self._masses.size, fitParsTable.rowCount()))
@@ -413,18 +402,23 @@ class AnalysisRoutine:
         ) = self.calculateMeansAndStds(widths, intensities)
 
         assert (
-            len(widths) == self._masses.size 
-        ), "Widths and intensities must be in shape (noOfMasses, noOfSpec)"
-        return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
+            len(meanWidths) == len(self._profiles) 
+        ), "Number of mean widths must match number of profiles!"
+
+        self._mean_widths = meanWidths
+        self._std_widths = stdWidths
+        self._mean_intensity_ratios = meanIntensityRatios
+        self._std_intensity_ratios = stdIntensityRatios
+
+        self.createMeansAndStdTableWS()
+        return
 
 
-    def createMeansAndStdTableWS(
-        self, meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
-    ):
+    def createMeansAndStdTableWS(self):
         meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._workspace_being_fit.name() + "_Mean_Widths_And_Intensities"
+            OutputWorkspace=self._workspace_being_fit.name() + "_MeanWidthsAndIntensities"
         )
-        meansTableWS.addColumn(type="float", name="Mass")
+        meansTableWS.addColumn(type="str", name="Mass")
         meansTableWS.addColumn(type="float", name="Mean Widths")
         meansTableWS.addColumn(type="float", name="Std Widths")
         meansTableWS.addColumn(type="float", name="Mean Intensities")
@@ -432,16 +426,16 @@ class AnalysisRoutine:
 
         print("\nCreated Table with means and std:")
         print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
-        for m, mw, stdw, mi, stdi in zip(
-            self._masses.astype(float),
-            meanWidths,
-            stdWidths,
-            meanIntensityRatios,
-            stdIntensityRatios,
+        for p, mean_width, std_width, mean_intensity, std_intensity in zip(
+            self._profiles.values(),
+            self._mean_widths,
+            self._std_widths,
+            self._mean_intensity_ratios,
+            self._std_intensity_ratios,
         ):
-            meansTableWS.addRow([m, mw, stdw, mi, stdi])
-            print(f"{m:5.2f}  {mw:10.5f} \u00B1 {stdw:7.5f}  {mi:10.5f} \u00B1 {stdi:7.5f}")
-        print("\n")
+            meansTableWS.addRow([p.label, mean_width, std_width, mean_intensity, std_intensity])
+            print(f"{p.label:5s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}  \
+                    {mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
         return
 
 
@@ -737,15 +731,14 @@ class AnalysisRoutine:
 
         self._zero_columns_mask = np.all(dataY == 0, axis=0)  # Masked Cols
 
-        ws = CloneWorkspace(
+        self._workspace_for_corrections = CloneWorkspace(
             InputWorkspace=self._workspace_for_corrections.name(), 
             OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
         )
-        for row in range(ws.getNumberHistograms()):
+        for row in range(self._workspace_for_corrections.getNumberHistograms()):
             # TODO: Once the option to chage point to hist is removed, remove [:len(ncp)]
-            ws.dataY(row)[self._zero_columns_mask] = ncp[row, self._zero_columns_mask[:len(ncp[row])]]
+            self._workspace_for_corrections.dataY(row)[self._zero_columns_mask] = ncp[row, self._zero_columns_mask[:len(ncp[row])]]
 
-        self._workspace_for_corrections = ws
         SumSpectra(
             InputWorkspace=self._workspace_for_corrections.name(), 
             OutputWorkspace=self._workspace_for_corrections.name() + "_Sum"
@@ -759,29 +752,39 @@ class AnalysisRoutine:
         initial workspace to set these columns again to zero on the
         workspace resulting from the multiple scattering or gamma correction.
         """
-        ws = mtd[ws_to_remask_name]
-        for row in range(ws.getNumberHistograms()):
-            ws.dataY(row)[self._zero_columns_mask] = 0
-            ws.dataE(row)[self._zero_columns_mask] = 0
-        # dataX, dataY, dataE = extractWS(ws)
-        # mask = np.all(dataY == 0, axis=0)
-        #
-        # wsM = mtd[wsToMaskName]
-        # dataXM, dataYM, dataEM = extractWS(wsM)
-        # dataYM[:, mask] = 0
-        # if np.all(dataE == 0):
-        #     dataEM = np.zeros(dataEM.shape)
-        #
-        # passDataIntoWS(dataXM, dataYM, dataEM, wsM)
+        ws_to_remask = mtd[ws_to_remask_name]
+        for row in range(ws_to_remask.getNumberHistograms()):
+            ws_to_remask.dataY(row)[self._zero_columns_mask] = 0
+            ws_to_remask.dataE(row)[self._zero_columns_mask] = 0
         return
 
 
-    def createWorkspacesForMSCorrection(self, meanWidths, meanIntensityRatios):
+    def _correct_for_gamma_and_multiple_scattering(self, ws_name):
+
+        if self._gamma_correction:
+            gamma_correction_ws = self.create_gamma_workspaces()
+            Minus(
+                LHSWorkspace=ws_name,
+                RHSWorkspace=gamma_correction_ws.name(),
+                OutputWorkspace=ws_name
+            )
+
+        if self._multiple_scattering_correction:
+            multiple_scattering_ws = self.create_multiple_scattering_workspaces()
+            Minus(
+                LHSWorkspace=ws_name,
+                RHSWorkspace=multiple_scattering_ws.name(), 
+                OutputWorkspace=ws_name
+            )
+        return
+
+
+    def create_multiple_scattering_workspaces(self):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
 
         self.createSlabGeometry(self._workspace_for_corrections)  # Sample properties for MS correction
 
-        sampleProperties = self.calcMSCorrectionSampleProperties(meanWidths, meanIntensityRatios)
+        sampleProperties = self.calcMSCorrectionSampleProperties(self._mean_widths, self._mean_intensity_ratios)
         print(
             "\nThe sample properties for Multiple Scattering correction are:\n\n",
             sampleProperties,
@@ -884,12 +887,12 @@ class AnalysisRoutine:
         return mtd[ws.name() + "_MulScattering"]
 
 
-    def createWorkspacesForGammaCorrection(self, meanWidths, meanIntensityRatios):
+    def create_gamma_workspaces(self):
         """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
         inputWS = self._workspace_for_corrections.name()
 
-        profiles = self.calcGammaCorrectionProfiles(meanWidths, meanIntensityRatios)
+        profiles = self.calcGammaCorrectionProfiles(self._mean_widths, self._mean_intensity_ratios)
 
         # Approach below not currently suitable for current versions of Mantid, but will be in the future
         # background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
@@ -937,7 +940,7 @@ class AnalysisRoutine:
         return profiles
 
 
-    def _set_up_results_mehtods(self):
+    def _set_results(self):
         """Used to collect results from workspaces and store them in .npz files for testing."""
 
         self.wsFinal = mtd[self._name + str(self._number_of_iterations)]
@@ -981,7 +984,7 @@ class AnalysisRoutine:
                 allIterNcp.append(allNCP)
 
                 # Extract Mean and Std Widths, Intensities
-                meansTable = mtd[wsIterName + "_Mean_Widths_And_Intensities"]
+                meansTable = mtd[wsIterName + "_MeanWidthsAndIntensities"]
                 allMeanWidhts.append(meansTable.column("Mean Widths"))
                 allStdWidths.append(meansTable.column("Std Widths"))
                 allMeanIntensities.append(meansTable.column("Mean Intensities"))
