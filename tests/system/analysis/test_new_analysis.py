@@ -3,9 +3,6 @@ import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
 from mvesuvio.util import handle_config
-
-ipFilesPath = Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")
-
 from mvesuvio.oop.AnalysisRoutine import AnalysisRoutine
 from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile
 from mvesuvio.oop.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace 
@@ -31,9 +28,7 @@ class AnalysisRunner:
 
         ws = loadRawAndEmptyWsFromUserPath(
             userWsRawPath=str(Path(__file__).absolute().parent.parent.parent/"data"/"analysis"/"inputs"/"sample_test"/"input_ws"/"sample_test_raw_forward.nxs" ),
-            # userWsRawPath='/home/ljg28444/Documents/user_0/some_new_experiment/some_new_exp/input_ws/some_new_exp_raw_forward.nxs',
             userWsEmptyPath=str(Path(__file__).absolute().parent.parent.parent/"data"/"analysis"/"inputs"/"sample_test"/"input_ws"/"sample_test_empty_forward.nxs" ),
-            # userWsEmptyPath='/home/ljg28444/Documents/user_0/some_new_experiment/some_new_exp/input_ws/some_new_exp_empty_forward.nxs',
             tofBinning = "110.,1.,430",
             name='exp',
             scaleRaw=1,
@@ -45,7 +40,7 @@ class AnalysisRunner:
                                         maskTOFRange=None)
 
         AR = AnalysisRoutine(cropedWs,
-                             ip_file='/home/ljg28444/.mvesuvio/ip_files/ip2018_3.par',
+                             ip_file=str(Path(__file__).absolute().parent.parent.parent.parent/"src"/"mvesuvio"/"config"/"ip_files"/'ip2018_3.par'),
                              number_of_iterations=3,
                              mask_spectra=[173, 174, 179],
                              multiple_scattering_correction=True,
