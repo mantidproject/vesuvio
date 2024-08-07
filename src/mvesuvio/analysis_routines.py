@@ -1,6 +1,9 @@
-from .analysis_reduction import iterativeFitForDataReduction
+# from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace
+from mvesuvio.oop.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace
+from mvesuvio.oop.AnalysisRoutine import AnalysisRoutine
+from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile
 import numpy as np
 
 
@@ -15,7 +18,53 @@ def runIndependentIterativeProcedure(IC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    return iterativeFitForDataReduction(IC)
+    ws = loadRawAndEmptyWsFromUserPath(
+        userWsRawPath=IC.userWsRawPath,
+        userWsEmptyPath=IC.userWsEmptyPath,
+        tofBinning=IC.tofBinning,
+        name=IC.name,
+        scaleRaw=IC.scaleRaw,
+        scaleEmpty=IC.scaleEmpty,
+        subEmptyFromRaw=IC.subEmptyFromRaw
+    )
+
+    cropedWs = cropAndMaskWorkspace(
+        ws, 
+        firstSpec=IC.firstSpec,
+        lastSpec=IC.lastSpec,
+        maskedDetectors=IC.maskedSpecAllNo,
+        maskTOFRange=IC.maskTOFRange
+    )
+
+    AR = AnalysisRoutine(
+        cropedWs,
+        ip_file=IC.InstrParsPath,
+        number_of_iterations=IC.noOfMSIterations,
+        mask_spectra=IC.maskedSpecAllNo,
+        multiple_scattering_correction=IC.MSCorrectionFlag,
+        vertical_width=IC.vertical_width, 
+        horizontal_width=IC.horizontal_width, 
+        thickness=IC.thickness,
+        gamma_correction=IC.GammaCorrectionFlag,
+        mode_running=IC.modeRunning,
+        transmission_guess=IC.transmission_guess,
+        multiple_scattering_order=IC.multiple_scattering_order,
+        number_of_events=IC.number_of_events
+    )
+        
+    # Create Profiles 
+    profiles = []
+    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
+        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
+    ):
+        profiles.append(NeutronComptonProfile(
+            str(mass), mass=mass, intensity=intensity, width=width, center=center,
+            intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
+        ))
+
+    AR.add_profiles(*profiles)
+    return AR.run()
 
 
 def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
