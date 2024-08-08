@@ -7,6 +7,54 @@ from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile
 import numpy as np
 
 
+def _create_analysis_object_from_current_interface(IC):
+    ws = loadRawAndEmptyWsFromUserPath(
+        userWsRawPath=IC.userWsRawPath,
+        userWsEmptyPath=IC.userWsEmptyPath,
+        tofBinning=IC.tofBinning,
+        name=IC.name,
+        scaleRaw=IC.scaleRaw,
+        scaleEmpty=IC.scaleEmpty,
+        subEmptyFromRaw=IC.subEmptyFromRaw
+    )
+    cropedWs = cropAndMaskWorkspace(
+        ws, 
+        firstSpec=IC.firstSpec,
+        lastSpec=IC.lastSpec,
+        maskedDetectors=IC.maskedSpecAllNo,
+        maskTOFRange=IC.maskTOFRange
+    )
+    AR = AnalysisRoutine(
+        cropedWs,
+        ip_file=IC.InstrParsPath,
+        h_ratio_to_lowest_mass=IC.HToMassIdxRatio,
+        number_of_iterations=IC.noOfMSIterations,
+        mask_spectra=IC.maskedSpecAllNo,
+        multiple_scattering_correction=IC.MSCorrectionFlag,
+        vertical_width=IC.vertical_width, 
+        horizontal_width=IC.horizontal_width, 
+        thickness=IC.thickness,
+        gamma_correction=IC.GammaCorrectionFlag,
+        mode_running=IC.modeRunning,
+        transmission_guess=IC.transmission_guess,
+        multiple_scattering_order=IC.multiple_scattering_order,
+        number_of_events=IC.number_of_events,
+        results_path=IC.resultsSavePath,
+        figures_path=IC.figSavePath
+    )
+    profiles = []
+    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
+        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
+    ):
+        profiles.append(NeutronComptonProfile(
+            label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
+            intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
+        ))
+    AR.add_profiles(*profiles)
+    return AR
+
+
 def runIndependentIterativeProcedure(IC, clearWS=True):
     """
     Runs the iterative fitting of NCP, cleaning any previously stored workspaces.
@@ -18,52 +66,7 @@ def runIndependentIterativeProcedure(IC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    ws = loadRawAndEmptyWsFromUserPath(
-        userWsRawPath=IC.userWsRawPath,
-        userWsEmptyPath=IC.userWsEmptyPath,
-        tofBinning=IC.tofBinning,
-        name=IC.name,
-        scaleRaw=IC.scaleRaw,
-        scaleEmpty=IC.scaleEmpty,
-        subEmptyFromRaw=IC.subEmptyFromRaw
-    )
-
-    cropedWs = cropAndMaskWorkspace(
-        ws, 
-        firstSpec=IC.firstSpec,
-        lastSpec=IC.lastSpec,
-        maskedDetectors=IC.maskedSpecAllNo,
-        maskTOFRange=IC.maskTOFRange
-    )
-
-    AR = AnalysisRoutine(
-        cropedWs,
-        ip_file=IC.InstrParsPath,
-        number_of_iterations=IC.noOfMSIterations,
-        mask_spectra=IC.maskedSpecAllNo,
-        multiple_scattering_correction=IC.MSCorrectionFlag,
-        vertical_width=IC.vertical_width, 
-        horizontal_width=IC.horizontal_width, 
-        thickness=IC.thickness,
-        gamma_correction=IC.GammaCorrectionFlag,
-        mode_running=IC.modeRunning,
-        transmission_guess=IC.transmission_guess,
-        multiple_scattering_order=IC.multiple_scattering_order,
-        number_of_events=IC.number_of_events
-    )
-        
-    # Create Profiles 
-    profiles = []
-    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
-        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
-    ):
-        profiles.append(NeutronComptonProfile(
-            str(mass), mass=mass, intensity=intensity, width=width, center=center,
-            intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
-        ))
-
-    AR.add_profiles(*profiles)
+    AR = _create_analysis_object_from_current_interface(IC)
     return AR.run()
 
 
@@ -191,61 +194,14 @@ def calculateHToMassIdxRatio(fwdScatResults):
 
 
 def runJoint(bckwdIC, fwdIC):
-    wsFinal, bckwdScatResults = iterativeFitForDataReduction(bckwdIC)
-    setInitFwdParsFromBackResults(bckwdScatResults, bckwdIC, fwdIC)
-    wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
-    return wsFinal, bckwdScatResults, fwdScatResults
 
+    backRoutine = _create_analysis_object_from_current_interface(bckwdIC)
+    frontRoutine = _create_analysis_object_from_current_interface(fwdIC)
 
-def setInitFwdParsFromBackResults(bckwdScatResults, bckwdIC, fwdIC):
-    """
-    Used to pass mean widths and intensities from back scattering onto intial conditions of forward scattering.
-    Checks if H is present and adjust the passing accordingly:
-    If H present, use HToMassIdxRatio to recalculate intensities and fix only non-H widths.
-    If H not present, widths and intensities are directly mapped and all widhts except first are fixed.
-    """
-
-    # Get widts and intensity ratios from backscattering results
-    backMeanWidths = bckwdScatResults.all_mean_widths[-1]
-    backMeanIntensityRatios = bckwdScatResults.all_mean_intensities[-1]
-
-    if isHPresent(fwdIC.masses):
-        assert len(backMeanWidths) == fwdIC.noOfMasses - 1, (
-            "H Mass present, no of masses in frontneeds to be bigger" "than back by 1."
-        )
-
-        # Use H ratio to calculate intensity ratios
-        HIntensity = bckwdIC.HToMassIdxRatio * backMeanIntensityRatios[bckwdIC.massIdx]
-        # Add H intensity in the first idx
-        initialFwdIntensityRatios = np.append([HIntensity], backMeanIntensityRatios)
-        # Normalize intensities
-        initialFwdIntensityRatios /= np.sum(initialFwdIntensityRatios)
-
-        # Set calculated intensity ratios to forward scattering
-        fwdIC.initPars[0::3] = initialFwdIntensityRatios
-        # Set forward widths from backscattering
-        fwdIC.initPars[4::3] = backMeanWidths
-        # Fix all widths except for H, i.e. the first one
-        fwdIC.bounds[4::3] = backMeanWidths[:, np.newaxis] * np.ones((1, 2))
-
-    else:  # H mass not present anywhere
-        assert len(backMeanWidths) == fwdIC.noOfMasses, (
-            "H Mass not present, no of masses needs to be the same for"
-            "front and back scattering."
-        )
-
-        # Set widths and intensity ratios
-        fwdIC.initPars[1::3] = backMeanWidths
-        fwdIC.initPars[0::3] = backMeanIntensityRatios
-
-        if len(backMeanWidths) > 1:  # In the case of single mass, width is not fixed
-            # Fix all widhts except first
-            fwdIC.bounds[4::3] = backMeanWidths[1:][:, np.newaxis] * np.ones((1, 2))
-
-    print(
-        "\nChanged initial conditions of forward scattering according to mean widhts and intensity ratios from "
-        "backscattering.\n"
-    )
+    backRoutine.run()
+    frontRoutine.set_initial_profiles_from(backRoutine)
+    print("\nCHANGED STARTING POINT OF PROFILES\n")
+    frontRoutine.run()
     return
 
 

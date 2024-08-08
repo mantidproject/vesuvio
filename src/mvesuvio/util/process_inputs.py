@@ -81,6 +81,14 @@ def completeICFromInputs(IC, wsIC):
     except AttributeError:
         IC.normVoigt = True
 
+    #Create default for H ratio
+    # Only for completeness sake, will be removed anyway 
+    # when transition to new interface is complete
+    try:
+        IC.HToMassIdxRatio
+    except AttributeError:
+        IC.HToMassIdxRatio = None 
+
     return
 
 

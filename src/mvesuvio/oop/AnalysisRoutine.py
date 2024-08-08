@@ -9,15 +9,16 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, MaskDetectors, SumS
                             CreateWorkspace
 from mvesuvio.analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 import numpy as np 
+import matplotlib.pyplot as plt
 from scipy import optimize
 import sys
 
 class AnalysisRoutine:
 
-    def __init__(self, workspace, ip_file, number_of_iterations, mask_spectra,
+    def __init__(self, workspace, ip_file, h_ratio_to_lowest_mass, number_of_iterations, mask_spectra,
                  multiple_scattering_correction, vertical_width, horizontal_width, thickness,
                  gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
-                 number_of_events=None, results_path=None):
+                 number_of_events=None, results_path=None, figures_path=None):
 
         self._name = workspace.name() + '_'
         self._ip_file = ip_file
@@ -38,6 +39,7 @@ class AnalysisRoutine:
         self._gamma_correction = gamma_correction
 
         self._save_results_path = results_path
+        self._save_figures_path = figures_path
 
         # Variables changing during fit
         self._workspace_for_corrections = workspace
@@ -47,7 +49,8 @@ class AnalysisRoutine:
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
 
-        self._h_ratio = None
+        self._h_ratio = h_ratio_to_lowest_mass 
+        #TODO: Code way of implementing constraints in fit
         self._constraints = () 
         self._profiles = {} 
 
@@ -55,38 +58,55 @@ class AnalysisRoutine:
         self._run_hist_data = True 
         self._run_norm_voigt = False
 
-        # Links to another AnalysisRoutine object:
-        self._profiles_destination = None
-        self._h_ratio_destination = None
-
 
     def add_profiles(self, *args: NeutronComptonProfile):
         for profile in args:
             self._profiles[profile.label] = profile
 
 
+    @property
+    def profiles(self):
+        return self._profiles
+
+    def set_initial_profiles_from(self, source: 'AnalysisRoutine'):
+        
+        # Set intensities
+        for p in self._profiles.values():
+            if np.isclose(p.mass, 1, atol=0.1):    # Hydrogen present
+                p.intensity = source._h_ratio * source._get_lightest_profile().mean_intensity
+                continue
+            p.intensity = source.profiles[p.label].mean_intensity
+
+        # Normalise intensities
+        sum_intensities = sum([p.intensity for p in self._profiles.values()])
+        for p in self._profiles.values():
+            p.intensity /= sum_intensities
+            
+        # Set widths
+        for p in self._profiles.values():
+            try:
+                p.width = source.profiles[p.label].mean_width
+            except KeyError:
+                continue
+
+        # Fix all widths except lightest mass
+        for p in self._profiles.values():
+            if p == self._get_lightest_profile():
+                continue
+            p.width_bounds = [p.width, p.width]
+
+        return
+
+
+    def _get_lightest_profile(self):
+        profiles = [p for p in self._profiles.values()]
+        masses = [p.mass for p in self._profiles.values()]
+        return profiles[np.argmin(masses)]
+
+
     def add_constraint(self, constraint_string: str):
         self._constraints.append(constraint_string)
 
-
-    def add_h_ratio_to_next_lowest_mass(self, ratio: float):
-        self._h_ratio_to_next_lowest_mass = ratio
-
-
-    def send_ncp_fit_parameters(self):
-       self._profiles_destination.profiles = self.profiles
-
-
-    def send_h_ratio(self):
-        self._h_ratio_destination.h_ratio_to_next_lowest_mass = self._h_ratio
-
-    @property
-    def h_ratio_to_next_lowest_mass(self):
-        return self._h_ratio
-
-    @h_ratio_to_next_lowest_mass.setter
-    def h_ratio_to_next_lowest_mass(self, value):
-        self.h_ratio_to_next_lowest_mass = value
 
     @property
     def profiles(self):
@@ -103,9 +123,6 @@ class AnalysisRoutine:
     def _set_const_methods(self):
         # Set up variables used during fitting
         self._masses = np.array([p.mass for p in self._profiles.values()])
-
-
-        self._fig_save_path = None
 
 
     def _update_workspace_data(self):
@@ -126,10 +143,10 @@ class AnalysisRoutine:
         )
         table.setTitle("SciPy Fit Parameters")
         table.addColumn(type="float", name="Spectrum")
-        for p in self._profiles.values():
-            table.addColumn(type="float", name=f"{p.label} Intensity")
-            table.addColumn(type="float", name=f"{p.label} Width")
-            table.addColumn(type="float", name=f"{p.label} Center ")
+        for key in self._profiles.keys():
+            table.addColumn(type="float", name=f"{key} Intensity")
+            table.addColumn(type="float", name=f"{key} Width")
+            table.addColumn(type="float", name=f"{key} Center ")
         table.addColumn(type="float", name="Normalised Chi2")
         table.addColumn(type="float", name="Number of Iteraions")
 
@@ -141,20 +158,43 @@ class AnalysisRoutine:
             self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
-        self._mean_widths = None 
-        self._std_widths = None 
-        self._mean_intensity_ratios = None 
-        self._std_intensity_ratios = None 
+        self._mean_widths = None
+        self._std_widths = None
+        self._mean_intensity_ratios = None
+        self._std_intensity_ratios = None
+
+    @property
+    def mean_widths(self):
+        return self._mean_widths
+
+    @mean_widths.setter
+    def mean_widths(self, value):
+        self._mean_widths = value
+        for i, p in enumerate(self._profiles.values()):
+            p.mean_width = self._mean_widths[i]
+        return
+
+
+    @property
+    def mean_intensity_ratios(self):
+        return self._mean_intensity_ratios
+
+    @mean_intensity_ratios.setter
+    def mean_intensity_ratios(self, value):
+        self._mean_intensity_ratios = value
+        for i, p in enumerate(self.profiles.values()):
+            p.mean_intensity = self._mean_intensity_ratios[i]
+        return
 
 
     def _create_emtpy_ncp_workspace(self, suffix):
         return CreateWorkspace(
-                DataX=self._dataX,
-                DataY=np.zeros(self._dataY.size),
-                DataE=np.zeros(self._dataE.size),
-                Nspec=self._workspace_being_fit.getNumberHistograms(),
-                OutputWorkspace=self._workspace_being_fit.name()+suffix,
-                ParentWorkspace=self._workspace_being_fit
+            DataX=self._dataX,
+            DataY=np.zeros(self._dataY.size),
+            DataE=np.zeros(self._dataE.size),
+            Nspec=self._workspace_being_fit.getNumberHistograms(),
+            OutputWorkspace=self._workspace_being_fit.name()+suffix,
+            ParentWorkspace=self._workspace_being_fit
     )
 
 
@@ -193,6 +233,7 @@ class AnalysisRoutine:
             self._fit_neutron_compton_profiles()
 
             self._create_summed_workspaces()
+            self._save_plots()
             self._set_means_and_std()
 
             # When last iteration, skip MS and GC
@@ -346,28 +387,31 @@ class AnalysisRoutine:
         return ySpacesForEachMass
 
 
-    def save_plots(self, wsDataSum, wsTotNCPSum, wsMNCPSum):
+    def _save_plots(self):
         # if IC.runningSampleWS:  # Skip saving figure if running bootstrap
         #     return
 
-        if not self._fig_save_path:
+        if not self._save_figures_path:
             return
+
         lw = 2
 
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
-        ax.errorbar(wsDataSum, "k.", label="Spectra")
 
-        ax.plot(wsTotNCPSum, "r-", label="Total NCP", linewidth=lw)
-        for m, wsNcp in zip(self._masses, wsMNCPSum):
-            ax.plot(wsNcp, label=f"NCP m={m}", linewidth=lw)
+        ws_data_sum = mtd[self._workspace_being_fit.name()+"_Sum"]
+        ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra")
+
+        for key, ws in self._fit_profiles_workspaces.items():
+            ws_sum = mtd[ws.name()+"_Sum"] 
+            ax.plot(ws_sum, label=f'Sum of {key} profile', linewidth=lw)
 
         ax.set_xlabel("TOF")
         ax.set_ylabel("Counts")
         ax.set_title("Sum of NCP fits")
         ax.legend()
 
-        fileName = wsDataSum.name() + "_NCP_Fits.pdf"
-        savePath = self._fig_save_path / fileName
+        fileName = self._workspace_being_fit.name() + "_profiles_sum.pdf"
+        savePath = self._save_figures_path / fileName
         plt.savefig(savePath, bbox_inches="tight")
         plt.close(fig)
         return
@@ -405,9 +449,9 @@ class AnalysisRoutine:
             len(meanWidths) == len(self._profiles) 
         ), "Number of mean widths must match number of profiles!"
 
-        self._mean_widths = meanWidths
+        self.mean_widths = meanWidths     # Use setter
         self._std_widths = stdWidths
-        self._mean_intensity_ratios = meanIntensityRatios
+        self.mean_intensity_ratios = meanIntensityRatios   # Use setter
         self._std_intensity_ratios = stdIntensityRatios
 
         self.createMeansAndStdTableWS()
@@ -519,7 +563,7 @@ class AnalysisRoutine:
         for p in self._profiles.values():
             for attr in ['intensity', 'width', 'center']:
                 initial_parameters.append(getattr(p, attr))
-            for attr in ['_intensity_bounds', '_width_bounds', '_center_bounds']:
+            for attr in ['intensity_bounds', 'width_bounds', 'center_bounds']:
                 bounds.append(getattr(p, attr))
 
         result = optimize.minimize(
