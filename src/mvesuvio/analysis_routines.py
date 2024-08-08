@@ -200,7 +200,6 @@ def runJoint(bckwdIC, fwdIC):
 
     backRoutine.run()
     frontRoutine.set_initial_profiles_from(backRoutine)
-    print("\nCHANGED STARTING POINT OF PROFILES\n")
     frontRoutine.run()
     return
 

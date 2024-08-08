@@ -869,7 +869,7 @@ class AnalysisRoutine:
                 masses = np.append(masses, 1.0079)
                 meanWidths = np.append(meanWidths, 5.0)
 
-                HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(self._masses)]
+                HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(masses)]
                 meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
                 meanIntensityRatios /= np.sum(meanIntensityRatios)
 
