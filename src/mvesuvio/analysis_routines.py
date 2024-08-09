@@ -1,9 +1,9 @@
 # from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace
-from mvesuvio.oop.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace
-from mvesuvio.oop.AnalysisRoutine import AnalysisRoutine
-from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile
+from mvesuvio.util.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace
+from mvesuvio.analysis_reduction import AnalysisRoutine
+from mvesuvio.analysis_reduction import NeutronComptonProfile
 import numpy as np
 
 
