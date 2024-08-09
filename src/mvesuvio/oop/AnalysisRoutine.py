@@ -18,7 +18,7 @@ class AnalysisRoutine:
     def __init__(self, workspace, ip_file, h_ratio_to_lowest_mass, number_of_iterations, mask_spectra,
                  multiple_scattering_correction, vertical_width, horizontal_width, thickness,
                  gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
-                 number_of_events=None, results_path=None, figures_path=None):
+                 number_of_events=None, results_path=None, figures_path=None, constraints=()):
 
         self._name = workspace.name()
         self._ip_file = ip_file
@@ -50,8 +50,7 @@ class AnalysisRoutine:
         self._fit_profiles_workspaces = {}
 
         self._h_ratio = h_ratio_to_lowest_mass 
-        #TODO: Code way of implementing constraints in fit
-        self._constraints = () 
+        self._constraints = constraints 
         self._profiles = {} 
 
         # Only used for system tests, remove once tests are updated
@@ -104,10 +103,6 @@ class AnalysisRoutine:
         return profiles[np.argmin(masses)]
 
 
-    def add_constraint(self, constraint_string: str):
-        self._constraints.append(constraint_string)
-
-
     def calculate_h_ratio(self):
 
         if not np.isclose(self._get_lightest_profile().mass, 1, atol=0.1):    # Hydrogen present
@@ -125,17 +120,13 @@ class AnalysisRoutine:
     def profiles(self):
         return self._profiles
 
+
     @profiles.setter
     def profiles(self, incoming_profiles):
         assert(isinstance(incoming_profiles, dict))
         common_keys = self._profiles.keys() & incoming_profiles.keys() 
         common_keys_profiles = {k: incoming_profiles[k] for k in common_keys}
         self._profiles = {**self._profiles, **common_keys_profiles}
-
-
-    def _set_const_methods(self):
-        # Set up variables used during fitting
-        self._masses = np.array([p.mass for p in self._profiles.values()])
 
 
     def _update_workspace_data(self):
@@ -223,9 +214,7 @@ class AnalysisRoutine:
 
         assert len(self.profiles) > 0, "Add profiles before atempting to run the routine!"
 
-        self._set_const_methods()
-
-        self.createTableInitialParameters()
+        self._create_table_initial_parameters()
 
         # Legacy code from Bootstrap
         # if self.runningSampleWS:
@@ -262,6 +251,8 @@ class AnalysisRoutine:
                 OutputWorkspace="next_iteration"
             )
             self._correct_for_gamma_and_multiple_scattering("next_iteration")
+
+            # Need to remask columns of output of corrections 
             self._remask_columns_with_zeros("next_iteration")
 
             RenameWorkspace(
@@ -270,11 +261,11 @@ class AnalysisRoutine:
             )
 
         self._set_results()
-        self.save_results()
+        self._save_results()
         return self 
 
 
-    def createTableInitialParameters(self):
+    def _create_table_initial_parameters(self):
         meansTableWS = CreateEmptyTableWorkspace(
             OutputWorkspace=self._name + "_Initial_Parameters"
         )
@@ -296,6 +287,7 @@ class AnalysisRoutine:
             print(f"{'Initial Width:':>20s} {p.width:<8.3f} Bounds: {p.width_bounds}")
             print(f"{'Initial Center:':>20s} {p.center:<8.3f} Bounds: {p.center_bounds}")
         print("\n")
+        return
 
 
     def _fit_neutron_compton_profiles(self):
@@ -391,7 +383,7 @@ class AnalysisRoutine:
         delta_E = delta_E[np.newaxis, :, :]
 
         mN, Ef, en_to_vel, vf, hbar = loadConstants()
-        masses = self._masses.reshape(self._masses.size, 1, 1)
+        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1, 1)
 
         energyRecoil = np.square(hbar * delta_Q) / 2.0 / masses
         ySpacesForEachMass = (
@@ -446,7 +438,7 @@ class AnalysisRoutine:
         """Calculate mean widths and intensities from tableWorkspace"""
 
         fitParsTable = self._table_fit_results
-        widths = np.zeros((self._masses.size, fitParsTable.rowCount()))
+        widths = np.zeros((len(self._profiles), fitParsTable.rowCount()))
         intensities = np.zeros(widths.shape)
         for i, p in enumerate(self._profiles.values()):
             widths[i] = fitParsTable.column(f"{p.label} Width")
@@ -640,7 +632,7 @@ class AnalysisRoutine:
         intensities = pars[::3].reshape(-1, 1)
         widths = pars[1::3].reshape(-1, 1)
         centers = pars[2::3].reshape(-1, 1)
-        masses = self._masses.reshape(-1, 1)
+        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1)
 
         v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
 
@@ -691,7 +683,7 @@ class AnalysisRoutine:
 
 
     def calcGaussianResolution(self, centers):
-        masses = self._masses.reshape((self._masses.size, 1))
+        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
@@ -737,7 +729,7 @@ class AnalysisRoutine:
 
 
     def calcLorentzianResolution(self, centers):
-        masses = self._masses.reshape((self._masses.size, 1))
+        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
@@ -773,6 +765,41 @@ class AnalysisRoutine:
         )
         return pseudo_voigt / norm
 
+
+    # When interface is updated, uncomment to change the way
+    # constraints are handled:
+
+    # def _get_parsed_constraints(self):
+    #
+    #     parsed_constraints = []
+    #
+    #     for constraint in  self._constraints:
+    #         constraint['fun'] = self._get_parsed_constraint_function(constraint['fun']) 
+    #
+    #         parsed_constraints.append(constraint)
+    #
+    #     return parsed_constraints
+    #
+    #
+    # def _get_parsed_constraint_function(self, function_string: str):
+    #
+    #     profile_order = [key for key in self._profiles.keys()]
+    #     attribute_order = ['intensity', 'width', 'center']
+    #
+    #     words = function_string.split(' ')
+    #     for i, word in enumerate(words):
+    #         if '.' in word:
+    #
+    #             try:    # Skip floats 
+    #                 float(word) 
+    #             except ValueError: 
+    #                 continue
+    #
+    #             profile, attribute = word
+    #             words[i] = f"pars[{profile_order.index(profile) + attribute_order.index(attribute)}]" 
+    #
+    #     return eval(f"lambda pars: {' '.join(words)}")
+        
 
     def _replace_zero_columns_with_ncp_fit(self):
         """
@@ -874,7 +901,7 @@ class AnalysisRoutine:
 
 
     def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
-        masses = self._masses.flatten()
+        masses = [p.mass for p in self._profiles.values()]
 
         # If Backsscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
@@ -981,7 +1008,7 @@ class AnalysisRoutine:
 
 
     def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
-        masses = self._masses.flatten()
+        masses = [p.mass for p in self._profiles.values()]
         profiles = ""
         for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
             profiles += (
@@ -1061,7 +1088,7 @@ class AnalysisRoutine:
         self.all_std_widths = np.array(allStdWidths)
         self.all_std_intensities = np.array(allStdIntensities)
 
-    def save_results(self):
+    def _save_results(self):
         """Saves all of the arrays stored in this object"""
 
         maskedDetectorIdx = np.array(self._mask_spectra) - self._firstSpec

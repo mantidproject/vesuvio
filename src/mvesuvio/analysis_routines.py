@@ -40,7 +40,8 @@ def _create_analysis_object_from_current_interface(IC):
         multiple_scattering_order=IC.multiple_scattering_order,
         number_of_events=IC.number_of_events,
         results_path=IC.resultsSavePath,
-        figures_path=IC.figSavePath
+        figures_path=IC.figSavePath,
+        constraints=IC.constraints
     )
     profiles = []
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
