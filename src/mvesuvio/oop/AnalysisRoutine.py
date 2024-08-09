@@ -20,7 +20,7 @@ class AnalysisRoutine:
                  gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
                  number_of_events=None, results_path=None, figures_path=None):
 
-        self._name = workspace.name() + '_'
+        self._name = workspace.name()
         self._ip_file = ip_file
         self._number_of_iterations = number_of_iterations
         spectrum_list = workspace.getSpectrumNumbers()
@@ -107,6 +107,19 @@ class AnalysisRoutine:
     def add_constraint(self, constraint_string: str):
         self._constraints.append(constraint_string)
 
+
+    def calculate_h_ratio(self):
+
+        if not np.isclose(self._get_lightest_profile().mass, 1, atol=0.1):    # Hydrogen present
+            return None
+        
+        # Hydrogen is present 
+        intensities = np.array([p.mean_intensity for p in self._profiles.values()])
+        masses = np.array([p.mass for p in self._profiles.values()])
+
+        sorted_intensities = intensities[np.argsort(masses)]
+        return sorted_intensities[0] / sorted_intensities[1] 
+        
 
     @property
     def profiles(self):
@@ -220,7 +233,7 @@ class AnalysisRoutine:
         #         InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name()
         #     )
 
-        RenameWorkspace(
+        CloneWorkspace(
             InputWorkspace=self._workspace_being_fit.name(), 
             OutputWorkspace=self._name + '0' 
         )

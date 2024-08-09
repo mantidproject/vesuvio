@@ -34,13 +34,12 @@ def runRoutine(
         if proc is None:
             return
 
-        ranPreliminary = False
         if (proc == "BACKWARD") | (proc == "JOINT"):
+
             if isHPresent(fwdIC.masses) & (bckwdIC.HToMassIdxRatio is None):
-                HRatios, massIdxs = runPreProcToEstHRatio(
-                    bckwdIC, fwdIC
-                )  # Sets H ratio to bckwdIC automatically
-                ranPreliminary = True
+                runPreProcToEstHRatio(bckwdIC, fwdIC)
+                return
+
             assert isHPresent(fwdIC.masses) != (
                 bckwdIC.HToMassIdxRatio is None
             ), "When H is not present, HToMassIdxRatio has to be set to None"
@@ -51,10 +50,6 @@ def runRoutine(
             res = runIndependentIterativeProcedure(fwdIC)
         if proc == "JOINT":
             res = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
-
-        # If preliminary procedure ran, make TableWS with H ratios values
-        if ranPreliminary:
-            createTableWSHRatios(HRatios, massIdxs)
         return res
 
     # Names of workspaces to be fitted in y space

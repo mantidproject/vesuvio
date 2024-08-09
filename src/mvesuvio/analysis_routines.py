@@ -92,105 +92,51 @@ def runPreProcToEstHRatio(bckwdIC, fwdIC):
     Runs iterative procedure with alternating back and forward scattering.
     """
 
-    assert (
-        bckwdIC.runningSampleWS is False
-    ), "Preliminary procedure not suitable for Bootstrap."
-    fwdIC.runningPreliminary = True
+    # assert (
+    #     bckwdIC.runningSampleWS is False
+    # ), "Preliminary procedure not suitable for Bootstrap."
+    # fwdIC.runningPreliminary = True
 
-    # Store original no of MS and set MS iterations to zero
-    oriMS = []
-    for IC in [bckwdIC, fwdIC]:
-        oriMS.append(IC.noOfMSIterations)
-        IC.noOfMSIterations = 0
-
-    nIter = askUserNoOfIterations()
-
-    HRatios = []  # List to store HRatios
-    massIdxs = []
-    # Run preliminary forward with a good guess for the widths of non-H masses
-    wsFinal, fwdScatResults = iterativeFitForDataReduction(fwdIC)
-    for i in range(int(nIter)):  # Loop until convergence is achieved
-        AnalysisDataService.clear()  # Clears all Workspaces
-
-        # Update H ratio
-        massIdx, HRatio = calculateHToMassIdxRatio(fwdScatResults)
-        bckwdIC.HToMassIdxRatio = HRatio
-        bckwdIC.massIdx = massIdx
-        HRatios.append(HRatio)
-        massIdxs.append(massIdx)
-
-        wsFinal, bckwdScatResults, fwdScatResults = runJoint(bckwdIC, fwdIC)
-
-    print(f"\nIdxs of masses for H ratio for each iteration: \n{massIdxs}")
-    print(f"\nCorresponding H ratios: \n{HRatios}")
-
-    fwdIC.runningPreliminary = (
-        False  # Change to default since end of preliminary procedure
+    userInput = input(
+        "\nHydrogen intensity ratio to lowest mass is not set. Run procedure to estimate it?"
     )
+    if not ((userInput == "y") or (userInput == "Y")):
+        raise KeyboardInterrupt("Procedure interrupted.")
 
-    # Set original number of MS iterations
-    for IC, ori in zip([bckwdIC, fwdIC], oriMS):
-        IC.noOfMSIterations = ori
+    table_h_ratios = createTableWSHRatios()
 
-    # Update the H ratio with the best estimate, chages bckwdIC outside function
-    massIdx, HRatio = calculateHToMassIdxRatio(fwdScatResults)
-    bckwdIC.HToMassIdxRatio = HRatio
-    bckwdIC.massIdx = massIdx
-    HRatios.append(HRatio)
-    massIdxs.append(massIdx)
+    backRoutine = _create_analysis_object_from_current_interface(bckwdIC)
+    frontRoutine = _create_analysis_object_from_current_interface(fwdIC)
 
-    return HRatios, massIdxs
+    frontRoutine.run()
+    current_ratio = frontRoutine.calculate_h_ratio()
+    table_h_ratios.addRow([current_ratio])
+    previous_ratio = np.nan 
 
+    while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
 
-def createTableWSHRatios(HRatios, massIdxs):
-    tableWS = CreateEmptyTableWorkspace(
-        OutputWorkspace="H_Ratios_From_Preliminary_Procedure"
-    )
-    tableWS.setTitle("H Ratios and Idxs at each iteration")
-    tableWS.addColumn(type="int", name="iter")
-    tableWS.addColumn(type="float", name="H Ratio")
-    tableWS.addColumn(type="int", name="Mass Idx")
-    for i, (hr, hi) in enumerate(zip(HRatios, massIdxs)):
-        tableWS.addRow([i, hr, hi])
+        backRoutine._h_ratio = current_ratio
+        backRoutine.run()
+        frontRoutine.set_initial_profiles_from(backRoutine)
+        frontRoutine.run()
+
+        previous_ratio = current_ratio
+        current_ratio = frontRoutine.calculate_h_ratio()
+
+        table_h_ratios.addRow([current_ratio])
+
+    print("\nProcedute to estimate Hydrogen ratio finished.",
+          "\nEstimates at each iteration converged:",
+          f"\n{table_h_ratios.column(0)}")
     return
 
 
-def askUserNoOfIterations():
-    print("\nH was detected but HToMassIdxRatio was not provided.")
-    print(
-        "\nSugested preliminary procedure:\n\nrun_forward\nfor n:\n    estimate_HToMassIdxRatio\n    run_backward\n"
-        "    run_forward"
+def createTableWSHRatios():
+    table = CreateEmptyTableWorkspace(
+        OutputWorkspace="H_Ratios_Estimates"
     )
-    userInput = input(
-        "\n\nDo you wish to run preliminary procedure to estimate HToMassIdxRatio? (y/n)"
-    )
-    if not ((userInput == "y") or (userInput == "Y")):
-        raise KeyboardInterrupt("Preliminary procedure interrupted.")
-
-    nIter = int(input("\nHow many iterations do you wish to run? n="))
-    return nIter
-
-
-def calculateHToMassIdxRatio(fwdScatResults):
-    """
-    Calculate H ratio to mass with highest peak.
-    Returns idx of mass and corresponding H ratio.
-    """
-    fwdMeanIntensityRatios = fwdScatResults.all_mean_intensities[-1]
-
-    # To find idx of mass in backward scattering, take out first mass H
-    fwdIntensitiesNoH = fwdMeanIntensityRatios[1:]
-
-    massIdx = np.argmax(
-        fwdIntensitiesNoH
-    )  # Idex of forward inensities, which include H
-    assert (
-        fwdIntensitiesNoH[massIdx] != 0
-    ), "Cannot estimate H intensity since maximum peak from backscattering is zero."
-
-    HRatio = fwdMeanIntensityRatios[0] / fwdIntensitiesNoH[massIdx]
-
-    return massIdx, HRatio
+    table.addColumn(type="float", name="H Ratio to lowest mass at each iteration")
+    return table
 
 
 def runJoint(bckwdIC, fwdIC):
