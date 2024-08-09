@@ -1,17 +1,19 @@
-from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile 
-from mvesuvio.oop.analysis_helpers import extractWS, histToPointData, loadConstants, \
-                                            gaussian, lorentizian, numericalThirdDerivative, \
-                                            switchFirstTwoAxis, createWS
-from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, MaskDetectors, SumSpectra, \
+import numpy as np 
+import matplotlib.pyplot as plt
+from scipy import optimize
+from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace
-from mvesuvio.analysis_fitting import passDataIntoWS, replaceZerosWithNCP
-import numpy as np 
-import matplotlib.pyplot as plt
-from scipy import optimize
-import sys
+
+from mvesuvio.oop.NeutronComptonProfile import NeutronComptonProfile 
+from mvesuvio.oop.analysis_helpers import histToPointData, loadConstants, \
+                                        gaussian, lorentizian, numericalThirdDerivative
+
+
+np.set_printoptions(suppress=True, precision=4, linewidth=200)
+
 
 class AnalysisRoutine:
 
@@ -23,9 +25,6 @@ class AnalysisRoutine:
         self._name = workspace.name()
         self._ip_file = ip_file
         self._number_of_iterations = number_of_iterations
-        spectrum_list = workspace.getSpectrumNumbers()
-        self._firstSpec = min(spectrum_list)
-        self._lastSpec = max(spectrum_list)
         self._mask_spectra = mask_spectra
         self._transmission_guess = transmission_guess
         self._multiple_scattering_order = multiple_scattering_order
@@ -34,24 +33,22 @@ class AnalysisRoutine:
         self._horizontal_width = horizontal_width
         self._thickness = thickness
         self._mode_running = mode_running
-
         self._multiple_scattering_correction = multiple_scattering_correction
         self._gamma_correction = gamma_correction
-
         self._save_results_path = results_path
         self._save_figures_path = figures_path
+        self._h_ratio = h_ratio_to_lowest_mass 
+        self._constraints = constraints 
+
+        self._profiles = {} 
 
         # Variables changing during fit
         self._workspace_for_corrections = workspace
-        self._zero_columns_mask = None
         self._workspace_being_fit = workspace
         self._row_being_fit = 0 
+        self._zero_columns_boolean_mask = None
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
-
-        self._h_ratio = h_ratio_to_lowest_mass 
-        self._constraints = constraints 
-        self._profiles = {} 
 
         # Only used for system tests, remove once tests are updated
         self._run_hist_data = True 
@@ -66,6 +63,7 @@ class AnalysisRoutine:
     @property
     def profiles(self):
         return self._profiles
+
 
     def set_initial_profiles_from(self, source: 'AnalysisRoutine'):
         
@@ -130,7 +128,10 @@ class AnalysisRoutine:
 
 
     def _update_workspace_data(self):
-        self._dataX, self._dataY, self._dataE = extractWS(self._workspace_being_fit)
+
+        self._dataX = self._workspace_being_fit.extractX()
+        self._dataY = self._workspace_being_fit.extractY()
+        self._dataE = self._workspace_being_fit.extractE()
 
         if self._run_hist_data:  # Converts point data from workspaces to histogram data
             self._dataY, self._dataX, self._dataE = histToPointData(self._dataY, self._dataX, self._dataE)
@@ -138,10 +139,23 @@ class AnalysisRoutine:
         self._set_up_kinematic_arrays()
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * len(self._profiles) + 3))
-
         self._row_being_fit = 0 
+        self._table_fit_results = self._initialize_table_fit_parameters()
 
-        #Initialise Table for fit parameters
+        # Initialise workspaces for fitted ncp 
+        self._fit_profiles_workspaces = {}
+        for element, p in self._profiles.items():
+            self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
+        self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
+
+        # Initialise empty means
+        self._mean_widths = None
+        self._std_widths = None
+        self._mean_intensity_ratios = None
+        self._std_intensity_ratios = None
+
+
+    def _initialize_table_fit_parameters(self):
         table = CreateEmptyTableWorkspace(
             OutputWorkspace=self._workspace_being_fit.name()+ "_fit_results"
         )
@@ -153,23 +167,13 @@ class AnalysisRoutine:
             table.addColumn(type="float", name=f"{key} Center ")
         table.addColumn(type="float", name="Normalised Chi2")
         table.addColumn(type="float", name="Number of Iteraions")
+        return table
 
-        self._table_fit_results = table 
-
-        #Initialise workspaces for fitted ncp 
-        self._fit_profiles_workspaces = {}
-        for element, p in self._profiles.items():
-            self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
-        self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
-
-        self._mean_widths = None
-        self._std_widths = None
-        self._mean_intensity_ratios = None
-        self._std_intensity_ratios = None
 
     @property
     def mean_widths(self):
         return self._mean_widths
+
 
     @mean_widths.setter
     def mean_widths(self, value):
@@ -324,9 +328,13 @@ class AnalysisRoutine:
         """Loads instrument parameters into array, from the file in the specified path"""
 
         data = np.loadtxt(self._ip_file, dtype=str)[1:].astype(float)
-
         spectra = data[:, 0]
-        select_rows = np.where((spectra >= self._firstSpec) & (spectra <= self._lastSpec))
+
+        workspace_spectrum_list = self._workspace_being_fit.getSpectrumNumbers()
+        first_spec = min(workspace_spectrum_list)
+        last_spec = max(workspace_spectrum_list)
+
+        select_rows = np.where((spectra >= first_spec) & (spectra <= last_spec))
         instrPars = data[select_rows]
         return instrPars
 
@@ -526,7 +534,7 @@ class AnalysisRoutine:
             maskedIntensities, axis=0
         )  # Not nansum()
 
-        # TODO: sort this out
+        # Keep this around in case it is needed again
         # When trying to estimate HToMassIdxRatio and normalization fails, skip normalization
         # if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
         #     assert IC.noOfMSIterations == 0, (
@@ -552,11 +560,6 @@ class AnalysisRoutine:
 
 
     def _fit_neutron_compton_profiles_to_row(self):
-        """
-        Fits the neutron compton profiles to one spectrum.
-        Calculates the best fit parameters and adds them to results table.
-        Adds row with calculated profiles to results workspace.
-        """
 
         if np.all(self._dataY[self._row_being_fit] == 0):
             self._table_fit_results.addRow(np.zeros(3*len(self._profiles)+3))
@@ -591,10 +594,7 @@ class AnalysisRoutine:
         # Store results for easier access when calculating means
         self._fit_parameters[self._row_being_fit] = tableRow 
 
-        with np.printoptions(
-            suppress=True, precision=4, linewidth=200, threshold=sys.maxsize
-        ):
-            print(tableRow)
+        print(tableRow)
 
         # Pass fit profiles into workspaces
         individual_ncps = self._neutron_compton_profiles(fitPars)
@@ -813,7 +813,7 @@ class AnalysisRoutine:
         dataY = self._workspace_for_corrections.extractY()
         ncp = self._fit_profiles_workspaces['total'].extractY()
 
-        self._zero_columns_mask = np.all(dataY == 0, axis=0)  # Masked Cols
+        self._zero_columns_boolean_mask = np.all(dataY == 0, axis=0)  # Masked Cols
 
         self._workspace_for_corrections = CloneWorkspace(
             InputWorkspace=self._workspace_for_corrections.name(), 
@@ -821,7 +821,7 @@ class AnalysisRoutine:
         )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
             # TODO: Once the option to chage point to hist is removed, remove [:len(ncp)]
-            self._workspace_for_corrections.dataY(row)[self._zero_columns_mask] = ncp[row, self._zero_columns_mask[:len(ncp[row])]]
+            self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask[:len(ncp[row])]]
 
         SumSpectra(
             InputWorkspace=self._workspace_for_corrections.name(), 
@@ -838,8 +838,8 @@ class AnalysisRoutine:
         """
         ws_to_remask = mtd[ws_to_remask_name]
         for row in range(ws_to_remask.getNumberHistograms()):
-            ws_to_remask.dataY(row)[self._zero_columns_mask] = 0
-            ws_to_remask.dataE(row)[self._zero_columns_mask] = 0
+            ws_to_remask.dataY(row)[self._zero_columns_boolean_mask] = 0
+            ws_to_remask.dataE(row)[self._zero_columns_boolean_mask] = 0
         return
 
 
@@ -1064,7 +1064,7 @@ class AnalysisRoutine:
                         wsIterName + f"_{p.label}_ncp"
                     ]
                     allNCP.append(ncpWsToAppend.extractY())
-                allNCP = switchFirstTwoAxis(np.array(allNCP))
+                allNCP = np.swapaxes(np.array(allNCP), 0, 1)
                 allIterNcp.append(allNCP)
 
                 # Extract Mean and Std Widths, Intensities
@@ -1091,7 +1091,7 @@ class AnalysisRoutine:
     def _save_results(self):
         """Saves all of the arrays stored in this object"""
 
-        maskedDetectorIdx = np.array(self._mask_spectra) - self._firstSpec
+        maskedDetectorIdx = np.array(self._mask_spectra) - min(self._workspace_being_fit.getSpectrumNumbers())
 
         # TODO: Take out nans next time when running original results
         # Because original results were recently saved with nans, mask spectra with nans
