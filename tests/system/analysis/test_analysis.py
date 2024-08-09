@@ -47,14 +47,15 @@ class AnalysisRunner:
             YSpaceFitInitialConditions(),
             True,
         )
+        AnalysisRunner._currentResults = scattRes 
+        return
 
-        wsFinal, forwardScatteringResults = scattRes
-
-        # Test the results
-        np.set_printoptions(suppress=True, precision=8, linewidth=150)
-
-        currentResults = forwardScatteringResults
-        AnalysisRunner._currentResults = currentResults
+        # wsFinal, forwardScatteringResults = scattRes
+        #
+        # # Test the results
+        #
+        # currentResults = forwardScatteringResults
+        # AnalysisRunner._currentResults = currentResults
 
     @classmethod
     def _load_benchmark_results(cls):
@@ -89,6 +90,8 @@ class TestFitParameters(unittest.TestCase):
         self.optintensities = self.optmainPars[:, :, 0::3]
         self.optwidths = self.optmainPars[:, :, 1::3]
         self.optcenters = self.optmainPars[:, :, 2::3]
+
+        np.set_printoptions(suppress=True, precision=8, linewidth=150)
 
     def test_chi2(self):
         nptest.assert_almost_equal(self.orichi2, self.optchi2, decimal=6)
