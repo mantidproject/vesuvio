@@ -2,6 +2,7 @@
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
                             CloneWorkspace, MaskDetectors, CreateWorkspace
 import numpy as np
+import numbers
 
 from mvesuvio.analysis_fitting import passDataIntoWS
 
@@ -16,9 +17,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
         OutputWorkspace=name + "raw",
     )
 
-    assert (isinstance(scaleRaw, float)) | (
-        isinstance(scaleRaw, int)
-    ), "Scaling factor of raw ws needs to be float or int."
+    assert (isinstance(numbers.Real)), "Scaling factor of raw ws needs to be float or int."
     Scale(
         InputWorkspace=name + "raw",
         OutputWorkspace=name + "raw",
@@ -27,7 +26,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
 
     SumSpectra(InputWorkspace=name + "raw", OutputWorkspace=name + "raw" + "_sum")
     wsToBeFitted = CloneWorkspace(
-        InputWorkspace=name + "raw", OutputWorkspace=name + "uncroped_unmasked"
+        InputWorkspace=name + "raw", OutputWorkspace=name + "uncropped_unmasked"
     )
 
     # if mode=="DoubleDifference":
@@ -55,7 +54,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
         wsToBeFitted = Minus(
             LHSWorkspace=name + "raw",
             RHSWorkspace=name + "empty",
-            OutputWorkspace=name + "uncroped_unmasked",
+            OutputWorkspace=name + "uncropped_unmasked",
         )
     return wsToBeFitted
 
@@ -71,7 +70,7 @@ def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectors, maskTOFRange)
     initialIdx = firstSpec - wsFirstSpec
     lastIdx = lastSpec - wsFirstSpec
 
-    newWsName = ws.name().split("uncroped")[0]  # Retrieve original name
+    newWsName = ws.name().split("uncropped")[0]  # Retrieve original name
     wsCrop = CropWorkspace(
         InputWorkspace=ws,
         StartWorkspaceIndex=initialIdx,
@@ -140,7 +139,8 @@ def loadConstants():
     en_to_vel = 4.3737 * 1.0e-4
     vf = np.sqrt(Ef) * en_to_vel  # m/us
     hbar = 2.0445
-    return mN, Ef, en_to_vel, vf, hbar
+    constants = (mN, Ef, en_to_vel, vf, hbar)
+    return constants
 
 
 def gaussian(x, sigma):
