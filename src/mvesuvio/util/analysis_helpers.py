@@ -17,7 +17,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
         OutputWorkspace=name + "raw",
     )
 
-    assert (isinstance(numbers.Real)), "Scaling factor of raw ws needs to be float or int."
+    assert (isinstance(scaleRaw, numbers.Real)), "Scaling factor of raw ws needs to be float or int."
     Scale(
         InputWorkspace=name + "raw",
         OutputWorkspace=name + "raw",
@@ -144,41 +144,33 @@ def loadConstants():
 
 
 def gaussian(x, sigma):
-    """Gaussian function centered at zero"""
-    gaussian = np.exp(-(x**2) / 2 / sigma**2)
-    gaussian /= np.sqrt(2.0 * np.pi) * sigma
-    return gaussian
+    """Gaussian centered at zero"""
+    gauss = np.exp(-(x**2) / 2 / sigma**2) 
+    gauss /= np.sqrt(2.0 * np.pi) * sigma
+    return gauss
 
 
-def lorentizian(x, gamma):
+def lorentzian(x, gamma):
     """Lorentzian centered at zero"""
-    lorentzian = gamma / np.pi / (x**2 + gamma**2)
-    return lorentzian
+    return gamma / np.pi / (x**2 + gamma**2)
 
 
-def numericalThirdDerivative(x, fun):
-    k6 = (-fun[:, 12:] + fun[:, :-12]) * 1
-    k5 = (+fun[:, 11:-1] - fun[:, 1:-11]) * 24
-    k4 = (-fun[:, 10:-2] + fun[:, 2:-10]) * 192
-    k3 = (+fun[:, 9:-3] - fun[:, 3:-9]) * 488
-    k2 = (+fun[:, 8:-4] - fun[:, 4:-8]) * 387
-    k1 = (-fun[:, 7:-5] + fun[:, 5:-7]) * 1584
+def numericalThirdDerivative(x, y):
+    k6 = (- y[:, 12:] + y[:, :-12]) * 1
+    k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
+    k4 = (- y[:, 10:-2] + y[:, 2:-10]) * 192
+    k3 = (+ y[:, 9:-3] - y[:, 3:-9]) * 488
+    k2 = (+ y[:, 8:-4] - y[:, 4:-8]) * 387
+    k1 = (- y[:, 7:-5] + y[:, 5:-7]) * 1584
 
     dev = k1 + k2 + k3 + k4 + k5 + k6
     dev /= np.power(x[:, 7:-5] - x[:, 6:-6], 3)
     dev /= 12**3
 
-    derivative = np.zeros(fun.shape)
-    derivative[:, 6:-6] = dev
+    derivative = np.zeros_like(y)
     # Padded with zeros left and right to return array with same shape
+    derivative[:, 6:-6] = dev
     return derivative
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
 def createWS(dataX, dataY, dataE, wsName, parentWorkspace=None):

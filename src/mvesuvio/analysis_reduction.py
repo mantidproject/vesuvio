@@ -8,7 +8,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CreateWorkspace
 
 from mvesuvio.util.analysis_helpers import histToPointData, loadConstants, \
-                                        gaussian, lorentizian, numericalThirdDerivative
+                                        gaussian, lorentzian, numericalThirdDerivative
 
 from dataclasses import dataclass
 
@@ -777,7 +777,7 @@ class AnalysisRoutine:
         f = 0.5346 * fl + np.sqrt(0.2166 * fl**2 + fg**2)
         eta = 1.36603 * fl / f - 0.47719 * (fl / f) ** 2 + 0.11116 * (fl / f) ** 3
         sigma_v, gamma_v = f / (2.0 * np.sqrt(2.0 * np.log(2.0))), f / 2.0
-        pseudo_voigt = eta * lorentizian(x, gamma_v) + (1.0 - eta) * gaussian(x, sigma_v)
+        pseudo_voigt = eta * lorentzian(x, gamma_v) + (1.0 - eta) * gaussian(x, sigma_v)
 
         norm = (
             np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if self._run_norm_voigt else 1
