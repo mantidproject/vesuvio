@@ -11,6 +11,7 @@ from mvesuvio.analysis_routines import (
     createTableWSHRatios,
     isHPresent,
 )
+
 from mantid.api import mtd
 
 def runRoutine(

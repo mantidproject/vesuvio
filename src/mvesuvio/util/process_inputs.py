@@ -1,9 +1,9 @@
 from mantid.simpleapi import Load, LoadVesuvio, SaveNexus, DeleteWorkspace
-from pathlib import Path
 from mvesuvio.util import handle_config
 from mantid.kernel import logger
-import ntpath
 
+from pathlib import Path
+import ntpath
 
 def _get_expr_path():
     inputsPath = Path(handle_config.read_config_var("caching.inputs"))

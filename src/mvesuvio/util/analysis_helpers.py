@@ -1,8 +1,9 @@
 
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
                             CloneWorkspace, MaskDetectors, CreateWorkspace
-from mvesuvio.analysis_fitting import passDataIntoWS, replaceZerosWithNCP
 import numpy as np
+
+from mvesuvio.analysis_fitting import passDataIntoWS
 
 
 def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 
