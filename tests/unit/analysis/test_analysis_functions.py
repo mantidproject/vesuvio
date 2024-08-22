@@ -1,24 +1,25 @@
 import unittest
+import numpy as np
+import numpy.testing as nptest
 from mock import MagicMock
-from mvesuvio.analysis_reduction import extractWS
+from mvesuvio.util.analysis_helpers import extractWS
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 
 
 class TestAnalysisFunctions(unittest.TestCase):
     def setUp(self):
-        self.ws = MagicMock()
-        self.ws.extractX = MagicMock()
-        self.ws.extractY = MagicMock()
-        self.ws.extractE = MagicMock()
+        pass
 
-    def test_extract_ws_returns_3_values(self):
-        returned_values = extractWS(self.ws)
-        self.assertEqual(3, len(returned_values))
+    def test_extract_ws(self):
+        data = [1, 2, 3]
+        ws = CreateWorkspace(DataX=data, DataY=data, DataE=data, NSpec=1, UnitX="some_unit")
 
-    def test_extract_ws_calls_extract_X_Y_and_E(self):
-        _ = extractWS(self.ws)
-        self.ws.extractX.assert_called_once()
-        self.ws.extractY.assert_called_once()
-        self.ws.extractE.assert_called_once()
+        dataX, dataY, dataE = extractWS(ws)
+        nptest.assert_array_equal([data], dataX)
+        nptest.assert_array_equal([data], dataY)
+        nptest.assert_array_equal([data], dataE)
+
+        DeleteWorkspace(ws)
 
 
 if __name__ == "__main__":

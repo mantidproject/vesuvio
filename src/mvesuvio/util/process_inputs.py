@@ -1,9 +1,9 @@
 from mantid.simpleapi import Load, LoadVesuvio, SaveNexus, DeleteWorkspace
-from pathlib import Path
 from mvesuvio.util import handle_config
 from mantid.kernel import logger
-import ntpath
 
+from pathlib import Path
+import ntpath
 
 def _get_expr_path():
     inputsPath = Path(handle_config.read_config_var("caching.inputs"))
@@ -80,6 +80,14 @@ def completeICFromInputs(IC, wsIC):
         IC.normVoigt
     except AttributeError:
         IC.normVoigt = True
+
+    #Create default for H ratio
+    # Only for completeness' sake, will be removed anyway 
+    # when transition to new interface is complete
+    try:
+        IC.HToMassIdxRatio
+    except AttributeError:
+        IC.HToMassIdxRatio = None 
 
     return
 
