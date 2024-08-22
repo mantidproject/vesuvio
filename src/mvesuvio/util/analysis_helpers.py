@@ -108,7 +108,7 @@ def maskBinsWithZeros(ws, maskTOFRange):
 
 
 def extractWS(ws):
-    """Directly exctracts data from workspace into arrays"""
+    """Directly extracts data from workspace into arrays"""
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
@@ -123,7 +123,7 @@ def histToPointData(dataY, dataX, dataE):
     histWidths = dataX[:, 1:] - dataX[:, :-1]
     assert np.min(histWidths) == np.max(
         histWidths
-    ), "Histogram widhts need to be the same length"
+    ), "Histogram widths need to be the same length"
 
     dataYp = dataY[:, :-1]
     dataEp = dataE[:, :-1]

@@ -185,7 +185,7 @@ class AnalysisRoutine:
             table.addColumn(type="float", name=f"{key} Width")
             table.addColumn(type="float", name=f"{key} Center ")
         table.addColumn(type="float", name="Normalised Chi2")
-        table.addColumn(type="float", name="Number of Iteraions")
+        table.addColumn(type="float", name="Number of Iterations")
         return table
 
 
@@ -235,7 +235,7 @@ class AnalysisRoutine:
 
     def run(self):
 
-        assert len(self.profiles) > 0, "Add profiles before atempting to run the routine!"
+        assert len(self.profiles) > 0, "Add profiles before attempting to run the routine!"
 
         self._create_table_initial_parameters()
 
@@ -318,7 +318,7 @@ class AnalysisRoutine:
         Performs the fit of neutron compton profiles to the workspace being fit.
         The profiles are fit on a spectrum by spectrum basis.
         """
-        print("\nFitting Neutron Compron Prolfiles:\n")
+        print("\nFitting Neutron Compton Prolfiles:\n")
 
         self._row_being_fit = 0
         while self._row_being_fit != len(self._dataY):
@@ -402,7 +402,7 @@ class AnalysisRoutine:
 
 
     def convertDataXToYSpacesForEachMass(self, dataX, delta_Q, delta_E):
-        "Calculates y spaces from TOF data, each row corresponds to one mass"
+        """"Calculates y spaces from TOF data, each row corresponds to one mass"""
 
         # Prepare arrays to broadcast
         dataX = dataX[np.newaxis, :, :]
@@ -570,10 +570,10 @@ class AnalysisRoutine:
         assert not (np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
         assert np.nanmax(betterWidths) != np.nanmin(
             betterWidths
-        ), f"All fitered widths have the same value: {np.nanmin(betterWidths)}"
+        ), f"All filtered widths have the same value: {np.nanmin(betterWidths)}"
         assert np.nanmax(betterIntensities) != np.nanmin(
             betterIntensities
-        ), f"All fitered widths have the same value: {np.nanmin(betterIntensities)}"
+        ), f"All filtered intensities have the same value: {np.nanmin(betterIntensities)}"
 
         return betterWidths, betterIntensities
 
@@ -644,7 +644,7 @@ class AnalysisRoutine:
 
     def _neutron_compton_profiles(self, pars):
         """
-        Neutron Compron Profile distribution on TOF space for a single spectrum. 
+        Neutron Compton Profile distribution on TOF space for a single spectrum. 
         Calculated from kinematics, J(y) and resolution functions.
         """
 
@@ -836,7 +836,7 @@ class AnalysisRoutine:
             OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
         )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
-            # TODO: Once the option to chage point to hist is removed, remove [:len(ncp)]
+            # TODO: Once the option to change point to hist is removed, remove [:len(ncp)]
             self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask[:len(ncp[row])]]
 
         SumSpectra(
@@ -919,7 +919,7 @@ class AnalysisRoutine:
     def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
         masses = [p.mass for p in self._profiles.values()]
 
-        # If Backsscattering mode and H is present in the sample, add H to MS properties
+        # If Backscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
             if self._h_ratio is not None:  # If H is present, ratio is a number
                 masses = np.append(masses, 1.0079)

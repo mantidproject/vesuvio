@@ -82,7 +82,7 @@ def completeICFromInputs(IC, wsIC):
         IC.normVoigt = True
 
     #Create default for H ratio
-    # Only for completeness sake, will be removed anyway 
+    # Only for completeness' sake, will be removed anyway 
     # when transition to new interface is complete
     try:
         IC.HToMassIdxRatio
