@@ -995,24 +995,9 @@ class AnalysisRoutine:
         profiles = self.calcGammaCorrectionProfiles(self._mean_widths, self._mean_intensity_ratios)
 
         # Approach below not currently suitable for current versions of Mantid, but will be in the future
-        # background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
-        # DeleteWorkspace(corrected)
-        # RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS+"_Gamma_Background")
-
-        ws = CloneWorkspace(InputWorkspace=inputWS, OutputWorkspace="tmpGC")
-        for spec in range(ws.getNumberHistograms()):
-            background, corrected = VesuvioCalculateGammaBackground(
-                InputWorkspace=inputWS, ComptonFunction=profiles, WorkspaceIndexList=spec
-            )
-            ws.dataY(spec)[:], ws.dataE(spec)[:] = (
-                background.dataY(0)[:],
-                background.dataE(0)[:],
-            )
-        DeleteWorkspace(background)
+        background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
         DeleteWorkspace(corrected)
-        RenameWorkspace(
-            InputWorkspace="tmpGC", OutputWorkspace=inputWS + "_Gamma_Background"
-        )
+        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_Gamma_Background")
 
         Scale(
             InputWorkspace=inputWS + "_Gamma_Background",
