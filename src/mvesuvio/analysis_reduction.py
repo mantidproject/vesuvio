@@ -1,6 +1,8 @@
 import numpy as np 
 import matplotlib.pyplot as plt
-import scipy
+from scipy import optimize
+from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
+     IntBoundedValidator, FloatBoundedValidator
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
@@ -33,36 +35,86 @@ class NeutronComptonProfile:
     mean_center: float = None
 
 
-class AnalysisRoutine:
+class AnalysisRoutine(PythonAlgorithm):
 
-    def __init__(self, workspace, ip_file, h_ratio_to_lowest_mass, number_of_iterations, mask_spectra,
-                 multiple_scattering_correction, vertical_width, horizontal_width, thickness,
-                 gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
-                 number_of_events=None, results_path=None, figures_path=None, constraints=()):
+    def summary(self):
+        return "Runs the analysis reduction routine for VESUVIO."
 
-        self._name = workspace.name()
-        self._ip_file = ip_file
-        self._number_of_iterations = number_of_iterations
-        self._mask_spectra = mask_spectra
-        self._transmission_guess = transmission_guess
-        self._multiple_scattering_order = multiple_scattering_order
-        self._number_of_events = number_of_events
-        self._vertical_width = vertical_width
-        self._horizontal_width = horizontal_width
-        self._thickness = thickness
-        self._mode_running = mode_running
-        self._multiple_scattering_correction = multiple_scattering_correction
-        self._gamma_correction = gamma_correction
-        self._save_results_path = results_path
-        self._save_figures_path = figures_path
-        self._h_ratio = h_ratio_to_lowest_mass 
-        self._constraints = constraints 
+    def category(self):
+        return "VesuvioAnalysis"
+
+    def PyInit(self):
+        self.declareProperty(MatrixWorkspaceProperty(name="InputWorkspace",
+                                               defaultValue="",
+                                               direction=Direction.Input),
+                                               doc="Workspace to fit Neutron Compton Profiles.")
+
+        self.declareProperty(FileProperty(name='InstrumentParametersFile', 
+                                      defaultValue='', 
+                                      action=FileAction.Load, 
+                                      extensions=["par", "dat"]),
+                                      doc="Filename of the instrument parameter file.")
+
+        self.declareProperty("HRatioToLowestMass", 0.0, validator=FloatBoundedValidator(lower=0), 
+                             doc="Intensity ratio between H peak and lowest mass peak.")
+
+        self.declareProperty("NumberOfIterations", 2, validator=IntBoundedValidator(lower=0))
+
+        self.declareProperty(IntArrayProperty(name="InvalidDetectors",
+                                  validator=IntArrayBoundedValidator(lower=3, upper=198),
+                                  direction=Direction.Input),
+                                  doc="List of invalid detectors whithin range 3-198")
+
+        self.declareProperty("MultipleScatteringCorrection", False, doc="Whether to run multiple scattering correction")
+        self.declareProperty("GammaCorrection", False, doc="Whether to run gamma correction")
+
+        self.declareProperty("SampleVerticalWidth", -1.0, validator=FloatBoundedValidator(lower=0))
+        self.declareProperty("SampleHorizontalWidth", -1.0, validator=FloatBoundedValidator(lower=0))
+        self.declareProperty("SampleThickness", -1.0, validator=FloatBoundedValidator(lower=0))
+
+        self.declareProperty("ModeRunning",
+                            "BACKWARD",
+                            validator=StringListValidator(["BACKWARD", "FORWARD"]),
+                            doc="Whether running backward or forward scattering.")
+
+        self.declareProperty("OutputDirectory", "", doc="Directory where to save analysis results.")
+
+        # self.declareProperty("Constraints", (), doc="Constraints to use during fitting profiles.")
+
+        self.declareProperty("TransmissionGuess", -1.0, validator=FloatBoundedValidator(lower=0, upper=1))
+        self.declareProperty("MultipleScatteringOrder", -1, validator=IntBoundedValidator(lower=0))
+        self.declareProperty("NumberOfEvents", -1, validator=IntBoundedValidator(lower=0))
+        self.declareProperty("ResultsPath", "", doc="Directory to store results, to be deleted later")
+        self.declareProperty("FiguresPath", "", doc="Directory to store figures, to be deleted later")
+
+                                    
+    def PyExec(self):
+        self._setup()
+
+    def _setup(self):
+        self._name = self.getProperty("InputWorkspace").value.name()
+        self._ip_file = self.getPropertY("InstrumentParametersFile").value
+        self._number_of_iterations = self.getProperty("NumberOfIterations").value
+        self._mask_spectra = self.getProperty("InvalidDetectors").value 
+        self._transmission_guess = self.getProperty("TransmissionGuess").value 
+        self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value 
+        self._number_of_events = self.getProperty("NumberOfEvents").value 
+        self._vertical_width = self.getProperty("SampleVerticalWidth").value 
+        self._horizontal_width = self.getProperty("SampleHorizontalWidth").value 
+        self._thickness = self.getProperty("SampleThickness").value 
+        self._mode_running = self.getProperty("ModeRunning").value 
+        self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
+        self._gamma_correction = self.getProperty("GammaCorrection").value 
+        self._save_results_path = self.getProperty("ResultsPath").value
+        self._save_figures_path = self.getProperty("FiguresPath").value 
+        self._h_ratio = self.getProperty("HRatioToLowestMass").value 
+        self._constraints = () #self.getProperty("Constraints").value 
 
         self._profiles = {} 
 
         # Variables changing during fit
-        self._workspace_for_corrections = workspace
-        self._workspace_being_fit = workspace
+        self._workspace_for_corrections = self.getProperty("InputWorkspace").value 
+        self._workspace_being_fit = self.getProperty("InputWorkspace").value
         self._row_being_fit = 0 
         self._zero_columns_boolean_mask = None
         self._table_fit_results = None
@@ -898,7 +950,7 @@ class AnalysisRoutine:
 
         # If Backscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
-            if self._h_ratio is not None:  # If H is present, ratio is a number
+            if self._h_ratio > 0:  # If H is present, ratio is a number
                 masses = np.append(masses, 1.0079)
                 meanWidths = np.append(meanWidths, 5.0)
 

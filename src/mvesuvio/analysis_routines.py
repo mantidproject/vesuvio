@@ -1,12 +1,13 @@
 # from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace
+from mantid.api import AlgorithmFactory
 import numpy as np
 
 from mvesuvio.util.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace
 from mvesuvio.analysis_reduction import AnalysisRoutine
 from mvesuvio.analysis_reduction import NeutronComptonProfile
-
+from tests.testhelpers.calibration.algorithms import create_algorithm
 
 def _create_analysis_object_from_current_interface(IC):
     ws = loadRawAndEmptyWsFromUserPath(
@@ -25,24 +26,26 @@ def _create_analysis_object_from_current_interface(IC):
         maskedDetectors=IC.maskedSpecAllNo,
         maskTOFRange=IC.maskTOFRange
     )
-    AR = AnalysisRoutine(
-        cropedWs,
-        ip_file=IC.InstrParsPath,
-        h_ratio_to_lowest_mass=IC.HToMassIdxRatio,
-        number_of_iterations=IC.noOfMSIterations,
-        mask_spectra=IC.maskedSpecAllNo,
-        multiple_scattering_correction=IC.MSCorrectionFlag,
-        vertical_width=IC.vertical_width, 
-        horizontal_width=IC.horizontal_width, 
-        thickness=IC.thickness,
-        gamma_correction=IC.GammaCorrectionFlag,
-        mode_running=IC.modeRunning,
-        transmission_guess=IC.transmission_guess,
-        multiple_scattering_order=IC.multiple_scattering_order,
-        number_of_events=IC.number_of_events,
-        results_path=IC.resultsSavePath,
-        figures_path=IC.figSavePath,
-        constraints=IC.constraints
+
+    AlgorithmFactory.subscribe(AnalysisRoutine)
+    alg = create_algorithm("AnalysisRoutine",
+        InputWorkspace=cropedWs,
+        InstrumentParametersFile=str(IC.InstrParsPath),
+        HRatioToLowestMass=IC.HToMassIdxRatio,
+        NumberOfIterations=int(IC.noOfMSIterations),
+        InvalidDetectors=IC.maskedSpecAllNo.astype(int).tolist(),
+        MultipleScatteringCorrection=IC.MSCorrectionFlag,
+        SampleVerticalWidth=IC.vertical_width, 
+        SampleHorizontalWidth=IC.horizontal_width, 
+        SampleThickness=IC.thickness,
+        GammaCorrection=IC.GammaCorrectionFlag,
+        ModeRunning=IC.modeRunning,
+        TransmissionGuess=IC.transmission_guess,
+        MultipleScatteringOrder=int(IC.multiple_scattering_order),
+        NumberOfEvents=int(IC.number_of_events),
+        # Constraints=IC.constraints,
+        ResultsPath=str(IC.resultsSavePath),
+        FiguresPath=str(IC.figSavePath)
     )
     profiles = []
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
@@ -53,8 +56,8 @@ def _create_analysis_object_from_current_interface(IC):
             label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
             intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
         ))
-    AR.add_profiles(*profiles)
-    return AR
+    alg.add_profiles(*profiles)
+    return alg 
 
 
 def runIndependentIterativeProcedure(IC, clearWS=True):
@@ -68,8 +71,8 @@ def runIndependentIterativeProcedure(IC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    AR = _create_analysis_object_from_current_interface(IC)
-    return AR.run()
+    alg = _create_analysis_object_from_current_interface(IC)
+    return alg.execute()
 
 
 def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
@@ -110,7 +113,7 @@ def runPreProcToEstHRatio(bckwdIC, fwdIC):
     backRoutine = _create_analysis_object_from_current_interface(bckwdIC)
     frontRoutine = _create_analysis_object_from_current_interface(fwdIC)
 
-    frontRoutine.run()
+    frontRoutine.execute()
     current_ratio = frontRoutine.calculate_h_ratio()
     table_h_ratios.addRow([current_ratio])
     previous_ratio = np.nan 
@@ -118,9 +121,9 @@ def runPreProcToEstHRatio(bckwdIC, fwdIC):
     while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
 
         backRoutine._h_ratio = current_ratio
-        backRoutine.run()
+        backRoutine.execute()
         frontRoutine.set_initial_profiles_from(backRoutine)
-        frontRoutine.run()
+        frontRoutine.execute()
 
         previous_ratio = current_ratio
         current_ratio = frontRoutine.calculate_h_ratio()
@@ -146,9 +149,9 @@ def runJoint(bckwdIC, fwdIC):
     backRoutine = _create_analysis_object_from_current_interface(bckwdIC)
     frontRoutine = _create_analysis_object_from_current_interface(fwdIC)
 
-    backRoutine.run()
+    backRoutine.execute()
     frontRoutine.set_initial_profiles_from(backRoutine)
-    frontRoutine.run()
+    frontRoutine.execute()
     return
 
 

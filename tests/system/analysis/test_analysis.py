@@ -50,13 +50,6 @@ class AnalysisRunner:
         AnalysisRunner._currentResults = scattRes 
         return
 
-        # wsFinal, forwardScatteringResults = scattRes
-        #
-        # # Test the results
-        #
-        # currentResults = forwardScatteringResults
-        # AnalysisRunner._currentResults = currentResults
-
     @classmethod
     def _load_benchmark_results(cls):
         benchmarkPath = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark"

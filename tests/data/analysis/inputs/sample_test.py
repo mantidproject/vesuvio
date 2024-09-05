@@ -75,6 +75,8 @@ class ForwardInitialConditions(GeneralInitialConditions):
     def __init__(self, ipFilesPath):
         self.InstrParsPath = ipFilesPath / "ip2018_3.par"
 
+    HToMassIdxRatio = 0.0     # New way to ignore ratio
+
     masses = np.array([1.0079, 12, 16, 27])
     initPars = np.array([1, 4.7, 0, 1, 12.71, 0.0, 1, 8.76, 0.0, 1, 13.897, 0.0])
     bounds = np.array(
