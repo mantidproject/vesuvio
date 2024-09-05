@@ -27,9 +27,21 @@ def _create_analysis_object_from_current_interface(IC):
         maskTOFRange=IC.maskTOFRange
     )
 
+    profiles = []
+    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
+        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
+    ):
+        profiles.append(NeutronComptonProfile(
+            label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
+            intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
+        ))
+    profiles_table = create_profiles_table(cropedWs.name()+"_Initial_Parameters", profiles)
+
     AlgorithmFactory.subscribe(AnalysisRoutine)
     alg = create_algorithm("AnalysisRoutine",
         InputWorkspace=cropedWs,
+        InputProfiles=profiles_table,
         InstrumentParametersFile=str(IC.InstrParsPath),
         HRatioToLowestMass=IC.HToMassIdxRatio,
         NumberOfIterations=int(IC.noOfMSIterations),
@@ -47,18 +59,26 @@ def _create_analysis_object_from_current_interface(IC):
         ResultsPath=str(IC.resultsSavePath),
         FiguresPath=str(IC.figSavePath)
     )
-    profiles = []
-    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
-        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
-    ):
-        profiles.append(NeutronComptonProfile(
-            label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
-            intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
-        ))
     alg.add_profiles(*profiles)
+
     return alg 
 
+
+def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
+    table = CreateEmptyTableWorkspace(OutputWorkspace=name)
+    table.addColumn(type="str", name="label")
+    table.addColumn(type="float", name="mass")
+    table.addColumn(type="float", name="intensity")
+    table.addColumn(type="str", name="intensity_bounds")
+    table.addColumn(type="float", name="width")
+    table.addColumn(type="str", name="width_bounds")
+    table.addColumn(type="float", name="center")
+    table.addColumn(type="str", name="center_bounds")
+    
+    for p in profiles:
+        table.addRow([str(getattr(p, attr)) if "bounds" in attr else getattr(p, attr) for attr in table.getColumnNames()])
+
+    return table
 
 def runIndependentIterativeProcedure(IC, clearWS=True):
     """

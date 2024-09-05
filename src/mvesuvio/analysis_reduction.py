@@ -87,6 +87,10 @@ class AnalysisRoutine(PythonAlgorithm):
         self.declareProperty("ResultsPath", "", doc="Directory to store results, to be deleted later")
         self.declareProperty("FiguresPath", "", doc="Directory to store figures, to be deleted later")
 
+        self.declareProperty(TableWorkspaceProperty(name="InputProfiles",
+                                                    defaultValue="",
+                                                    direction=Direction.Input),
+                                                    doc="Table workspace containing starting parameters for profiles")
                                     
     def PyExec(self):
         self._setup()
@@ -111,6 +115,7 @@ class AnalysisRoutine(PythonAlgorithm):
         self._constraints = () #self.getProperty("Constraints").value 
 
         self._profiles = {} 
+        self._profiles_table = self.getProperty("InputProfiles").value
 
         # Variables changing during fit
         self._workspace_for_corrections = self.getProperty("InputWorkspace").value 
@@ -281,8 +286,6 @@ class AnalysisRoutine(PythonAlgorithm):
 
         assert len(self.profiles) > 0, "Add profiles before attempting to run the routine!"
 
-        self._create_table_initial_parameters()
-
         # Legacy code from Bootstrap
         # if self.runningSampleWS:
         #     initialWs = RenameWorkspace(
@@ -330,31 +333,6 @@ class AnalysisRoutine(PythonAlgorithm):
         self._set_results()
         self._save_results()
         return self 
-
-
-    def _create_table_initial_parameters(self):
-        meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._name + "_Initial_Parameters"
-        )
-        meansTableWS.addColumn(type="float", name="Mass")
-        meansTableWS.addColumn(type="float", name="Initial Widths")
-        meansTableWS.addColumn(type="str", name="Bounds Widths")
-        meansTableWS.addColumn(type="float", name="Initial Intensities")
-        meansTableWS.addColumn(type="str", name="Bounds Intensities")
-        meansTableWS.addColumn(type="float", name="Initial Centers")
-        meansTableWS.addColumn(type="str", name="Bounds Centers")
-
-        print("\nCreated Table with Initial Parameters:")
-        for p in self._profiles.values():
-            meansTableWS.addRow([p.mass, p.width, str(p.width_bounds), 
-                                 p.intensity, str(p.intensity_bounds), 
-                                 p.center, str(p.center_bounds)])
-            print("\nMass: ", p.mass)
-            print(f"{'Initial Intensity:':>20s} {p.intensity:<8.3f} Bounds: {p.intensity_bounds}")
-            print(f"{'Initial Width:':>20s} {p.width:<8.3f} Bounds: {p.width_bounds}")
-            print(f"{'Initial Center:':>20s} {p.center:<8.3f} Bounds: {p.center_bounds}")
-        print("\n")
-        return
 
 
     def _fit_neutron_compton_profiles(self):

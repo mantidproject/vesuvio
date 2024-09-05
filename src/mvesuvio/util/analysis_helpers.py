@@ -1,6 +1,6 @@
 
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
-                            CloneWorkspace, MaskDetectors, CreateWorkspace
+                            CloneWorkspace, MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace
 import numpy as np
 import numbers
 
