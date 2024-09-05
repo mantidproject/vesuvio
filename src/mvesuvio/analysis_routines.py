@@ -34,14 +34,15 @@ def _create_analysis_object_from_current_interface(IC):
     ):
         profiles.append(NeutronComptonProfile(
             label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
-            intensity_bounds=intensity_bound, width_bounds=width_bound, center_bounds=center_bound
+            intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
         ))
+
     profiles_table = create_profiles_table(cropedWs.name()+"_Initial_Parameters", profiles)
 
     AlgorithmFactory.subscribe(AnalysisRoutine)
     alg = create_algorithm("AnalysisRoutine",
         InputWorkspace=cropedWs,
-        InputProfiles=profiles_table,
+        InputProfiles=profiles_table.name(),
         InstrumentParametersFile=str(IC.InstrParsPath),
         HRatioToLowestMass=IC.HToMassIdxRatio,
         NumberOfIterations=int(IC.noOfMSIterations),
@@ -59,7 +60,7 @@ def _create_analysis_object_from_current_interface(IC):
         ResultsPath=str(IC.resultsSavePath),
         FiguresPath=str(IC.figSavePath)
     )
-    alg.add_profiles(*profiles)
+    # alg.add_profiles(*profiles)
 
     return alg 
 
@@ -74,11 +75,47 @@ def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
     table.addColumn(type="str", name="width_bounds")
     table.addColumn(type="float", name="center")
     table.addColumn(type="str", name="center_bounds")
-    
     for p in profiles:
         table.addRow([str(getattr(p, attr)) if "bounds" in attr else getattr(p, attr) for attr in table.getColumnNames()])
 
+    for p in profiles:
+        print(str(getattr(p, "intensity_bounds")))
+        print(str(getattr(p, "width_bounds")))
     return table
+
+def set_initial_profiles_from(self, source: 'AnalysisRoutine'):
+    
+    # Set intensities
+    for p in self._profiles.values():
+        if np.isclose(p.mass, 1, atol=0.1):    # Hydrogen present
+            p.intensity = source._h_ratio * source._get_lightest_profile().mean_intensity
+            continue
+        p.intensity = source.profiles[p.label].mean_intensity
+
+    # Normalise intensities
+    sum_intensities = sum([p.intensity for p in self._profiles.values()])
+    for p in self._profiles.values():
+        p.intensity /= sum_intensities
+        
+    # Set widths
+    for p in self._profiles.values():
+        try:
+            p.width = source.profiles[p.label].mean_width
+        except KeyError:
+            continue
+
+    # Fix all widths except lightest mass
+    for p in self._profiles.values():
+        if p == self._get_lightest_profile():
+            continue
+        p.width_bounds = [p.width, p.width]
+
+    return
+
+def _get_lightest_profile(self):
+    profiles = [p for p in self._profiles.values()]
+    masses = [p.mass for p in self._profiles.values()]
+    return profiles[np.argmin(masses)]
 
 def runIndependentIterativeProcedure(IC, clearWS=True):
     """
