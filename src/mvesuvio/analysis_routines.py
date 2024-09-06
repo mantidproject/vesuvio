@@ -83,11 +83,10 @@ def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
     table.addColumn(type="float", name="center")
     table.addColumn(type="str", name="center_bounds")
     for p in profiles:
-        table.addRow([str(getattr(p, attr)) if "bounds" in attr else getattr(p, attr) for attr in table.getColumnNames()])
-
-    for p in profiles:
-        print(str(getattr(p, "intensity_bounds")))
-        print(str(getattr(p, "width_bounds")))
+        table.addRow([str(getattr(p, attr)) 
+            if "bounds" in attr 
+            else getattr(p, attr) 
+            for attr in table.getColumnNames()])
     return table
 
 

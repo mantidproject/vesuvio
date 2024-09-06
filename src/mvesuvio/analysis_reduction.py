@@ -124,6 +124,26 @@ class AnalysisRoutine(PythonAlgorithm):
 
         self._profiles_table = self.getProperty("InputProfiles").value
 
+        # Need to transform profiles table into parameter array for minimize
+        self._initial_fit_parameters = []
+        for intensity, width, center in zip(
+            self._profiles_table.column("intensity"),
+            self._profiles_table.column("width"),
+            self._profiles_table.column("center")
+        ):
+            self._initial_fit_parameters.extend([intensity, width, center])
+
+        self._initial_fit_bounds = []
+        for intensity_bounds, width_bounds, center_bounds in zip(
+            self._profiles_table.column("intensity_bounds"),
+            self._profiles_table.column("width_bounds"),
+            self._profiles_table.column("center_bounds")
+        ):
+            self._initial_fit_bounds.extend([eval(intensity_bounds), eval(width_bounds), eval(center_bounds)])
+
+        # Masses need to be defined in the same order
+        self._masses = np.array(self._profiles_table.column("mass"))
+
         # Variables changing during fit
         self._workspace_for_corrections = self.getProperty("InputWorkspace").value 
         self._workspace_being_fit = self.getProperty("InputWorkspace").value
@@ -135,16 +155,15 @@ class AnalysisRoutine(PythonAlgorithm):
 
     def calculate_h_ratio(self):
 
-        if not np.isclose(min(self._profiles_table.column("mass")), 1, atol=0.1):    # Hydrogen not present
+        if not np.isclose(min(self._masses), 1, atol=0.1):    # Hydrogen not present
             return None
         
         # Hydrogen present 
         # intensities = np.array([p.mean_intensity for p in self._profiles.values()])
         intensities = self.mean_intensity_ratios
         # masses = np.array([p.mass for p in self._profiles.values()])
-        masses = self._profiles_table.column("mass")
 
-        sorted_intensities = intensities[np.argsort(masses)]
+        sorted_intensities = intensities[np.argsort(self._masses)]
         return sorted_intensities[0] / sorted_intensities[1] 
         
 
@@ -357,7 +376,7 @@ class AnalysisRoutine(PythonAlgorithm):
         delta_E = delta_E[np.newaxis, :, :]
 
         mN, Ef, en_to_vel, vf, hbar = loadConstants()
-        masses = np.array(self._profiles_table.column("mass")).reshape(-1, 1, 1)
+        masses = self._masses.reshape(-1, 1, 1)
 
         energyRecoil = np.square(hbar * delta_Q) / 2.0 / masses
         ySpacesForEachMass = (
@@ -533,28 +552,11 @@ class AnalysisRoutine(PythonAlgorithm):
             self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
             return
 
-        # Need to transform profiles into parameter array for minimize
-        initial_parameters = []
-        for intensity, width, center in zip(
-            self._profiles_table.column("intensity"),
-            self._profiles_table.column("width"),
-            self._profiles_table.column("center")
-        ):
-            initial_parameters.extend([intensity, width, center])
-
-        bounds = []
-        for intensity_bounds, width_bounds, center_bounds in zip(
-            self._profiles_table.column("intensity_bounds"),
-            self._profiles_table.column("width_bounds"),
-            self._profiles_table.column("center_bounds")
-        ):
-            bounds.extend([eval(intensity_bounds), eval(width_bounds), eval(center_bounds)])
-
         result = optimize.minimize(
             self.errorFunction,
-            initial_parameters,
+            self._initial_fit_parameters,
             method="SLSQP",
-            bounds=bounds,
+            bounds=self._initial_fit_bounds,
             constraints=self._constraints,
         )
         fitPars = result["x"]
@@ -608,7 +610,7 @@ class AnalysisRoutine(PythonAlgorithm):
         intensities = pars[::3].reshape(-1, 1)
         widths = pars[1::3].reshape(-1, 1)
         centers = pars[2::3].reshape(-1, 1)
-        masses = np.array(self._profiles_table.column("mass")).reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
 
         v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
 
@@ -659,7 +661,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
 
     def calcGaussianResolution(self, centers):
-        masses = np.array(self._profiles_table.column("mass")).reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
@@ -705,7 +707,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
 
     def calcLorentzianResolution(self, centers):
-        masses = np.array(self._profiles_table.column("mass")).reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
@@ -859,7 +861,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
 
     def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
-        masses = np.array(self._profiles_table.column("mass"))
+        masses = self._masses
 
         # If Backscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
@@ -950,9 +952,8 @@ class AnalysisRoutine(PythonAlgorithm):
 
 
     def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
-        masses = np.array(self._profiles_table.column("mass"))
         profiles = ""
-        for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
+        for mass, width, intensity in zip(self._masses, meanWidths, meanIntensityRatios):
             profiles += (
                 "name=GaussianComptonProfile,Mass="
                 + str(mass)
