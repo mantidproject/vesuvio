@@ -44,59 +44,114 @@ class AnalysisRoutine(PythonAlgorithm):
         return "VesuvioAnalysis"
 
     def PyInit(self):
-        self.declareProperty(MatrixWorkspaceProperty(name="InputWorkspace",
-                                               defaultValue="",
-                                               direction=Direction.Input),
-                                               doc="Workspace to fit Neutron Compton Profiles.")
+        self.declareProperty(MatrixWorkspaceProperty(
+            name="InputWorkspace",
+            defaultValue="",
+            direction=Direction.Input),
+            doc="Workspace to fit Neutron Compton Profiles."
+        )
+        self.declareProperty(TableWorkspaceProperty(
+            name="InputProfiles",
+            defaultValue="",
+            direction=Direction.Input),
+            doc="Table workspace containing starting parameters for profiles"
+        )
+        self.declareProperty(FileProperty(
+            name='InstrumentParametersFile', 
+            defaultValue='', 
+            action=FileAction.Load, 
+            extensions=["par", "dat"]),
+            doc="Filename of the instrument parameter file."
+        )
+        self.declareProperty(
+            name="HRatioToLowestMass", 
+            defaultValue=0.0,
+            validator=FloatBoundedValidator(lower=0), 
+            doc="Intensity ratio between H peak and lowest mass peak."
+        )
+        self.declareProperty(
+            name="NumberOfIterations", 
+            defaultValue=2,
+            validator=IntBoundedValidator(lower=0)
+        )
+        self.declareProperty(IntArrayProperty(
+            name="InvalidDetectors",
+            validator=IntArrayBoundedValidator(lower=3, upper=198),
+            direction=Direction.Input),
+            doc="List of invalid detectors whithin range 3-198"
+        )
+        self.declareProperty(
+            name="MultipleScatteringCorrection", 
+            defaultValue=False, 
+            doc="Whether to run multiple scattering correction"
+        )
+        self.declareProperty(
+            name="GammaCorrection", 
+            defaultValue=False, 
+            doc="Whether to run gamma correction"
+        )
+        self.declareProperty(
+            name="SampleVerticalWidth",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="SampleHorizontalWidth",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="SampleThickness",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="ModeRunning",
+            defaultValue="BACKWARD",
+            validator=StringListValidator(["BACKWARD", "FORWARD"]),
+            doc="Whether running backward or forward scattering.")
 
-        self.declareProperty(TableWorkspaceProperty(name="InputProfiles",
-                                        defaultValue="",
-                                        direction=Direction.Input),
-                                        doc="Table workspace containing starting parameters for profiles")
-
-        self.declareProperty(FileProperty(name='InstrumentParametersFile', 
-                                      defaultValue='', 
-                                      action=FileAction.Load, 
-                                      extensions=["par", "dat"]),
-                                      doc="Filename of the instrument parameter file.")
-
-        self.declareProperty("HRatioToLowestMass", 0.0, validator=FloatBoundedValidator(lower=0), 
-                             doc="Intensity ratio between H peak and lowest mass peak.")
-
-        self.declareProperty("NumberOfIterations", 2, validator=IntBoundedValidator(lower=0))
-
-        self.declareProperty(IntArrayProperty(name="InvalidDetectors",
-                                  validator=IntArrayBoundedValidator(lower=3, upper=198),
-                                  direction=Direction.Input),
-                                  doc="List of invalid detectors whithin range 3-198")
-
-        self.declareProperty("MultipleScatteringCorrection", False, doc="Whether to run multiple scattering correction")
-        self.declareProperty("GammaCorrection", False, doc="Whether to run gamma correction")
-
-        self.declareProperty("SampleVerticalWidth", -1.0, validator=FloatBoundedValidator(lower=0))
-        self.declareProperty("SampleHorizontalWidth", -1.0, validator=FloatBoundedValidator(lower=0))
-        self.declareProperty("SampleThickness", -1.0, validator=FloatBoundedValidator(lower=0))
-
-        self.declareProperty("ModeRunning",
-                            "BACKWARD",
-                            validator=StringListValidator(["BACKWARD", "FORWARD"]),
-                            doc="Whether running backward or forward scattering.")
-
-        self.declareProperty("OutputDirectory", "", doc="Directory where to save analysis results.")
-
-        # self.declareProperty("Constraints", (), doc="Constraints to use during fitting profiles.")
-
-        self.declareProperty("TransmissionGuess", -1.0, validator=FloatBoundedValidator(lower=0, upper=1))
-        self.declareProperty("MultipleScatteringOrder", -1, validator=IntBoundedValidator(lower=0))
-        self.declareProperty("NumberOfEvents", -1, validator=IntBoundedValidator(lower=0))
-        self.declareProperty("ResultsPath", "", doc="Directory to store results, to be deleted later")
-        self.declareProperty("FiguresPath", "", doc="Directory to store figures, to be deleted later")
-
+        self.declareProperty(
+            name="OutputDirectory",
+            defaultValue="",
+            doc="Directory where to save analysis results."
+        )
+        # self.declareProperty(
+        #     name="Constraints",
+        #     defaultValue=(),
+        #     doc="Constraints to use during fitting profiles."
+        # )
+        self.declareProperty(
+            name="TransmissionGuess",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0, upper=1)
+        )
+        self.declareProperty(
+            name="MultipleScatteringOrder",
+            defaultValue=-1,
+            validator=IntBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="NumberOfEvents",
+            defaultValue=-1,
+            validator=IntBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="ResultsPath",
+            defaultValue="",
+            doc="Directory to store results, to be deleted later"
+        )
+        self.declareProperty(
+            name="FiguresPath",
+            defaultValue="",
+            doc="Directory to store figures, to be deleted later"
+        )
         # Outputs
-        self.declareProperty(TableWorkspaceProperty(name="OutputMeansTable",
-                                                    defaultValue="",
-                                                    direction=Direction.Output),
-                                                    doc="TableWorkspace containing final means of intensity and widths.")
+        self.declareProperty(TableWorkspaceProperty(
+            name="OutputMeansTable",
+            defaultValue="",
+            direction=Direction.Output),
+            doc="TableWorkspace containing final means of intensity and widths.")
 
                                     
     def PyExec(self):
