@@ -26,9 +26,9 @@ class NeutronComptonProfile:
     width: float
     center: float
 
-    intensity_bounds: tuple[float, float]
-    width_bounds: tuple[float, float]
-    center_bounds: tuple[float, float]
+    intensity_bounds: list[float, float]
+    width_bounds: list[float, float]
+    center_bounds: list[float, float]
 
     mean_intensity: float = None
     mean_width: float = None
@@ -92,6 +92,12 @@ class AnalysisRoutine(PythonAlgorithm):
         self.declareProperty("ResultsPath", "", doc="Directory to store results, to be deleted later")
         self.declareProperty("FiguresPath", "", doc="Directory to store figures, to be deleted later")
 
+        # Outputs
+        self.declareProperty(TableWorkspaceProperty(name="OutputMeansTable",
+                                                    defaultValue="",
+                                                    direction=Direction.Output),
+                                                    doc="TableWorkspace containing final means of intensity and widths.")
+
                                     
     def PyExec(self):
         self._setup()
@@ -116,7 +122,6 @@ class AnalysisRoutine(PythonAlgorithm):
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
         self._constraints = () #self.getProperty("Constraints").value 
 
-        self._profiles = {} 
         self._profiles_table = self.getProperty("InputProfiles").value
 
         # Variables changing during fit
@@ -142,19 +147,6 @@ class AnalysisRoutine(PythonAlgorithm):
         sorted_intensities = intensities[np.argsort(masses)]
         return sorted_intensities[0] / sorted_intensities[1] 
         
-
-    # @property
-    # def profiles(self):
-    #     return self._profiles
-
-
-    # @profiles.setter
-    # def profiles(self, incoming_profiles):
-    #     assert(isinstance(incoming_profiles, dict))
-    #     common_keys = self._profiles.keys() & incoming_profiles.keys() 
-    #     common_keys_profiles = {k: incoming_profiles[k] for k in common_keys}
-    #     self._profiles = {**self._profiles, **common_keys_profiles}
-
 
     def _update_workspace_data(self):
 
@@ -194,31 +186,6 @@ class AnalysisRoutine(PythonAlgorithm):
         table.addColumn(type="float", name="Normalised Chi2")
         table.addColumn(type="float", name="Number of Iterations")
         return table
-
-
-    @property
-    def mean_widths(self):
-        return self._mean_widths
-
-
-    @mean_widths.setter
-    def mean_widths(self, value):
-        self._mean_widths = value
-        # for i, p in enumerate(self._profiles.values()):
-        #     p.mean_width = self._mean_widths[i]
-        return
-
-
-    @property
-    def mean_intensity_ratios(self):
-        return self._mean_intensity_ratios
-
-    @mean_intensity_ratios.setter
-    def mean_intensity_ratios(self, value):
-        self._mean_intensity_ratios = value
-        # for i, p in enumerate(self.profiles.values()):
-        #     p.mean_intensity = self._mean_intensity_ratios[i]
-        return
 
 
     def _create_emtpy_ncp_workspace(self, suffix):
@@ -423,7 +390,7 @@ class AnalysisRoutine(PythonAlgorithm):
         ax.legend()
 
         fileName = self._workspace_being_fit.name() + "_profiles_sum.pdf"
-        savePath = self._save_figures_path + fileName
+        savePath = self._save_figures_path + '/' + fileName
         plt.savefig(savePath, bbox_inches="tight")
         plt.close(fig)
         return
@@ -461,24 +428,24 @@ class AnalysisRoutine(PythonAlgorithm):
             len(meanWidths) == self._profiles_table.rowCount()
         ), "Number of mean widths must match number of profiles!"
 
-        self.mean_widths = meanWidths     # Use setter
+        self._mean_widths = meanWidths
         self._std_widths = stdWidths
-        self.mean_intensity_ratios = meanIntensityRatios   # Use setter
+        self._mean_intensity_ratios = meanIntensityRatios
         self._std_intensity_ratios = stdIntensityRatios
 
-        self.createMeansAndStdTableWS()
+        self._create_means_table()
         return
 
 
-    def createMeansAndStdTableWS(self):
-        meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._workspace_being_fit.name() + "_MeanWidthsAndIntensities"
+    def _create_means_table(self):
+        table = CreateEmptyTableWorkspace(
+            OutputWorkspace=self._workspace_being_fit.name() + "_means"
         )
-        meansTableWS.addColumn(type="str", name="Mass")
-        meansTableWS.addColumn(type="float", name="Mean Widths")
-        meansTableWS.addColumn(type="float", name="Std Widths")
-        meansTableWS.addColumn(type="float", name="Mean Intensities")
-        meansTableWS.addColumn(type="float", name="Std Intensities")
+        table.addColumn(type="str", name="label")
+        table.addColumn(type="float", name="mean_width")
+        table.addColumn(type="float", name="std_width")
+        table.addColumn(type="float", name="mean_intensity")
+        table.addColumn(type="float", name="std_intensity")
 
         print("\nCreated Table with means and std:")
         print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
@@ -489,10 +456,12 @@ class AnalysisRoutine(PythonAlgorithm):
             self._mean_intensity_ratios,
             self._std_intensity_ratios,
         ):
-            meansTableWS.addRow([label, mean_width, std_width, mean_intensity, std_intensity])
+            table.addRow([label, mean_width, std_width, mean_intensity, std_intensity])
             print(f"{label:5s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}  \
                     {mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
-        return
+
+        self.setPropertyValue("OutputMeansTable", table.name())
+        return table
 
 
     def calculateMeansAndStds(self, widthsIn, intensitiesIn):
@@ -581,13 +550,7 @@ class AnalysisRoutine(PythonAlgorithm):
         ):
             bounds.extend([eval(intensity_bounds), eval(width_bounds), eval(center_bounds)])
 
-        # for p in self._profiles.values():
-        #     for attr in ['intensity', 'width', 'center']:
-        #         initial_parameters.append(getattr(p, attr))
-        #     for attr in ['intensity_bounds', 'width_bounds', 'center_bounds']:
-        #         bounds.append(getattr(p, attr))
-
-        result = scipy.optimize.minimize(
+        result = optimize.minimize(
             self.errorFunction,
             initial_parameters,
             method="SLSQP",
@@ -779,7 +742,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
     def _get_parsed_constraint_function(self, function_string: str):
 
-        profile_order = [key for key in self._profiles.keys()]
+        profile_order = [label for label in self._profiles_table.column("label")]
         attribute_order = ['intensity', 'width', 'center']
 
         words = function_string.split(' ')
@@ -1047,11 +1010,11 @@ class AnalysisRoutine(PythonAlgorithm):
                 allIterNcp.append(allNCP)
 
                 # Extract Mean and Std Widths, Intensities
-                meansTable = mtd[wsIterName + "_MeanWidthsAndIntensities"]
-                allMeanWidhts.append(meansTable.column("Mean Widths"))
-                allStdWidths.append(meansTable.column("Std Widths"))
-                allMeanIntensities.append(meansTable.column("Mean Intensities"))
-                allStdIntensities.append(meansTable.column("Std Intensities"))
+                meansTable = mtd[wsIterName + "_means"]
+                allMeanWidhts.append(meansTable.column("mean_width"))
+                allStdWidths.append(meansTable.column("std_width"))
+                allMeanIntensities.append(meansTable.column("mean_intensity"))
+                allStdIntensities.append(meansTable.column("std_intensity"))
 
                 j += 1
             except KeyError:

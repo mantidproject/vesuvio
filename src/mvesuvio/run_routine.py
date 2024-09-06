@@ -22,6 +22,7 @@ def runRoutine(
     fwdIC,
     yFitIC,
     yes_to_all=False,
+    running_tests=False
 ):
     # Set extra attributes from user attributes
     completeICFromInputs(fwdIC, wsFrontIC)
@@ -46,9 +47,9 @@ def runRoutine(
             ), "When H is not present, HToMassIdxRatio has to be set to None"
 
         if proc == "BACKWARD":
-            res = runIndependentIterativeProcedure(bckwdIC)
+            res = runIndependentIterativeProcedure(bckwdIC, running_tests=running_tests)
         if proc == "FORWARD":
-            res = runIndependentIterativeProcedure(fwdIC)
+            res = runIndependentIterativeProcedure(fwdIC, running_tests=running_tests)
         if proc == "JOINT":
             res = runJointBackAndForwardProcedure(bckwdIC, fwdIC)
         return res

@@ -1,7 +1,7 @@
 # from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace
-from mantid.api import AlgorithmFactory
+from mantid.api import AlgorithmFactory, AlgorithmManager
 import numpy as np
 
 from mvesuvio.util.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace
@@ -9,7 +9,7 @@ from mvesuvio.analysis_reduction import AnalysisRoutine
 from mvesuvio.analysis_reduction import NeutronComptonProfile
 from tests.testhelpers.calibration.algorithms import create_algorithm
 
-def _create_analysis_object_from_current_interface(IC):
+def _create_analysis_object_from_current_interface(IC, running_tests=False):
     ws = loadRawAndEmptyWsFromUserPath(
         userWsRawPath=IC.userWsRawPath,
         userWsEmptyPath=IC.userWsEmptyPath,
@@ -37,31 +37,38 @@ def _create_analysis_object_from_current_interface(IC):
             intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
         ))
 
-    profiles_table = create_profiles_table(cropedWs.name()+"_Initial_Parameters", profiles)
+    profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
-    AlgorithmFactory.subscribe(AnalysisRoutine)
-    alg = create_algorithm("AnalysisRoutine",
-        InputWorkspace=cropedWs,
-        InputProfiles=profiles_table.name(),
-        InstrumentParametersFile=str(IC.InstrParsPath),
-        HRatioToLowestMass=IC.HToMassIdxRatio,
-        NumberOfIterations=int(IC.noOfMSIterations),
-        InvalidDetectors=IC.maskedSpecAllNo.astype(int).tolist(),
-        MultipleScatteringCorrection=IC.MSCorrectionFlag,
-        SampleVerticalWidth=IC.vertical_width, 
-        SampleHorizontalWidth=IC.horizontal_width, 
-        SampleThickness=IC.thickness,
-        GammaCorrection=IC.GammaCorrectionFlag,
-        ModeRunning=IC.modeRunning,
-        TransmissionGuess=IC.transmission_guess,
-        MultipleScatteringOrder=int(IC.multiple_scattering_order),
-        NumberOfEvents=int(IC.number_of_events),
-        # Constraints=IC.constraints,
-        ResultsPath=str(IC.resultsSavePath),
-        FiguresPath=str(IC.figSavePath)
-    )
-    # alg.add_profiles(*profiles)
+    kwargs = {
+        "InputWorkspace": cropedWs,
+        "InputProfiles": profiles_table.name(),
+        "InstrumentParametersFile": str(IC.InstrParsPath),
+        "HRatioToLowestMass": IC.HToMassIdxRatio,
+        "NumberOfIterations": int(IC.noOfMSIterations),
+        "InvalidDetectors": IC.maskedSpecAllNo.astype(int).tolist(),
+        "MultipleScatteringCorrection": IC.MSCorrectionFlag,
+        "SampleVerticalWidth": IC.vertical_width, 
+        "SampleHorizontalWidth": IC.horizontal_width, 
+        "SampleThickness": IC.thickness,
+        "GammaCorrection": IC.GammaCorrectionFlag,
+        "ModeRunning": IC.modeRunning,
+        "TransmissionGuess": IC.transmission_guess,
+        "MultipleScatteringOrder": int(IC.multiple_scattering_order),
+        "NumberOfEvents": int(IC.number_of_events),
+        # Constraints"": IC.constraints,
+        "ResultsPath": str(IC.resultsSavePath),
+        "FiguresPath": str(IC.figSavePath),
+        "OutputMeansTable":" Final_Means"
+    }
 
+    if running_tests:
+        alg = AnalysisRoutine()
+    else:
+        AlgorithmFactory.subscribe(AnalysisRoutine)
+        alg = AlgorithmManager.createUnmanaged("AnalysisRoutine")
+
+    alg.initialize()
+    alg.setProperties(kwargs)
     return alg 
 
 
@@ -82,6 +89,7 @@ def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
         print(str(getattr(p, "intensity_bounds")))
         print(str(getattr(p, "width_bounds")))
     return table
+
 
 def set_initial_profiles_from(self, source: 'AnalysisRoutine'):
     
@@ -117,7 +125,7 @@ def _get_lightest_profile(self):
     masses = [p.mass for p in self._profiles.values()]
     return profiles[np.argmin(masses)]
 
-def runIndependentIterativeProcedure(IC, clearWS=True):
+def runIndependentIterativeProcedure(IC, clearWS=True, running_tests=False):
     """
     Runs the iterative fitting of NCP, cleaning any previously stored workspaces.
     input: Backward or Forward scattering initial conditions object
@@ -128,8 +136,10 @@ def runIndependentIterativeProcedure(IC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    alg = _create_analysis_object_from_current_interface(IC)
-    return alg.execute()
+    alg = _create_analysis_object_from_current_interface(IC, running_tests=running_tests)
+    alg.execute()
+    means_table = alg.getPropertyValue("OutputMeansTable")
+    return alg
 
 
 def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):

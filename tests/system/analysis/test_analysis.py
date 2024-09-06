@@ -46,6 +46,7 @@ class AnalysisRunner:
             ForwardInitialConditions(ipFilesPath),
             YSpaceFitInitialConditions(),
             True,
+            running_tests=True
         )
         AnalysisRunner._currentResults = scattRes 
         return
