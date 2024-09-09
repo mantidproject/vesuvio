@@ -38,12 +38,12 @@ def runRoutine(
 
         if (proc == "BACKWARD") | (proc == "JOINT"):
 
-            if isHPresent(fwdIC.masses) & (bckwdIC.HToMassIdxRatio is None):
+            if isHPresent(fwdIC.masses) & (bckwdIC.HToMassIdxRatio==0):
                 runPreProcToEstHRatio(bckwdIC, fwdIC)
                 return
 
             assert isHPresent(fwdIC.masses) != (
-                bckwdIC.HToMassIdxRatio is None
+                bckwdIC.HToMassIdxRatio==0 
             ), "When H is not present, HToMassIdxRatio has to be set to None"
 
         if proc == "BACKWARD":
