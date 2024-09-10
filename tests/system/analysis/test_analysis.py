@@ -100,13 +100,13 @@ class TestFitParameters(unittest.TestCase):
         nptest.assert_almost_equal(self.orinit, self.optnit, decimal=-2)
 
     def test_intensities(self):
-        nptest.assert_almost_equal(self.oriintensities, self.optintensities, decimal=2)
+        nptest.assert_almost_equal(self.oriintensities, self.optintensities, decimal=4)
 
     def test_widths(self):
-        nptest.assert_almost_equal(self.oriwidths, self.optwidths, decimal=2)
+        nptest.assert_almost_equal(self.oriwidths, self.optwidths, decimal=4)
 
     def test_centers(self):
-        nptest.assert_almost_equal(self.oricenters, self.optcenters, decimal=1)
+        nptest.assert_almost_equal(self.oricenters, self.optcenters, decimal=2)
 
 
 class TestNcp(unittest.TestCase):
@@ -124,7 +124,7 @@ class TestNcp(unittest.TestCase):
         correctNansOri = np.where(
             (self.orincp == 0) & np.isnan(self.optncp), np.nan, self.orincp
         )
-        nptest.assert_almost_equal(correctNansOri, self.optncp, decimal=4)
+        nptest.assert_almost_equal(correctNansOri, self.optncp, decimal=5)
 
 
 class TestMeanWidths(unittest.TestCase):
@@ -138,7 +138,7 @@ class TestMeanWidths(unittest.TestCase):
         self.optmeanwidths = self.currentResults.all_mean_widths
 
     def test_widths(self):
-        nptest.assert_almost_equal(self.orimeanwidths, self.optmeanwidths, decimal=5)
+        nptest.assert_almost_equal(self.orimeanwidths, self.optmeanwidths, decimal=6)
 
 
 class TestMeanIntensities(unittest.TestCase):
