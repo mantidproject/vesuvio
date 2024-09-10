@@ -112,25 +112,6 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
-def histToPointData(dataY, dataX, dataE):
-    """
-    Used only when comparing with original results.
-    Sets each dataY point to the center of bins.
-    Last column of data is removed.
-    Removed original scaling by bin widths
-    """
-
-    histWidths = dataX[:, 1:] - dataX[:, :-1]
-    assert np.min(histWidths) == np.max(
-        histWidths
-    ), "Histogram widths need to be the same length"
-
-    dataYp = dataY[:, :-1]
-    dataEp = dataE[:, :-1]
-    dataXp = dataX[:, :-1] + histWidths[0, 0] / 2
-    return dataYp, dataXp, dataEp
-
-
 def loadConstants():
     """Output: the mass of the neutron, final energy of neutrons (selected by gold foil),
     factor to change energies into velocities, final velocity of neutron and hbar"""

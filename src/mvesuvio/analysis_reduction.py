@@ -7,7 +7,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace
 
-from mvesuvio.util.analysis_helpers import histToPointData, loadConstants, numericalThirdDerivative
+from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
 
 from dataclasses import dataclass
 
@@ -67,9 +67,6 @@ class AnalysisRoutine:
         self._zero_columns_boolean_mask = None
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
-
-        # Only used for system tests, remove once tests are updated
-        self._run_hist_data = True 
 
 
     def add_profiles(self, *args: NeutronComptonProfile):
@@ -149,9 +146,6 @@ class AnalysisRoutine:
         self._dataX = self._workspace_being_fit.extractX()
         self._dataY = self._workspace_being_fit.extractY()
         self._dataE = self._workspace_being_fit.extractE()
-
-        if self._run_hist_data:  # Converts point data from workspaces to histogram data
-            self._dataY, self._dataX, self._dataE = histToPointData(self._dataY, self._dataX, self._dataE)
 
         self._set_up_kinematic_arrays()
 
