@@ -1,14 +1,13 @@
 import numpy as np 
 import matplotlib.pyplot as plt
-from scipy import optimize
+import scipy
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace
 
-from mvesuvio.util.analysis_helpers import histToPointData, loadConstants, \
-                                        gaussian, lorentzian, numericalThirdDerivative
+from mvesuvio.util.analysis_helpers import histToPointData, loadConstants, numericalThirdDerivative
 
 from dataclasses import dataclass
 
@@ -71,7 +70,6 @@ class AnalysisRoutine:
 
         # Only used for system tests, remove once tests are updated
         self._run_hist_data = True 
-        self._run_norm_voigt = False
 
 
     def add_profiles(self, *args: NeutronComptonProfile):
@@ -593,7 +591,7 @@ class AnalysisRoutine:
             for attr in ['intensity_bounds', 'width_bounds', 'center_bounds']:
                 bounds.append(getattr(p, attr))
 
-        result = optimize.minimize(
+        result = scipy.optimize.minimize(
             self.errorFunction,
             initial_parameters,
             method="SLSQP",
@@ -658,7 +656,7 @@ class AnalysisRoutine:
         gaussRes, lorzRes = self.caculateResolutionForEachMass(centers)
         totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
 
-        JOfY = self.pseudoVoigt(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
+        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
 
         FSE = (
             -numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
@@ -769,20 +767,6 @@ class AnalysisRoutine:
 
         lorentzianResWidth = np.sqrt(dWdE1_lor + dQdE1_lor) * dE1_lorz  # in A-1
         return lorentzianResWidth
-
-
-    def pseudoVoigt(self, x, sigma, gamma):
-        """Convolution between Gaussian with std sigma and Lorentzian with HWHM gamma"""
-        fg, fl = 2.0 * sigma * np.sqrt(2.0 * np.log(2.0)), 2.0 * gamma
-        f = 0.5346 * fl + np.sqrt(0.2166 * fl**2 + fg**2)
-        eta = 1.36603 * fl / f - 0.47719 * (fl / f) ** 2 + 0.11116 * (fl / f) ** 3
-        sigma_v, gamma_v = f / (2.0 * np.sqrt(2.0 * np.log(2.0))), f / 2.0
-        pseudo_voigt = eta * lorentzian(x, gamma_v) + (1.0 - eta) * gaussian(x, sigma_v)
-
-        norm = (
-            np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if self._run_norm_voigt else 1
-        )
-        return pseudo_voigt / norm
 
 
     def _get_parsed_constraints(self):

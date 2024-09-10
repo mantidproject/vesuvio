@@ -143,18 +143,6 @@ def loadConstants():
     return constants
 
 
-def gaussian(x, sigma):
-    """Gaussian centered at zero"""
-    gauss = np.exp(-(x**2) / 2 / sigma**2) 
-    gauss /= np.sqrt(2.0 * np.pi) * sigma
-    return gauss
-
-
-def lorentzian(x, gamma):
-    """Lorentzian centered at zero"""
-    return gamma / np.pi / (x**2 + gamma**2)
-
-
 def numericalThirdDerivative(x, y):
     k6 = (- y[:, 12:] + y[:, :-12]) * 1
     k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
