@@ -116,7 +116,7 @@ class TestNcp(unittest.TestCase):
         cls.currentResults = AnalysisRunner.get_current_result()
 
     def setUp(self):
-        self.orincp = self.benchmarkResults["all_tot_ncp"][:, :, :-1]
+        self.orincp = self.benchmarkResults["all_tot_ncp"]
 
         self.optncp = self.currentResults.all_tot_ncp
 
