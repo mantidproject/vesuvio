@@ -1059,7 +1059,6 @@ class AnalysisRoutine:
         self.all_spec_best_par_chi_nit = np.array(allBestPar)
         self.all_tot_ncp = np.array(allTotNcp)
         self.all_ncp_for_each_mass = np.array(allIterNcp)
-
         self.all_mean_widths = np.array(allMeanWidhts)
         self.all_mean_intensities = np.array(allMeanIntensities)
         self.all_std_widths = np.array(allStdWidths)
