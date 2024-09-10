@@ -1,14 +1,13 @@
 import numpy as np 
 import matplotlib.pyplot as plt
-from scipy import optimize
+import scipy
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace
 
-from mvesuvio.util.analysis_helpers import histToPointData, loadConstants, \
-                                        gaussian, lorentzian, numericalThirdDerivative
+from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
 
 from dataclasses import dataclass
 
@@ -68,10 +67,6 @@ class AnalysisRoutine:
         self._zero_columns_boolean_mask = None
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
-
-        # Only used for system tests, remove once tests are updated
-        self._run_hist_data = True 
-        self._run_norm_voigt = False
 
 
     def add_profiles(self, *args: NeutronComptonProfile):
@@ -151,9 +146,6 @@ class AnalysisRoutine:
         self._dataX = self._workspace_being_fit.extractX()
         self._dataY = self._workspace_being_fit.extractY()
         self._dataE = self._workspace_being_fit.extractE()
-
-        if self._run_hist_data:  # Converts point data from workspaces to histogram data
-            self._dataY, self._dataX, self._dataE = histToPointData(self._dataY, self._dataX, self._dataE)
 
         self._set_up_kinematic_arrays()
 
@@ -593,7 +585,7 @@ class AnalysisRoutine:
             for attr in ['intensity_bounds', 'width_bounds', 'center_bounds']:
                 bounds.append(getattr(p, attr))
 
-        result = optimize.minimize(
+        result = scipy.optimize.minimize(
             self.errorFunction,
             initial_parameters,
             method="SLSQP",
@@ -658,7 +650,7 @@ class AnalysisRoutine:
         gaussRes, lorzRes = self.caculateResolutionForEachMass(centers)
         totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
 
-        JOfY = self.pseudoVoigt(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
+        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
 
         FSE = (
             -numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
@@ -771,20 +763,6 @@ class AnalysisRoutine:
         return lorentzianResWidth
 
 
-    def pseudoVoigt(self, x, sigma, gamma):
-        """Convolution between Gaussian with std sigma and Lorentzian with HWHM gamma"""
-        fg, fl = 2.0 * sigma * np.sqrt(2.0 * np.log(2.0)), 2.0 * gamma
-        f = 0.5346 * fl + np.sqrt(0.2166 * fl**2 + fg**2)
-        eta = 1.36603 * fl / f - 0.47719 * (fl / f) ** 2 + 0.11116 * (fl / f) ** 3
-        sigma_v, gamma_v = f / (2.0 * np.sqrt(2.0 * np.log(2.0))), f / 2.0
-        pseudo_voigt = eta * lorentzian(x, gamma_v) + (1.0 - eta) * gaussian(x, sigma_v)
-
-        norm = (
-            np.abs(np.trapz(pseudo_voigt, x, axis=1))[:, np.newaxis] if self._run_norm_voigt else 1
-        )
-        return pseudo_voigt / norm
-
-
     def _get_parsed_constraints(self):
 
         parsed_constraints = []
@@ -836,8 +814,7 @@ class AnalysisRoutine:
             OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
         )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
-            # TODO: Once the option to change point to hist is removed, remove [:len(ncp)]
-            self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask[:len(ncp[row])]]
+            self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask]
 
         SumSpectra(
             InputWorkspace=self._workspace_for_corrections.name(), 
@@ -1082,7 +1059,6 @@ class AnalysisRoutine:
         self.all_spec_best_par_chi_nit = np.array(allBestPar)
         self.all_tot_ncp = np.array(allTotNcp)
         self.all_ncp_for_each_mass = np.array(allIterNcp)
-
         self.all_mean_widths = np.array(allMeanWidhts)
         self.all_mean_intensities = np.array(allMeanIntensities)
         self.all_std_widths = np.array(allStdWidths)
@@ -1090,14 +1066,6 @@ class AnalysisRoutine:
 
     def _save_results(self):
         """Saves all of the arrays stored in this object"""
-
-        maskedDetectorIdx = np.array(self._mask_spectra) - min(self._workspace_being_fit.getSpectrumNumbers())
-
-        # TODO: Take out nans next time when running original results
-        # Because original results were recently saved with nans, mask spectra with nans
-        self.all_spec_best_par_chi_nit[:, maskedDetectorIdx, :] = np.nan
-        self.all_ncp_for_each_mass[:, maskedDetectorIdx, :, :] = np.nan
-        self.all_tot_ncp[:, maskedDetectorIdx, :] = np.nan
 
         if not self._save_results_path:
             return 

@@ -112,25 +112,6 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
-def histToPointData(dataY, dataX, dataE):
-    """
-    Used only when comparing with original results.
-    Sets each dataY point to the center of bins.
-    Last column of data is removed.
-    Removed original scaling by bin widths
-    """
-
-    histWidths = dataX[:, 1:] - dataX[:, :-1]
-    assert np.min(histWidths) == np.max(
-        histWidths
-    ), "Histogram widths need to be the same length"
-
-    dataYp = dataY[:, :-1]
-    dataEp = dataE[:, :-1]
-    dataXp = dataX[:, :-1] + histWidths[0, 0] / 2
-    return dataYp, dataXp, dataEp
-
-
 def loadConstants():
     """Output: the mass of the neutron, final energy of neutrons (selected by gold foil),
     factor to change energies into velocities, final velocity of neutron and hbar"""
@@ -141,18 +122,6 @@ def loadConstants():
     hbar = 2.0445
     constants = (mN, Ef, en_to_vel, vf, hbar)
     return constants
-
-
-def gaussian(x, sigma):
-    """Gaussian centered at zero"""
-    gauss = np.exp(-(x**2) / 2 / sigma**2) 
-    gauss /= np.sqrt(2.0 * np.pi) * sigma
-    return gauss
-
-
-def lorentzian(x, gamma):
-    """Lorentzian centered at zero"""
-    return gamma / np.pi / (x**2 + gamma**2)
 
 
 def numericalThirdDerivative(x, y):
