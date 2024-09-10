@@ -216,11 +216,9 @@ class AnalysisRoutine(PythonAlgorithm):
             return None
         
         # Hydrogen present 
-        # intensities = np.array([p.mean_intensity for p in self._profiles.values()])
-        intensities = self.mean_intensity_ratios
-        # masses = np.array([p.mass for p in self._profiles.values()])
-
+        intensities = self._mean_intensity_ratios
         sorted_intensities = intensities[np.argsort(self._masses)]
+
         return sorted_intensities[0] / sorted_intensities[1] 
         
 
