@@ -1,8 +1,10 @@
 import numpy as np 
 import matplotlib.pyplot as plt
-from scipy import optimize
+import scipy
 from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
      IntBoundedValidator, FloatBoundedValidator
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty
+from mantid.dataobjects import TableWorkspaceProperty
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
@@ -607,7 +609,7 @@ class AnalysisRoutine(PythonAlgorithm):
             self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
             return
 
-        result = optimize.minimize(
+        result = scipy.optimize.minimize(
             self.errorFunction,
             self._initial_fit_parameters,
             method="SLSQP",
