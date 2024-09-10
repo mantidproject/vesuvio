@@ -814,8 +814,7 @@ class AnalysisRoutine:
             OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
         )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
-            # TODO: Once the option to change point to hist is removed, remove [:len(ncp)]
-            self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask[:len(ncp[row])]]
+            self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask]
 
         SumSpectra(
             InputWorkspace=self._workspace_for_corrections.name(), 
@@ -1068,14 +1067,6 @@ class AnalysisRoutine:
 
     def _save_results(self):
         """Saves all of the arrays stored in this object"""
-
-        maskedDetectorIdx = np.array(self._mask_spectra) - min(self._workspace_being_fit.getSpectrumNumbers())
-
-        # TODO: Take out nans next time when running original results
-        # Because original results were recently saved with nans, mask spectra with nans
-        self.all_spec_best_par_chi_nit[:, maskedDetectorIdx, :] = np.nan
-        self.all_ncp_for_each_mass[:, maskedDetectorIdx, :, :] = np.nan
-        self.all_tot_ncp[:, maskedDetectorIdx, :] = np.nan
 
         if not self._save_results_path:
             return 

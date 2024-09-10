@@ -117,14 +117,10 @@ class TestNcp(unittest.TestCase):
 
     def setUp(self):
         self.orincp = self.benchmarkResults["all_tot_ncp"]
-
         self.optncp = self.currentResults.all_tot_ncp
 
     def test_ncp(self):
-        correctNansOri = np.where(
-            (self.orincp == 0) & np.isnan(self.optncp), np.nan, self.orincp
-        )
-        nptest.assert_almost_equal(correctNansOri, self.optncp, decimal=5)
+        nptest.assert_almost_equal(self.orincp, self.optncp, decimal=5)
 
 
 class TestMeanWidths(unittest.TestCase):
