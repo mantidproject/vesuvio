@@ -4,12 +4,11 @@ from mantid.simpleapi import CreateEmptyTableWorkspace
 from mantid.api import AlgorithmFactory, AlgorithmManager
 import numpy as np
 
-from mvesuvio.util.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace
+from mvesuvio.util.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, NeutronComptonProfile
 from mvesuvio.analysis_reduction import AnalysisRoutine
-from mvesuvio.analysis_reduction import NeutronComptonProfile
 from tests.testhelpers.calibration.algorithms import create_algorithm
 
-def _create_analysis_object_from_current_interface(IC, running_tests=False):
+def _create_analysis_object_from_current_interface(IC, running_tests=False, overwrite_profiles_table=None):
     ws = loadRawAndEmptyWsFromUserPath(
         userWsRawPath=IC.userWsRawPath,
         userWsEmptyPath=IC.userWsEmptyPath,
@@ -27,17 +26,20 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False):
         maskTOFRange=IC.maskTOFRange
     )
 
-    profiles = []
-    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
-        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
-    ):
-        profiles.append(NeutronComptonProfile(
-            label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
-            intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
-        ))
+    if overwrite_profiles_table:
+        profiles_table = overwrite_profiles_table
+    else:
+        profiles = []
+        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+            IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
+            IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
+        ):
+            profiles.append(NeutronComptonProfile(
+                label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
+                intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
+            ))
 
-    profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
+        profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
     kwargs = {
         "InputWorkspace": cropedWs,
@@ -90,40 +92,6 @@ def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
     return table
 
 
-def set_initial_profiles_from(self, source: 'AnalysisRoutine'):
-    
-    # Set intensities
-    for p in self._profiles.values():
-        if np.isclose(p.mass, 1, atol=0.1):    # Hydrogen present
-            p.intensity = source._h_ratio * source._get_lightest_profile().mean_intensity
-            continue
-        p.intensity = source.profiles[p.label].mean_intensity
-
-    # Normalise intensities
-    sum_intensities = sum([p.intensity for p in self._profiles.values()])
-    for p in self._profiles.values():
-        p.intensity /= sum_intensities
-        
-    # Set widths
-    for p in self._profiles.values():
-        try:
-            p.width = source.profiles[p.label].mean_width
-        except KeyError:
-            continue
-
-    # Fix all widths except lightest mass
-    for p in self._profiles.values():
-        if p == self._get_lightest_profile():
-            continue
-        p.width_bounds = [p.width, p.width]
-
-    return
-
-def _get_lightest_profile(self):
-    profiles = [p for p in self._profiles.values()]
-    masses = [p.mass for p in self._profiles.values()]
-    return profiles[np.argmin(masses)]
-
 def runIndependentIterativeProcedure(IC, clearWS=True, running_tests=False):
     """
     Runs the iterative fitting of NCP, cleaning any previously stored workspaces.
@@ -137,7 +105,6 @@ def runIndependentIterativeProcedure(IC, clearWS=True, running_tests=False):
 
     alg = _create_analysis_object_from_current_interface(IC, running_tests=running_tests)
     alg.execute()
-    means_table = alg.getPropertyValue("OutputMeansTable")
     return alg
 
 
@@ -212,12 +179,18 @@ def createTableWSHRatios():
 
 def runJoint(bckwdIC, fwdIC):
 
-    backRoutine = _create_analysis_object_from_current_interface(bckwdIC)
-    frontRoutine = _create_analysis_object_from_current_interface(fwdIC)
+    back_alg= _create_analysis_object_from_current_interface(bckwdIC)
+    front_alg= _create_analysis_object_from_current_interface(fwdIC)
 
-    backRoutine.execute()
-    frontRoutine.set_initial_profiles_from(backRoutine)
-    frontRoutine.execute()
+    back_alg.execute()
+    incoming_means_table = back_alg.getProperty("OutputMeansTable").value
+    receiving_profiles_table = front_alg.getProperty("InputProfiles").value
+
+    fixed_profiles_table = fix_profiles(incoming_means_table, receiving_profiles_table)
+
+    front_alg.setProperty("InputProfiles", fixed_profiles_table)
+
+    front_alg.execute()
     return
 
 

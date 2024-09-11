@@ -516,6 +516,7 @@ class AnalysisRoutine(PythonAlgorithm):
             OutputWorkspace=self._workspace_being_fit.name() + "_means"
         )
         table.addColumn(type="str", name="label")
+        table.addColumn(type="float", name="mass")
         table.addColumn(type="float", name="mean_width")
         table.addColumn(type="float", name="std_width")
         table.addColumn(type="float", name="mean_intensity")
@@ -523,14 +524,15 @@ class AnalysisRoutine(PythonAlgorithm):
 
         print("\nCreated Table with means and std:")
         print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
-        for label, mean_width, std_width, mean_intensity, std_intensity in zip(
+        for label, mass, mean_width, std_width, mean_intensity, std_intensity in zip(
             self._profiles_table.column("label"),
+            self._masses,
             self._mean_widths,
             self._std_widths,
             self._mean_intensity_ratios,
             self._std_intensity_ratios,
         ):
-            table.addRow([label, mean_width, std_width, mean_intensity, std_intensity])
+            table.addRow([label, mass, mean_width, std_width, mean_intensity, std_intensity])
             print(f"{label:5s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}  \
                     {mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
 

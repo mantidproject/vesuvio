@@ -6,6 +6,26 @@ import numbers
 
 from mvesuvio.analysis_fitting import passDataIntoWS
 
+from dataclasses import dataclass
+
+@dataclass(frozen=False)
+class NeutronComptonProfile:
+    label: str
+    mass: float
+
+    intensity: float
+    width: float
+    center: float
+
+    intensity_bounds: list[float, float]
+    width_bounds: list[float, float]
+    center_bounds: list[float, float]
+
+    mean_intensity: float = None
+    mean_width: float = None
+    mean_center: float = None
+
+
 
 def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 
                                   tofBinning, name, scaleRaw, scaleEmpty, subEmptyFromRaw):
@@ -152,3 +172,62 @@ def createWS(dataX, dataY, dataE, wsName, parentWorkspace=None):
         ParentWorkspace=parentWorkspace
     )
     return ws
+
+
+def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio):
+    means_dict = _convert_table_to_dict(incoming_means_table)
+    profiles_dict = _convert_table_to_dict(receiving_profiles_table)
+
+    # Set intensities
+    for p in profiles_dict.values():
+        if np.isclose(p['mass'], 1, atol=0.1):    # Hydrogen present
+            p['intensity'] = h_ratio * _get_lightest_profile(means_dict)['mean_intensity']
+            continue
+        p['intensity'] = means_dict[p['label']]['mean_intensity']
+
+    # Normalise intensities
+    sum_intensities = sum([p['intensity'] for p in profiles_dict.values()])
+    for p in profiles_dict.values():
+        p['intensity'] /= sum_intensities
+        
+    # Set widths
+    for p in profiles_dict.values():
+        try:
+            p['width'] = means_dict[p['label']]['mean_width']
+        except KeyError:
+            continue
+
+    # Fix all widths except lightest mass
+    for p in profiles_dict.values():
+        if p == _get_lightest_profile(profiles_dict):
+            continue
+        p['width_bounds'] = str([p['width'] , p['width']])
+
+    result_profiles_table = _convert_dict_to_table(profiles_dict)
+    return result_profiles_table
+
+
+def _convert_table_to_dict(table):
+    result_dict = {}
+    for i in range(table.rowCount()):
+        row_dict = table.row(i) 
+        result_dict[row_dict['label']] = row_dict
+    return result_dict
+
+
+def _convert_dict_to_table(m_dict):
+    table = CreateEmptyTableWorkspace()
+    for p in m_dict.values():
+        if table.columnCount() == 0:
+            for key, value in p.items():
+                value_type = 'str' if isinstance(value, str) else 'float'
+                table.addColumn(value_type, key)
+
+        table.addRow(p)
+    return table
+
+
+def _get_lightest_profile(p_dict):
+    profiles = [p for p in p_dict.values()]
+    masses = [p['mass'] for p in p_dict.values()]
+    return profiles[np.argmin(masses)]
