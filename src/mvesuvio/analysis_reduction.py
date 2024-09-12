@@ -13,28 +13,9 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
 
 from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
 
-from dataclasses import dataclass
 
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
-
-
-@dataclass(frozen=False)
-class NeutronComptonProfile:
-    label: str
-    mass: float
-
-    intensity: float
-    width: float
-    center: float
-
-    intensity_bounds: list[float, float]
-    width_bounds: list[float, float]
-    center_bounds: list[float, float]
-
-    mean_intensity: float = None
-    mean_width: float = None
-    mean_center: float = None
 
 
 class AnalysisRoutine(PythonAlgorithm):
@@ -923,12 +904,12 @@ class AnalysisRoutine(PythonAlgorithm):
         # If Backscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
             if self._h_ratio > 0:  # If H is present, ratio is a number
-                masses = np.append(masses, 1.0079)
-                meanWidths = np.append(meanWidths, 5.0)
-
                 HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(masses)]
                 meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
                 meanIntensityRatios /= np.sum(meanIntensityRatios)
+
+                masses = np.append(masses, 1.0079)
+                meanWidths = np.append(meanWidths, 5.0)
 
         MSProperties = np.zeros(3 * len(masses))
         MSProperties[::3] = masses

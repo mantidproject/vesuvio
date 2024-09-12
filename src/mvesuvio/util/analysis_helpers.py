@@ -1,6 +1,7 @@
 
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
-                            CloneWorkspace, MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace
+                            CloneWorkspace, MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
+                            mtd, RenameWorkspace
 import numpy as np
 import numbers
 
@@ -204,7 +205,8 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
         p['width_bounds'] = str([p['width'] , p['width']])
 
     result_profiles_table = _convert_dict_to_table(profiles_dict)
-    return result_profiles_table
+    RenameWorkspace(result_profiles_table, receiving_profiles_table.name())
+    return mtd[result_profiles_table.name()]
 
 
 def _convert_table_to_dict(table):

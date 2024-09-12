@@ -1,14 +1,14 @@
 # from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import CreateEmptyTableWorkspace
+from mantid.simpleapi import CreateEmptyTableWorkspace, mtd
 from mantid.api import AlgorithmFactory, AlgorithmManager
 import numpy as np
 
-from mvesuvio.util.analysis_helpers import loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, NeutronComptonProfile
+from mvesuvio.util.analysis_helpers import fix_profile_parameters, loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, NeutronComptonProfile
 from mvesuvio.analysis_reduction import AnalysisRoutine
 from tests.testhelpers.calibration.algorithms import create_algorithm
 
-def _create_analysis_object_from_current_interface(IC, running_tests=False, overwrite_profiles_table=None):
+def _create_analysis_object_from_current_interface(IC, running_tests=False):
     ws = loadRawAndEmptyWsFromUserPath(
         userWsRawPath=IC.userWsRawPath,
         userWsEmptyPath=IC.userWsEmptyPath,
@@ -26,20 +26,17 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False, over
         maskTOFRange=IC.maskTOFRange
     )
 
-    if overwrite_profiles_table:
-        profiles_table = overwrite_profiles_table
-    else:
-        profiles = []
-        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-            IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
-            IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
-        ):
-            profiles.append(NeutronComptonProfile(
-                label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
-                intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
-            ))
+    profiles = []
+    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+        IC.masses, IC.initPars[::3], IC.initPars[1::3], IC.initPars[2::3],
+        IC.bounds[::3], IC.bounds[1::3], IC.bounds[2::3]
+    ):
+        profiles.append(NeutronComptonProfile(
+            label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
+            intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
+        ))
 
-        profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
+    profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
     kwargs = {
         "InputWorkspace": cropedWs,
@@ -120,7 +117,31 @@ def runJointBackAndForwardProcedure(bckwdIC, fwdIC, clearWS=True):
     if clearWS:
         AnalysisDataService.clear()
 
-    return runJoint(bckwdIC, fwdIC)
+    back_alg= _create_analysis_object_from_current_interface(bckwdIC)
+    front_alg= _create_analysis_object_from_current_interface(fwdIC)
+
+    return run_joint_algs(back_alg, front_alg)
+
+
+def run_joint_algs(back_alg, front_alg):
+
+    back_alg.execute()
+
+    incoming_means_table = mtd[back_alg.getPropertyValue("OutputMeansTable")]
+    h_ratio = back_alg.getProperty("HRatioToLowestMass").value
+
+    assert incoming_means_table is not None, "Means table from backward routine not correctly accessed."
+    assert h_ratio is not None, "H ratio from backward routine not correctly accesssed."
+
+    receiving_profiles_table = front_alg.getProperty("InputProfiles").value
+
+    fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio)
+
+    # Even if the name is the same, need to trigger update
+    front_alg.setProperty("InputProfiles", receiving_profiles_table.name())
+
+    front_alg.execute()
+    return
 
 
 def runPreProcToEstHRatio(bckwdIC, fwdIC):
@@ -175,23 +196,6 @@ def createTableWSHRatios():
     )
     table.addColumn(type="float", name="H Ratio to lowest mass at each iteration")
     return table
-
-
-def runJoint(bckwdIC, fwdIC):
-
-    back_alg= _create_analysis_object_from_current_interface(bckwdIC)
-    front_alg= _create_analysis_object_from_current_interface(fwdIC)
-
-    back_alg.execute()
-    incoming_means_table = back_alg.getProperty("OutputMeansTable").value
-    receiving_profiles_table = front_alg.getProperty("InputProfiles").value
-
-    fixed_profiles_table = fix_profiles(incoming_means_table, receiving_profiles_table)
-
-    front_alg.setProperty("InputProfiles", fixed_profiles_table)
-
-    front_alg.execute()
-    return
 
 
 def isHPresent(masses) -> bool:
