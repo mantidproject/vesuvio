@@ -31,51 +31,52 @@ class NeutronComptonProfile:
 def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 
                                   tofBinning, name, scaleRaw, scaleEmpty, subEmptyFromRaw):
     print("\nLoading local workspaces ...\n")
-    Load(Filename=str(userWsRawPath), OutputWorkspace=name + "raw")
+    Load(Filename=str(userWsRawPath), OutputWorkspace=name + "_raw")
     Rebin(
-        InputWorkspace=name + "raw",
+        InputWorkspace=name + "_raw",
         Params=tofBinning,
-        OutputWorkspace=name + "raw",
+        OutputWorkspace=name + "_raw",
     )
 
     assert (isinstance(scaleRaw, numbers.Real)), "Scaling factor of raw ws needs to be float or int."
     Scale(
-        InputWorkspace=name + "raw",
-        OutputWorkspace=name + "raw",
+        InputWorkspace=name + "_raw",
+        OutputWorkspace=name + "_raw",
         Factor=str(scaleRaw),
     )
 
-    SumSpectra(InputWorkspace=name + "raw", OutputWorkspace=name + "raw" + "_sum")
-    wsToBeFitted = CloneWorkspace(
-        InputWorkspace=name + "raw", OutputWorkspace=name + "uncropped_unmasked"
-    )
+    SumSpectra(InputWorkspace=name + "_raw", OutputWorkspace=name + "_raw" + "_sum")
+    wsToBeFitted = mtd[name+"_raw"]
+    # wsToBeFitted = CloneWorkspace(
+    #     InputWorkspace=name + "_raw", OutputWorkspace=name + "uncropped_unmasked"
+    # )
 
     # if mode=="DoubleDifference":
     if subEmptyFromRaw:
-        Load(Filename=str(userWsEmptyPath), OutputWorkspace=name + "empty")
+        Load(Filename=str(userWsEmptyPath), OutputWorkspace=name + "_empty")
         Rebin(
-            InputWorkspace=name + "empty",
+            InputWorkspace=name + "_empty",
             Params=tofBinning,
-            OutputWorkspace=name + "empty",
+            OutputWorkspace=name + "_empty",
         )
 
         assert (isinstance(scaleEmpty, float)) | (
             isinstance(scaleEmpty, int)
         ), "Scaling factor of empty ws needs to be float or int"
         Scale(
-            InputWorkspace=name + "empty",
-            OutputWorkspace=name + "empty",
+            InputWorkspace=name + "_empty",
+            OutputWorkspace=name + "_empty",
             Factor=str(scaleEmpty),
         )
 
         SumSpectra(
-            InputWorkspace=name + "empty", OutputWorkspace=name + "empty" + "_sum"
+            InputWorkspace=name + "_empty", OutputWorkspace=name + "_empty" + "_sum"
         )
 
         wsToBeFitted = Minus(
-            LHSWorkspace=name + "raw",
-            RHSWorkspace=name + "empty",
-            OutputWorkspace=name + "uncropped_unmasked",
+            LHSWorkspace=name + "_raw",
+            RHSWorkspace=name + "_empty",
+            OutputWorkspace=name + "_raw_minus_empty",
         )
     return wsToBeFitted
 
@@ -91,7 +92,7 @@ def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectors, maskTOFRange)
     initialIdx = firstSpec - wsFirstSpec
     lastIdx = lastSpec - wsFirstSpec
 
-    newWsName = ws.name().split("uncropped")[0]  # Retrieve original name
+    newWsName = ws.name().split("_raw")[0]  # Retrieve original name
     wsCrop = CropWorkspace(
         InputWorkspace=ws,
         StartWorkspaceIndex=initialIdx,

@@ -30,7 +30,8 @@ def completeICFromInputs(IC, wsIC):
     else:
         raise ValueError("Invalid first and last spectra input.")
 
-    IC.name = scriptName + "_" + IC.modeRunning + "_"
+    name_suffix = "fwd" if IC.modeRunning=="FORWARD" else "bckwd"
+    IC.name = scriptName + "_" + name_suffix
 
     IC.masses = IC.masses.astype(float)
     IC.noOfMasses = len(IC.masses)

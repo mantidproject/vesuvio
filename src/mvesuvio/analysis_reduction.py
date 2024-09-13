@@ -274,12 +274,12 @@ class AnalysisRoutine(PythonAlgorithm):
 
         CloneWorkspace(
             InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._name + '0' 
+            OutputWorkspace=self._name + '_0' 
         )
 
         for iteration in range(self._number_of_iterations + 1):
 
-            self._workspace_being_fit = mtd[self._name + str(iteration)]
+            self._workspace_being_fit = mtd[self._name + '_' + str(iteration)]
             self._update_workspace_data()
 
             self._fit_neutron_compton_profiles()
@@ -307,7 +307,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
             RenameWorkspace(
                 InputWorkspace="next_iteration", 
-                OutputWorkspace=self._name + str(iteration + 1)
+                OutputWorkspace=self._name + '_' + str(iteration + 1)
             )
 
         self._set_results()
@@ -432,11 +432,11 @@ class AnalysisRoutine(PythonAlgorithm):
 
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
 
-        ws_data_sum = mtd[self._workspace_being_fit.name()+"_Sum"]
+        ws_data_sum = mtd[self._workspace_being_fit.name()+"_sum"]
         ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra")
 
         for key, ws in self._fit_profiles_workspaces.items():
-            ws_sum = mtd[ws.name()+"_Sum"] 
+            ws_sum = mtd[ws.name()+"_sum"] 
             ax.plot(ws_sum, label=f'Sum of {key} profile', linewidth=lw)
 
         ax.set_xlabel("TOF")
@@ -455,12 +455,12 @@ class AnalysisRoutine(PythonAlgorithm):
 
         SumSpectra(
             InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._workspace_being_fit.name() + "_Sum")
+            OutputWorkspace=self._workspace_being_fit.name() + "_sum")
 
         for ws in self._fit_profiles_workspaces.values():
             SumSpectra(
                 InputWorkspace=ws.name(),
-                OutputWorkspace=ws.name() + "_Sum"
+                OutputWorkspace=ws.name() + "_sum"
             )
 
     def _set_means_and_std(self):
@@ -814,16 +814,17 @@ class AnalysisRoutine(PythonAlgorithm):
 
         self._zero_columns_boolean_mask = np.all(dataY == 0, axis=0)  # Masked Cols
 
-        self._workspace_for_corrections = CloneWorkspace(
-            InputWorkspace=self._workspace_for_corrections.name(), 
-            OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
-        )
+        # self._workspace_for_corrections = self._workspace_for_corrections
+        # CloneWorkspace(
+        #     InputWorkspace=self._workspace_for_corrections.name(), 
+        #     OutputWorkspace=self._workspace_for_corrections.name()
+        # )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
             self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask]
 
         SumSpectra(
             InputWorkspace=self._workspace_for_corrections.name(), 
-            OutputWorkspace=self._workspace_for_corrections.name() + "_Sum"
+            OutputWorkspace=self._workspace_for_corrections.name() + "_sum"
         )
         return
 
@@ -921,7 +922,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
 
     def createMulScatWorkspaces(self, ws, sampleProperties):
-        """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
+        """Uses the Mantid algorithm for the MS correction to create two Workspaces _tot_sctr and _mltp_sctr"""
 
         print("\nEvaluating the Multiple Scattering Correction...\n")
         # selects only the masses, every 3 numbers
@@ -936,7 +937,7 @@ class AnalysisRoutine(PythonAlgorithm):
             Thickness=0.1,
         )
 
-        _TotScattering, _MulScattering = VesuvioCalculateMS(
+        _tot_sctr, _mltp_sctr = VesuvioCalculateMS(
             ws,
             NoOfMasses=len(MS_masses),
             SampleDensity=dens.cell(9, 1),
@@ -947,8 +948,8 @@ class AnalysisRoutine(PythonAlgorithm):
         )
 
         data_normalisation = Integration(ws)
-        simulation_normalisation = Integration("_TotScattering")
-        for workspace in ("_MulScattering", "_TotScattering"):
+        simulation_normalisation = Integration("_tot_sctr")
+        for workspace in ("_mltp_sctr", "_tot_sctr"):
             Divide(
                 LHSWorkspace=workspace,
                 RHSWorkspace=simulation_normalisation,
@@ -961,12 +962,12 @@ class AnalysisRoutine(PythonAlgorithm):
             )
             RenameWorkspace(InputWorkspace=workspace, OutputWorkspace=ws.name() + workspace)
             SumSpectra(
-                ws.name() + workspace, OutputWorkspace=ws.name() + workspace + "_Sum"
+                ws.name() + workspace, OutputWorkspace=ws.name() + workspace + "_sum"
             )
 
         DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
-        # The only remaining workspaces are the _MulScattering and _TotScattering
-        return mtd[ws.name() + "_MulScattering"]
+        # The only remaining workspaces are the _mltp_sctr and _tot_sctr
+        return mtd[ws.name() + "_mltp_sctr"]
 
 
     def create_gamma_workspaces(self):
@@ -978,15 +979,15 @@ class AnalysisRoutine(PythonAlgorithm):
 
         background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
         DeleteWorkspace(corrected)
-        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_Gamma_Background")
+        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_gamma_backgr")
 
         Scale(
-            InputWorkspace=inputWS + "_Gamma_Background",
-            OutputWorkspace=inputWS + "_Gamma_Background",
+            InputWorkspace=inputWS + "_gamma_backgr",
+            OutputWorkspace=inputWS + "_gamma_backgr",
             Factor=0.9,
             Operation="Multiply",
         )
-        return mtd[inputWS + "_Gamma_Background"]
+        return mtd[inputWS + "_gamma_backgr"]
 
 
     def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
@@ -1008,7 +1009,7 @@ class AnalysisRoutine(PythonAlgorithm):
     def _set_results(self):
         """Used to collect results from workspaces and store them in .npz files for testing."""
 
-        self.wsFinal = mtd[self._name + str(self._number_of_iterations)]
+        self.wsFinal = mtd[self._name + '_' + str(self._number_of_iterations)]
 
         allIterNcp = []
         allFitWs = []
