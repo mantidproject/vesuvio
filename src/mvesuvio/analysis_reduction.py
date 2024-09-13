@@ -309,7 +309,7 @@ class AnalysisRoutine(PythonAlgorithm):
         Performs the fit of neutron compton profiles to the workspace being fit.
         The profiles are fit on a spectrum by spectrum basis.
         """
-        print("\nFitting Neutron Compton Prolfiles:\n")
+        self.log().notice("\nFitting neutron compton profiles ...\n")
 
         self._row_being_fit = 0
         while self._row_being_fit != len(self._dataY):
@@ -492,8 +492,7 @@ class AnalysisRoutine(PythonAlgorithm):
         table.addColumn(type="float", name="mean_intensity")
         table.addColumn(type="float", name="std_intensity")
 
-        print("\nCreated Table with means and std:")
-        print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
+        self.log().notice("\nmass    mean widths    mean intensities\n")
         for label, mass, mean_width, std_width, mean_intensity, std_intensity in zip(
             self._profiles_table.column("label"),
             self._masses,
@@ -503,8 +502,8 @@ class AnalysisRoutine(PythonAlgorithm):
             self._std_intensity_ratios,
         ):
             table.addRow([label, mass, mean_width, std_width, mean_intensity, std_intensity])
-            print(f"{label:5s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}  \
-                    {mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
+            self.log().notice(f"{label:6s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}" + \
+                f"{mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
 
         self.setPropertyValue("OutputMeansTable", table.name())
         return table
@@ -599,7 +598,7 @@ class AnalysisRoutine(PythonAlgorithm):
         # Store results for easier access when calculating means
         self._fit_parameters[self._row_being_fit] = tableRow 
 
-        print(tableRow)
+        self.log().notice(' '.join(str(tableRow).split(",")).replace('[', '').replace(']', ''))
 
         # Pass fit profiles into workspaces
         individual_ncps = self._neutron_compton_profiles(fitPars)
@@ -803,11 +802,6 @@ class AnalysisRoutine(PythonAlgorithm):
 
         self._zero_columns_boolean_mask = np.all(dataY == 0, axis=0)  # Masked Cols
 
-        # self._workspace_for_corrections = self._workspace_for_corrections
-        # CloneWorkspace(
-        #     InputWorkspace=self._workspace_for_corrections.name(), 
-        #     OutputWorkspace=self._workspace_for_corrections.name()
-        # )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
             self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask]
 
@@ -857,10 +851,10 @@ class AnalysisRoutine(PythonAlgorithm):
         self.createSlabGeometry(self._workspace_for_corrections)  # Sample properties for MS correction
 
         sampleProperties = self.calcMSCorrectionSampleProperties(self._mean_widths, self._mean_intensity_ratios)
-        print(
-            "\nThe sample properties for Multiple Scattering correction are:\n\n",
-            sampleProperties,
-            "\n",
+        self.log().notice(
+            "\nSample properties for multiple scattering correction:\n\n" + \
+            "mass   intensity   width\n" + \
+            str(np.array(sampleProperties).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
         )
 
         return self.createMulScatWorkspaces(self._workspace_for_corrections, sampleProperties)
@@ -913,7 +907,7 @@ class AnalysisRoutine(PythonAlgorithm):
     def createMulScatWorkspaces(self, ws, sampleProperties):
         """Uses the Mantid algorithm for the MS correction to create two Workspaces _tot_sctr and _mltp_sctr"""
 
-        print("\nEvaluating the Multiple Scattering Correction...\n")
+        self.log().notice("\nEvaluating multiple scattering correction ...\n")
         # selects only the masses, every 3 numbers
         MS_masses = sampleProperties[::3]
         # same as above, but starts at first intensities
@@ -991,7 +985,8 @@ class AnalysisRoutine(PythonAlgorithm):
                 + str(intensity)
                 + ";"
             )
-        print("\n The sample properties for Gamma Correction are:\n", profiles)
+        self.log().notice("\nThe sample properties for Gamma Correction are:\n\n" + \
+                str(profiles).replace(';', '\n\n').replace(',', '\n'))
         return profiles
 
 
