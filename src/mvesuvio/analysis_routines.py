@@ -1,10 +1,12 @@
 # from .analysis_reduction import iterativeFitForDataReduction
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import CreateEmptyTableWorkspace, mtd
+from mantid.simpleapi import CreateEmptyTableWorkspace, mtd, RenameWorkspace
 from mantid.api import AlgorithmFactory, AlgorithmManager
 import numpy as np
 
-from mvesuvio.util.analysis_helpers import fix_profile_parameters, loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, NeutronComptonProfile
+from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
+                            loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
+                            NeutronComptonProfile, calculate_h_ratio
 from mvesuvio.analysis_reduction import AnalysisRoutine
 from tests.testhelpers.calibration.algorithms import create_algorithm
 
@@ -39,7 +41,7 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False):
     profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
     kwargs = {
-        "InputWorkspace": cropedWs,
+        "InputWorkspace": cropedWs.name(),
         "InputProfiles": profiles_table.name(),
         "InstrumentParametersFile": str(IC.InstrParsPath),
         "HRatioToLowestMass": IC.HToMassIdxRatio,
@@ -133,12 +135,14 @@ def run_joint_algs(back_alg, front_alg):
     assert incoming_means_table is not None, "Means table from backward routine not correctly accessed."
     assert h_ratio is not None, "H ratio from backward routine not correctly accesssed."
 
-    receiving_profiles_table = front_alg.getProperty("InputProfiles").value
+    receiving_profiles_table = mtd[front_alg.getPropertyValue("InputProfiles")]
 
-    fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio)
+    fixed_profiles_table = fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio)
 
+    # Update original profiles table
+    RenameWorkspace(fixed_profiles_table, receiving_profiles_table.name())
     # Even if the name is the same, need to trigger update
-    front_alg.setProperty("InputProfiles", receiving_profiles_table.name())
+    front_alg.setPropertyValue("InputProfiles", receiving_profiles_table.name())
 
     front_alg.execute()
     return
@@ -164,23 +168,26 @@ def runPreProcToEstHRatio(bckwdIC, fwdIC):
 
     table_h_ratios = createTableWSHRatios()
 
-    backRoutine = _create_analysis_object_from_current_interface(bckwdIC)
-    frontRoutine = _create_analysis_object_from_current_interface(fwdIC)
+    back_alg = _create_analysis_object_from_current_interface(bckwdIC)
+    front_alg = _create_analysis_object_from_current_interface(fwdIC)
 
-    frontRoutine.execute()
-    current_ratio = frontRoutine.calculate_h_ratio()
+    front_alg.execute()
+
+    means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
+    current_ratio = calculate_h_ratio(means_table) 
+
     table_h_ratios.addRow([current_ratio])
     previous_ratio = np.nan 
 
     while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
 
-        backRoutine._h_ratio = current_ratio
-        backRoutine.execute()
-        frontRoutine.set_initial_profiles_from(backRoutine)
-        frontRoutine.execute()
+        back_alg.setProperty("HRatioToLowestMass", current_ratio)
+        run_joint_algs(back_alg, front_alg)
 
         previous_ratio = current_ratio
-        current_ratio = frontRoutine.calculate_h_ratio()
+
+        means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
+        current_ratio = calculate_h_ratio(means_table) 
 
         table_h_ratios.addRow([current_ratio])
 
@@ -192,22 +199,9 @@ def runPreProcToEstHRatio(bckwdIC, fwdIC):
 
 def createTableWSHRatios():
     table = CreateEmptyTableWorkspace(
-        OutputWorkspace="H_Ratios_Estimates"
+        OutputWorkspace="hydrogen_intensity_ratios_estimates"
     )
-    table.addColumn(type="float", name="H Ratio to lowest mass at each iteration")
+    table.addColumn(type="float", name="Hydrogen intensity ratio to lowest mass at each iteration")
     return table
 
 
-def isHPresent(masses) -> bool:
-    Hmask = np.abs(masses - 1) / 1 < 0.1  # H mass whithin 10% of 1 au
-
-    if np.any(Hmask):  # H present
-        print("\nH mass detected.\n")
-        assert (
-            len(Hmask) > 1
-        ), "When H is only mass present, run independent forward procedure, not joint."
-        assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
-        assert sum(Hmask) == 1, "More than one mass very close to H were detected."
-        return True
-    else:
-        return False

@@ -2,7 +2,8 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from mock import MagicMock
-from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table, fix_profile_parameters
+from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
+    fix_profile_parameters, calculate_h_ratio
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 
 
@@ -104,6 +105,14 @@ class TestAnalysisHelpers(unittest.TestCase):
             result_table.row(2),
             {'label': '27.0', 'mass': 27.0, 'intensity': 0.3056112229824066, 'intensity_bounds': '[0, None]', 'width': 15.397000312805176, 'width_bounds': '[15.397, 15.397]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
         )
+
+
+    def test_calculate_h_ratio(self):
+        means_table_mock = MagicMock()
+        means_table_mock.column.side_effect = lambda x: [16, 1, 12] if x is "mass" else [0.1, 0.85, 0.05]
+        h_ratio = calculate_h_ratio(means_table_mock)
+        self.assertEqual(h_ratio, 0.85 / 0.05)
+
 
 if __name__ == "__main__":
     unittest.main()

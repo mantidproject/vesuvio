@@ -8,11 +8,10 @@ from mvesuvio.analysis_routines import (
     runIndependentIterativeProcedure,
     runJointBackAndForwardProcedure,
     runPreProcToEstHRatio,
-    createTableWSHRatios,
-    isHPresent,
 )
 
 from mantid.api import mtd
+import numpy as np
 
 def runRoutine(
     userCtr,
@@ -115,3 +114,18 @@ def checkInputs(crtIC):
 
     if (crtIC.procedure != "JOINT") & (crtIC.fitInYSpace is not None):
         assert crtIC.procedure == crtIC.fitInYSpace
+
+
+def isHPresent(masses) -> bool:
+    Hmask = np.abs(masses - 1) / 1 < 0.1  # H mass whithin 10% of 1 au
+
+    if np.any(Hmask):  # H present
+        print("\nH mass detected.\n")
+        assert (
+            len(Hmask) > 1
+        ), "When H is only mass present, run independent forward procedure, not joint."
+        assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
+        assert sum(Hmask) == 1, "More than one mass very close to H were detected."
+        return True
+    else:
+        return False

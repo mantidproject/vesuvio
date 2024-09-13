@@ -206,8 +206,7 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
         p['width_bounds'] = str([p['width'] , p['width']])
 
     result_profiles_table = _convert_dict_to_table(profiles_dict)
-    RenameWorkspace(result_profiles_table, receiving_profiles_table.name())
-    return mtd[result_profiles_table.name()]
+    return result_profiles_table
 
 
 def _convert_table_to_dict(table):
@@ -234,3 +233,18 @@ def _get_lightest_profile(p_dict):
     profiles = [p for p in p_dict.values()]
     masses = [p['mass'] for p in p_dict.values()]
     return profiles[np.argmin(masses)]
+
+
+def calculate_h_ratio(means_table):
+
+    masses = means_table.column("mass")
+    intensities = np.array(means_table.column("mean_intensity"))
+
+    if not np.isclose(min(masses), 1, atol=0.1):    # Hydrogen not present
+        return None
+    
+    # Hydrogen present 
+    sorted_intensities = intensities[np.argsort(masses)]
+
+    return sorted_intensities[0] / sorted_intensities[1] 
+

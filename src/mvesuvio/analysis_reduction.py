@@ -9,7 +9,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace
+                            CreateWorkspace, CreateSampleWorkspace
 
 from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
 
@@ -142,7 +142,7 @@ class AnalysisRoutine(PythonAlgorithm):
         self.run()
 
     def _setup(self):
-        self._name = self.getProperty("InputWorkspace").value.name()
+        self._name = self.getPropertyValue("InputWorkspace")
         self._ip_file = self.getProperty("InstrumentParametersFile").value
         self._number_of_iterations = self.getProperty("NumberOfIterations").value
         self._mask_spectra = self.getProperty("InvalidDetectors").value 
@@ -191,17 +191,6 @@ class AnalysisRoutine(PythonAlgorithm):
         self._fit_profiles_workspaces = {}
 
 
-    def calculate_h_ratio(self):
-
-        if not np.isclose(min(self._masses), 1, atol=0.1):    # Hydrogen not present
-            return None
-        
-        # Hydrogen present 
-        intensities = self._mean_intensity_ratios
-        sorted_intensities = intensities[np.argsort(self._masses)]
-
-        return sorted_intensities[0] / sorted_intensities[1] 
-        
 
     def _update_workspace_data(self):
 
