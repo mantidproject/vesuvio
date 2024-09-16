@@ -1,6 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import scipy
+import dill      # Only for converting constraints from string
 from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
      IntBoundedValidator, FloatBoundedValidator
 from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty
@@ -11,7 +12,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace, CreateSampleWorkspace
 
-from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
+from mvesuvio.util.analysis_helpers import deserialize_lambdas, loadConstants, numericalThirdDerivative
 
 
 
@@ -37,7 +38,7 @@ class AnalysisRoutine(PythonAlgorithm):
             name="InputProfiles",
             defaultValue="",
             direction=Direction.Input),
-            doc="Table workspace containing starting parameters for profiles"
+            doc="Table workspace containing starting parameters for profiles."
         )
         self.declareProperty(FileProperty(
             name='InstrumentParametersFile', 
@@ -61,17 +62,17 @@ class AnalysisRoutine(PythonAlgorithm):
             name="InvalidDetectors",
             validator=IntArrayBoundedValidator(lower=3, upper=198),
             direction=Direction.Input),
-            doc="List of invalid detectors whithin range 3-198"
+            doc="List of invalid detectors whithin range 3-198."
         )
         self.declareProperty(
             name="MultipleScatteringCorrection", 
             defaultValue=False, 
-            doc="Whether to run multiple scattering correction"
+            doc="Whether to run multiple scattering correction."
         )
         self.declareProperty(
             name="GammaCorrection", 
             defaultValue=False, 
-            doc="Whether to run gamma correction"
+            doc="Whether to run gamma correction."
         )
         self.declareProperty(
             name="SampleVerticalWidth",
@@ -99,11 +100,11 @@ class AnalysisRoutine(PythonAlgorithm):
             defaultValue="",
             doc="Directory where to save analysis results."
         )
-        # self.declareProperty(
-        #     name="Constraints",
-        #     defaultValue=(),
-        #     doc="Constraints to use during fitting profiles."
-        # )
+        self.declareProperty(
+            name="Constraints",
+            defaultValue="",
+            doc="Constraints to use during fitting profiles."
+        )
         self.declareProperty(
             name="TransmissionGuess",
             defaultValue=-1.0,
@@ -122,12 +123,12 @@ class AnalysisRoutine(PythonAlgorithm):
         self.declareProperty(
             name="ResultsPath",
             defaultValue="",
-            doc="Directory to store results, to be deleted later"
+            doc="Directory to store results, to be deleted later."
         )
         self.declareProperty(
             name="FiguresPath",
             defaultValue="",
-            doc="Directory to store figures, to be deleted later"
+            doc="Directory to store figures, to be deleted later."
         )
         # Outputs
         self.declareProperty(TableWorkspaceProperty(
@@ -158,7 +159,7 @@ class AnalysisRoutine(PythonAlgorithm):
         self._save_results_path = self.getProperty("ResultsPath").value
         self._save_figures_path = self.getProperty("FiguresPath").value 
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
-        self._constraints = () #self.getProperty("Constraints").value 
+        self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
 
         self._profiles_table = self.getProperty("InputProfiles").value
 

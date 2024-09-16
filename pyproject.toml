@@ -26,6 +26,7 @@ dependencies = [
     "iminuit",
     "h5py",
     "jacobi==0.4.2",
+    "dill",
 ]
 
 [project.optional-dependencies]

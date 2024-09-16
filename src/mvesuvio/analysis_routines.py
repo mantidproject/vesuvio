@@ -3,10 +3,11 @@ from mantid.api import AnalysisDataService
 from mantid.simpleapi import CreateEmptyTableWorkspace, mtd, RenameWorkspace
 from mantid.api import AlgorithmFactory, AlgorithmManager
 import numpy as np
+import dill         # To convert constraints to string
 
 from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
-                            NeutronComptonProfile, calculate_h_ratio
+                            NeutronComptonProfile, calculate_h_ratio, serialize_lambdas
 from mvesuvio.analysis_reduction import AnalysisRoutine
 from tests.testhelpers.calibration.algorithms import create_algorithm
 
@@ -56,7 +57,7 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False):
         "TransmissionGuess": IC.transmission_guess,
         "MultipleScatteringOrder": int(IC.multiple_scattering_order),
         "NumberOfEvents": int(IC.number_of_events),
-        # Constraints"": IC.constraints,
+        "Constraints": str(dill.dumps(IC.constraints)),
         "ResultsPath": str(IC.resultsSavePath),
         "FiguresPath": str(IC.figSavePath),
         "OutputMeansTable":" Final_Means"

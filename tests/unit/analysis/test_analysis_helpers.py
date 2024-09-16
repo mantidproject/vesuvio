@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import dill
 import numpy.testing as nptest
 from mock import MagicMock
 from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
@@ -109,9 +110,18 @@ class TestAnalysisHelpers(unittest.TestCase):
 
     def test_calculate_h_ratio(self):
         means_table_mock = MagicMock()
-        means_table_mock.column.side_effect = lambda x: [16, 1, 12] if x is "mass" else [0.1, 0.85, 0.05]
+        means_table_mock.column.side_effect = lambda x: [16, 1, 12] if x=="mass" else [0.1, 0.85, 0.05]
         h_ratio = calculate_h_ratio(means_table_mock)
         self.assertEqual(h_ratio, 0.85 / 0.05)
+
+
+    def test_conversion_of_constraints(self):
+        constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
+        string_constraints = str(dill.dumps(constraints))
+        self.assertIsInstance(string_constraints, str)
+        converted_constraints = dill.loads(eval(string_constraints))
+        self.assertEqual(converted_constraints[0]['fun']([3, 0, 0, 1]), 3-2.7527)
+        self.assertEqual(converted_constraints[1]['fun']([0, 0, 0, 2, 0, 0, 1]), 2-0.7234)
 
 
 if __name__ == "__main__":
