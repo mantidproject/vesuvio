@@ -58,7 +58,7 @@ def runRoutine(
     ICs = []
     for mode, IC in zip(["BACKWARD", "FORWARD"], [bckwdIC, fwdIC]):
         if (userCtr.fitInYSpace == mode) | (userCtr.fitInYSpace == "JOINT"):
-            wsNames.append(buildFinalWSName(mode, IC))
+            wsNames.append(IC.name + '_' + str(IC.noOfMSIterations))
             ICs.append(IC)
 
     # Default workflow for procedure + fit in y space
@@ -69,7 +69,7 @@ def runRoutine(
             wsInMtd
         ):  # When wsName is empty list, loop doesn't run
             for wsName, IC in zip(wsNames, ICs):
-                resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+                resYFit = fitInYSpaceProcedure(yFitIC, IC, wsName)
             return None, resYFit  # To match return below.
 
         checkUserClearWS(yes_to_all)  # Check if user is OK with cleaning all workspaces
@@ -77,7 +77,7 @@ def runRoutine(
 
         resYFit = None
         for wsName, IC in zip(wsNames, ICs):
-            resYFit = fitInYSpaceProcedure(yFitIC, IC, mtd[wsName])
+            resYFit = fitInYSpaceProcedure(yFitIC, IC, wsName)
 
         return res, resYFit  # Return results used only in tests
 

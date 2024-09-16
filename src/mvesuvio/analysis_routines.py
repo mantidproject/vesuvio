@@ -7,7 +7,7 @@ import dill         # To convert constraints to string
 
 from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
-                            NeutronComptonProfile, calculate_h_ratio, serialize_lambdas
+                            NeutronComptonProfile, calculate_h_ratio
 from mvesuvio.analysis_reduction import AnalysisRoutine
 from tests.testhelpers.calibration.algorithms import create_algorithm
 
