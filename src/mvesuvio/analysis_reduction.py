@@ -12,7 +12,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace, CreateSampleWorkspace
 
-from mvesuvio.util.analysis_helpers import deserialize_lambdas, loadConstants, numericalThirdDerivative
+from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
 
 
 
