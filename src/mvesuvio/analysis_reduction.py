@@ -1007,7 +1007,7 @@ class AnalysisRoutine(PythonAlgorithm):
         j = 0
         while True:
             try:
-                wsIterName = self._name + str(j)
+                wsIterName = self._name + '_' + str(j)
 
                 # Extract ws that were fitted
                 ws = mtd[wsIterName]
