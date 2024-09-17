@@ -73,13 +73,13 @@ class AnalysisRunner:
         AnalysisDataService.clear()
         wsFinal = Load(
             str(cls._input_data_path / "wsFinal.nxs"),
-            OutputWorkspace=scriptName + "_FORWARD_1",
+            OutputWorkspace=scriptName + "_fwd_1",
         )
         for i in range(len(fwdIC.masses)):
             fileName = "wsFinal_ncp_" + str(i) + ".nxs"
             Load(
                 str(cls._input_data_path / fileName),
-                OutputWorkspace=wsFinal.name() + "_TOF_Fitted_Profile_" + str(i),
+                OutputWorkspace=wsFinal.name() + "_label" + str(i) +"_ncp",
             )
 
     @classmethod

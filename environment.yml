@@ -18,3 +18,4 @@ dependencies:
   - pytest
   - jacobi==0.4.2 #pinned until newer versions functionality confirmed
   - coverage
+  - dill      # Used to convert constraints to strings
