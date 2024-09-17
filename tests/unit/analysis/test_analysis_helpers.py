@@ -117,8 +117,10 @@ class TestAnalysisHelpers(unittest.TestCase):
 
     def test_conversion_of_constraints(self):
         constraints = ({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] },{'type': 'eq', 'fun': lambda par:  par[3] - 0.7234*par[6] })
+        # Used before passing constraints into Mantid algorithm
         string_constraints = str(dill.dumps(constraints))
         self.assertIsInstance(string_constraints, str)
+        # Used inside Mantid algorithm to convert back to SciPy constraints
         converted_constraints = dill.loads(eval(string_constraints))
         self.assertEqual(converted_constraints[0]['fun']([3, 0, 0, 1]), 3-2.7527)
         self.assertEqual(converted_constraints[1]['fun']([0, 0, 0, 2, 0, 0, 1]), 2-0.7234)

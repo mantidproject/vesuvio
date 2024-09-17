@@ -163,7 +163,7 @@ class AnalysisRoutine(PythonAlgorithm):
 
         self._profiles_table = self.getProperty("InputProfiles").value
 
-        # Need to transform profiles table into parameter array for minimize
+        # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
         for intensity, width, center in zip(
             self._profiles_table.column("intensity"),
@@ -225,11 +225,11 @@ class AnalysisRoutine(PythonAlgorithm):
         table.setTitle("SciPy Fit Parameters")
         table.addColumn(type="float", name="Spectrum")
         for label in self._profiles_table.column("label"):
-            table.addColumn(type="float", name=f"{label} Intensity")
-            table.addColumn(type="float", name=f"{label} Width")
-            table.addColumn(type="float", name=f"{label} Center ")
-        table.addColumn(type="float", name="Normalised Chi2")
-        table.addColumn(type="float", name="Number of Iterations")
+            table.addColumn(type="float", name=f"{label} intensity")
+            table.addColumn(type="float", name=f"{label} width")
+            table.addColumn(type="float", name=f"{label} center ")
+        table.addColumn(type="float", name="normalised chi2")
+        table.addColumn(type="float", name="no of iterations")
         return table
 
 
@@ -460,8 +460,8 @@ class AnalysisRoutine(PythonAlgorithm):
         widths = np.zeros((self._profiles_table.rowCount(), fitParsTable.rowCount()))
         intensities = np.zeros(widths.shape)
         for i, label in enumerate(self._profiles_table.column("label")):
-            widths[i] = fitParsTable.column(f"{label} Width")
-            intensities[i] = fitParsTable.column(f"{label} Intensity")
+            widths[i] = fitParsTable.column(f"{label} width")
+            intensities[i] = fitParsTable.column(f"{label} intensity")
         (
             meanWidths,
             stdWidths,

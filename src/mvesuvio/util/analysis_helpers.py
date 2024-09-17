@@ -47,11 +47,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
 
     SumSpectra(InputWorkspace=name + "_raw", OutputWorkspace=name + "_raw" + "_sum")
     wsToBeFitted = mtd[name+"_raw"]
-    # wsToBeFitted = CloneWorkspace(
-    #     InputWorkspace=name + "_raw", OutputWorkspace=name + "uncropped_unmasked"
-    # )
 
-    # if mode=="DoubleDifference":
     if subEmptyFromRaw:
         Load(Filename=str(userWsEmptyPath), OutputWorkspace=name + "_empty")
         Rebin(

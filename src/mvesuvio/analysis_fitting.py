@@ -55,7 +55,6 @@ def extractNCPFromWorkspaces(wsFinal, ic):
             if 'total' in ws_name:
                 continue
 
-            print(ws_name)
             ws = mtd[ws_name]
             dataY = ws.extractY()[np.newaxis, :, :]
             try:
