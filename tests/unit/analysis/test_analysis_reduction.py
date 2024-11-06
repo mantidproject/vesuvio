@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from mock import MagicMock
-from mvesuvio.analysis_reduction import AnalysisRoutine 
+from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine 
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 import inspect
 

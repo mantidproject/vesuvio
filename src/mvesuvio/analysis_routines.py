@@ -8,8 +8,7 @@ import dill         # To convert constraints to string
 from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
                             NeutronComptonProfile, calculate_h_ratio
-from mvesuvio.analysis_reduction import AnalysisRoutine
-from tests.testhelpers.calibration.algorithms import create_algorithm
+from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 def _create_analysis_object_from_current_interface(IC, running_tests=False):
     ws = loadRawAndEmptyWsFromUserPath(
@@ -45,7 +44,7 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False):
         "InputWorkspace": cropedWs.name(),
         "InputProfiles": profiles_table.name(),
         "InstrumentParametersFile": str(IC.InstrParsPath),
-        "HRatioToLowestMass": IC.HToMassIdxRatio,
+        "HRatioToLowestMass": IC.HToMassIdxRatio if hasattr(IC, 'HRatioToLowestMass') else 0,
         "NumberOfIterations": int(IC.noOfMSIterations),
         "InvalidDetectors": IC.maskedSpecAllNo.astype(int).tolist(),
         "MultipleScatteringCorrection": IC.MSCorrectionFlag,
@@ -64,10 +63,10 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False):
     }
 
     if running_tests:
-        alg = AnalysisRoutine()
+        alg = VesuvioAnalysisRoutine()
     else:
-        AlgorithmFactory.subscribe(AnalysisRoutine)
-        alg = AlgorithmManager.createUnmanaged("AnalysisRoutine")
+        AlgorithmFactory.subscribe(VesuvioAnalysisRoutine)
+        alg = AlgorithmManager.createUnmanaged("VesuvioAnalysisRoutine")
 
     alg.initialize()
     alg.setProperties(kwargs)

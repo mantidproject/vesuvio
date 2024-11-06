@@ -19,7 +19,7 @@ from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivati
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 
-class AnalysisRoutine(PythonAlgorithm):
+class VesuvioAnalysisRoutine(PythonAlgorithm):
 
     def summary(self):
         return "Runs the analysis reduction routine for VESUVIO."
