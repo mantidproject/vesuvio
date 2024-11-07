@@ -47,13 +47,13 @@ class BackwardInitialConditions(GeneralInitialConditions):
     initPars = np.array([1, 12, 0.0, 1, 12, 0.0, 1, 12.5, 0.0])
     bounds = np.array(
         [
-            [0, np.nan],
+            [0, None],
             [8, 16],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [8, 16],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [11, 14],
             [-3, 1],
         ]
@@ -75,20 +75,22 @@ class ForwardInitialConditions(GeneralInitialConditions):
     def __init__(self, ipFilesPath):
         self.InstrParsPath = ipFilesPath / "ip2018_3.par"
 
+    HToMassIdxRatio = 0     # New way to ignore ratio
+
     masses = np.array([1.0079, 12, 16, 27])
     initPars = np.array([1, 4.7, 0, 1, 12.71, 0.0, 1, 8.76, 0.0, 1, 13.897, 0.0])
     bounds = np.array(
         [
-            [0, np.nan],
+            [0, None],
             [3, 6],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [12.71, 12.71],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [8.76, 8.76],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [13.897, 13.897],
             [-3, 1],
         ]

@@ -1,144 +1,196 @@
 import numpy as np 
 import matplotlib.pyplot as plt
 import scipy
+import dill      # Only for converting constraints from string
+from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
+     IntBoundedValidator, FloatBoundedValidator
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty
+from mantid.dataobjects import TableWorkspaceProperty
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace
+                            CreateWorkspace, CreateSampleWorkspace
 
 from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
 
-from dataclasses import dataclass
 
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 
-@dataclass(frozen=False)
-class NeutronComptonProfile:
-    label: str
-    mass: float
+class VesuvioAnalysisRoutine(PythonAlgorithm):
 
-    intensity: float
-    width: float
-    center: float
+    def summary(self):
+        return "Runs the analysis reduction routine for VESUVIO."
 
-    intensity_bounds: tuple[float, float]
-    width_bounds: tuple[float, float]
-    center_bounds: tuple[float, float]
+    def category(self):
+        return "VesuvioAnalysis"
 
-    mean_intensity: float = None
-    mean_width: float = None
-    mean_center: float = None
+    def PyInit(self):
+        self.declareProperty(MatrixWorkspaceProperty(
+            name="InputWorkspace",
+            defaultValue="",
+            direction=Direction.Input),
+            doc="Workspace to fit Neutron Compton Profiles."
+        )
+        self.declareProperty(TableWorkspaceProperty(
+            name="InputProfiles",
+            defaultValue="",
+            direction=Direction.Input),
+            doc="Table workspace containing starting parameters for profiles."
+        )
+        self.declareProperty(FileProperty(
+            name='InstrumentParametersFile', 
+            defaultValue='', 
+            action=FileAction.Load, 
+            extensions=["par", "dat"]),
+            doc="Filename of the instrument parameter file."
+        )
+        self.declareProperty(
+            name="HRatioToLowestMass", 
+            defaultValue=0.0,
+            validator=FloatBoundedValidator(lower=0), 
+            doc="Intensity ratio between H peak and lowest mass peak."
+        )
+        self.declareProperty(
+            name="NumberOfIterations", 
+            defaultValue=2,
+            validator=IntBoundedValidator(lower=0)
+        )
+        self.declareProperty(IntArrayProperty(
+            name="InvalidDetectors",
+            validator=IntArrayBoundedValidator(lower=3, upper=198),
+            direction=Direction.Input),
+            doc="List of invalid detectors whithin range 3-198."
+        )
+        self.declareProperty(
+            name="MultipleScatteringCorrection", 
+            defaultValue=False, 
+            doc="Whether to run multiple scattering correction."
+        )
+        self.declareProperty(
+            name="GammaCorrection", 
+            defaultValue=False, 
+            doc="Whether to run gamma correction."
+        )
+        self.declareProperty(
+            name="SampleVerticalWidth",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="SampleHorizontalWidth",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="SampleThickness",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="ModeRunning",
+            defaultValue="BACKWARD",
+            validator=StringListValidator(["BACKWARD", "FORWARD"]),
+            doc="Whether running backward or forward scattering.")
 
+        self.declareProperty(
+            name="OutputDirectory",
+            defaultValue="",
+            doc="Directory where to save analysis results."
+        )
+        self.declareProperty(
+            name="Constraints",
+            defaultValue="",
+            doc="Constraints to use during fitting profiles."
+        )
+        self.declareProperty(
+            name="TransmissionGuess",
+            defaultValue=-1.0,
+            validator=FloatBoundedValidator(lower=0, upper=1)
+        )
+        self.declareProperty(
+            name="MultipleScatteringOrder",
+            defaultValue=-1,
+            validator=IntBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="NumberOfEvents",
+            defaultValue=-1,
+            validator=IntBoundedValidator(lower=0)
+        )
+        self.declareProperty(
+            name="ResultsPath",
+            defaultValue="",
+            doc="Directory to store results, to be deleted later."
+        )
+        self.declareProperty(
+            name="FiguresPath",
+            defaultValue="",
+            doc="Directory to store figures, to be deleted later."
+        )
+        # Outputs
+        self.declareProperty(TableWorkspaceProperty(
+            name="OutputMeansTable",
+            defaultValue="",
+            direction=Direction.Output),
+            doc="TableWorkspace containing final means of intensity and widths.")
 
-class AnalysisRoutine:
+                                    
+    def PyExec(self):
+        self._setup()
+        self.run()
 
-    def __init__(self, workspace, ip_file, h_ratio_to_lowest_mass, number_of_iterations, mask_spectra,
-                 multiple_scattering_correction, vertical_width, horizontal_width, thickness,
-                 gamma_correction, mode_running, transmission_guess=None, multiple_scattering_order=None, 
-                 number_of_events=None, results_path=None, figures_path=None, constraints=()):
+    def _setup(self):
+        self._name = self.getPropertyValue("InputWorkspace")
+        self._ip_file = self.getProperty("InstrumentParametersFile").value
+        self._number_of_iterations = self.getProperty("NumberOfIterations").value
+        self._mask_spectra = self.getProperty("InvalidDetectors").value 
+        self._transmission_guess = self.getProperty("TransmissionGuess").value 
+        self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value 
+        self._number_of_events = self.getProperty("NumberOfEvents").value 
+        self._vertical_width = self.getProperty("SampleVerticalWidth").value 
+        self._horizontal_width = self.getProperty("SampleHorizontalWidth").value 
+        self._thickness = self.getProperty("SampleThickness").value 
+        self._mode_running = self.getProperty("ModeRunning").value 
+        self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
+        self._gamma_correction = self.getProperty("GammaCorrection").value 
+        self._save_results_path = self.getProperty("ResultsPath").value
+        self._save_figures_path = self.getProperty("FiguresPath").value 
+        self._h_ratio = self.getProperty("HRatioToLowestMass").value 
+        self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
 
-        self._name = workspace.name()
-        self._ip_file = ip_file
-        self._number_of_iterations = number_of_iterations
-        self._mask_spectra = mask_spectra
-        self._transmission_guess = transmission_guess
-        self._multiple_scattering_order = multiple_scattering_order
-        self._number_of_events = number_of_events
-        self._vertical_width = vertical_width
-        self._horizontal_width = horizontal_width
-        self._thickness = thickness
-        self._mode_running = mode_running
-        self._multiple_scattering_correction = multiple_scattering_correction
-        self._gamma_correction = gamma_correction
-        self._save_results_path = results_path
-        self._save_figures_path = figures_path
-        self._h_ratio = h_ratio_to_lowest_mass 
-        self._constraints = constraints 
+        self._profiles_table = self.getProperty("InputProfiles").value
 
-        self._profiles = {} 
+        # Need to transform profiles table into parameter array for optimize.minimize()
+        self._initial_fit_parameters = []
+        for intensity, width, center in zip(
+            self._profiles_table.column("intensity"),
+            self._profiles_table.column("width"),
+            self._profiles_table.column("center")
+        ):
+            self._initial_fit_parameters.extend([intensity, width, center])
+
+        self._initial_fit_bounds = []
+        for intensity_bounds, width_bounds, center_bounds in zip(
+            self._profiles_table.column("intensity_bounds"),
+            self._profiles_table.column("width_bounds"),
+            self._profiles_table.column("center_bounds")
+        ):
+            self._initial_fit_bounds.extend([eval(intensity_bounds), eval(width_bounds), eval(center_bounds)])
+
+        # Masses need to be defined in the same order
+        self._masses = np.array(self._profiles_table.column("mass"))
 
         # Variables changing during fit
-        self._workspace_for_corrections = workspace
-        self._workspace_being_fit = workspace
+        self._workspace_for_corrections = self.getProperty("InputWorkspace").value 
+        self._workspace_being_fit = self.getProperty("InputWorkspace").value
         self._row_being_fit = 0 
         self._zero_columns_boolean_mask = None
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
 
-
-    def add_profiles(self, *args: NeutronComptonProfile):
-        for profile in args:
-            self._profiles[profile.label] = profile
-
-
-    @property
-    def profiles(self):
-        return self._profiles
-
-
-    def set_initial_profiles_from(self, source: 'AnalysisRoutine'):
-        
-        # Set intensities
-        for p in self._profiles.values():
-            if np.isclose(p.mass, 1, atol=0.1):    # Hydrogen present
-                p.intensity = source._h_ratio * source._get_lightest_profile().mean_intensity
-                continue
-            p.intensity = source.profiles[p.label].mean_intensity
-
-        # Normalise intensities
-        sum_intensities = sum([p.intensity for p in self._profiles.values()])
-        for p in self._profiles.values():
-            p.intensity /= sum_intensities
-            
-        # Set widths
-        for p in self._profiles.values():
-            try:
-                p.width = source.profiles[p.label].mean_width
-            except KeyError:
-                continue
-
-        # Fix all widths except lightest mass
-        for p in self._profiles.values():
-            if p == self._get_lightest_profile():
-                continue
-            p.width_bounds = [p.width, p.width]
-
-        return
-
-
-    def _get_lightest_profile(self):
-        profiles = [p for p in self._profiles.values()]
-        masses = [p.mass for p in self._profiles.values()]
-        return profiles[np.argmin(masses)]
-
-
-    def calculate_h_ratio(self):
-
-        if not np.isclose(self._get_lightest_profile().mass, 1, atol=0.1):    # Hydrogen present
-            return None
-        
-        # Hydrogen is present 
-        intensities = np.array([p.mean_intensity for p in self._profiles.values()])
-        masses = np.array([p.mass for p in self._profiles.values()])
-
-        sorted_intensities = intensities[np.argsort(masses)]
-        return sorted_intensities[0] / sorted_intensities[1] 
-        
-
-    @property
-    def profiles(self):
-        return self._profiles
-
-
-    @profiles.setter
-    def profiles(self, incoming_profiles):
-        assert(isinstance(incoming_profiles, dict))
-        common_keys = self._profiles.keys() & incoming_profiles.keys() 
-        common_keys_profiles = {k: incoming_profiles[k] for k in common_keys}
-        self._profiles = {**self._profiles, **common_keys_profiles}
 
 
     def _update_workspace_data(self):
@@ -149,13 +201,13 @@ class AnalysisRoutine:
 
         self._set_up_kinematic_arrays()
 
-        self._fit_parameters = np.zeros((len(self._dataY), 3 * len(self._profiles) + 3))
+        self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
         self._row_being_fit = 0 
         self._table_fit_results = self._initialize_table_fit_parameters()
 
         # Initialise workspaces for fitted ncp 
         self._fit_profiles_workspaces = {}
-        for element, p in self._profiles.items():
+        for element in self._profiles_table.column("label"):
             self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
@@ -172,38 +224,13 @@ class AnalysisRoutine:
         )
         table.setTitle("SciPy Fit Parameters")
         table.addColumn(type="float", name="Spectrum")
-        for key in self._profiles.keys():
-            table.addColumn(type="float", name=f"{key} Intensity")
-            table.addColumn(type="float", name=f"{key} Width")
-            table.addColumn(type="float", name=f"{key} Center ")
-        table.addColumn(type="float", name="Normalised Chi2")
-        table.addColumn(type="float", name="Number of Iterations")
+        for label in self._profiles_table.column("label"):
+            table.addColumn(type="float", name=f"{label} intensity")
+            table.addColumn(type="float", name=f"{label} width")
+            table.addColumn(type="float", name=f"{label} center ")
+        table.addColumn(type="float", name="normalised chi2")
+        table.addColumn(type="float", name="no of iterations")
         return table
-
-
-    @property
-    def mean_widths(self):
-        return self._mean_widths
-
-
-    @mean_widths.setter
-    def mean_widths(self, value):
-        self._mean_widths = value
-        for i, p in enumerate(self._profiles.values()):
-            p.mean_width = self._mean_widths[i]
-        return
-
-
-    @property
-    def mean_intensity_ratios(self):
-        return self._mean_intensity_ratios
-
-    @mean_intensity_ratios.setter
-    def mean_intensity_ratios(self, value):
-        self._mean_intensity_ratios = value
-        for i, p in enumerate(self.profiles.values()):
-            p.mean_intensity = self._mean_intensity_ratios[i]
-        return
 
 
     def _create_emtpy_ncp_workspace(self, suffix):
@@ -227,9 +254,7 @@ class AnalysisRoutine:
 
     def run(self):
 
-        assert len(self.profiles) > 0, "Add profiles before attempting to run the routine!"
-
-        self._create_table_initial_parameters()
+        assert self._profiles_table.rowCount() > 0, "Need at least one profile to run the routine!"
 
         # Legacy code from Bootstrap
         # if self.runningSampleWS:
@@ -239,12 +264,12 @@ class AnalysisRoutine:
 
         CloneWorkspace(
             InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._name + '0' 
+            OutputWorkspace=self._name + '_0' 
         )
 
         for iteration in range(self._number_of_iterations + 1):
 
-            self._workspace_being_fit = mtd[self._name + str(iteration)]
+            self._workspace_being_fit = mtd[self._name + '_' + str(iteration)]
             self._update_workspace_data()
 
             self._fit_neutron_compton_profiles()
@@ -272,7 +297,7 @@ class AnalysisRoutine:
 
             RenameWorkspace(
                 InputWorkspace="next_iteration", 
-                OutputWorkspace=self._name + str(iteration + 1)
+                OutputWorkspace=self._name + '_' + str(iteration + 1)
             )
 
         self._set_results()
@@ -280,37 +305,12 @@ class AnalysisRoutine:
         return self 
 
 
-    def _create_table_initial_parameters(self):
-        meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._name + "_Initial_Parameters"
-        )
-        meansTableWS.addColumn(type="float", name="Mass")
-        meansTableWS.addColumn(type="float", name="Initial Widths")
-        meansTableWS.addColumn(type="str", name="Bounds Widths")
-        meansTableWS.addColumn(type="float", name="Initial Intensities")
-        meansTableWS.addColumn(type="str", name="Bounds Intensities")
-        meansTableWS.addColumn(type="float", name="Initial Centers")
-        meansTableWS.addColumn(type="str", name="Bounds Centers")
-
-        print("\nCreated Table with Initial Parameters:")
-        for p in self._profiles.values():
-            meansTableWS.addRow([p.mass, p.width, str(p.width_bounds), 
-                                 p.intensity, str(p.intensity_bounds), 
-                                 p.center, str(p.center_bounds)])
-            print("\nMass: ", p.mass)
-            print(f"{'Initial Intensity:':>20s} {p.intensity:<8.3f} Bounds: {p.intensity_bounds}")
-            print(f"{'Initial Width:':>20s} {p.width:<8.3f} Bounds: {p.width_bounds}")
-            print(f"{'Initial Center:':>20s} {p.center:<8.3f} Bounds: {p.center_bounds}")
-        print("\n")
-        return
-
-
     def _fit_neutron_compton_profiles(self):
         """
         Performs the fit of neutron compton profiles to the workspace being fit.
         The profiles are fit on a spectrum by spectrum basis.
         """
-        print("\nFitting Neutron Compton Prolfiles:\n")
+        self.log().notice("\nFitting neutron compton profiles ...\n")
 
         self._row_being_fit = 0
         while self._row_being_fit != len(self._dataY):
@@ -402,7 +402,7 @@ class AnalysisRoutine:
         delta_E = delta_E[np.newaxis, :, :]
 
         mN, Ef, en_to_vel, vf, hbar = loadConstants()
-        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1, 1)
+        masses = self._masses.reshape(-1, 1, 1)
 
         energyRecoil = np.square(hbar * delta_Q) / 2.0 / masses
         ySpacesForEachMass = (
@@ -422,11 +422,11 @@ class AnalysisRoutine:
 
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
 
-        ws_data_sum = mtd[self._workspace_being_fit.name()+"_Sum"]
+        ws_data_sum = mtd[self._workspace_being_fit.name()+"_sum"]
         ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra")
 
         for key, ws in self._fit_profiles_workspaces.items():
-            ws_sum = mtd[ws.name()+"_Sum"] 
+            ws_sum = mtd[ws.name()+"_sum"] 
             ax.plot(ws_sum, label=f'Sum of {key} profile', linewidth=lw)
 
         ax.set_xlabel("TOF")
@@ -435,7 +435,7 @@ class AnalysisRoutine:
         ax.legend()
 
         fileName = self._workspace_being_fit.name() + "_profiles_sum.pdf"
-        savePath = self._save_figures_path / fileName
+        savePath = self._save_figures_path + '/' + fileName
         plt.savefig(savePath, bbox_inches="tight")
         plt.close(fig)
         return
@@ -445,23 +445,23 @@ class AnalysisRoutine:
 
         SumSpectra(
             InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._workspace_being_fit.name() + "_Sum")
+            OutputWorkspace=self._workspace_being_fit.name() + "_sum")
 
         for ws in self._fit_profiles_workspaces.values():
             SumSpectra(
                 InputWorkspace=ws.name(),
-                OutputWorkspace=ws.name() + "_Sum"
+                OutputWorkspace=ws.name() + "_sum"
             )
 
     def _set_means_and_std(self):
         """Calculate mean widths and intensities from tableWorkspace"""
 
         fitParsTable = self._table_fit_results
-        widths = np.zeros((len(self._profiles), fitParsTable.rowCount()))
+        widths = np.zeros((self._profiles_table.rowCount(), fitParsTable.rowCount()))
         intensities = np.zeros(widths.shape)
-        for i, p in enumerate(self._profiles.values()):
-            widths[i] = fitParsTable.column(f"{p.label} Width")
-            intensities[i] = fitParsTable.column(f"{p.label} Intensity")
+        for i, label in enumerate(self._profiles_table.column("label")):
+            widths[i] = fitParsTable.column(f"{label} width")
+            intensities[i] = fitParsTable.column(f"{label} intensity")
         (
             meanWidths,
             stdWidths,
@@ -470,41 +470,44 @@ class AnalysisRoutine:
         ) = self.calculateMeansAndStds(widths, intensities)
 
         assert (
-            len(meanWidths) == len(self._profiles) 
+            len(meanWidths) == self._profiles_table.rowCount()
         ), "Number of mean widths must match number of profiles!"
 
-        self.mean_widths = meanWidths     # Use setter
+        self._mean_widths = meanWidths
         self._std_widths = stdWidths
-        self.mean_intensity_ratios = meanIntensityRatios   # Use setter
+        self._mean_intensity_ratios = meanIntensityRatios
         self._std_intensity_ratios = stdIntensityRatios
 
-        self.createMeansAndStdTableWS()
+        self._create_means_table()
         return
 
 
-    def createMeansAndStdTableWS(self):
-        meansTableWS = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._workspace_being_fit.name() + "_MeanWidthsAndIntensities"
+    def _create_means_table(self):
+        table = CreateEmptyTableWorkspace(
+            OutputWorkspace=self._workspace_being_fit.name() + "_means"
         )
-        meansTableWS.addColumn(type="str", name="Mass")
-        meansTableWS.addColumn(type="float", name="Mean Widths")
-        meansTableWS.addColumn(type="float", name="Std Widths")
-        meansTableWS.addColumn(type="float", name="Mean Intensities")
-        meansTableWS.addColumn(type="float", name="Std Intensities")
+        table.addColumn(type="str", name="label")
+        table.addColumn(type="float", name="mass")
+        table.addColumn(type="float", name="mean_width")
+        table.addColumn(type="float", name="std_width")
+        table.addColumn(type="float", name="mean_intensity")
+        table.addColumn(type="float", name="std_intensity")
 
-        print("\nCreated Table with means and std:")
-        print("\nMass    Mean \u00B1 Std Widths    Mean \u00B1 Std Intensities\n")
-        for p, mean_width, std_width, mean_intensity, std_intensity in zip(
-            self._profiles.values(),
+        self.log().notice("\nmass    mean widths    mean intensities\n")
+        for label, mass, mean_width, std_width, mean_intensity, std_intensity in zip(
+            self._profiles_table.column("label"),
+            self._masses,
             self._mean_widths,
             self._std_widths,
             self._mean_intensity_ratios,
             self._std_intensity_ratios,
         ):
-            meansTableWS.addRow([p.label, mean_width, std_width, mean_intensity, std_intensity])
-            print(f"{p.label:5s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}  \
-                    {mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
-        return
+            table.addRow([label, mass, mean_width, std_width, mean_intensity, std_intensity])
+            self.log().notice(f"{label:6s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}" + \
+                f"{mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
+
+        self.setPropertyValue("OutputMeansTable", table.name())
+        return table
 
 
     def calculateMeansAndStds(self, widthsIn, intensitiesIn):
@@ -573,23 +576,14 @@ class AnalysisRoutine:
     def _fit_neutron_compton_profiles_to_row(self):
 
         if np.all(self._dataY[self._row_being_fit] == 0):
-            self._table_fit_results.addRow(np.zeros(3*len(self._profiles)+3))
+            self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
             return
-
-        # Need to transform profiles into parameter array for minimize
-        initial_parameters = []
-        bounds = []
-        for p in self._profiles.values():
-            for attr in ['intensity', 'width', 'center']:
-                initial_parameters.append(getattr(p, attr))
-            for attr in ['intensity_bounds', 'width_bounds', 'center_bounds']:
-                bounds.append(getattr(p, attr))
 
         result = scipy.optimize.minimize(
             self.errorFunction,
-            initial_parameters,
+            self._initial_fit_parameters,
             method="SLSQP",
-            bounds=bounds,
+            bounds=self._initial_fit_bounds,
             constraints=self._constraints,
         )
         fitPars = result["x"]
@@ -605,11 +599,11 @@ class AnalysisRoutine:
         # Store results for easier access when calculating means
         self._fit_parameters[self._row_being_fit] = tableRow 
 
-        print(tableRow)
+        self.log().notice(' '.join(str(tableRow).split(",")).replace('[', '').replace(']', ''))
 
         # Pass fit profiles into workspaces
         individual_ncps = self._neutron_compton_profiles(fitPars)
-        for ncp, element in zip(individual_ncps, self._profiles.keys()):
+        for ncp, element in zip(individual_ncps, self._profiles_table.column("label")):
             self._fit_profiles_workspaces[element].dataY(self._row_being_fit)[:] = ncp
 
         self._fit_profiles_workspaces['total'].dataY(self._row_being_fit)[:] = np.sum(individual_ncps, axis=0)
@@ -643,7 +637,7 @@ class AnalysisRoutine:
         intensities = pars[::3].reshape(-1, 1)
         widths = pars[1::3].reshape(-1, 1)
         centers = pars[2::3].reshape(-1, 1)
-        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
 
         v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
 
@@ -694,7 +688,7 @@ class AnalysisRoutine:
 
 
     def calcGaussianResolution(self, centers):
-        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
@@ -740,7 +734,7 @@ class AnalysisRoutine:
 
 
     def calcLorentzianResolution(self, centers):
-        masses = np.array([p.mass for p in self._profiles.values()]).reshape(-1, 1)
+        masses = self._masses.reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
@@ -777,7 +771,7 @@ class AnalysisRoutine:
 
     def _get_parsed_constraint_function(self, function_string: str):
 
-        profile_order = [key for key in self._profiles.keys()]
+        profile_order = [label for label in self._profiles_table.column("label")]
         attribute_order = ['intensity', 'width', 'center']
 
         words = function_string.split(' ')
@@ -809,16 +803,12 @@ class AnalysisRoutine:
 
         self._zero_columns_boolean_mask = np.all(dataY == 0, axis=0)  # Masked Cols
 
-        self._workspace_for_corrections = CloneWorkspace(
-            InputWorkspace=self._workspace_for_corrections.name(), 
-            OutputWorkspace=self._workspace_for_corrections.name() + "_CorrectionsInput"
-        )
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
             self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask]
 
         SumSpectra(
             InputWorkspace=self._workspace_for_corrections.name(), 
-            OutputWorkspace=self._workspace_for_corrections.name() + "_Sum"
+            OutputWorkspace=self._workspace_for_corrections.name() + "_sum"
         )
         return
 
@@ -862,10 +852,10 @@ class AnalysisRoutine:
         self.createSlabGeometry(self._workspace_for_corrections)  # Sample properties for MS correction
 
         sampleProperties = self.calcMSCorrectionSampleProperties(self._mean_widths, self._mean_intensity_ratios)
-        print(
-            "\nThe sample properties for Multiple Scattering correction are:\n\n",
-            sampleProperties,
-            "\n",
+        self.log().notice(
+            "\nSample properties for multiple scattering correction:\n\n" + \
+            "mass   intensity   width\n" + \
+            str(np.array(sampleProperties).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
         )
 
         return self.createMulScatWorkspaces(self._workspace_for_corrections, sampleProperties)
@@ -894,17 +884,17 @@ class AnalysisRoutine:
 
 
     def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
-        masses = [p.mass for p in self._profiles.values()]
+        masses = self._masses
 
         # If Backscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
-            if self._h_ratio is not None:  # If H is present, ratio is a number
-                masses = np.append(masses, 1.0079)
-                meanWidths = np.append(meanWidths, 5.0)
-
+            if self._h_ratio > 0:  # If H is present, ratio is a number
                 HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(masses)]
                 meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
                 meanIntensityRatios /= np.sum(meanIntensityRatios)
+
+                masses = np.append(masses, 1.0079)
+                meanWidths = np.append(meanWidths, 5.0)
 
         MSProperties = np.zeros(3 * len(masses))
         MSProperties[::3] = masses
@@ -916,9 +906,9 @@ class AnalysisRoutine:
 
 
     def createMulScatWorkspaces(self, ws, sampleProperties):
-        """Uses the Mantid algorithm for the MS correction to create two Workspaces _TotScattering and _MulScattering"""
+        """Uses the Mantid algorithm for the MS correction to create two Workspaces _tot_sctr and _mltp_sctr"""
 
-        print("\nEvaluating the Multiple Scattering Correction...\n")
+        self.log().notice("\nEvaluating multiple scattering correction ...\n")
         # selects only the masses, every 3 numbers
         MS_masses = sampleProperties[::3]
         # same as above, but starts at first intensities
@@ -931,7 +921,7 @@ class AnalysisRoutine:
             Thickness=0.1,
         )
 
-        _TotScattering, _MulScattering = VesuvioCalculateMS(
+        _tot_sctr, _mltp_sctr = VesuvioCalculateMS(
             ws,
             NoOfMasses=len(MS_masses),
             SampleDensity=dens.cell(9, 1),
@@ -942,8 +932,8 @@ class AnalysisRoutine:
         )
 
         data_normalisation = Integration(ws)
-        simulation_normalisation = Integration("_TotScattering")
-        for workspace in ("_MulScattering", "_TotScattering"):
+        simulation_normalisation = Integration("_tot_sctr")
+        for workspace in ("_mltp_sctr", "_tot_sctr"):
             Divide(
                 LHSWorkspace=workspace,
                 RHSWorkspace=simulation_normalisation,
@@ -956,12 +946,12 @@ class AnalysisRoutine:
             )
             RenameWorkspace(InputWorkspace=workspace, OutputWorkspace=ws.name() + workspace)
             SumSpectra(
-                ws.name() + workspace, OutputWorkspace=ws.name() + workspace + "_Sum"
+                ws.name() + workspace, OutputWorkspace=ws.name() + workspace + "_sum"
             )
 
         DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
-        # The only remaining workspaces are the _MulScattering and _TotScattering
-        return mtd[ws.name() + "_MulScattering"]
+        # The only remaining workspaces are the _mltp_sctr and _tot_sctr
+        return mtd[ws.name() + "_mltp_sctr"]
 
 
     def create_gamma_workspaces(self):
@@ -973,21 +963,20 @@ class AnalysisRoutine:
 
         background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
         DeleteWorkspace(corrected)
-        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_Gamma_Background")
+        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_gamma_backgr")
 
         Scale(
-            InputWorkspace=inputWS + "_Gamma_Background",
-            OutputWorkspace=inputWS + "_Gamma_Background",
+            InputWorkspace=inputWS + "_gamma_backgr",
+            OutputWorkspace=inputWS + "_gamma_backgr",
             Factor=0.9,
             Operation="Multiply",
         )
-        return mtd[inputWS + "_Gamma_Background"]
+        return mtd[inputWS + "_gamma_backgr"]
 
 
     def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
-        masses = [p.mass for p in self._profiles.values()]
         profiles = ""
-        for mass, width, intensity in zip(masses, meanWidths, meanIntensityRatios):
+        for mass, width, intensity in zip(self._masses, meanWidths, meanIntensityRatios):
             profiles += (
                 "name=GaussianComptonProfile,Mass="
                 + str(mass)
@@ -997,14 +986,15 @@ class AnalysisRoutine:
                 + str(intensity)
                 + ";"
             )
-        print("\n The sample properties for Gamma Correction are:\n", profiles)
+        self.log().notice("\nThe sample properties for Gamma Correction are:\n\n" + \
+                str(profiles).replace(';', '\n\n').replace(',', '\n'))
         return profiles
 
 
     def _set_results(self):
         """Used to collect results from workspaces and store them in .npz files for testing."""
 
-        self.wsFinal = mtd[self._name + str(self._number_of_iterations)]
+        self.wsFinal = mtd[self._name + '_' + str(self._number_of_iterations)]
 
         allIterNcp = []
         allFitWs = []
@@ -1017,7 +1007,7 @@ class AnalysisRoutine:
         j = 0
         while True:
             try:
-                wsIterName = self._name + str(j)
+                wsIterName = self._name + '_' + str(j)
 
                 # Extract ws that were fitted
                 ws = mtd[wsIterName]
@@ -1036,20 +1026,20 @@ class AnalysisRoutine:
 
                 # Extract individual ncp
                 allNCP = []
-                for p in self._profiles.values():
+                for label in self._profiles_table.column("label"):
                     ncpWsToAppend = mtd[
-                        wsIterName + f"_{p.label}_ncp"
+                        wsIterName + f"_{label}_ncp"
                     ]
                     allNCP.append(ncpWsToAppend.extractY())
                 allNCP = np.swapaxes(np.array(allNCP), 0, 1)
                 allIterNcp.append(allNCP)
 
                 # Extract Mean and Std Widths, Intensities
-                meansTable = mtd[wsIterName + "_MeanWidthsAndIntensities"]
-                allMeanWidhts.append(meansTable.column("Mean Widths"))
-                allStdWidths.append(meansTable.column("Std Widths"))
-                allMeanIntensities.append(meansTable.column("Mean Intensities"))
-                allStdIntensities.append(meansTable.column("Std Intensities"))
+                meansTable = mtd[wsIterName + "_means"]
+                allMeanWidhts.append(meansTable.column("mean_width"))
+                allStdWidths.append(meansTable.column("std_width"))
+                allMeanIntensities.append(meansTable.column("mean_intensity"))
+                allStdIntensities.append(meansTable.column("std_intensity"))
 
                 j += 1
             except KeyError:

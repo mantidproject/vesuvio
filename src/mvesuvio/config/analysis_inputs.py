@@ -43,7 +43,6 @@ class BackwardInitialConditions(GeneralInitialConditions):
         self.InstrParsPath = ipFilesPath / "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
-    massIdx = 0
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])

@@ -13,6 +13,13 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
 def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
+
+    try:
+        wsTOF = mtd[wsTOF]
+    except KeyError: 
+        print(f"Workspace to fit {wsTOF} not found.")
+        return
+
     ncpForEachMass = extractNCPFromWorkspaces(wsTOF, IC)
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
 
@@ -42,14 +49,18 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
 def extractNCPFromWorkspaces(wsFinal, ic):
     """Extra function to extract ncps from loaded ws in mantid."""
 
-    ncpForEachMass = mtd[wsFinal.name() + "_TOF_Fitted_Profile_0"].extractY()[
-        np.newaxis, :, :
-    ]
-    for i in range(1, ic.noOfMasses):
-        ncpToAppend = mtd[wsFinal.name() + "_TOF_Fitted_Profile_" + str(i)].extractY()[
-            np.newaxis, :, :
-        ]
-        ncpForEachMass = np.append(ncpForEachMass, ncpToAppend, axis=0)
+    for ws_name in mtd.getObjectNames():
+        if ws_name.startswith(ic.name+'_'+str(ic.noOfMSIterations)) and ws_name.endswith('ncp'):
+
+            if 'total' in ws_name:
+                continue
+
+            ws = mtd[ws_name]
+            dataY = ws.extractY()[np.newaxis, :, :]
+            try:
+                ncpForEachMass = np.append(ncpForEachMass, dataY, axis=0)
+            except UnboundLocalError:
+                ncpForEachMass = dataY 
 
     # Ensure shape of ncp matches data
     shape = ncpForEachMass.shape
