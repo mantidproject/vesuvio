@@ -9,6 +9,8 @@ from iminuit.util import make_func_code, describe
 import jacobi
 import time
 
+from mvesuvio.util import handle_config
+
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
@@ -1507,7 +1509,8 @@ def extractData(ws, wsRes, ic):
 
 
 def loadInstrParsFileIntoArray(ic):
-    data = np.loadtxt(ic.InstrParsPath, dtype=str)[1:].astype(float)
+    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+    data = np.loadtxt(str(ipFilesPath / ic.instrParsFile), dtype=str)[1:].astype(float)
     spectra = data[:, 0]
     select_rows = np.where((spectra >= ic.firstSpec) & (spectra <= ic.lastSpec))
     instrPars = data[select_rows]

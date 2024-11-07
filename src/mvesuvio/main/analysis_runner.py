@@ -8,15 +8,14 @@ from mvesuvio.util import handle_config
 
 def run(yes_to_all=False):
     inputs_path = Path(handle_config.read_config_var("caching.inputs"))
-    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
     ai = import_from_path(inputs_path, "analysis_inputs")
 
     start_time = time.time()
 
-    wsBackIC = ai.LoadVesuvioBackParameters(ipFilesPath)
-    wsFrontIC = ai.LoadVesuvioFrontParameters(ipFilesPath)
-    bckwdIC = ai.BackwardInitialConditions(ipFilesPath)
+    wsBackIC = ai.LoadVesuvioBackParameters
+    wsFrontIC = ai.LoadVesuvioFrontParameters
+    bckwdIC = ai.BackwardInitialConditions
     fwdIC = ai.ForwardInitialConditions
     yFitIC = ai.YSpaceFitInitialConditions
     userCtr = ai.UserScriptControls
