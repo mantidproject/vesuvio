@@ -9,6 +9,9 @@ from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
                             NeutronComptonProfile, calculate_h_ratio
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
+from mvesuvio.util import handle_config
+
+from pathlib import Path
 
 def _create_analysis_object_from_current_interface(IC, running_tests=False):
     ws = loadRawAndEmptyWsFromUserPath(
@@ -40,10 +43,12 @@ def _create_analysis_object_from_current_interface(IC, running_tests=False):
 
     profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
+    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+
     kwargs = {
         "InputWorkspace": cropedWs.name(),
         "InputProfiles": profiles_table.name(),
-        "InstrumentParametersFile": str(IC.InstrParsPath),
+        "InstrumentParametersFile": str(ipFilesPath / IC.instrParsFile),
         "HRatioToLowestMass": IC.HToMassIdxRatio if hasattr(IC, 'HRatioToLowestMass') else 0,
         "NumberOfIterations": int(IC.noOfMSIterations),
         "InvalidDetectors": IC.maskedSpecAllNo.astype(int).tolist(),

@@ -47,12 +47,6 @@ def completeICFromInputs(IC, wsIC):
     IC.scaleEmpty = wsIC.scaleEmpty
     IC.scaleRaw = wsIC.scaleRaw
 
-    # When attribute InstrParsPath is not present, set it equal to path from wsIC
-    try:
-        IC.InstrParsPath  # If present, leave it unaltered
-    except AttributeError:
-        IC.InstrParsPath = wsIC.ipfile
-
     # Sort out input and output paths
     rawPath, emptyPath = setInputWSForSample(wsIC)
 
@@ -69,26 +63,6 @@ def completeICFromInputs(IC, wsIC):
 
     # Default not running preliminary procedure to estimate HToMass0Ratio
     IC.runningPreliminary = False
-
-    # Create default of not running original version with histogram data
-    try:
-        IC.runHistData
-    except AttributeError:
-        IC.runHistData = False
-
-    # Norm voigt except when comparing with tests
-    try:
-        IC.normVoigt
-    except AttributeError:
-        IC.normVoigt = True
-
-    #Create default for H ratio
-    # Only for completeness' sake, will be removed anyway 
-    # when transition to new interface is complete
-    try:
-        IC.HToMassIdxRatio
-    except AttributeError:
-        IC.HToMassIdxRatio = None 
 
     return
 
@@ -108,23 +82,25 @@ def setInputWSForSample(wsIC):
     rawPath = inputWSPath / rawWSName
     emptyPath = inputWSPath / emptyWSName
 
+    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+
     if not wsHistoryMatchesInputs(wsIC.runs, wsIC.mode, wsIC.ipfile, rawPath):
-        saveWSFromLoadVesuvio(wsIC.runs, wsIC.mode, wsIC.ipfile, rawPath)
+        saveWSFromLoadVesuvio(wsIC.runs, wsIC.mode, str(ipFilesPath/wsIC.ipfile), rawPath)
 
     if not wsHistoryMatchesInputs(wsIC.empty_runs, wsIC.mode, wsIC.ipfile, emptyPath):
-        saveWSFromLoadVesuvio(wsIC.empty_runs, wsIC.mode, wsIC.ipfile, emptyPath)
+        saveWSFromLoadVesuvio(wsIC.empty_runs, wsIC.mode, str(ipFilesPath/wsIC.ipfile), emptyPath)
 
     return rawPath, emptyPath
 
 
 def getRunningMode(wsIC):
-    if wsIC.__class__.__name__ == "LoadVesuvioBackParameters":
+    if wsIC.__name__ == "LoadVesuvioBackParameters":
         runningMode = "backward"
-    elif wsIC.__class__.__name__ == "LoadVesuvioFrontParameters":
+    elif wsIC.__name__ == "LoadVesuvioFrontParameters":
         runningMode = "forward"
     else:
         raise ValueError(
-            f"Input class for loading workspace not valid: {wsIC.__class__.__name__}"
+            f"Input class for loading workspace not valid: {wsIC.__name__}"
         )
     return runningMode
 
@@ -177,9 +153,9 @@ def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
         return False
 
     saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
-    if saved_ipfile_name != ipfile.name:
+    if saved_ipfile_name != ipfile:
         logger.notice(
-            f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile.name}"
+            f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfilename}"
         )
         return False
 

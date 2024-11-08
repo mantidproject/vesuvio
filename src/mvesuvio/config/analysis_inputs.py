@@ -1,9 +1,10 @@
 import numpy as np
+from dataclasses import dataclass
 
 
+@dataclass
 class LoadVesuvioBackParameters:
-    def __init__(self, ipFilesPath):
-        self.ipfile = ipFilesPath / "ip2019.par"
+    ipfile = "ip2019.par"
 
     runs = "43066-43076"  # 77K         # The numbers of the runs to be analysed
     empty_runs = (
@@ -16,9 +17,9 @@ class LoadVesuvioBackParameters:
     scaleRaw = 1
 
 
+@dataclass
 class LoadVesuvioFrontParameters:
-    def __init__(self, ipFilesPath):
-        self.ipfile = ipFilesPath / "ip2018_3.par"
+    ipfile = "ip2018_3.par"
 
     runs = "43066-43076"  # 100K        # The numbers of the runs to be analysed
     empty_runs = (
@@ -31,6 +32,7 @@ class LoadVesuvioFrontParameters:
     scaleRaw = 1
 
 
+@dataclass
 class GeneralInitialConditions:
     """Used to define initial conditions shared by both Back and Forward scattering"""
 
@@ -38,27 +40,26 @@ class GeneralInitialConditions:
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
 
+@dataclass
 class BackwardInitialConditions(GeneralInitialConditions):
-    def __init__(self, ipFilesPath):
-        self.InstrParsPath = ipFilesPath / "ip2018_3.par"
+    instrParsFile = "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
 
     # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
-    # noOfMasses = len(masses)
 
     # Intensities, NCP widths, NCP centers
     initPars = np.array([1, 12, 0.0, 1, 12, 0.0, 1, 12.5, 0.0])
     bounds = np.array(
         [
-            [0, np.nan],
+            [0, None],
             [8, 16],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [8, 16],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [11, 14],
             [-3, 1],
         ]
@@ -83,14 +84,11 @@ class BackwardInitialConditions(GeneralInitialConditions):
     multiple_scattering_order = 2
     number_of_events = 1.0e5
 
-    # Original data uses histogram data instead of point data
-    runHistData = True
-    normVoigt = False
 
-
+@dataclass
 class ForwardInitialConditions(GeneralInitialConditions):
-    def __init__(self, ipFilesPath):
-        self.InstrParsPath = ipFilesPath / "ip2018_3.par"
+
+    instrParsFile = "ip2018_3.par"
 
     masses = np.array([1.0079, 12, 16, 27])
 
@@ -98,16 +96,16 @@ class ForwardInitialConditions(GeneralInitialConditions):
     initPars = np.array([1, 4.7, 0, 1, 12.71, 0.0, 1, 8.76, 0.0, 1, 13.897, 0.0])
     bounds = np.array(
         [
-            [0, np.nan],
+            [0, None],
             [3, 6],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [12.71, 12.71],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [8.76, 8.76],
             [-3, 1],
-            [0, np.nan],
+            [0, None],
             [13.897, 13.897],
             [-3, 1],
         ]
@@ -131,11 +129,8 @@ class ForwardInitialConditions(GeneralInitialConditions):
     multiple_scattering_order = 2
     number_of_events = 1.0e5
 
-    # Original data uses histogram data instead of point data
-    runHistData = True
-    normVoigt = False
 
-
+@dataclass
 class YSpaceFitInitialConditions:
     showPlots = True
     symmetrisationFlag = True
@@ -147,6 +142,7 @@ class YSpaceFitInitialConditions:
     maskTypeProcedure = "NAN"  # Options: 'NCP', 'NAN', None
 
 
+@dataclass
 class UserScriptControls:
     runRoutine = True
 

@@ -87,9 +87,8 @@ def __run_analysis(yes_to_all):
     environ["MANTIDPROPERTIES"] = path.join(
         handle_config.VESUVIO_CONFIG_PATH, "Mantid.user.properties"
     )
-    from mvesuvio.main import analysis_runner
-
-    analysis_runner.run(yes_to_all)
+    from mvesuvio.main.run_routine import Runner 
+    Runner().run()
 
 
 if __name__ == "__main__":
