@@ -29,7 +29,7 @@ class AnalysisRunner:
 
     @classmethod
     def _run(cls):
-        scattRes, yfitRes = Runner(True, True).run()
+        scattRes, yfitRes = Runner(True).run()
         cls._currentResults = scattRes 
         return
 

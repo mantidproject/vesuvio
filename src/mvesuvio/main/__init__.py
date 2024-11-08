@@ -13,7 +13,7 @@ def main(manual_args=None):
     if args.command == "run":
         if not handle_config.config_set():
             __setup_config(None)
-        __run_analysis(args.yes)
+        __run_analysis()
 
 
 def __setup_and_parse_args():
@@ -39,10 +39,7 @@ def __set_up_parser():
         type=str,
     )
 
-    run_parser = subparsers.add_parser("run", help="run mvesuvio analysis")
-    run_parser.add_argument(
-        "--yes", "-y", help="Say yes to all input prompts", action="store_true"
-    )
+    subparsers.add_parser("run", help="run mvesuvio analysis")
     return parser
 
 
@@ -83,7 +80,7 @@ def __setup_config(args):
     handle_config.check_dir_exists("IP folder", ipfolder_dir)
 
 
-def __run_analysis(yes_to_all):
+def __run_analysis():
     environ["MANTIDPROPERTIES"] = path.join(
         handle_config.VESUVIO_CONFIG_PATH, "Mantid.user.properties"
     )

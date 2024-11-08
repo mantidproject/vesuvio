@@ -58,7 +58,7 @@ class AnalysisRunner:
     @classmethod
     def _run(cls):
         cls.load_workspaces()   # Load data to skip run of routine
-        scattRes, yfitRes = Runner(True, True).run()
+        scattRes, yfitRes = Runner(True).run()
         cls._currentResults = yfitRes
 
     @classmethod

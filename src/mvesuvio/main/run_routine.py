@@ -20,8 +20,7 @@ import sys
 
 
 class Runner:
-    def __init__(self, yes_to_all=False, running_tests=False) -> None:
-        self.yes_to_all = yes_to_all
+    def __init__(self, running_tests=False) -> None:
         self.running_tests = running_tests
         self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
         self.setup()
@@ -65,8 +64,6 @@ class Runner:
 
 
     def run(self):
-        start_time = time.time()
-
         if not self.userCtr.runRoutine:
             return
         # Default workflow for procedure + fit in y space
@@ -77,13 +74,8 @@ class Runner:
             self.runAnalysisFitting()
             return self.analysis_result, self.fitting_result  
 
-        checkUserClearWS(self.yes_to_all)  # Check if user is OK with cleaning all workspaces
-
         self.runAnalysisRoutine()
         self.runAnalysisFitting()
-
-        end_time = time.time()
-        print("\nRunning time: ", end_time - start_time, " seconds")
 
         # Return results used only in tests
         return self.analysis_result, self.fitting_result  
@@ -118,20 +110,6 @@ class Runner:
         if routine_type == "JOINT":
             self.analysis_result = runJointBackAndForwardProcedure(self.bckwdIC, self.fwdIC)
         return 
-
-
-def checkUserClearWS(yes_to_all=False):
-    """If any workspace is loaded, check if user is sure to start new procedure."""
-
-    if not yes_to_all and len(mtd) != 0:
-        userInput = input(
-            "This action will clean all current workspaces to start anew. Proceed? (y/n): "
-        )
-        if (userInput == "y") | (userInput == "Y"):
-            pass
-        else:
-            raise KeyboardInterrupt("Run of procedure canceled.")
-    return
 
 
 def checkInputs(crtIC):
