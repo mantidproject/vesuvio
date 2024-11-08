@@ -75,7 +75,7 @@ class Runner:
         wsInMtd = [ws in mtd for ws in self.ws_to_fit_y_space]  # Bool list
         if (len(wsInMtd) > 0) and all(wsInMtd):
             self.runAnalysisFitting()
-            return
+            return self.analysis_result, self.fitting_result  
 
         checkUserClearWS(self.yes_to_all)  # Check if user is OK with cleaning all workspaces
 
@@ -85,13 +85,14 @@ class Runner:
         end_time = time.time()
         print("\nRunning time: ", end_time - start_time, " seconds")
 
-        return self.analysis_result, self.fitting_result # Return results used only in tests
+        # Return results used only in tests
+        return self.analysis_result, self.fitting_result  
 
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            resYFit = fitInYSpaceProcedure(self.yFitIC, i_cls, wsName)
-        self.fitting_result = resYFit
+            self.fitting_result = fitInYSpaceProcedure(self.yFitIC, i_cls, wsName)
+        return
 
 
     def runAnalysisRoutine(self):
@@ -111,13 +112,11 @@ class Runner:
             ), "When H is not present, HToMassIdxRatio has to be set to None"
 
         if routine_type == "BACKWARD":
-            res = runIndependentIterativeProcedure(self.bckwdIC, running_tests=self.running_tests)
+            self.analysis_result = runIndependentIterativeProcedure(self.bckwdIC, running_tests=self.running_tests)
         if routine_type == "FORWARD":
-            res = runIndependentIterativeProcedure(self.fwdIC, running_tests=self.running_tests)
+            self.analysis_result = runIndependentIterativeProcedure(self.fwdIC, running_tests=self.running_tests)
         if routine_type == "JOINT":
-            res = runJointBackAndForwardProcedure(self.bckwdIC, self.fwdIC)
-
-        self.analysis_result = res
+            self.analysis_result = runJointBackAndForwardProcedure(self.bckwdIC, self.fwdIC)
         return 
 
 
