@@ -6,8 +6,10 @@ import numpy as np
 import numbers
 
 from mvesuvio.analysis_fitting import passDataIntoWS
+from mvesuvio.util import handle_config
 
 from dataclasses import dataclass
+
 
 @dataclass(frozen=False)
 class NeutronComptonProfile:
@@ -26,6 +28,18 @@ class NeutronComptonProfile:
     mean_width: float = None
     mean_center: float = None
 
+
+def name_for_starting_ws(load_ai):
+    if load_ai.__name__ in ["LoadVesuvioBackParameters", "BackwardInitialConditions"]:
+        name_suffix = "bckwd"
+    elif load_ai.__name__ in ["LoadVesuvioFrontParameters", "ForwardInitialConditions"]:
+        name_suffix = "fwd"
+    else:
+        raise ValueError(
+            f"Input class for workspace not valid: {load_ai.__name__}"
+        )
+    name = handle_config.get_script_name() + "_" + name_suffix
+    return name
 
 
 def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 

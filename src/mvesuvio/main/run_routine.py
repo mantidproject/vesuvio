@@ -1,12 +1,8 @@
-from mvesuvio.util.process_inputs import (
-    completeICFromInputs,
-    completeYFitIC,
-)
 from mvesuvio.analysis_fitting import fitInYSpaceProcedure
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
-                            NeutronComptonProfile, calculate_h_ratio
+                            NeutronComptonProfile, calculate_h_ratio, name_for_starting_ws
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
@@ -42,10 +38,6 @@ class Runner:
         self.yFitIC = ai.YSpaceFitInitialConditions
         self.userCtr = ai.UserScriptControls
 
-        # Set extra attributes from user attributes
-        completeICFromInputs(self.fwdIC, self.wsFrontIC)
-        completeICFromInputs(self.bckwdIC, self.wsBackIC)
-        completeYFitIC(self.yFitIC)
         checkInputs(self.userCtr)
 
         # Names of workspaces to check if they exist to do fitting
@@ -53,7 +45,7 @@ class Runner:
         self.classes_to_fit_y_space = []
         for mode, i_cls in zip(["BACKWARD", "FORWARD"], [self.bckwdIC, self.fwdIC]):
             if (self.userCtr.fitInYSpace == mode) | (self.userCtr.fitInYSpace == "JOINT"):
-                self.ws_to_fit_y_space.append(i_cls.name + '_' + str(i_cls.noOfMSIterations))
+                self.ws_to_fit_y_space.append(name_for_starting_ws(i_cls) + '_' + str(i_cls.noOfMSIterations))
                 self.classes_to_fit_y_space.append(i_cls)
 
         self.analysis_result = None
@@ -65,6 +57,16 @@ class Runner:
         self.experiment_path = inputs_script_path.parent / script_name
         self.input_ws_path =  self.experiment_path / "input_ws"
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
+
+        # TODO: remove this by fixing circular import 
+        self.fwdIC.name = name_for_starting_ws(self.fwdIC)
+        self.bckwdIC.name = name_for_starting_ws(self.bckwdIC)
+
+        # TODO: sort out yfit inputs
+        figSavePath = self.experiment_path / "figures"
+        figSavePath.mkdir(exist_ok=True)
+        self.yFitIC.figSavePath = figSavePath
+
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -198,7 +200,7 @@ class Runner:
             userWsRawPath=raw_path,
             userWsEmptyPath=empty_path,
             tofBinning=ai.tofBinning,
-            name=ai.name,
+            name=name_for_starting_ws(load_ai),
             scaleRaw=load_ai.scaleRaw,
             scaleEmpty=load_ai.scaleEmpty,
             subEmptyFromRaw=load_ai.subEmptyFromRaw
@@ -240,7 +242,7 @@ class Runner:
             "SampleHorizontalWidth": ai.horizontal_width, 
             "SampleThickness": ai.thickness,
             "GammaCorrection": ai.GammaCorrectionFlag,
-            "ModeRunning": ai.modeRunning,
+            "ModeRunning": getRunningMode(load_ai),
             "TransmissionGuess": ai.transmission_guess,
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.number_of_events),
@@ -263,7 +265,7 @@ class Runner:
 
     def _save_ws_if_not_on_path(self, load_ai):
 
-        runningMode = getRunningMode(load_ai)
+        runningMode = getRunningMode(load_ai).lower()
         scriptName = handle_config.get_script_name()
 
         rawWSName = scriptName + "_" + "raw" + "_" + runningMode + ".nxs"
@@ -311,9 +313,9 @@ class Runner:
 
 def getRunningMode(wsIC):
     if wsIC.__name__ == "LoadVesuvioBackParameters":
-        runningMode = "backward"
+        runningMode = "BACKWARD"
     elif wsIC.__name__ == "LoadVesuvioFrontParameters":
-        runningMode = "forward"
+        runningMode = "FORWARD"
     else:
         raise ValueError(
             f"Input class for loading workspace not valid: {wsIC.__name__}"
