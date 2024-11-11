@@ -41,14 +41,6 @@ def completeICFromInputs(IC, wsIC):
     ]
     IC.maskedDetectorIdx = IC.maskedSpecNo - IC.firstSpec
 
-    # Sort out input and output paths
-    rawPath, emptyPath = setInputWSForSample(wsIC)
-
-    IC.userWsRawPath = rawPath
-    IC.userWsEmptyPath = emptyPath
-
-    setOutputDirsForSample(IC)
-
     # Do not run bootstrap sample, by default
     IC.runningSampleWS = False
 

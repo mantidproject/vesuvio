@@ -11,14 +11,17 @@ from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import CreateEmptyTableWorkspace, mtd, RenameWorkspace
+from mantid.simpleapi import CreateEmptyTableWorkspace, mtd, RenameWorkspace, \
+                            Load, LoadVesuvio, SaveNexus, DeleteWorkspace
 from mantid.api import AlgorithmFactory, AlgorithmManager
+from mantid.kernel import logger
 
 import numpy as np
 from pathlib import Path
 import importlib
 import sys
 import dill         # To convert constraints to string
+import ntpath
 
 
 class Runner:
@@ -56,6 +59,12 @@ class Runner:
         self.analysis_result = None
         self.fitting_result = None
 
+        # I/O paths
+        inputs_script_path = Path(handle_config.read_config_var("caching.inputs"))
+        script_name = handle_config.get_script_name()
+        self.experiment_path = inputs_script_path.parent / script_name
+        self.input_ws_path =  self.experiment_path / "input_ws"
+        self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -182,9 +191,12 @@ class Runner:
 
 
     def _create_analysis_algorithm(self, load_ai, ai):
+
+        raw_path, empty_path = self._save_ws_if_not_on_path(load_ai)
+
         ws = loadRawAndEmptyWsFromUserPath(
-            userWsRawPath=ai.userWsRawPath,
-            userWsEmptyPath=ai.userWsEmptyPath,
+            userWsRawPath=raw_path,
+            userWsEmptyPath=empty_path,
             tofBinning=ai.tofBinning,
             name=ai.name,
             scaleRaw=load_ai.scaleRaw,
@@ -213,6 +225,9 @@ class Runner:
 
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
+        # TODO: Output paths should probably not be set here
+        self._set_output_paths(ai) 
+
         kwargs = {
             "InputWorkspace": cropedWs.name(),
             "InputProfiles": profiles_table.name(),
@@ -230,8 +245,8 @@ class Runner:
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
-            "ResultsPath": str(ai.resultsSavePath),
-            "FiguresPath": str(ai.figSavePath),
+            "ResultsPath": str(self.results_save_path),
+            "FiguresPath": str(self.fig_save_path),
             "OutputMeansTable":" Final_Means"
         }
 
@@ -244,6 +259,120 @@ class Runner:
         alg.initialize()
         alg.setProperties(kwargs)
         return alg 
+
+
+    def _save_ws_if_not_on_path(self, load_ai):
+
+        runningMode = getRunningMode(load_ai)
+        scriptName = handle_config.get_script_name()
+
+        rawWSName = scriptName + "_" + "raw" + "_" + runningMode + ".nxs"
+        emptyWSName = scriptName + "_" + "empty" + "_" + runningMode + ".nxs"
+
+        rawPath = self.input_ws_path / rawWSName
+        emptyPath = self.input_ws_path / emptyWSName
+
+        ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+
+        if not wsHistoryMatchesInputs(load_ai.runs, load_ai.mode, load_ai.ipfile, rawPath):
+            saveWSFromLoadVesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), rawPath)
+
+        if not wsHistoryMatchesInputs(load_ai.empty_runs, load_ai.mode, load_ai.ipfile, emptyPath):
+            saveWSFromLoadVesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), emptyPath)
+        return rawPath, emptyPath
+
+
+    def _set_output_paths(self, ai):
+        experimentPath = self.experiment_path
+        outputPath = experimentPath / "output_files"
+        outputPath.mkdir(parents=True, exist_ok=True)
+
+        # Build Filename based on ic
+        corr = ""
+        if ai.GammaCorrectionFlag & (ai.noOfMSIterations > 0):
+            corr += "_GC"
+        if ai.MSCorrectionFlag & (ai.noOfMSIterations > 0):
+            corr += "_MS"
+
+        fileName = (
+            f"spec_{ai.firstSpec}-{ai.lastSpec}_iter_{ai.noOfMSIterations}{corr}" + ".npz"
+        )
+        fileNameYSpace = fileName + "_ySpaceFit" + ".npz"
+
+        self.results_save_path = outputPath / fileName
+        ai.ySpaceFitSavePath = outputPath / fileNameYSpace
+
+        # Set directories for figures
+        figSavePath = experimentPath / "figures"
+        figSavePath.mkdir(exist_ok=True)
+        self.fig_save_path = figSavePath
+        return
+
+
+def getRunningMode(wsIC):
+    if wsIC.__name__ == "LoadVesuvioBackParameters":
+        runningMode = "backward"
+    elif wsIC.__name__ == "LoadVesuvioFrontParameters":
+        runningMode = "forward"
+    else:
+        raise ValueError(
+            f"Input class for loading workspace not valid: {wsIC.__name__}"
+        )
+    return runningMode
+
+
+def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
+    if not (localPath.is_file()):
+        logger.notice("Cached workspace not found")
+        return False
+    local_ws = Load(Filename=str(localPath))
+    ws_history = local_ws.getHistory()
+    metadata = ws_history.getAlgorithmHistory(0)
+
+    saved_runs = metadata.getPropertyValue("Filename")
+    if saved_runs != runs:
+        logger.notice(
+            f"Filename in saved workspace did not match: {saved_runs} and {runs}"
+        )
+        return False
+
+    saved_mode = metadata.getPropertyValue("Mode")
+    if saved_mode != mode:
+        logger.notice(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
+        return False
+
+    saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
+    if saved_ipfile_name != ipfile:
+        logger.notice(
+            f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfilename}"
+        )
+        return False
+
+    print("\nLocally saved workspace metadata matched with analysis inputs.\n")
+    DeleteWorkspace(local_ws)
+    return True
+
+
+def saveWSFromLoadVesuvio(runs, mode, ipfile, localPath):
+    if "backward" in localPath.name:
+        spectra = "3-134"
+    elif "forward" in localPath.name:
+        spectra = "135-198"
+    else:
+        raise ValueError(f"Invalid name to save workspace: {localPath.name}")
+
+    vesuvio_ws = LoadVesuvio(
+        Filename=runs,
+        SpectrumList=spectra,
+        Mode=mode,
+        InstrumentParFile=str(ipfile),
+        OutputWorkspace=localPath.name,
+        LoadLogFiles=False,
+    )
+
+    SaveNexus(vesuvio_ws, str(localPath.absolute()))
+    print(f"Workspace saved locally at: {localPath.absolute()}")
+    return
 
 
 def checkInputs(crtIC):
