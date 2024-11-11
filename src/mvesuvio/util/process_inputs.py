@@ -41,12 +41,6 @@ def completeICFromInputs(IC, wsIC):
     ]
     IC.maskedDetectorIdx = IC.maskedSpecNo - IC.firstSpec
 
-    # Extract some attributes from wsIC
-    IC.mode = wsIC.mode
-    IC.subEmptyFromRaw = wsIC.subEmptyFromRaw
-    IC.scaleEmpty = wsIC.scaleEmpty
-    IC.scaleRaw = wsIC.scaleRaw
-
     # Sort out input and output paths
     rawPath, emptyPath = setInputWSForSample(wsIC)
 

@@ -3,20 +3,22 @@ from mvesuvio.util.process_inputs import (
     completeYFitIC,
 )
 from mvesuvio.analysis_fitting import fitInYSpaceProcedure
-from mvesuvio.analysis_routines import (
-    runIndependentIterativeProcedure,
-    runJointBackAndForwardProcedure,
-    runPreProcToEstHRatio,
-)
 from mvesuvio.util import handle_config
+from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
+                            loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
+                            NeutronComptonProfile, calculate_h_ratio
+from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
-import numpy as np
+from mantid.api import AnalysisDataService
+from mantid.simpleapi import CreateEmptyTableWorkspace, mtd, RenameWorkspace
+from mantid.api import AlgorithmFactory, AlgorithmManager
 
-import time
+import numpy as np
 from pathlib import Path
 import importlib
 import sys
+import dill         # To convert constraints to string
 
 
 class Runner:
@@ -24,6 +26,7 @@ class Runner:
         self.running_tests = running_tests
         self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
         self.setup()
+
 
     def setup(self):
         
@@ -96,20 +99,151 @@ class Runner:
         if (routine_type == "BACKWARD") | (routine_type== "JOINT"):
 
             if isHPresent(self.fwdIC.masses) & (self.bckwdIC.HToMassIdxRatio==0):
-                runPreProcToEstHRatio(self.bckwdIC, self.fwdIC)
+                self.run_estimate_h_ratio()
                 return
 
+            # TODO: make this automatic
             assert isHPresent(self.fwdIC.masses) != (
                 self.bckwdIC.HToMassIdxRatio==0 
-            ), "When H is not present, HToMassIdxRatio has to be set to None"
+            ), "No Hydrogen detected, HToMassIdxRatio has to be set to 0"
 
         if routine_type == "BACKWARD":
-            self.analysis_result = runIndependentIterativeProcedure(self.bckwdIC, running_tests=self.running_tests)
+            self.run_single_analysis(self.wsBackIC, self.bckwdIC)
         if routine_type == "FORWARD":
-            self.analysis_result = runIndependentIterativeProcedure(self.fwdIC, running_tests=self.running_tests)
+            self.run_single_analysis(self.wsFrontIC, self.fwdIC)
         if routine_type == "JOINT":
-            self.analysis_result = runJointBackAndForwardProcedure(self.bckwdIC, self.fwdIC)
+            self.run_joint_analysis()
         return 
+
+
+    def run_single_analysis(self, load_ai, ai):
+        AnalysisDataService.clear()
+        alg = self._create_analysis_algorithm(load_ai, ai)
+        alg.execute()
+        self.analysis_result = alg
+        return
+
+
+    def run_joint_analysis(self):
+        AnalysisDataService.clear()
+        back_alg = self._create_analysis_algorithm(self.wsBackIC, self.bckwdIC)
+        front_alg = self._create_analysis_algorithm(self.wsFrontIC, self.fwdIC)
+        self.analysis_result = run_joint_algs(back_alg, front_alg)
+        return
+
+
+    def run_estimate_h_ratio(self):
+        """
+        Used when H is present and H to first mass ratio is not known.
+        Preliminary forward scattering is run to get rough estimate of H to first mass ratio.
+        Runs iterative procedure with alternating back and forward scattering.
+        """
+
+        # assert (
+        #     bckwdIC.runningSampleWS is False
+        # ), "Preliminary procedure not suitable for Bootstrap."
+        # fwdIC.runningPreliminary = True
+
+        userInput = input(
+            "\nHydrogen intensity ratio to lowest mass is not set. Run procedure to estimate it?"
+        )
+        if not ((userInput == "y") or (userInput == "Y")):
+            raise KeyboardInterrupt("Procedure interrupted.")
+
+        table_h_ratios = createTableWSHRatios()
+
+        back_alg = self._create_analysis_algorithm(self.wsBackIC, self.bckwdIC)
+        front_alg = self._create_analysis_algorithm(self.wsFrontIC, self.fwdIC)
+
+        front_alg.execute()
+
+        means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
+        current_ratio = calculate_h_ratio(means_table) 
+
+        table_h_ratios.addRow([current_ratio])
+        previous_ratio = np.nan 
+
+        while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
+
+            back_alg.setProperty("HRatioToLowestMass", current_ratio)
+            run_joint_algs(back_alg, front_alg)
+
+            previous_ratio = current_ratio
+
+            means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
+            current_ratio = calculate_h_ratio(means_table) 
+
+            table_h_ratios.addRow([current_ratio])
+
+        print("\nProcedute to estimate Hydrogen ratio finished.",
+              "\nEstimates at each iteration converged:",
+              f"\n{table_h_ratios.column(0)}")
+        return
+
+
+    def _create_analysis_algorithm(self, load_ai, ai):
+        ws = loadRawAndEmptyWsFromUserPath(
+            userWsRawPath=ai.userWsRawPath,
+            userWsEmptyPath=ai.userWsEmptyPath,
+            tofBinning=ai.tofBinning,
+            name=ai.name,
+            scaleRaw=load_ai.scaleRaw,
+            scaleEmpty=load_ai.scaleEmpty,
+            subEmptyFromRaw=load_ai.subEmptyFromRaw
+        )
+        cropedWs = cropAndMaskWorkspace(
+            ws, 
+            firstSpec=ai.firstSpec,
+            lastSpec=ai.lastSpec,
+            maskedDetectors=ai.maskedSpecAllNo,
+            maskTOFRange=ai.maskTOFRange
+        )
+
+        profiles = []
+        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+            ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
+            ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
+        ):
+            profiles.append(NeutronComptonProfile(
+                label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
+                intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
+            ))
+
+        profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
+
+        ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+
+        kwargs = {
+            "InputWorkspace": cropedWs.name(),
+            "InputProfiles": profiles_table.name(),
+            "InstrumentParametersFile": str(ipFilesPath / ai.instrParsFile),
+            "HRatioToLowestMass": ai.HToMassIdxRatio if hasattr(ai, 'HRatioToLowestMass') else 0,
+            "NumberOfIterations": int(ai.noOfMSIterations),
+            "InvalidDetectors": ai.maskedSpecAllNo.astype(int).tolist(),
+            "MultipleScatteringCorrection": ai.MSCorrectionFlag,
+            "SampleVerticalWidth": ai.vertical_width, 
+            "SampleHorizontalWidth": ai.horizontal_width, 
+            "SampleThickness": ai.thickness,
+            "GammaCorrection": ai.GammaCorrectionFlag,
+            "ModeRunning": ai.modeRunning,
+            "TransmissionGuess": ai.transmission_guess,
+            "MultipleScatteringOrder": int(ai.multiple_scattering_order),
+            "NumberOfEvents": int(ai.number_of_events),
+            "Constraints": str(dill.dumps(ai.constraints)),
+            "ResultsPath": str(ai.resultsSavePath),
+            "FiguresPath": str(ai.figSavePath),
+            "OutputMeansTable":" Final_Means"
+        }
+
+        if self.running_tests:
+            alg = VesuvioAnalysisRoutine()
+        else:
+            AlgorithmFactory.subscribe(VesuvioAnalysisRoutine)
+            alg = AlgorithmManager.createUnmanaged("VesuvioAnalysisRoutine")
+
+        alg.initialize()
+        alg.setProperties(kwargs)
+        return alg 
 
 
 def checkInputs(crtIC):
@@ -145,6 +279,56 @@ def isHPresent(masses) -> bool:
         return True
     else:
         return False
+
+
+def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
+    table = CreateEmptyTableWorkspace(OutputWorkspace=name)
+    table.addColumn(type="str", name="label")
+    table.addColumn(type="float", name="mass")
+    table.addColumn(type="float", name="intensity")
+    table.addColumn(type="str", name="intensity_bounds")
+    table.addColumn(type="float", name="width")
+    table.addColumn(type="str", name="width_bounds")
+    table.addColumn(type="float", name="center")
+    table.addColumn(type="str", name="center_bounds")
+    for p in profiles:
+        table.addRow([str(getattr(p, attr)) 
+            if "bounds" in attr 
+            else getattr(p, attr) 
+            for attr in table.getColumnNames()])
+    return table
+
+
+def run_joint_algs(back_alg, front_alg):
+
+    back_alg.execute()
+
+    incoming_means_table = mtd[back_alg.getPropertyValue("OutputMeansTable")]
+    h_ratio = back_alg.getProperty("HRatioToLowestMass").value
+
+    assert incoming_means_table is not None, "Means table from backward routine not correctly accessed."
+    assert h_ratio is not None, "H ratio from backward routine not correctly accesssed."
+
+    receiving_profiles_table = mtd[front_alg.getPropertyValue("InputProfiles")]
+
+    fixed_profiles_table = fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio)
+
+    # Update original profiles table
+    RenameWorkspace(fixed_profiles_table, receiving_profiles_table.name())
+    # Even if the name is the same, need to trigger update
+    front_alg.setPropertyValue("InputProfiles", receiving_profiles_table.name())
+
+    front_alg.execute()
+    return
+
+
+def createTableWSHRatios():
+    table = CreateEmptyTableWorkspace(
+        OutputWorkspace="hydrogen_intensity_ratios_estimates"
+    )
+    table.addColumn(type="float", name="Hydrogen intensity ratio to lowest mass at each iteration")
+    return table
+
 
 if __name__ == "__main__":
     Runner().run()
