@@ -128,8 +128,8 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
 
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name() + "_Mass0")
     passDataIntoWS(dataX, dataY, dataE, wsSubMass)
-    # MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)
-    MaskDetectors(Workspace=wsSubMass, SpectraList=ic.maskedSpecAllNo)
+    wsMask, maskList = ExtractMask(ws)
+    MaskDetectors(Workspace=wsSubMass, MaskedWorkspace=wsMask)
     SumSpectra(
         InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name() + "_Sum"
     )

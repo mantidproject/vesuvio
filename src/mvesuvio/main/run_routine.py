@@ -58,6 +58,10 @@ class Runner:
         self.input_ws_path =  self.experiment_path / "input_ws"
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
+        # TODO: Output paths should probably not be set like this 
+        self._set_output_paths(self.bckwdIC) 
+        self._set_output_paths(self.fwdIC) 
+
         # TODO: remove this by fixing circular import 
         self.fwdIC.name = name_for_starting_ws(self.fwdIC)
         self.bckwdIC.name = name_for_starting_ws(self.bckwdIC)
@@ -226,9 +230,6 @@ class Runner:
         profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
-
-        # TODO: Output paths should probably not be set here
-        self._set_output_paths(ai) 
 
         kwargs = {
             "InputWorkspace": cropedWs.name(),
