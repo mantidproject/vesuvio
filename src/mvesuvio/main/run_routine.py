@@ -30,8 +30,8 @@ class Runner:
         
         ai = self.import_from_inputs()
 
-        self.wsBackIC = ai.LoadVesuvioBackParameters
-        self.wsFrontIC = ai.LoadVesuvioFrontParameters
+        # self.wsBackIC = ai.LoadVesuvioBackParameters
+        # self.wsFrontIC = ai.LoadVesuvioFrontParameters
         self.bckwdIC = ai.BackwardInitialConditions
         self.fwdIC = ai.ForwardInitialConditions
         self.yFitIC = ai.YSpaceFitInitialConditions
@@ -123,17 +123,17 @@ class Runner:
             ), "No Hydrogen detected, HToMassIdxRatio has to be set to 0"
 
         if routine_type == "BACKWARD":
-            self.run_single_analysis(self.wsBackIC, self.bckwdIC)
+            self.run_single_analysis(self.bckwdIC)
         if routine_type == "FORWARD":
-            self.run_single_analysis(self.wsFrontIC, self.fwdIC)
+            self.run_single_analysis(self.fwdIC)
         if routine_type == "JOINT":
             self.run_joint_analysis()
         return 
 
 
-    def run_single_analysis(self, load_ai, ai):
+    def run_single_analysis(self, ai):
         AnalysisDataService.clear()
-        alg = self._create_analysis_algorithm(load_ai, ai)
+        alg = self._create_analysis_algorithm(ai)
         alg.execute()
         self.analysis_result = alg
         return
@@ -141,8 +141,8 @@ class Runner:
 
     def run_joint_analysis(self):
         AnalysisDataService.clear()
-        back_alg = self._create_analysis_algorithm(self.wsBackIC, self.bckwdIC)
-        front_alg = self._create_analysis_algorithm(self.wsFrontIC, self.fwdIC)
+        back_alg = self._create_analysis_algorithm(self.bckwdIC)
+        front_alg = self._create_analysis_algorithm(self.fwdIC)
         self.run_joint_algs(back_alg, front_alg)
         return
 
@@ -191,8 +191,8 @@ class Runner:
 
         table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
 
-        back_alg = self._create_analysis_algorithm(self.wsBackIC, self.bckwdIC)
-        front_alg = self._create_analysis_algorithm(self.wsFrontIC, self.fwdIC)
+        back_alg = self._create_analysis_algorithm(self.bckwdIC)
+        front_alg = self._create_analysis_algorithm(self.fwdIC)
 
         front_alg.execute()
 
@@ -220,18 +220,18 @@ class Runner:
         return
 
 
-    def _create_analysis_algorithm(self, load_ai, ai):
+    def _create_analysis_algorithm(self, ai):
 
-        raw_path, empty_path = self._save_ws_if_not_on_path(load_ai)
+        raw_path, empty_path = self._save_ws_if_not_on_path(ai)
 
         ws = loadRawAndEmptyWsFromUserPath(
             userWsRawPath=raw_path,
             userWsEmptyPath=empty_path,
             tofBinning=ai.tofBinning,
-            name=name_for_starting_ws(load_ai),
-            scaleRaw=load_ai.scaleRaw,
-            scaleEmpty=load_ai.scaleEmpty,
-            subEmptyFromRaw=load_ai.subEmptyFromRaw
+            name=name_for_starting_ws(ai),
+            scaleRaw=ai.scaleRaw,
+            scaleEmpty=ai.scaleEmpty,
+            subEmptyFromRaw=ai.subEmptyFromRaw
         )
         cropedWs = cropAndMaskWorkspace(
             ws, 
@@ -249,7 +249,7 @@ class Runner:
         kwargs = {
             "InputWorkspace": cropedWs.name(),
             "InputProfiles": profiles_table.name(),
-            "InstrumentParametersFile": str(ipFilesPath / ai.instrParsFile),
+            "InstrumentParametersFile": str(ipFilesPath / ai.ipfile),
             "HRatioToLowestMass": ai.HToMassIdxRatio if hasattr(ai, 'HRatioToLowestMass') else 0,
             "NumberOfIterations": int(ai.noOfMSIterations),
             "InvalidDetectors": ai.maskedSpecAllNo.astype(int).tolist(),
@@ -258,7 +258,7 @@ class Runner:
             "SampleHorizontalWidth": ai.horizontal_width, 
             "SampleThickness": ai.thickness,
             "GammaCorrection": ai.GammaCorrectionFlag,
-            "ModeRunning": scattering_type(load_ai),
+            "ModeRunning": scattering_type(ai),
             "TransmissionGuess": ai.transmission_guess,
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.number_of_events),

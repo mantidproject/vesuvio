@@ -3,50 +3,27 @@ from dataclasses import dataclass
 
 
 @dataclass
-class LoadVesuvioBackParameters:
-    ipfile = "ip2019.par"
+class SampleParameters:
+    # Sample slab parameters, expressed in meters
+    vertical_width = 0.1 
+    horizontal_width = 0.1 
+    thickness = 0.001
 
-    runs = "43066-43076"  # 77K         # The numbers of the runs to be analysed
-    empty_runs = (
-        "41876-41923"  # 77K         # The numbers of the empty runs to be subtracted
-    )
+
+@dataclass
+class BackwardInitialConditions(SampleParameters):
+    runs = "43066-43076"
+    empty_runs = "41876-41923" 
     mode = "DoubleDifference"
+    ipfile = "ip2019.par"
 
     subEmptyFromRaw = True  # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1  # None or scaling factor
     scaleRaw = 1
+    # instrParsFile = "ip2018_3.par"
 
+    HToMassIdxRatio = 19.0620008206  # Set to zero when H is not present
 
-@dataclass
-class LoadVesuvioFrontParameters:
-    ipfile = "ip2018_3.par"
-
-    runs = "43066-43076"  # 100K        # The numbers of the runs to be analysed
-    empty_runs = (
-        "43868-43911"  # 100K        # The numbers of the empty runs to be subtracted
-    )
-    mode = "SingleDifference"
-
-    subEmptyFromRaw = False  # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1  # None or scaling factor
-    scaleRaw = 1
-
-
-@dataclass
-class GeneralInitialConditions:
-    """Used to define initial conditions shared by both Back and Forward scattering"""
-
-    # Sample slab parameters
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-
-
-@dataclass
-class BackwardInitialConditions(GeneralInitialConditions):
-    instrParsFile = "ip2018_3.par"
-
-    HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
-
-    # Masses, instrument parameters and initial fitting parameters
     masses = np.array([12, 16, 27])
 
     # Intensities, NCP widths, NCP centers
@@ -66,7 +43,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     )
     constraints = ()
 
-    noOfMSIterations = 3  # 4
+    noOfMSIterations = 0  # 4
     firstSpec = 3  # 3
     lastSpec = 134  # 134
 
@@ -86,9 +63,16 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 @dataclass
-class ForwardInitialConditions(GeneralInitialConditions):
+class ForwardInitialConditions(SampleParameters):
 
-    instrParsFile = "ip2018_3.par"
+    runs = "43066-43076"
+    empty_runs = "43868-43911"
+    mode = "SingleDifference"
+    ipfile = "ip2018_3.par"
+
+    subEmptyFromRaw = False  # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 1  # None or scaling factor
+    scaleRaw = 1
 
     masses = np.array([1.0079, 12, 16, 27])
 
@@ -150,12 +134,13 @@ class UserScriptControls:
     procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
     # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
+    fitInYSpace = "FORWARD"   #"FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
-####################
-### RUN ANALYSIS ###
-####################
+########################
+### END OF USER EDIT ###
+########################
+
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
     import mvesuvio

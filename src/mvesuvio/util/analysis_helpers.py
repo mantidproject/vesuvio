@@ -136,11 +136,11 @@ def name_for_starting_ws(load_ai):
 
 
 def scattering_type(load_ai, shorthand=False):
-    if load_ai.__name__ in ["LoadVesuvioBackParameters", "BackwardInitialConditions"]:
+    if load_ai.__name__ in ["BackwardInitialConditions"]:
         scatteringType = "BACKWARD"
         if shorthand:
             scatteringType = "bckwd"
-    elif load_ai.__name__ in ["LoadVesuvioFrontParameters", "ForwardInitialConditions"]:
+    elif load_ai.__name__ in ["ForwardInitialConditions"]:
         scatteringType = "FORWARD"
         if shorthand:
             scatteringType = "fwd"

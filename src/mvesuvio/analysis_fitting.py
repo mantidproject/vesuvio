@@ -1512,7 +1512,7 @@ def extractData(ws, wsRes, ic):
 
 def loadInstrParsFileIntoArray(ic):
     ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
-    data = np.loadtxt(str(ipFilesPath / ic.instrParsFile), dtype=str)[1:].astype(float)
+    data = np.loadtxt(str(ipFilesPath / ic.ipfile), dtype=str)[1:].astype(float)
     spectra = data[:, 0]
     select_rows = np.where((spectra >= ic.firstSpec) & (spectra <= ic.lastSpec))
     instrPars = data[select_rows]
