@@ -35,18 +35,15 @@ class Runner:
         self.bckwdIC = ai.BackwardInitialConditions
         self.fwdIC = ai.ForwardInitialConditions
         self.yFitIC = ai.YSpaceFitInitialConditions
-        self.userCtr = ai.UserScriptControls
-
-        for flag in [self.userCtr.procedure, self.userCtr.fitInYSpace]:
-            assert flag in ["BACKWARD", "FORWARD", "JOINT", None], "Procedure not recognized"
+        # self.userCtr = ai.UserScriptControls
 
         # Names of workspaces to check if they exist to skip analysis
         self.ws_to_fit_y_space = []
         self.classes_to_fit_y_space = []
-        for mode, i_cls in zip(["BACKWARD", "FORWARD"], [self.bckwdIC, self.fwdIC]):
-            if (self.userCtr.fitInYSpace == mode) | (self.userCtr.fitInYSpace == "JOINT"):
-                self.ws_to_fit_y_space.append(name_for_starting_ws(i_cls) + '_' + str(i_cls.noOfMSIterations))
-                self.classes_to_fit_y_space.append(i_cls)
+        for ai_cls in [self.bckwdIC, self.fwdIC]:
+            if ai_cls.fit_in_y_space:
+                self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + '_' + str(ai_cls.noOfMSIterations))
+                self.classes_to_fit_y_space.append(ai_cls)
 
         self.analysis_result = None
         self.fitting_result = None
@@ -82,7 +79,7 @@ class Runner:
 
 
     def run(self):
-        if not self.userCtr.runRoutine:
+        if not self.bckwdIC.run_this_scattering_type and not self.fwdIC.run_this_scattering_type:
             return
         # Default workflow for procedure + fit in y space
 
@@ -106,12 +103,8 @@ class Runner:
 
 
     def runAnalysisRoutine(self):
-        routine_type = self.userCtr.procedure
 
-        if routine_type is None:
-            return
-
-        if (routine_type == "BACKWARD") | (routine_type== "JOINT"):
+        if self.bckwdIC.run_this_scattering_type:
 
             if is_hydrogen_present(self.fwdIC.masses) & (self.bckwdIC.HToMassIdxRatio==0):
                 self.run_estimate_h_ratio()
@@ -122,12 +115,15 @@ class Runner:
                 self.bckwdIC.HToMassIdxRatio==0 
             ), "No Hydrogen detected, HToMassIdxRatio has to be set to 0"
 
-        if routine_type == "BACKWARD":
-            self.run_single_analysis(self.bckwdIC)
-        if routine_type == "FORWARD":
-            self.run_single_analysis(self.fwdIC)
-        if routine_type == "JOINT":
+        if self.bckwdIC.run_this_scattering_type and self.fwdIC.run_this_scattering_type:
             self.run_joint_analysis()
+            return 
+        if self.bckwdIC.run_this_scattering_type:
+            self.run_single_analysis(self.bckwdIC)
+            return 
+        if self.fwdIC.run_this_scattering_type:
+            self.run_single_analysis(self.fwdIC)
+            return
         return 
 
 

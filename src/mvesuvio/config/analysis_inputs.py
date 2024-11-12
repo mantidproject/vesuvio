@@ -12,6 +12,9 @@ class SampleParameters:
 
 @dataclass
 class BackwardInitialConditions(SampleParameters):
+    run_this_scattering_type = True
+    fit_in_y_space = False
+
     runs = "43066-43076"
     empty_runs = "41876-41923" 
     mode = "DoubleDifference"
@@ -64,6 +67,8 @@ class BackwardInitialConditions(SampleParameters):
 
 @dataclass
 class ForwardInitialConditions(SampleParameters):
+    run_this_scattering_type = True
+    fit_in_y_space = True
 
     runs = "43066-43076"
     empty_runs = "43868-43911"
@@ -114,6 +119,7 @@ class ForwardInitialConditions(SampleParameters):
     number_of_events = 1.0e5
 
 
+
 @dataclass
 class YSpaceFitInitialConditions:
     showPlots = True
@@ -124,17 +130,6 @@ class YSpaceFitInitialConditions:
     globalFit = True  # Performs global fit with Minuit by default
     nGlobalFitGroups = 4  # Number or string "ALL"
     maskTypeProcedure = "NAN"  # Options: 'NCP', 'NAN', None
-
-
-@dataclass
-class UserScriptControls:
-    runRoutine = True
-
-    # Choose main procedure to run
-    procedure = "FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
-
-    # Choose on which ws to perform the fit in y space
-    fitInYSpace = "FORWARD"   #"FORWARD"  # Options: None, "BACKWARD", "FORWARD", "JOINT"
 
 
 ########################

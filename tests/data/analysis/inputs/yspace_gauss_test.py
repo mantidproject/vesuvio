@@ -1,17 +1,13 @@
 from tests.data.analysis.inputs.analysis_test import (
-    LoadVesuvioBackParameters,
-    LoadVesuvioFrontParameters,
-    GeneralInitialConditions,
     BackwardInitialConditions,
     ForwardInitialConditions,
     YSpaceFitInitialConditions,
-    UserScriptControls
 )
-
 ForwardInitialConditions.noOfMSIterations = 1
 ForwardInitialConditions.firstSpec = 164
 ForwardInitialConditions.lastSpec = 175
+ForwardInitialConditions.fit_in_y_space = True 
+BackwardInitialConditions.fit_in_y_space = False
+ForwardInitialConditions.run_this_scattering_type = True 
+BackwardInitialConditions.run_this_scattering_type = False
 YSpaceFitInitialConditions.fitModel = "SINGLE_GAUSSIAN"
-UserScriptControls.runRoutine = True
-UserScriptControls.procedure = "FORWARD" 
-UserScriptControls.fitInYSpace = "FORWARD"

@@ -1,7 +1,16 @@
 import numpy as np
 
 
-class LoadVesuvioBackParameters:
+class GeneralInitialConditions:
+    transmission_guess = 0.8537  # Experimental value from VesuvioTransmission
+    multiple_scattering_order, number_of_events = 2, 1.0e5
+    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
+
+
+class BackwardInitialConditions(GeneralInitialConditions):
+    run_this_scattering_type = False
+    fit_in_y_space = False 
+
     ipfile = "ip2019.par"
 
     runs = "43066-43076"  # 77K         # The numbers of the runs to be analysed
@@ -13,30 +22,6 @@ class LoadVesuvioBackParameters:
     subEmptyFromRaw = True  # Flag to control wether empty ws gets subtracted from raw
     scaleEmpty = 1  # None or scaling factor
     scaleRaw = 1
-
-
-class LoadVesuvioFrontParameters:
-    ipfile = "ip2018_3.par"
-
-    runs = "43066-43076"  # 100K        # The numbers of the runs to be analysed
-    empty_runs = (
-        "43868-43911"  # 100K        # The numbers of the empty runs to be subtracted
-    )
-    spectra = "144-182"  # Spectra to be analysed
-    mode = "SingleDifference"
-    subEmptyFromRaw = False  # Flag to control wether empty ws gets subtracted from raw
-    scaleEmpty = 1  # None or scaling factor
-    scaleRaw = 1
-
-
-class GeneralInitialConditions:
-    transmission_guess = 0.8537  # Experimental value from VesuvioTransmission
-    multiple_scattering_order, number_of_events = 2, 1.0e5
-    vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
-
-
-class BackwardInitialConditions(GeneralInitialConditions):
-    instrParsFile = "ip2018_3.par"
 
     HToMassIdxRatio = 19.0620008206  # Set to zero or None when H is not present
     massIdx = 0
@@ -67,7 +52,20 @@ class BackwardInitialConditions(GeneralInitialConditions):
 
 
 class ForwardInitialConditions(GeneralInitialConditions):
-    instrParsFile = "ip2018_3.par"
+    run_this_scattering_type = True
+    fit_in_y_space = False
+
+    ipfile = "ip2018_3.par"
+
+    runs = "43066-43076"  # 100K        # The numbers of the runs to be analysed
+    empty_runs = (
+        "43868-43911"  # 100K        # The numbers of the empty runs to be subtracted
+    )
+    spectra = "144-182"  # Spectra to be analysed
+    mode = "SingleDifference"
+    subEmptyFromRaw = False  # Flag to control wether empty ws gets subtracted from raw
+    scaleEmpty = 1  # None or scaling factor
+    scaleRaw = 1
 
     HToMassIdxRatio = 0     # New way to ignore ratio
 
