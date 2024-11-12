@@ -2,22 +2,21 @@ from mvesuvio.analysis_fitting import fitInYSpaceProcedure
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
-                            NeutronComptonProfile, calculate_h_ratio, name_for_starting_ws
+                            NeutronComptonProfile, calculate_h_ratio, name_for_starting_ws, \
+                            scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
+                            is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import CreateEmptyTableWorkspace, mtd, RenameWorkspace, \
-                            Load, LoadVesuvio, SaveNexus, DeleteWorkspace
+from mantid.simpleapi import mtd, RenameWorkspace
 from mantid.api import AlgorithmFactory, AlgorithmManager
-from mantid.kernel import logger
 
 import numpy as np
 from pathlib import Path
 import importlib
 import sys
 import dill         # To convert constraints to string
-import ntpath
 
 
 class Runner:
@@ -38,9 +37,10 @@ class Runner:
         self.yFitIC = ai.YSpaceFitInitialConditions
         self.userCtr = ai.UserScriptControls
 
-        checkInputs(self.userCtr)
+        for flag in [self.userCtr.procedure, self.userCtr.fitInYSpace]:
+            assert flag in ["BACKWARD", "FORWARD", "JOINT"], "Procedure not recognized"
 
-        # Names of workspaces to check if they exist to do fitting
+        # Names of workspaces to check if they exist to skip analysis
         self.ws_to_fit_y_space = []
         self.classes_to_fit_y_space = []
         for mode, i_cls in zip(["BACKWARD", "FORWARD"], [self.bckwdIC, self.fwdIC]):
@@ -113,12 +113,12 @@ class Runner:
 
         if (routine_type == "BACKWARD") | (routine_type== "JOINT"):
 
-            if isHPresent(self.fwdIC.masses) & (self.bckwdIC.HToMassIdxRatio==0):
+            if is_hydrogen_present(self.fwdIC.masses) & (self.bckwdIC.HToMassIdxRatio==0):
                 self.run_estimate_h_ratio()
                 return
 
             # TODO: make this automatic
-            assert isHPresent(self.fwdIC.masses) != (
+            assert is_hydrogen_present(self.fwdIC.masses) != (
                 self.bckwdIC.HToMassIdxRatio==0 
             ), "No Hydrogen detected, HToMassIdxRatio has to be set to 0"
 
@@ -143,7 +143,31 @@ class Runner:
         AnalysisDataService.clear()
         back_alg = self._create_analysis_algorithm(self.wsBackIC, self.bckwdIC)
         front_alg = self._create_analysis_algorithm(self.wsFrontIC, self.fwdIC)
-        self.analysis_result = run_joint_algs(back_alg, front_alg)
+        self.run_joint_algs(back_alg, front_alg)
+        return
+
+
+    @classmethod
+    def run_joint_algs(cls, back_alg, front_alg):
+
+        back_alg.execute()
+
+        incoming_means_table = mtd[back_alg.getPropertyValue("OutputMeansTable")]
+        h_ratio = back_alg.getProperty("HRatioToLowestMass").value
+
+        assert incoming_means_table is not None, "Means table from backward routine not correctly accessed."
+        assert h_ratio is not None, "H ratio from backward routine not correctly accesssed."
+
+        receiving_profiles_table = mtd[front_alg.getPropertyValue("InputProfiles")]
+
+        fixed_profiles_table = fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio)
+
+        # Update original profiles table
+        RenameWorkspace(fixed_profiles_table, receiving_profiles_table.name())
+        # Even if the name is the same, need to trigger update
+        front_alg.setPropertyValue("InputProfiles", receiving_profiles_table.name())
+
+        front_alg.execute()
         return
 
 
@@ -165,7 +189,7 @@ class Runner:
         if not ((userInput == "y") or (userInput == "Y")):
             raise KeyboardInterrupt("Procedure interrupted.")
 
-        table_h_ratios = createTableWSHRatios()
+        table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
 
         back_alg = self._create_analysis_algorithm(self.wsBackIC, self.bckwdIC)
         front_alg = self._create_analysis_algorithm(self.wsFrontIC, self.fwdIC)
@@ -181,7 +205,7 @@ class Runner:
         while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
 
             back_alg.setProperty("HRatioToLowestMass", current_ratio)
-            run_joint_algs(back_alg, front_alg)
+            self.run_joint_algs(back_alg, front_alg)
 
             previous_ratio = current_ratio
 
@@ -217,16 +241,7 @@ class Runner:
             maskTOFRange=ai.maskTOFRange
         )
 
-        profiles = []
-        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-            ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
-            ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
-        ):
-            profiles.append(NeutronComptonProfile(
-                label=str(mass), mass=mass, intensity=intensity, width=width, center=center,
-                intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
-            ))
-
+        profiles = self._make_neutron_profiles(ai)
         profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
 
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
@@ -243,7 +258,7 @@ class Runner:
             "SampleHorizontalWidth": ai.horizontal_width, 
             "SampleThickness": ai.thickness,
             "GammaCorrection": ai.GammaCorrectionFlag,
-            "ModeRunning": getRunningMode(load_ai),
+            "ModeRunning": scattering_type(load_ai),
             "TransmissionGuess": ai.transmission_guess,
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.number_of_events),
@@ -264,24 +279,37 @@ class Runner:
         return alg 
 
 
+    def _make_neutron_profiles(cls, ai):
+        profiles = []
+        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+            ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
+            ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
+        ):
+            profiles.append(NeutronComptonProfile(
+                label=str(float(mass)), mass=float(mass), intensity=float(intensity), width=float(width), center=float(center),
+                intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
+            ))
+        return profiles
+
+
     def _save_ws_if_not_on_path(self, load_ai):
 
-        runningMode = getRunningMode(load_ai).lower()
+        scatteringType = scattering_type(load_ai).lower()
         scriptName = handle_config.get_script_name()
 
-        rawWSName = scriptName + "_" + "raw" + "_" + runningMode + ".nxs"
-        emptyWSName = scriptName + "_" + "empty" + "_" + runningMode + ".nxs"
+        rawWSName = scriptName + "_" + "raw" + "_" + scatteringType + ".nxs"
+        emptyWSName = scriptName + "_" + "empty" + "_" + scatteringType + ".nxs"
 
         rawPath = self.input_ws_path / rawWSName
         emptyPath = self.input_ws_path / emptyWSName
 
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
-        if not wsHistoryMatchesInputs(load_ai.runs, load_ai.mode, load_ai.ipfile, rawPath):
-            saveWSFromLoadVesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), rawPath)
+        if not ws_history_matches_inputs(load_ai.runs, load_ai.mode, load_ai.ipfile, rawPath):
+            save_ws_from_load_vesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), rawPath)
 
-        if not wsHistoryMatchesInputs(load_ai.empty_runs, load_ai.mode, load_ai.ipfile, emptyPath):
-            saveWSFromLoadVesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), emptyPath)
+        if not ws_history_matches_inputs(load_ai.empty_runs, load_ai.mode, load_ai.ipfile, emptyPath):
+            save_ws_from_load_vesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), emptyPath)
         return rawPath, emptyPath
 
 
@@ -310,156 +338,6 @@ class Runner:
         figSavePath.mkdir(exist_ok=True)
         self.fig_save_path = figSavePath
         return
-
-
-def getRunningMode(wsIC):
-    if wsIC.__name__ == "LoadVesuvioBackParameters":
-        runningMode = "BACKWARD"
-    elif wsIC.__name__ == "LoadVesuvioFrontParameters":
-        runningMode = "FORWARD"
-    else:
-        raise ValueError(
-            f"Input class for loading workspace not valid: {wsIC.__name__}"
-        )
-    return runningMode
-
-
-def wsHistoryMatchesInputs(runs, mode, ipfile, localPath):
-    if not (localPath.is_file()):
-        logger.notice("Cached workspace not found")
-        return False
-    local_ws = Load(Filename=str(localPath))
-    ws_history = local_ws.getHistory()
-    metadata = ws_history.getAlgorithmHistory(0)
-
-    saved_runs = metadata.getPropertyValue("Filename")
-    if saved_runs != runs:
-        logger.notice(
-            f"Filename in saved workspace did not match: {saved_runs} and {runs}"
-        )
-        return False
-
-    saved_mode = metadata.getPropertyValue("Mode")
-    if saved_mode != mode:
-        logger.notice(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
-        return False
-
-    saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
-    if saved_ipfile_name != ipfile:
-        logger.notice(
-            f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfilename}"
-        )
-        return False
-
-    print("\nLocally saved workspace metadata matched with analysis inputs.\n")
-    DeleteWorkspace(local_ws)
-    return True
-
-
-def saveWSFromLoadVesuvio(runs, mode, ipfile, localPath):
-    if "backward" in localPath.name:
-        spectra = "3-134"
-    elif "forward" in localPath.name:
-        spectra = "135-198"
-    else:
-        raise ValueError(f"Invalid name to save workspace: {localPath.name}")
-
-    vesuvio_ws = LoadVesuvio(
-        Filename=runs,
-        SpectrumList=spectra,
-        Mode=mode,
-        InstrumentParFile=str(ipfile),
-        OutputWorkspace=localPath.name,
-        LoadLogFiles=False,
-    )
-
-    SaveNexus(vesuvio_ws, str(localPath.absolute()))
-    print(f"Workspace saved locally at: {localPath.absolute()}")
-    return
-
-
-def checkInputs(crtIC):
-    try:
-        if ~crtIC.runRoutine:
-            return
-    except AttributeError:
-        if ~crtIC.runBootstrap:
-            return
-
-    for flag in [crtIC.procedure, crtIC.fitInYSpace]:
-        assert (
-            (flag == "BACKWARD")
-            | (flag == "FORWARD")
-            | (flag == "JOINT")
-            | (flag is None)
-        ), "Option not recognized."
-
-    if (crtIC.procedure != "JOINT") & (crtIC.fitInYSpace is not None):
-        assert crtIC.procedure == crtIC.fitInYSpace
-
-
-def isHPresent(masses) -> bool:
-    Hmask = np.abs(masses - 1) / 1 < 0.1  # H mass whithin 10% of 1 au
-
-    if np.any(Hmask):  # H present
-        print("\nH mass detected.\n")
-        assert (
-            len(Hmask) > 1
-        ), "When H is only mass present, run independent forward procedure, not joint."
-        assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
-        assert sum(Hmask) == 1, "More than one mass very close to H were detected."
-        return True
-    else:
-        return False
-
-
-def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
-    table = CreateEmptyTableWorkspace(OutputWorkspace=name)
-    table.addColumn(type="str", name="label")
-    table.addColumn(type="float", name="mass")
-    table.addColumn(type="float", name="intensity")
-    table.addColumn(type="str", name="intensity_bounds")
-    table.addColumn(type="float", name="width")
-    table.addColumn(type="str", name="width_bounds")
-    table.addColumn(type="float", name="center")
-    table.addColumn(type="str", name="center_bounds")
-    for p in profiles:
-        table.addRow([str(getattr(p, attr)) 
-            if "bounds" in attr 
-            else getattr(p, attr) 
-            for attr in table.getColumnNames()])
-    return table
-
-
-def run_joint_algs(back_alg, front_alg):
-
-    back_alg.execute()
-
-    incoming_means_table = mtd[back_alg.getPropertyValue("OutputMeansTable")]
-    h_ratio = back_alg.getProperty("HRatioToLowestMass").value
-
-    assert incoming_means_table is not None, "Means table from backward routine not correctly accessed."
-    assert h_ratio is not None, "H ratio from backward routine not correctly accesssed."
-
-    receiving_profiles_table = mtd[front_alg.getPropertyValue("InputProfiles")]
-
-    fixed_profiles_table = fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio)
-
-    # Update original profiles table
-    RenameWorkspace(fixed_profiles_table, receiving_profiles_table.name())
-    # Even if the name is the same, need to trigger update
-    front_alg.setPropertyValue("InputProfiles", receiving_profiles_table.name())
-
-    front_alg.execute()
-    return
-
-
-def createTableWSHRatios():
-    table = CreateEmptyTableWorkspace(
-        OutputWorkspace="hydrogen_intensity_ratios_estimates"
-    )
-    table.addColumn(type="float", name="Hydrogen intensity ratio to lowest mass at each iteration")
-    return table
 
 
 if __name__ == "__main__":
