@@ -10,7 +10,7 @@ class SampleParameters:
 
 
 @dataclass
-class BackwardInitialConditions(SampleParameters):
+class BackwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = False
     fit_in_y_space = False
 
@@ -47,7 +47,7 @@ class BackwardInitialConditions(SampleParameters):
 
 
 @dataclass
-class ForwardInitialConditions(SampleParameters):
+class ForwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
     fit_in_y_space = True
 
@@ -84,7 +84,7 @@ class ForwardInitialConditions(SampleParameters):
 
 
 @dataclass
-class YSpaceFitInitialConditions:
+class YSpaceFitInputs:
     showPlots = True
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-25, 0.5, 25"  # Needs to be symetric

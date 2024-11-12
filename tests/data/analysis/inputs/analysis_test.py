@@ -1,13 +1,11 @@
-import numpy as np
 
-
-class GeneralInitialConditions:
+class SampleParameters:
     transmission_guess = 0.8537  # Experimental value from VesuvioTransmission
     multiple_scattering_order, number_of_events = 2, 1.0e5
     vertical_width, horizontal_width, thickness = 0.1, 0.1, 0.001  # Expressed in meters
 
 
-class BackwardInitialConditions(GeneralInitialConditions):
+class BackwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = False
     fit_in_y_space = False 
     ipfile = "ip2019.par"
@@ -45,7 +43,7 @@ class BackwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = False
 
 
-class ForwardInitialConditions(GeneralInitialConditions):
+class ForwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
     fit_in_y_space = False
 
@@ -86,7 +84,7 @@ class ForwardInitialConditions(GeneralInitialConditions):
     GammaCorrectionFlag = True
 
 
-class YSpaceFitInitialConditions:
+class YSpaceFitInputs:
     showPlots = False
     symmetrisationFlag = True
     rebinParametersForYSpaceFit = "-20, 0.5, 20"  # Needs to be symetric

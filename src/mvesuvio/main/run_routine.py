@@ -30,17 +30,14 @@ class Runner:
         
         ai = self.import_from_inputs()
 
-        # self.wsBackIC = ai.LoadVesuvioBackParameters
-        # self.wsFrontIC = ai.LoadVesuvioFrontParameters
-        self.bckwdIC = ai.BackwardInitialConditions
-        self.fwdIC = ai.ForwardInitialConditions
-        self.yFitIC = ai.YSpaceFitInitialConditions
-        # self.userCtr = ai.UserScriptControls
+        self.bckwd_ai = ai.BackwardAnalysisInputs
+        self.fwd_ai = ai.ForwardAnalysisInputs
+        self.yFitIC = ai.YSpaceFitInputs
 
         # Names of workspaces to check if they exist to skip analysis
         self.ws_to_fit_y_space = []
         self.classes_to_fit_y_space = []
-        for ai_cls in [self.bckwdIC, self.fwdIC]:
+        for ai_cls in [self.bckwd_ai, self.fwd_ai]:
             if ai_cls.fit_in_y_space:
                 self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + '_' + str(ai_cls.noOfMSIterations))
                 self.classes_to_fit_y_space.append(ai_cls)
@@ -56,12 +53,12 @@ class Runner:
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
         # TODO: Output paths should probably not be set like this 
-        self._set_output_paths(self.bckwdIC) 
-        self._set_output_paths(self.fwdIC) 
+        self._set_output_paths(self.bckwd_ai) 
+        self._set_output_paths(self.fwd_ai) 
 
         # TODO: remove this by fixing circular import 
-        self.fwdIC.name = name_for_starting_ws(self.fwdIC)
-        self.bckwdIC.name = name_for_starting_ws(self.bckwdIC)
+        self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
+        self.bckwd_ai.name = name_for_starting_ws(self.bckwd_ai)
 
         # TODO: sort out yfit inputs
         figSavePath = self.experiment_path / "figures"
@@ -79,7 +76,7 @@ class Runner:
 
 
     def run(self):
-        if not self.bckwdIC.run_this_scattering_type and not self.fwdIC.run_this_scattering_type:
+        if not self.bckwd_ai.run_this_scattering_type and not self.fwd_ai.run_this_scattering_type:
             return
         # Default workflow for procedure + fit in y space
 
@@ -104,25 +101,25 @@ class Runner:
 
     def runAnalysisRoutine(self):
 
-        if self.bckwdIC.run_this_scattering_type:
+        if self.bckwd_ai.run_this_scattering_type:
 
-            if is_hydrogen_present(self.fwdIC.masses) & (self.bckwdIC.HToMassIdxRatio==0):
+            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.HToMassIdxRatio==0):
                 self.run_estimate_h_ratio()
                 return
 
             # TODO: make this automatic
-            assert is_hydrogen_present(self.fwdIC.masses) != (
-                self.bckwdIC.HToMassIdxRatio==0 
+            assert is_hydrogen_present(self.fwd_ai.masses) != (
+                self.bckwd_ai.HToMassIdxRatio==0 
             ), "No Hydrogen detected, HToMassIdxRatio has to be set to 0"
 
-        if self.bckwdIC.run_this_scattering_type and self.fwdIC.run_this_scattering_type:
+        if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
             self.run_joint_analysis()
             return 
-        if self.bckwdIC.run_this_scattering_type:
-            self.run_single_analysis(self.bckwdIC)
+        if self.bckwd_ai.run_this_scattering_type:
+            self.run_single_analysis(self.bckwd_ai)
             return 
-        if self.fwdIC.run_this_scattering_type:
-            self.run_single_analysis(self.fwdIC)
+        if self.fwd_ai.run_this_scattering_type:
+            self.run_single_analysis(self.fwd_ai)
             return
         return 
 
@@ -137,8 +134,8 @@ class Runner:
 
     def run_joint_analysis(self):
         AnalysisDataService.clear()
-        back_alg = self._create_analysis_algorithm(self.bckwdIC)
-        front_alg = self._create_analysis_algorithm(self.fwdIC)
+        back_alg = self._create_analysis_algorithm(self.bckwd_ai)
+        front_alg = self._create_analysis_algorithm(self.fwd_ai)
         self.run_joint_algs(back_alg, front_alg)
         return
 
@@ -187,8 +184,8 @@ class Runner:
 
         table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
 
-        back_alg = self._create_analysis_algorithm(self.bckwdIC)
-        front_alg = self._create_analysis_algorithm(self.fwdIC)
+        back_alg = self._create_analysis_algorithm(self.bckwd_ai)
+        front_alg = self._create_analysis_algorithm(self.fwd_ai)
 
         front_alg.execute()
 
