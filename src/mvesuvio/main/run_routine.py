@@ -38,7 +38,7 @@ class Runner:
         self.userCtr = ai.UserScriptControls
 
         for flag in [self.userCtr.procedure, self.userCtr.fitInYSpace]:
-            assert flag in ["BACKWARD", "FORWARD", "JOINT"], "Procedure not recognized"
+            assert flag in ["BACKWARD", "FORWARD", "JOINT", None], "Procedure not recognized"
 
         # Names of workspaces to check if they exist to skip analysis
         self.ws_to_fit_y_space = []
