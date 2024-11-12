@@ -66,7 +66,7 @@ def extractNCPFromWorkspaces(wsFinal, ic):
 
     # Ensure shape of ncp matches data
     shape = ncpForEachMass.shape
-    assert shape[0] == ic.masses.size
+    assert shape[0] == len(ic.masses)
     assert shape[1] == wsFinal.getNumberHistograms()
     # Final dimension can be missing last col or not
     assert (shape[2] == wsFinal.blocksize()) | (shape[2] == wsFinal.blocksize() - 1)

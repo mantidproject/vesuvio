@@ -248,7 +248,7 @@ class Runner:
             "InstrumentParametersFile": str(ipFilesPath / ai.ipfile),
             "HRatioToLowestMass": ai.HToMassIdxRatio if hasattr(ai, 'HRatioToLowestMass') else 0,
             "NumberOfIterations": int(ai.noOfMSIterations),
-            "InvalidDetectors": ai.maskedSpecAllNo.astype(int).tolist(),
+            "InvalidDetectors": [int(det) for det in ai.maskedSpecAllNo],
             "MultipleScatteringCorrection": ai.MSCorrectionFlag,
             "SampleVerticalWidth": ai.vertical_width, 
             "SampleHorizontalWidth": ai.horizontal_width, 

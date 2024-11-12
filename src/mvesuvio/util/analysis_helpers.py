@@ -58,7 +58,7 @@ def create_table_for_hydrogen_to_mass_ratios():
 
 
 def is_hydrogen_present(masses) -> bool:
-    Hmask = np.abs(masses - 1) / 1 < 0.1  # H mass whithin 10% of 1 au
+    Hmask = np.abs(np.array(masses) - 1) / 1 < 0.1  # H mass whithin 10% of 1 au
 
     if ~np.any(Hmask):  # H not present
         return False
