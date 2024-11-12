@@ -2,7 +2,7 @@ from mvesuvio.analysis_fitting import fitInYSpaceProcedure
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
-                            NeutronComptonProfile, calculate_h_ratio, name_for_starting_ws, \
+                            calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
                             is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
@@ -233,12 +233,8 @@ class Runner:
             maskedDetectors=ai.maskedSpecAllNo,
             maskTOFRange=ai.maskTOFRange
         )
-
-        profiles = self._make_neutron_profiles(ai)
-        profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", profiles)
-
+        profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", ai)
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
-
         kwargs = {
             "InputWorkspace": cropedWs.name(),
             "InputProfiles": profiles_table.name(),

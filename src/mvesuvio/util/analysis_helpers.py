@@ -9,29 +9,10 @@ import numbers
 from mvesuvio.analysis_fitting import passDataIntoWS
 from mvesuvio.util import handle_config
 
-from dataclasses import dataclass
 import ntpath
 
 
-@dataclass(frozen=False)
-class NeutronComptonProfile:
-    label: str
-    mass: float
-
-    intensity: float
-    width: float
-    center: float
-
-    intensity_bounds: list[float, float]
-    width_bounds: list[float, float]
-    center_bounds: list[float, float]
-
-    mean_intensity: float = None
-    mean_width: float = None
-    mean_center: float = None
-
-
-def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
+def create_profiles_table(name, ai):
     table = CreateEmptyTableWorkspace(OutputWorkspace=name)
     table.addColumn(type="str", name="label")
     table.addColumn(type="float", name="mass")
@@ -41,11 +22,14 @@ def create_profiles_table(name, profiles: list[NeutronComptonProfile]):
     table.addColumn(type="str", name="width_bounds")
     table.addColumn(type="float", name="center")
     table.addColumn(type="str", name="center_bounds")
-    for p in profiles:
-        table.addRow([str(getattr(p, attr)) 
-            if "bounds" in attr 
-            else getattr(p, attr) 
-            for attr in table.getColumnNames()])
+    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+        ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
+        ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
+    ):
+        table.addRow(
+            [str(float(mass)), float(mass), float(intensity), str(list(intensity_bound)),
+            float(width), str(list(width_bound)), float(center), str(list(center_bound))]
+        )
     return table
 
 
