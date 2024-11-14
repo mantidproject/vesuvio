@@ -502,7 +502,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._mean_intensity_ratios,
             self._std_intensity_ratios,
         ):
-            table.addRow([label, mass, mean_width, std_width, mean_intensity, std_intensity])
+            # Explicit conversion to float required to match profiles table
+            table.addRow([label, float(mass), float(mean_width), float(std_width), float(mean_intensity), float(std_intensity)])
             self.log().notice(f"{label:6s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}" + \
                 f"{mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
 

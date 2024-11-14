@@ -1,31 +1,138 @@
 
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
-                            CloneWorkspace, MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
-                            mtd, RenameWorkspace
+                            MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
+                            DeleteWorkspace, SaveNexus, LoadVesuvio, mtd
+from mantid.kernel import logger
 import numpy as np
 import numbers
 
 from mvesuvio.analysis_fitting import passDataIntoWS
+from mvesuvio.util import handle_config
 
-from dataclasses import dataclass
+import ntpath
 
-@dataclass(frozen=False)
-class NeutronComptonProfile:
-    label: str
-    mass: float
 
-    intensity: float
-    width: float
-    center: float
+def create_profiles_table(name, ai):
+    table = CreateEmptyTableWorkspace(OutputWorkspace=name)
+    table.addColumn(type="str", name="label")
+    table.addColumn(type="float", name="mass")
+    table.addColumn(type="float", name="intensity")
+    table.addColumn(type="str", name="intensity_bounds")
+    table.addColumn(type="float", name="width")
+    table.addColumn(type="str", name="width_bounds")
+    table.addColumn(type="float", name="center")
+    table.addColumn(type="str", name="center_bounds")
+    for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
+        ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
+        ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
+    ):
+        table.addRow(
+            [str(float(mass)), float(mass), float(intensity), str(list(intensity_bound)),
+            float(width), str(list(width_bound)), float(center), str(list(center_bound))]
+        )
+    return table
 
-    intensity_bounds: list[float, float]
-    width_bounds: list[float, float]
-    center_bounds: list[float, float]
 
-    mean_intensity: float = None
-    mean_width: float = None
-    mean_center: float = None
+def create_table_for_hydrogen_to_mass_ratios():
+    table = CreateEmptyTableWorkspace(
+        OutputWorkspace="hydrogen_intensity_ratios_estimates"
+    )
+    table.addColumn(type="float", name="Hydrogen intensity ratio to lowest mass at each iteration")
+    return table
 
+
+def is_hydrogen_present(masses) -> bool:
+    Hmask = np.abs(np.array(masses) - 1) / 1 < 0.1  # H mass whithin 10% of 1 au
+
+    if ~np.any(Hmask):  # H not present
+        return False
+
+    print("\nH mass detected.\n")
+    assert (
+        len(Hmask) > 1
+    ), "When H is only mass present, run independent forward procedure, not joint."
+    assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
+    assert sum(Hmask) == 1, "More than one mass very close to H were detected."
+    return True
+
+
+def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
+
+    if not (ws_path.is_file()):
+        logger.notice("Cached workspace not found")
+        return False
+
+    ws = Load(Filename=str(ws_path))
+    ws_history = ws.getHistory()
+    metadata = ws_history.getAlgorithmHistory(0)
+
+    saved_runs = metadata.getPropertyValue("Filename")
+    if saved_runs != runs:
+        logger.notice(
+            f"Filename in saved workspace did not match: {saved_runs} and {runs}"
+        )
+        return False
+
+    saved_mode = metadata.getPropertyValue("Mode")
+    if saved_mode != mode:
+        logger.notice(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
+        return False
+
+    saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
+    if saved_ipfile_name != ipfile:
+        logger.notice(
+            f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile}"
+        )
+        return False
+
+    print("\nLocally saved workspace metadata matched with analysis inputs.\n")
+    DeleteWorkspace(ws)
+    return True
+
+
+def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
+
+    if "backward" in ws_path.name:
+        spectra = "3-134"
+    elif "forward" in ws_path.name:
+        spectra = "135-198"
+    else:
+        raise ValueError(f"Invalid name to save workspace: {ws_path.name}")
+
+    vesuvio_ws = LoadVesuvio(
+        Filename=runs,
+        SpectrumList=spectra,
+        Mode=mode,
+        InstrumentParFile=str(ipfile),
+        OutputWorkspace=ws_path.name,
+        LoadLogFiles=False,
+    )
+
+    SaveNexus(vesuvio_ws, str(ws_path.absolute()))
+    print(f"Workspace saved locally at: {ws_path.absolute()}")
+    return
+
+
+def name_for_starting_ws(load_ai):
+    name_suffix = scattering_type(load_ai, shorthand=True) 
+    name = handle_config.get_script_name() + "_" + name_suffix
+    return name
+
+
+def scattering_type(load_ai, shorthand=False):
+    if load_ai.__name__ in ["BackwardAnalysisInputs"]:
+        scatteringType = "BACKWARD"
+        if shorthand:
+            scatteringType = "bckwd"
+    elif load_ai.__name__ in ["ForwardAnalysisInputs"]:
+        scatteringType = "FORWARD"
+        if shorthand:
+            scatteringType = "fwd"
+    else:
+        raise ValueError(
+            f"Input class for workspace not valid: {load_ai.__name__}"
+        )
+    return scatteringType 
 
 
 def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 

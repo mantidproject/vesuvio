@@ -1,4 +1,4 @@
-from mvesuvio.run_routine import runRoutine 
+from mvesuvio.main.run_routine import Runner 
 from mantid.simpleapi import Load
 from mantid.api import AnalysisDataService
 from pathlib import Path
@@ -6,40 +6,9 @@ import numpy as np
 import unittest
 import numpy.testing as nptest
 from mvesuvio.util import handle_config
-from tests.data.analysis.inputs.sample_test import (
-    LoadVesuvioBackParameters,
-    LoadVesuvioFrontParameters,
-    BackwardInitialConditions,
-    ForwardInitialConditions,
-    YSpaceFitInitialConditions,
-)
 import mvesuvio
-mvesuvio.set_config(
-    ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-    inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "sample_test.py")
-)
+
 np.set_printoptions(suppress=True, precision=8, linewidth=150)
-
-
-class UserScriptControls:
-    runRoutine = True
-    procedure = "FORWARD"
-    fitInYSpace = "FORWARD"
-
-
-userCtr = UserScriptControls
-ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
-wsBackIC = LoadVesuvioBackParameters(ipFilesPath)
-wsFrontIC = LoadVesuvioFrontParameters(ipFilesPath)
-bckwdIC = BackwardInitialConditions(ipFilesPath)
-fwdIC = ForwardInitialConditions(ipFilesPath)
-yFitIC = YSpaceFitInitialConditions()
-scriptName = handle_config.get_script_name()
-
-fwdIC.noOfMSIterations = 1
-fwdIC.firstSpec = 164
-fwdIC.lastSpec = 175
-yFitIC.fitModel = "SINGLE_GAUSSIAN"
 
 
 class AnalysisRunner:
@@ -64,17 +33,22 @@ class AnalysisRunner:
     @classmethod
     def get_current_result(cls):
         if not AnalysisRunner._currentResults:
+            mvesuvio.set_config(
+                ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
+                inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "yspace_gauss_test.py")
+            )
             cls._run()
         return AnalysisRunner._currentResults
 
     @classmethod
     def _load_workspaces(cls):
         AnalysisDataService.clear()
+        scriptName = handle_config.get_script_name()
         wsFinal = Load(
             str(cls._input_data_path / "wsFinal.nxs"),
             OutputWorkspace=scriptName + "_fwd_1",
         )
-        for i in range(len(fwdIC.masses)):
+        for i in range(4):
             fileName = "wsFinal_ncp_" + str(i) + ".nxs"
             Load(
                 str(cls._input_data_path / fileName),
@@ -84,10 +58,7 @@ class AnalysisRunner:
     @classmethod
     def _run(cls):
         cls.load_workspaces()   # Load data to skip run of routine
-
-        scattRes, yfitRes = runRoutine(
-            userCtr, wsBackIC, wsFrontIC, bckwdIC, fwdIC, yFitIC, True
-        )
+        scattRes, yfitRes = Runner(True).run()
         cls._currentResults = yfitRes
 
     @classmethod

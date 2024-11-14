@@ -2,22 +2,9 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 from pathlib import Path
-from mvesuvio.run_routine import runRoutine
+from mvesuvio.main.run_routine import Runner 
 from mvesuvio.util import handle_config
-from tests.data.analysis.inputs.sample_test import (
-    LoadVesuvioBackParameters,
-    LoadVesuvioFrontParameters,
-    BackwardInitialConditions,
-    ForwardInitialConditions,
-    YSpaceFitInitialConditions,
-    UserScriptControls,
-)
 import mvesuvio
-mvesuvio.set_config(
-    ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-    inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "sample_test.py")
-)
-ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
 
 class AnalysisRunner:
@@ -26,29 +13,24 @@ class AnalysisRunner:
 
     @classmethod
     def get_benchmark_result(cls):
-        if not AnalysisRunner._benchmarkResults:
+        if not cls._benchmarkResults:
             cls._load_benchmark_results()
-        return AnalysisRunner._benchmarkResults
+        return cls._benchmarkResults
 
     @classmethod
     def get_current_result(cls):
-        if not AnalysisRunner._currentResults:
+        if not cls._currentResults:
+            mvesuvio.set_config(
+                ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
+                inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "analysis_test.py")
+            )
             cls._run()
-        return AnalysisRunner._currentResults
+        return cls._currentResults
 
     @classmethod
     def _run(cls):
-        scattRes, yfitRes = runRoutine(
-            UserScriptControls(),
-            LoadVesuvioBackParameters(ipFilesPath),
-            LoadVesuvioFrontParameters(ipFilesPath),
-            BackwardInitialConditions(ipFilesPath),
-            ForwardInitialConditions(ipFilesPath),
-            YSpaceFitInitialConditions(),
-            True,
-            running_tests=True
-        )
-        AnalysisRunner._currentResults = scattRes 
+        scattRes, yfitRes = Runner(True).run()
+        cls._currentResults = scattRes 
         return
 
     @classmethod
@@ -57,7 +39,7 @@ class AnalysisRunner:
         benchmarkResults = np.load(
             str(benchmarkPath / "stored_spec_144-182_iter_3_GC_MS.npz")
         )
-        AnalysisRunner._benchmarkResults = benchmarkResults
+        cls._benchmarkResults = benchmarkResults
 
 
 class TestFitParameters(unittest.TestCase):

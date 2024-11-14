@@ -9,6 +9,8 @@ from iminuit.util import make_func_code, describe
 import jacobi
 import time
 
+from mvesuvio.util import handle_config
+
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
@@ -64,7 +66,7 @@ def extractNCPFromWorkspaces(wsFinal, ic):
 
     # Ensure shape of ncp matches data
     shape = ncpForEachMass.shape
-    assert shape[0] == ic.noOfMasses
+    assert shape[0] == len(ic.masses)
     assert shape[1] == wsFinal.getNumberHistograms()
     # Final dimension can be missing last col or not
     assert (shape[2] == wsFinal.blocksize()) | (shape[2] == wsFinal.blocksize() - 1)
@@ -93,7 +95,8 @@ def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
         else:
             AppendSpectra(resName, "tmp", OutputWorkspace=resName)
 
-    MaskDetectors(resName, WorkspaceIndexList=IC.maskedDetectorIdx)
+    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
+    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
     wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName + "_Sum")
 
     normalise_workspace(wsResSum)
@@ -125,7 +128,8 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
 
     wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name() + "_Mass0")
     passDataIntoWS(dataX, dataY, dataE, wsSubMass)
-    MaskDetectors(Workspace=wsSubMass, WorkspaceIndexList=ic.maskedDetectorIdx)
+    wsMask, maskList = ExtractMask(ws)
+    MaskDetectors(Workspace=wsSubMass, MaskedWorkspace=wsMask)
     SumSpectra(
         InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name() + "_Sum"
     )
@@ -1507,7 +1511,8 @@ def extractData(ws, wsRes, ic):
 
 
 def loadInstrParsFileIntoArray(ic):
-    data = np.loadtxt(ic.InstrParsPath, dtype=str)[1:].astype(float)
+    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+    data = np.loadtxt(str(ipFilesPath / ic.ipfile), dtype=str)[1:].astype(float)
     spectra = data[:, 0]
     select_rows = np.where((spectra >= ic.firstSpec) & (spectra <= ic.lastSpec))
     instrPars = data[select_rows]
