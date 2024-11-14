@@ -211,6 +211,12 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
+        # Initialise workspaces for fitted ncp 
+        self._fit_fse_workspaces = {}
+        for element in self._profiles_table.column("label"):
+            self._fit_fse_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_fse')
+        self._fit_fse_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_fse')
+
         # Initialise empty means
         self._mean_widths = None
         self._std_widths = None
@@ -453,6 +459,12 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 OutputWorkspace=ws.name() + "_sum"
             )
 
+        for ws in self._fit_fse_workspaces.values():
+            SumSpectra(
+                InputWorkspace=ws.name(),
+                OutputWorkspace=ws.name() + "_sum"
+            )
+
     def _set_means_and_std(self):
         """Calculate mean widths and intensities from tableWorkspace"""
 
@@ -603,30 +615,32 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self.log().notice(' '.join(str(tableRow).split(",")).replace('[', '').replace(']', ''))
 
         # Pass fit profiles into workspaces
-        individual_ncps = self._neutron_compton_profiles(fitPars)
-        for ncp, element in zip(individual_ncps, self._profiles_table.column("label")):
+        ncp_for_each_mass, fse_for_each_mass = self._neutron_compton_profiles(fitPars)
+        for ncp, fse, element in zip(ncp_for_each_mass, fse_for_each_mass, self._profiles_table.column("label")):
             self._fit_profiles_workspaces[element].dataY(self._row_being_fit)[:] = ncp
+            self._fit_fse_workspaces[element].dataY(self._row_being_fit)[:] = fse
 
-        self._fit_profiles_workspaces['total'].dataY(self._row_being_fit)[:] = np.sum(individual_ncps, axis=0)
+        self._fit_profiles_workspaces['total'].dataY(self._row_being_fit)[:] = np.sum(ncp_for_each_mass, axis=0)
+        self._fit_fse_workspaces['total'].dataY(self._row_being_fit)[:] = np.sum(fse_for_each_mass, axis=0)
         return
 
 
     def errorFunction(self, pars):
         """Error function to be minimized, in TOF space"""
 
-        ncpForEachMass = self._neutron_compton_profiles(pars)
-        ncpTotal = np.sum(ncpForEachMass, axis=0)
+        ncp_for_each_mass, fse_for_each_mass = self._neutron_compton_profiles(pars)
+        ncp_total = np.sum(ncp_for_each_mass, axis=0)
 
         # Ignore any masked values from Jackknife or masked tof range
         zerosMask = self._dataY[self._row_being_fit] == 0
-        ncpTotal = ncpTotal[~zerosMask]
-        dataY = self._dataY[self._row_being_fit, ~zerosMask]
-        dataE = self._dataE[self._row_being_fit, ~zerosMask]
+        ncp_total = ncp_total[~zerosMask]
+        data_y = self._dataY[self._row_being_fit, ~zerosMask]
+        data_e = self._dataE[self._row_being_fit, ~zerosMask]
 
         if np.all(self._dataE[self._row_being_fit] == 0):  # When errors not present
-            return np.sum((ncpTotal - dataY) ** 2)
+            return np.sum((ncp_total - data_y) ** 2)
 
-        return np.sum((ncpTotal - dataY) ** 2 / dataE**2)
+        return np.sum((ncp_total - data_y) ** 2 / data_e**2)
 
 
     def _neutron_compton_profiles(self, pars):
@@ -653,7 +667,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             / deltaQ
             * 0.72
         )
-        return intensities * (JOfY + FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
+        NCP = intensities * (JOfY + FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
+        return NCP, FSE
 
 
     def caculateResolutionForEachMass(self, centers):
