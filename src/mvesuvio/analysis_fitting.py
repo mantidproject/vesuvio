@@ -8,6 +8,7 @@ from iminuit import Minuit, cost
 from iminuit.util import make_func_code, describe
 import jacobi
 import time
+import re
 
 from mvesuvio.util import handle_config
 
@@ -26,6 +27,10 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
 
     wsTOFMass0 = subtractAllMassesExceptFirst(IC, wsTOF, ncpForEachMass)
+
+    if yFitIC.subtractFSE:
+        wsFSEMass0 = find_ws_name_fse_first_mass(IC)
+        wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
 
     wsJoY, wsJoYAvg = ySpaceReduction(
         wsTOFMass0, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :]
@@ -46,6 +51,22 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
         runGlobalFit(wsJoY, wsRes, IC, yFitIC)
 
     return yfitResults
+
+
+def find_ws_name_fse_first_mass(ic):
+    # Some dirty implementation to be deleted in the future
+    ws_names_fse = []
+    ws_masses = []
+    prefix = ic.name+'_'+str(ic.noOfMSIterations)
+    for ws_name in mtd.getObjectNames():
+        if ws_name.startswith(prefix) and ws_name.endswith('fse'):
+            name_ending = ws_name.replace(prefix, "")
+            match = re.search(r'\d+\.?\d*', name_ending)
+            if match:   # If float found in ws name ending
+                ws_masses.append(float(match.group()))
+                ws_names_fse.append(ws_name)
+
+    return ws_names_fse[np.argmin(ws_masses)]
 
 
 def extractNCPFromWorkspaces(wsFinal, ic):

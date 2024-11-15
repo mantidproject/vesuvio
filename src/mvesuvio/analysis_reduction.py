@@ -245,8 +245,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             DataY=np.zeros(self._dataY.size),
             DataE=np.zeros(self._dataE.size),
             Nspec=self._workspace_being_fit.getNumberHistograms(),
+            UnitX="TOF",    # I had hoped for a method like .XUnit() but alas
             OutputWorkspace=self._workspace_being_fit.name()+suffix,
-            ParentWorkspace=self._workspace_being_fit
+            ParentWorkspace=self._workspace_being_fit,
+            Distribution=True
     )
 
 
@@ -667,8 +669,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             / deltaQ
             * 0.72
         )
-        NCP = intensities * (JOfY + FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
-        return NCP, FSE
+        scaling_factor = intensities * E0 * E0 ** (-0.92) * masses / deltaQ
+        JoY *= scaling_factor
+        FSE *= scaling_factor
+        return JoY+FSE, FSE
 
 
     def caculateResolutionForEachMass(self, centers):
