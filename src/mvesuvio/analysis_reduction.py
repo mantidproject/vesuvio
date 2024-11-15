@@ -670,9 +670,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             * 0.72
         )
         scaling_factor = intensities * E0 * E0 ** (-0.92) * masses / deltaQ
-        JoY *= scaling_factor
+        JOfY *= scaling_factor
         FSE *= scaling_factor
-        return JoY+FSE, FSE
+        return JOfY+FSE, FSE
 
 
     def caculateResolutionForEachMass(self, centers):
