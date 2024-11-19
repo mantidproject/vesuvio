@@ -257,13 +257,9 @@ def numericalThirdDerivative(x, y):
     k2 = (+ y[:, 8:-4] - y[:, 4:-8]) * 387
     k1 = (- y[:, 7:-5] + y[:, 5:-7]) * 1584
 
-    dev = k1 + k2 + k3 + k4 + k5 + k6
-    dev /= np.power(x[:, 7:-5] - x[:, 6:-6], 3)
-    dev /= 12**3
-
-    derivative = np.zeros_like(y)
-    # Padded with zeros left and right to return array with same shape
-    derivative[:, 6:-6] = dev
+    derivative = k1 + k2 + k3 + k4 + k5 + k6
+    derivative /= np.power(x[:, 7:-5] - x[:, 6:-6], 3)
+    derivative /= 12**3
     return derivative
 
 

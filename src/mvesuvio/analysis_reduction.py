@@ -661,10 +661,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         gaussRes, lorzRes = self.caculateResolutionForEachMass(centers)
         totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
 
-        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
+        # Extend range because third derivative trims it
+        y_space_arrays_extended = self._extend_range_of_array(self._y_space_arrays[self._row_being_fit], 6)
+
+        JOfY = scipy.special.voigt_profile(y_space_arrays_extended - centers, totalGaussWidth, lorzRes)
 
         FSE = (
-            -numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
+            -numericalThirdDerivative(y_space_arrays_extended, JOfY)
             * widths**4
             / deltaQ
             * 0.72
@@ -673,6 +676,12 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         JOfY *= scaling_factor
         FSE *= scaling_factor
         return JOfY+FSE, FSE
+
+
+    def _extend_range_of_array(self, arr, n_columns):
+        left_extend = arr[:, :n_columns] + (arr[:, 0] - arr[:, n_columns]).reshape(-1, 1)
+        right_extend = arr[:, -n_columns:] + (arr[:, -1] - arr[:, -n_columns-1]).reshape(-1, 1)
+        return np.concatenate([left_extend, arr, right_extend], axis=-1)
 
 
     def caculateResolutionForEachMass(self, centers):
