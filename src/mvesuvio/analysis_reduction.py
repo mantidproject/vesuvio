@@ -12,7 +12,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace, CreateSampleWorkspace
 
-from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative, extend_range_of_array
+from mvesuvio.util.analysis_helpers import loadConstants, numerical_third_derivativ, extend_range_of_array
 
 
 
@@ -667,7 +667,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         JOfY = scipy.special.voigt_profile(y_space_arrays_extended - centers, totalGaussWidth, lorzRes)
 
         FSE = (
-            -numericalThirdDerivative(y_space_arrays_extended, JOfY)
+            -numerical_third_derivative(y_space_arrays_extended, JOfY)
             * widths**4
             / deltaQ
             * 0.72

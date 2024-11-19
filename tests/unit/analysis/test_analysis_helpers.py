@@ -1,11 +1,13 @@
 import unittest
 import numpy as np
+import scipy
 import dill
 import numpy.testing as nptest
 from mock import MagicMock
 from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, numericalThirdDerivative, extend_range_of_array
+    fix_profile_parameters, calculate_h_ratio, numerical_third_derivative, extend_range_of_array
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+import matplotlib.pyplot as plt
 
 
 class TestAnalysisHelpers(unittest.TestCase):
@@ -138,6 +140,16 @@ class TestAnalysisHelpers(unittest.TestCase):
         x = np.vstack([x, 2*x])
         x_extended = extend_range_of_array(x, 5)
         np.testing.assert_array_equal(x_extended, np.vstack([np.linspace(-7.5, 7.5, 31), np.linspace(-15, 15, 31)]))
+
+
+    def test_numerical_third_derivative(self):
+        x= np.linspace(-20, 20, 300)    # Workspaces are about 300 points of range
+        x = np.vstack([x, 2*x])
+        y = scipy.special.voigt_profile(x, 5, 5)
+        numerical_derivative = numerical_third_derivative(x, y)
+        expected_derivative = np.array([np.gradient(np.gradient(np.gradient(y_i, x_i), x_i), x_i)[6: -6] for y_i, x_i in zip(y, x) ])
+        np.testing.assert_allclose(numerical_derivative, expected_derivative, atol=1e-6)
+
 
 if __name__ == "__main__":
     unittest.main()

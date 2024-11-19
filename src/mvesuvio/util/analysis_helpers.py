@@ -255,7 +255,7 @@ def extend_range_of_array(arr, n_columns):
     return np.concatenate([left_extend, arr, right_extend], axis=-1)
 
 
-def numericalThirdDerivative(x, y):
+def numerical_third_derivative(x, y):
     k6 = (- y[:, 12:] + y[:, :-12]) * 1
     k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
     k4 = (- y[:, 10:-2] + y[:, 2:-10]) * 192
