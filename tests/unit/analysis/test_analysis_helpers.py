@@ -4,7 +4,7 @@ import dill
 import numpy.testing as nptest
 from mock import MagicMock
 from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio
+    fix_profile_parameters, calculate_h_ratio, numericalThirdDerivative, extend_range_of_array
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 
 
@@ -125,6 +125,19 @@ class TestAnalysisHelpers(unittest.TestCase):
         self.assertEqual(converted_constraints[0]['fun']([3, 0, 0, 1]), 3-2.7527)
         self.assertEqual(converted_constraints[1]['fun']([0, 0, 0, 2, 0, 0, 1]), 2-0.7234)
 
+
+    def test_extend_range_of_array_for_increasing_range(self):
+        x = np.arange(10)
+        x = np.vstack([x, 2*x])
+        x_extended = extend_range_of_array(x, 5)
+        np.testing.assert_array_equal(x_extended, np.vstack([np.arange(-5, 15, 1), np.arange(-10, 30, 2)]))
+
+
+    def test_extend_range_of_array_for_decreasing_range(self):
+        x = np.linspace(-5, 5, 21)
+        x = np.vstack([x, 2*x])
+        x_extended = extend_range_of_array(x, 5)
+        np.testing.assert_array_equal(x_extended, np.vstack([np.linspace(-7.5, 7.5, 31), np.linspace(-15, 15, 31)]))
 
 if __name__ == "__main__":
     unittest.main()

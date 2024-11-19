@@ -249,6 +249,12 @@ def loadConstants():
     return constants
 
 
+def extend_range_of_array(arr, n_columns):
+    left_extend = arr[:, :n_columns] + (arr[:, 0] - arr[:, n_columns]).reshape(-1, 1)
+    right_extend = arr[:, -n_columns:] + (arr[:, -1] - arr[:, -n_columns-1]).reshape(-1, 1)
+    return np.concatenate([left_extend, arr, right_extend], axis=-1)
+
+
 def numericalThirdDerivative(x, y):
     k6 = (- y[:, 12:] + y[:, :-12]) * 1
     k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
