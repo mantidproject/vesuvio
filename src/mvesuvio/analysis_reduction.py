@@ -12,11 +12,15 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace, CreateSampleWorkspace
 
-from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
-
-
+from mvesuvio.util.analysis_helpers import numericalThirdDerivative, load_resolution, load_instrument_params
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
+
+NEUTRON_MASS = 1.008  # a.m.u.
+ENERGY_FINAL = 4906.0  # meV
+ENERGY_TO_VELOCITY = 4.3737 * 1.0e-4
+VELOCITY_FINAL = np.sqrt(ENERGY_FINAL) * ENERGY_TO_VELOCITY  # m/us
+H_BAR = 2.0445
 
 
 class VesuvioAnalysisRoutine(PythonAlgorithm):
@@ -160,8 +164,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._save_figures_path = self.getProperty("FiguresPath").value 
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
-
         self._profiles_table = self.getProperty("InputProfiles").value
+
+        self._instrument_params = load_instrument_params(self._ip_file, self.getProperty("InputWorkspace").value.getSpectrumNumbers())
+        self._resolution_params = load_resolution(self._instrument_params)
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
@@ -192,14 +198,16 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._fit_profiles_workspaces = {}
 
 
-
     def _update_workspace_data(self):
 
         self._dataX = self._workspace_being_fit.extractX()
         self._dataY = self._workspace_being_fit.extractY()
         self._dataE = self._workspace_being_fit.extractE()
 
-        self._set_up_kinematic_arrays()
+        v0, E0, delta_E, delta_Q = self._calculate_kinematics(self._dataX)
+
+        self._kinematic_arrays = np.swapaxes([v0, E0, delta_E, delta_Q], 0, 1)
+        self._y_space_arrays = self._calculate_y_spaces(self._dataX, delta_Q, delta_E)
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
         self._row_being_fit = 0 
@@ -250,14 +258,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             ParentWorkspace=self._workspace_being_fit,
             Distribution=True
     )
-
-
-    def _set_up_kinematic_arrays(self):
-        resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = self.prepareFitArgs()
-        self._resolution_params = resolutionPars
-        self._instrument_params = instrPars
-        self._kinematic_arrays = kinematicArrays
-        self._y_space_arrays = ySpacesForEachMass
 
 
     def run(self):
@@ -329,94 +329,38 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def prepareFitArgs(self):
-        instrPars = self.loadInstrParsFileIntoArray()
-        resolutionPars = self.loadResolutionPars(instrPars)
+    def _calculate_kinematics(self, dataX):
+        det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)  # each is of len(dataX)
 
-        v0, E0, delta_E, delta_Q = self.calculateKinematicsArrays(instrPars)
-        kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
-        ySpacesForEachMass = self.convertDataXToYSpacesForEachMass(
-            self._dataX, delta_Q, delta_E
-        )
-        kinematicArrays = np.swapaxes(kinematicArrays, 0, 1)
-        ySpacesForEachMass = np.swapaxes(ySpacesForEachMass, 0, 1)
-        return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
-
-
-    def loadInstrParsFileIntoArray(self):
-        """Loads instrument parameters into array, from the file in the specified path"""
-
-        data = np.loadtxt(self._ip_file, dtype=str)[1:].astype(float)
-        spectra = data[:, 0]
-
-        workspace_spectrum_list = self._workspace_being_fit.getSpectrumNumbers()
-        first_spec = min(workspace_spectrum_list)
-        last_spec = max(workspace_spectrum_list)
-
-        select_rows = np.where((spectra >= first_spec) & (spectra <= last_spec))
-        instrPars = data[select_rows]
-        return instrPars
-
-
-    @staticmethod
-    def loadResolutionPars(instrPars):
-        """Resolution of parameters to propagate into TOF resolution
-        Output: matrix with each parameter in each column"""
-        spectrums = instrPars[:, 0]
-        L = len(spectrums)
-        # For spec no below 135, back scattering detectors, mode is double difference
-        # For spec no 135 or above, front scattering detectors, mode is single difference
-        dE1 = np.where(spectrums < 135, 88.7, 73)  # meV, STD
-        dE1_lorz = np.where(spectrums < 135, 40.3, 24)  # meV, HFHM
-        dTOF = np.repeat(0.37, L)  # us
-        dTheta = np.repeat(0.016, L)  # rad
-        dL0 = np.repeat(0.021, L)  # meters
-        dL1 = np.repeat(0.023, L)  # meters
-
-        resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()
-        return resolutionPars
-
-
-    def calculateKinematicsArrays(self, instrPars):
-        """Kinematics quantities calculated from TOF data"""
-
-        dataX = self._dataX
-
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
-        det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)  # each is of len(dataX)
-        t_us = dataX - T0  # T0 is electronic delay due to instruments
-        v0 = vf * L0 / (vf * t_us - L1)
-        E0 = np.square(
-            v0 / en_to_vel
-        )  # en_to_vel is a factor used to easily change velocity to energy and vice-versa
-
-        delta_E = E0 - Ef
+        # T0 is electronic delay due to instruments
+        t_us = dataX - T0  
+        v0 = VELOCITY_FINAL * L0 / (VELOCITY_FINAL * t_us - L1)
+        # en_to_vel is a factor used to easily change velocity to energy and vice-versa
+        E0 = np.square(v0 / ENERGY_TO_VELOCITY)  
+        delta_E = E0 - ENERGY_FINAL
         delta_Q2 = (
             2.0
-            * mN
-            / hbar**2
-            * (E0 + Ef - 2.0 * np.sqrt(E0 * Ef) * np.cos(angle / 180.0 * np.pi))
+            * NEUTRON_MASS 
+            / H_BAR**2
+            * (E0 + ENERGY_FINAL - 2.0 * np.sqrt(E0 * ENERGY_FINAL) * np.cos(angle / 180.0 * np.pi))
         )
         delta_Q = np.sqrt(delta_Q2)
         return v0, E0, delta_E, delta_Q  # shape(no of spectrums, no of bins)
 
 
-    def convertDataXToYSpacesForEachMass(self, dataX, delta_Q, delta_E):
-        """"Calculates y spaces from TOF data, each row corresponds to one mass"""
+    def _calculate_y_spaces(self, dataX, delta_Q, delta_E):
 
         # Prepare arrays to broadcast
         dataX = dataX[np.newaxis, :, :]
         delta_Q = delta_Q[np.newaxis, :, :]
         delta_E = delta_E[np.newaxis, :, :]
-
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
         masses = self._masses.reshape(-1, 1, 1)
 
-        energyRecoil = np.square(hbar * delta_Q) / 2.0 / masses
-        ySpacesForEachMass = (
-            masses / hbar**2 / delta_Q * (delta_E - energyRecoil)
-        )  # y-scaling
-        return ySpacesForEachMass
+        energy_recoil = np.square(H_BAR * delta_Q) / 2.0 / masses
+        y_spaces = masses / H_BAR**2 / delta_Q * (delta_E - energy_recoil)
+
+        # First axis selects spectra
+        return np.swapaxes(y_spaces, 0, 1) 
 
 
     def _save_plots(self):
@@ -712,13 +656,12 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
 
         angle = angle * np.pi / 180
 
-        dWdE1 = 1.0 + (E0 / Ef) ** 1.5 * (L1 / L0)
+        dWdE1 = 1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)
         dWdTOF = 2.0 * E0 * v0 / L0
-        dWdL1 = 2.0 * E0**1.5 / Ef**0.5 / L0
+        dWdL1 = 2.0 * E0**1.5 / ENERGY_FINAL**0.5 / L0
         dWdL0 = 2.0 * E0 / L0
 
         dW2 = (
@@ -728,25 +671,25 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             + dWdL0**2 * dL0**2
         )
         # conversion from meV^2 to A^-2, dydW = (M/q)^2
-        dW2 *= (masses / hbar**2 / delta_Q) ** 2
+        dW2 *= (masses / H_BAR**2 / delta_Q) ** 2
 
         dQdE1 = (
             1.0
-            - (E0 / Ef) ** 1.5 * L1 / L0
-            - np.cos(angle) * ((E0 / Ef) ** 0.5 - L1 / L0 * E0 / Ef)
+            - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0
+            - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 - L1 / L0 * E0 / ENERGY_FINAL)
         )
         dQdTOF = 2.0 * E0 * v0 / L0
-        dQdL1 = 2.0 * E0**1.5 / L0 / Ef**0.5
+        dQdL1 = 2.0 * E0**1.5 / L0 / ENERGY_FINAL**0.5
         dQdL0 = 2.0 * E0 / L0
-        dQdTheta = 2.0 * np.sqrt(E0 * Ef) * np.sin(angle)
+        dQdTheta = 2.0 * np.sqrt(E0 * ENERGY_FINAL) * np.sin(angle)
 
         dQ2 = (
             dQdE1**2 * dE1**2
             + (dQdTOF**2 * dTOF**2 + dQdL1**2 * dL1**2 + dQdL0**2 * dL0**2)
-            * np.abs(Ef / E0 * np.cos(angle) - 1)
+            * np.abs(ENERGY_FINAL / E0 * np.cos(angle) - 1)
             + dQdTheta**2 * dTheta**2
         )
-        dQ2 *= (mN / hbar**2 / delta_Q) ** 2
+        dQ2 *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
 
         # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
         gaussianResWidth = np.sqrt(dW2 + dQ2)
@@ -758,20 +701,19 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
         dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
 
         angle = angle * np.pi / 180
 
-        dWdE1_lor = (1.0 + (E0 / Ef) ** 1.5 * (L1 / L0)) ** 2
+        dWdE1_lor = (1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)) ** 2
         # conversion from meV^2 to A^-2
-        dWdE1_lor *= (masses / hbar**2 / delta_Q) ** 2
+        dWdE1_lor *= (masses / H_BAR**2 / delta_Q) ** 2
 
         dQdE1_lor = (
             1.0
-            - (E0 / Ef) ** 1.5 * L1 / L0
-            - np.cos(angle) * ((E0 / Ef) ** 0.5 + L1 / L0 * E0 / Ef)
+            - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0
+            - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 + L1 / L0 * E0 / ENERGY_FINAL)
         ) ** 2
-        dQdE1_lor *= (mN / hbar**2 / delta_Q) ** 2
+        dQdE1_lor *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
 
         lorentzianResWidth = np.sqrt(dWdE1_lor + dQdE1_lor) * dE1_lorz  # in A-1
         return lorentzianResWidth

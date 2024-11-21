@@ -237,18 +237,6 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
-def loadConstants():
-    """Output: the mass of the neutron, final energy of neutrons (selected by gold foil),
-    factor to change energies into velocities, final velocity of neutron and hbar"""
-    mN = 1.008  # a.m.u.
-    Ef = 4906.0  # meV
-    en_to_vel = 4.3737 * 1.0e-4
-    vf = np.sqrt(Ef) * en_to_vel  # m/us
-    hbar = 2.0445
-    constants = (mN, Ef, en_to_vel, vf, hbar)
-    return constants
-
-
 def numericalThirdDerivative(x, y):
     k6 = (- y[:, 12:] + y[:, :-12]) * 1
     k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
@@ -265,6 +253,35 @@ def numericalThirdDerivative(x, y):
     # Padded with zeros left and right to return array with same shape
     derivative[:, 6:-6] = dev
     return derivative
+
+
+def load_resolution(instrument_params):
+    """Resolution of parameters to propagate into TOF resolution
+    Output: matrix with each parameter in each column"""
+    spectra = instrument_params[:, 0]
+    L = len(spectra)
+    # For spec no below 135, back scattering detectors, mode is double difference
+    # For spec no 135 or above, front scattering detectors, mode is single difference
+    dE1 = np.where(spectra < 135, 88.7, 73)  # meV, STD
+    dE1_lorz = np.where(spectra < 135, 40.3, 24)  # meV, HFHM
+    dTOF = np.repeat(0.37, L)  # us
+    dTheta = np.repeat(0.016, L)  # rad
+    dL0 = np.repeat(0.021, L)  # meters
+    dL1 = np.repeat(0.023, L)  # meters
+
+    resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()
+    return resolutionPars
+
+
+def load_instrument_params(ip_file, spectrum_list):
+
+    first_spec = min(spectrum_list)
+    last_spec = max(spectrum_list)
+    data = np.loadtxt(ip_file, dtype=str)[1:].astype(float)
+    spectra = data[:, 0]
+
+    select_rows = np.where((spectra >= first_spec) & (spectra <= last_spec))
+    return data[select_rows]
 
 
 def createWS(dataX, dataY, dataE, wsName, parentWorkspace=None):
