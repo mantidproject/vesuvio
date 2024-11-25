@@ -6,6 +6,8 @@ from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 from mvesuvio.util.analysis_helpers import load_resolution
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 import inspect
+import scipy
+import re
 
 
 np.set_printoptions(suppress=True, precision=6, linewidth=200)
@@ -86,7 +88,6 @@ class TestAnalysisReduction(unittest.TestCase):
         
 
     def test_fit_neutron_compton_profiles_to_row(self):
-        # Test 3 spectra, one nornal, one with masked Tof and another fully masked
         alg = VesuvioAnalysisRoutine()
         alg._workspace_being_fit = MagicMock()
         alg._workspace_being_fit.name.return_value = "test_workspace"
@@ -104,9 +105,9 @@ class TestAnalysisReduction(unittest.TestCase):
             [[0.0015, 0.0014, 0.0014, 0.0014, 0.0014, 0.0014, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0014, 0.0014, 0.0014, 0.0014, 0.0014, 0.0014, 0.0014, 0.0013, 0.0013, 0.0013, 0.0013, 0.0012, 0.0012, 0.0012, 0.0012, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0009, 0.0009, 0.0016], 
              [0.0014, 0.0014, 0.0014, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0012, 0.0012, 0.0012, 0.0012, 0.0012, 0.0012, 0.0012, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0013, 0.0012, 0.0012, 0.0012, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.0011, 0.001, 0.001, 0.001, 0.001, 0.001, 0.0011, 0.0011, 0.0011, 0.001, 0.001, 0.001, 0.001, 0.0009, 0.0009, 0.0009, 0.0009, 0.0009, 0.0016]]
         )
-        alg._instrument_params = np.array(
-            [[3, 3, 131.12, -0.2, 11.005, 0.6039],
-            [4, 4, 132.77, -0.2, 11.005, 0.5789],
+        alg._instrument_params = np.array([
+            [144, 144, 54.1686, -0.41, 11.005, 0.720184],
+            [145, 145, 52.3407, -0.53, 11.005, 0.717311]
             ])
         alg._resolution_params = load_resolution(alg._instrument_params)
         alg._masses = np.array([1, 12, 16, 27])
@@ -149,23 +150,76 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._fit_neutron_compton_profiles_to_row()
         alg._row_being_fit = 2
         alg._fit_neutron_compton_profiles_to_row()
-
         # Compare results
-        expected_total_ncp_fits = np.array(
-            [[0.003246, 0.003334, 0.003416, 0.003492, 0.003562, 0.003628, 0.003633, 0.003679, 0.003721, 0.00376, 0.003796, 0.003829, 0.00386, 0.003888, 0.003914, 0.003937, 0.003959, 0.003978, 0.003996, 0.004012, 0.004026, 0.004038, 0.004049, 0.004059, 0.004067, 0.004074, 0.004079, 0.004083, 0.004086, 0.004088, 0.004088, 0.004087, 0.004085, 0.004082, 0.004078, 0.004073, 0.004067, 0.00406, 0.004052, 0.004043, 0.004033, 0.004022, 0.00401, 0.003996, 0.003982, 0.003967, 0.003951, 0.00384, 0.004628, 0.004635, 0.004642, 0.004649, 0.004655, 0.004659],
-             [0.003383, 0.003481, 0.003572, 0.003657, 0.003737, 0.003811, 0.003866, 0.003927, 0.003984, 0.004038, 0.004088, 0.004136, 0.00418, 0.004222, 0.004261, 0.004298, 0.004333, 0.004366, 0.004397, 0.004426, 0.004453, 0.004479, 0.004503, 0.004526, 0.004547, 0.004567, 0.004586, 0.004603, 0.00462, 0.004635, 0.004649, 0.004663, 0.004675, 0.004686, 0.004697, 0.004707, 0.004715, 0.004723, 0.004731, 0.004737, 0.004743, 0.004748, 0.004752, 0.004756, 0.004759, 0.004761, 0.004763, 0.004727, 0.005024, 0.005033, 0.005043, 0.005052, 0.00506, 0.005066],
-             [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., ]]
-        ) 
+        expected_total_ncp_fits = np.array([
+            [0.00004, 0.000059, 0.000089, 0.000138, 0.000215, 0.000335, 0.000647, 0.000943, 0.001347, 0.001888, 0.002593, 0.003486, 0.004589, 0.005913, 0.007453, 0.009182, 0.011037, 0.01292, 0.014694, 0.016196, 0.017254, 0.017722, 0.017509, 0.016606, 0.01509, 0.013115, 0.010885, 0.00861, 0.006475, 0.004615, 0.003101, 0.001949, 0.001128, 0.000583, 0.000251, 0.000068, -0.000016, -0.000041, -0.000005, 0.000119, 0.000355, 0.00105, 0.002667, 0.006238, 0.008899, 0.004131, 0.000602, -0.000026, 0.000111, 0.000078, 0.000061, 0.00005, 0.000043, 0.00004],
+            [0.000021, 0.000029, 0.000042, 0.000062, 0.000095, 0.000148, 0.000324, 0.000486, 0.00072, 0.001046, 0.001492, 0.002084, 0.002851, 0.003818, 0.005006, 0.006424, 0.008066, 0.009895, 0.011838, 0.013776, 0.015551, 0.016978, 0.017872, 0.018092, 0.017566, 0.016325, 0.014492, 0.012265, 0.009878, 0.007552, 0.005464, 0.003723, 0.002369, 0.001389, 0.00073, 0.000322, 0.000095, -0.000012, -0.000016, 0.000117, 0.000383, 0.001178, 0.003156, 0.006523, 0.009388, 0.00489, 0.00077, -0.000037, 0.000125, 0.000087, 0.000067, 0.000055, 0.000047, 0.000043], 
+            [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        ]) 
         np.testing.assert_allclose(ncp_total_array, expected_total_ncp_fits, atol=1e-6)
 
-        expected_fit_parameters = np.array(
-            [[3., 5568.767144, 6., -3., 0., 12.71, 0.999934, 0., 8.76, -3., 0., 13.897, -2.999712, 26.483439, 16.], 
-             [4., 6551.082529, 4.511378, -2.999998, 0., 12.71, 0.85686, 0., 8.76, -2.782142, 0., 13.897, -2.683993, 28.399091, 18.], 
-             [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]]
-        )
+        expected_fit_parameters = np.array([
+            [144., 7.095403, 5.051053, 0.015996, 0.218192, 12.71, 1., 0., 8.76, -1.091821, 0.29291, 13.897, 0.639245, 0.848425, 21.], 
+            [145., 6.825532, 5.073835, -0.087401, 0.29456, 12.71, 1., 0., 8.76, -0.14256, 0.26776, 13.897, -2.563441, 1.246451, 20.],
+            [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
+        ])
         np.testing.assert_allclose(alg._fit_parameters, expected_fit_parameters, atol=1e-6)
 
 
+    def test_fit_neutron_compton_profiles_to_row_with_masked_tof(self):
+        alg = VesuvioAnalysisRoutine()
+        alg._workspace_being_fit = MagicMock()
+        alg._workspace_being_fit.name.return_value = "test_workspace"
+        alg._workspace_being_fit.getNumberHistograms.return_value = 1
+        dataX = np.arange(113, 430).reshape(1, -1)
+        dataE = np.full_like(dataX, 0.0015)
+        dataY = scipy.special.voigt_profile(dataX - 235, 30, 0) + 0.005*(np.random.random_sample(dataX.shape)-0.5)
+
+        # Mask TOF range
+        cut_off_idx = 100
+        dataY[:, :cut_off_idx] = 0
+
+        alg._workspace_being_fit.extractY.return_value = dataY
+        alg._workspace_being_fit.extractX.return_value = dataX
+        alg._workspace_being_fit.extractE.return_value = dataE
+        alg._instrument_params = np.array([[144, 144, 54.1686, -0.41, 11.005, 0.720184]])
+        alg._resolution_params = load_resolution(alg._instrument_params)
+        alg._masses = np.array([1])
+        alg._initial_fit_parameters = np.array([1, 5.2, 0])
+        alg._initial_fit_bounds = np.array([[0, None], [3, 6], [None, None]])
+        alg._constraints = ()
+
+        # Set up several fit arguments
+        alg._profiles_table = MagicMock()
+        alg._profiles_table.column.return_value = ['1'] 
+        alg._profiles_table.rowCount.return_value = 1 
+        alg._create_emtpy_ncp_workspace = MagicMock()
+        alg._update_workspace_data()
+
+        # Create mock for storing ncp total result
+        ncp_array_masked = np.zeros_like(dataY)
+        alg._fit_profiles_workspaces = {"total": MagicMock(dataY=lambda arg: ncp_array_masked), "1": MagicMock()}
+
+        # Fit ncp
+        alg._row_being_fit = 0
+        alg._fit_neutron_compton_profiles_to_row()
+        fit_parameters_masked = alg._fit_parameters.copy()
+
+        # Now cut range so that zeros are not part of dataY
+        # (Still need to leave a padding with 6 zeros due to numerical derivative in ncp)
+        alg._workspace_being_fit.extractY.return_value = dataY[:, cut_off_idx - 6:].reshape(1, -1)
+        alg._workspace_being_fit.extractX.return_value = dataX[:, cut_off_idx - 6:].reshape(1, -1)
+        alg._workspace_being_fit.extractE.return_value = dataE[:, cut_off_idx - 6:].reshape(1, -1)
+        alg._update_workspace_data()
+
+        ncp_array_cut = ncp_array_masked[:, cut_off_idx - 6:].reshape(1, -1)
+        alg._fit_profiles_workspaces = {"total": MagicMock(dataY=lambda arg: ncp_array_cut), "1": MagicMock()}
+
+        alg._fit_neutron_compton_profiles_to_row()
+        fit_parameters_cut = alg._fit_parameters.copy()
+
+        np.testing.assert_allclose(fit_parameters_cut, fit_parameters_masked, atol=1e-6)
+        np.testing.assert_allclose(ncp_array_masked[:, cut_off_idx-6:], ncp_array_cut, atol=1e-6)
 
 
 if __name__ == "__main__":
