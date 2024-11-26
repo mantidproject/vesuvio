@@ -204,10 +204,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._dataY = self._workspace_being_fit.extractY()
         self._dataE = self._workspace_being_fit.extractE()
 
-        v0, E0, delta_E, delta_Q = self._calculate_kinematics(self._dataX)
-
-        self._kinematic_arrays = np.swapaxes([v0, E0, delta_E, delta_Q], 0, 1)
-        self._y_space_arrays = self._calculate_y_spaces(self._dataX, delta_Q, delta_E)
+        self._set_kinematic_arrays(self._dataX)
+        # Calculate y space after kinematics
+        self._y_space_arrays = self._calculate_y_spaces(self._dataX)
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
         self._row_being_fit = 0 
@@ -329,31 +328,31 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _calculate_kinematics(self, dataX):
+    def _set_kinematic_arrays(self, dataX):
         det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)  # each is of len(dataX)
 
         # T0 is electronic delay due to instruments
         t_us = dataX - T0  
-        v0 = VELOCITY_FINAL * L0 / (VELOCITY_FINAL * t_us - L1)
+        self._v0 = VELOCITY_FINAL * L0 / (VELOCITY_FINAL * t_us - L1)
         # en_to_vel is a factor used to easily change velocity to energy and vice-versa
-        E0 = np.square(v0 / ENERGY_TO_VELOCITY)  
-        delta_E = E0 - ENERGY_FINAL
+        self._E0 = np.square(self._v0 / ENERGY_TO_VELOCITY)  
+        self._deltaE = self._E0 - ENERGY_FINAL
         delta_Q2 = (
             2.0
             * NEUTRON_MASS 
             / H_BAR**2
-            * (E0 + ENERGY_FINAL - 2.0 * np.sqrt(E0 * ENERGY_FINAL) * np.cos(angle / 180.0 * np.pi))
+            * (self._E0 + ENERGY_FINAL - 2.0 * np.sqrt(self._E0 * ENERGY_FINAL) * np.cos(angle / 180.0 * np.pi))
         )
-        delta_Q = np.sqrt(delta_Q2)
-        return v0, E0, delta_E, delta_Q  # shape(no of spectrums, no of bins)
+        self._deltaQ = np.sqrt(delta_Q2)
+        return
 
 
-    def _calculate_y_spaces(self, dataX, delta_Q, delta_E):
+    def _calculate_y_spaces(self, dataX):
 
         # Prepare arrays to broadcast
         dataX = dataX[np.newaxis, :, :]
-        delta_Q = delta_Q[np.newaxis, :, :]
-        delta_E = delta_E[np.newaxis, :, :]
+        delta_Q = self._deltaQ[np.newaxis, :, :]
+        delta_E = self._deltaE[np.newaxis, :, :]
         masses = self._masses.reshape(-1, 1, 1)
 
         energy_recoil = np.square(H_BAR * delta_Q) / 2.0 / masses
@@ -600,7 +599,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         centers = pars[2::3].reshape(-1, 1)
         masses = self._masses.reshape(-1, 1)
 
-        v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
+        # v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
+        E0 = self._E0[self._row_being_fit]
+        deltaQ = self._deltaQ[self._row_being_fit]
+
 
         gaussRes, lorzRes = self.caculateResolutionForEachMass(centers)
         totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
@@ -613,10 +615,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             / deltaQ
             * 0.72
         )
-        scaling_factor = intensities * E0 * E0 ** (-0.92) * masses / deltaQ
-        JOfY *= scaling_factor
-        FSE *= scaling_factor
-        return JOfY+FSE, FSE
+        NCP = intensities * (JOfY+FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
+        FSE = intensities * FSE * E0 * E0 ** (-0.92) * masses / deltaQ
+        return NCP, FSE
 
 
     def caculateResolutionForEachMass(self, centers):
@@ -633,10 +634,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         shapeOfArrays = centers.shape
         proximityToYCenters = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
-        yClosestToCenters = proximityToYCenters.min(axis=1).reshape(shapeOfArrays)
+        yClosestToCenters = proximityToYCenters.min(axis=1).reshape(-1, 1)
         yCentersMask = proximityToYCenters == yClosestToCenters
 
-        v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
+        v0 = self._v0[self._row_being_fit]
+        E0 = self._E0[self._row_being_fit]
+        deltaE = self._deltaE[self._row_being_fit]
+        deltaQ = self._deltaQ[self._row_being_fit]
 
         # Expand arrays to match shape of yCentersMask
         v0 = v0 * np.ones(shapeOfArrays)

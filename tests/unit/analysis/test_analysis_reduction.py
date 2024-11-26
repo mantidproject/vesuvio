@@ -28,20 +28,20 @@ class TestAnalysisReduction(unittest.TestCase):
             [110.5, 111.5, 112.5, 113.5, 114.5],
             [110.5, 111.5, 112.5, 113.5, 114.5],
         ])
-        v0, E0, delta_E, delta_Q = alg._calculate_kinematics(dataX)
-        np.testing.assert_allclose(v0, np.array([[0.12095, 0.11964, 0.11835, 0.11709, 0.11586],
+        alg._set_kinematic_arrays(dataX)
+        np.testing.assert_allclose(alg._v0, np.array([[0.12095, 0.11964, 0.11835, 0.11709, 0.11586],
                                        [0.11988, 0.11858, 0.11732, 0.11608, 0.11487],
                                        [0.11948, 0.1182 , 0.11694, 0.11571, 0.11451],
                                        ]), atol=1e-4)
-        np.testing.assert_allclose(E0, np.array([[76475.65823, 74821.94729, 73221.30191, 71671.47572, 70170.33998],
+        np.testing.assert_allclose(alg._E0, np.array([[76475.65823, 74821.94729, 73221.30191, 71671.47572, 70170.33998],
                                        [75122.06378, 73511.83023, 71952.81999, 70442.88326, 68979.98182],
                                        [74627.68443, 73033.23536, 71489.34475, 69993.89741, 68544.88764],
                                        ]), atol=1e-4)
-        np.testing.assert_allclose(delta_E, np.array([[71569.65823, 69915.94729, 68315.30191, 66765.47572, 65264.33998],
+        np.testing.assert_allclose(alg._deltaE, np.array([[71569.65823, 69915.94729, 68315.30191, 66765.47572, 65264.33998],
                                        [70216.06378, 68605.83023, 67046.81999, 65536.88326, 64073.98182],
                                        [69721.68443, 68127.23536, 66583.34475, 65087.89741, 63638.88764],
                                        ]), atol=1e-4)
-        np.testing.assert_allclose(delta_Q, np.array([[227.01905, 224.95887, 222.94348, 220.97148, 219.04148],
+        np.testing.assert_allclose(alg._deltaQ, np.array([[227.01905, 224.95887, 222.94348, 220.97148, 219.04148],
                                        [226.21278, 224.18766, 222.20618, 220.26696, 218.36867],
                                        [226.07138, 224.05877, 222.08939, 220.16185, 218.27485],
                                        ]), atol=1e-4)
@@ -54,15 +54,15 @@ class TestAnalysisReduction(unittest.TestCase):
             [110.5, 111.5, 112.5, 113.5, 114.5],
             [110.5, 111.5, 112.5, 113.5, 114.5],
         ])
-        delta_Q = np.array([[227.01905, 224.95887, 222.94348, 220.97148, 219.04148],
+        alg._deltaQ = np.array([[227.01905, 224.95887, 222.94348, 220.97148, 219.04148],
            [226.21278, 224.18766, 222.20618, 220.26696, 218.36867],
            [226.07138, 224.05877, 222.08939, 220.16185, 218.27485],
         ])
-        delta_E = np.array([[71569.65823, 69915.94729, 68315.30191, 66765.47572, 65264.33998],
+        alg._deltaE = np.array([[71569.65823, 69915.94729, 68315.30191, 66765.47572, 65264.33998],
            [70216.06378, 68605.83023, 67046.81999, 65536.88326, 64073.98182],
            [69721.68443, 68127.23536, 66583.34475, 65087.89741, 63638.88764],
         ])
-        y_spaces = alg._calculate_y_spaces(dataX, delta_Q, delta_E)
+        y_spaces = alg._calculate_y_spaces(dataX)
         y_spaces_expected = np.array(
             [[[-38.0885,-38.12637,-38.16414,-38.20185,-38.23948],
             [791.54274,779.75738,768.21943,756.92089,745.85436],
@@ -86,6 +86,8 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._fit_neutron_compton_profiles()
         self.assertEqual(alg._fit_neutron_compton_profiles_to_row.call_count, 3)
         
+
+    # def test_neutron_compton_profile_fit_function(self):
 
     def test_fit_neutron_compton_profiles_to_row(self):
         alg = VesuvioAnalysisRoutine()
@@ -127,21 +129,17 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._create_emtpy_ncp_workspace = MagicMock(return_value = None)
         alg._update_workspace_data()
 
-        # Create mock for storing ncp total result
+        # Create arrays for storing ncp and fse total result
         ncp_total_array = np.zeros_like(alg._dataY)
-
-        def pick_ncp_row_result(row):
-            return ncp_total_array[row]
-
-        ncp_total_ws_mock = MagicMock()
-        ncp_total_ws_mock.dataY.side_effect = pick_ncp_row_result
+        fse_total_array = np.zeros_like(alg._dataY)
 
         alg._fit_profiles_workspaces = {
-            "total": ncp_total_ws_mock,
-            "1": MagicMock(),
-            "12": MagicMock(),
-            "16": MagicMock(),
-            "27": MagicMock()
+            "total": MagicMock(dataY=lambda row: ncp_total_array[row]),
+            "1": MagicMock(), "12": MagicMock(), "16": MagicMock(), "27": MagicMock()
+        }
+        alg._fit_fse_workspaces = {
+            "total": MagicMock(dataY=lambda row: fse_total_array[row]),
+            "1": MagicMock(), "12": MagicMock(), "16": MagicMock(), "27": MagicMock()
         }
         # Fit ncp
         alg._row_being_fit = 0
@@ -164,6 +162,8 @@ class TestAnalysisReduction(unittest.TestCase):
             [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
         ])
         np.testing.assert_allclose(alg._fit_parameters, expected_fit_parameters, atol=1e-6)
+        import re
+        print(re.sub(f"\s+", ", ", str(fse_total_array)))
 
 
     def test_fit_neutron_compton_profiles_to_row_with_masked_tof(self):
