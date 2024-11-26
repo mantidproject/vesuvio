@@ -87,6 +87,7 @@ class ForwardAnalysisInputs(SampleParameters):
 class YSpaceFitInputs:
     showPlots = False
     symmetrisationFlag = True
+    subtractFSE = False
     rebinParametersForYSpaceFit = "-20, 0.5, 20"  # Needs to be symetric
     fitModel = "SINGLE_GAUSSIAN"
     runMinos = True
