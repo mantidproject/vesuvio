@@ -46,7 +46,7 @@ class TestAnalysisReduction(unittest.TestCase):
                                        [226.07138, 224.05877, 222.08939, 220.16185, 218.27485],
                                        ]), atol=1e-4)
 
-    def test_calculate_y_spaces(self):
+    def test_set_y_space_arrays(self):
         alg = VesuvioAnalysisRoutine()
         alg._masses = np.array([1, 12, 16])
         dataX = np.array([
@@ -62,7 +62,7 @@ class TestAnalysisReduction(unittest.TestCase):
            [70216.06378, 68605.83023, 67046.81999, 65536.88326, 64073.98182],
            [69721.68443, 68127.23536, 66583.34475, 65087.89741, 63638.88764],
         ])
-        y_spaces = alg._calculate_y_spaces(dataX)
+        alg._set_y_space_arrays(dataX)
         y_spaces_expected = np.array(
             [[[-38.0885,-38.12637,-38.16414,-38.20185,-38.23948],
             [791.54274,779.75738,768.21943,756.92089,745.85436],
@@ -75,7 +75,7 @@ class TestAnalysisReduction(unittest.TestCase):
             [[-39.25409,-39.28749,-39.32085,-39.35414,-39.38735],
             [772.34348,760.87331,749.64145,738.64055,727.86342],
             [1067.46987,1051.84087,1036.53683,1021.54771,1006.8637,]]])
-        np.testing.assert_allclose(y_spaces, y_spaces_expected, atol=1e-4)
+        np.testing.assert_allclose(alg._y_space_arrays, y_spaces_expected, atol=1e-4)
 
 
     def test_fit_neutron_compton_profiles_number_of_calls(self):
@@ -87,7 +87,27 @@ class TestAnalysisReduction(unittest.TestCase):
         self.assertEqual(alg._fit_neutron_compton_profiles_to_row.call_count, 3)
         
 
-    # def test_neutron_compton_profile_fit_function(self):
+    def test_neutron_compton_profile_fit_function(self):
+        alg = VesuvioAnalysisRoutine()
+        alg._dataX = np.arange(113, 430, 6).reshape(1, -1)
+        alg._instrument_params = np.array([
+            [144, 144, 54.1686, -0.41, 11.005, 0.720184]
+            ])
+        alg._resolution_params = load_resolution(alg._instrument_params)
+        alg._masses = np.array([1, 12, 16, 27])
+        alg._set_kinematic_arrays(alg._dataX)
+        alg._set_y_space_arrays(alg._dataX)
+        example_fit_parameters = np.array([7.1, 5.05, 0.02, 0.22, 12.71, 1.0, 0.0, 8.76, -1.1, 0.3, 13.897, 0.64])
+        alg._row_being_fit = 0
+        NCP, FSE = alg._neutron_compton_profiles(example_fit_parameters)
+        expected_NCP = np.array([
+            [0.00004, 0.000059, 0.00009, 0.000138, 0.000216, 0.000336, 0.000648, 0.000944, 0.001349, 0.001891, 0.002596, 0.003491, 0.004595, 0.005921, 0.007464, 0.009194, 0.011051, 0.012936, 0.014711, 0.016212, 0.017269, 0.017734, 0.017518, 0.016611, 0.01509, 0.013112, 0.010879, 0.008601, 0.006465, 0.004605, 0.003092, 0.001939, 0.001119, 0.000574, 0.00024, 0.000055, -0.000033, -0.000064, -0.000064, -0.00005, -0.000033, -0.000017, -0.000004, 0.000005, 0.000012, 0.000016, 0.000018, 0.000027, 0.000025, 0.000023, 0.000022, 0.000021, 0.00002], 
+            [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000002, 0.000002, 0.000003, 0.000004, 0.000005, 0.000006, 0.000008, 0.000011, 0.000043, 0.000149, 0.00034, 0.000926, 0.002246, 0.003149, 0.00241, 0.000926, 0.00007, 0.000067, 0.00003, 0.000019, 0.000014, 0.000011, 0.000009], 
+            [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.], 
+            [ 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000001, 0.000002, 0.000002, 0.000002, 0.000003, 0.000004, 0.000005, 0.000006, 0.000008, 0.000011, 0.000017, 0.000021, 0.000052, 0.000152, 0.000455, 0.003186, 0.006654, 0.003274, 0.000527, 0.000117, 0.000058, 0.000037, 0.000026, 0.000019, 0.000015]
+        ])
+        np.testing.assert_allclose(NCP, expected_NCP, atol=1e-6)
+
 
     def test_fit_neutron_compton_profiles_to_row(self):
         alg = VesuvioAnalysisRoutine()
@@ -162,8 +182,6 @@ class TestAnalysisReduction(unittest.TestCase):
             [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]
         ])
         np.testing.assert_allclose(alg._fit_parameters, expected_fit_parameters, atol=1e-6)
-        import re
-        print(re.sub(f"\s+", ", ", str(fse_total_array)))
 
 
     def test_fit_neutron_compton_profiles_to_row_with_masked_tof(self):

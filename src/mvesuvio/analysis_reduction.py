@@ -206,7 +206,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         self._set_kinematic_arrays(self._dataX)
         # Calculate y space after kinematics
-        self._y_space_arrays = self._calculate_y_spaces(self._dataX)
+        self._set_y_space_arrays(self._dataX)
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
         self._row_being_fit = 0 
@@ -347,8 +347,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _calculate_y_spaces(self, dataX):
-
+    def _set_y_space_arrays(self, dataX):
         # Prepare arrays to broadcast
         dataX = dataX[np.newaxis, :, :]
         delta_Q = self._deltaQ[np.newaxis, :, :]
@@ -358,8 +357,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         energy_recoil = np.square(H_BAR * delta_Q) / 2.0 / masses
         y_spaces = masses / H_BAR**2 / delta_Q * (delta_E - energy_recoil)
 
-        # First axis selects spectra
-        return np.swapaxes(y_spaces, 0, 1) 
+        # Swap axis so that first axis selects spectra
+        self._y_space_arrays = np.swapaxes(y_spaces, 0, 1) 
+        return
 
 
     def _save_plots(self):
