@@ -599,15 +599,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         centers = pars[2::3].reshape(-1, 1)
         masses = self._masses.reshape(-1, 1)
 
-        # v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
         E0 = self._E0[self._row_being_fit]
         deltaQ = self._deltaQ[self._row_being_fit]
 
+        gaussian_width = self.calculate_gaussian_resolution(centers)
+        lorentzian_width = self.calculate_lorentzian_resolution(centers)
+        total_gaussian_width = np.sqrt(widths**2 + gaussian_width**2)
 
-        gaussRes, lorzRes = self.caculateResolutionForEachMass(centers)
-        totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
-
-        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
+        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
 
         FSE = (
             -numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
@@ -618,15 +617,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         NCP = intensities * (JOfY+FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
         FSE = intensities * FSE * E0 * E0 ** (-0.92) * masses / deltaQ
         return NCP, FSE
-
-
-    def caculateResolutionForEachMass(self, centers):
-        """Calculates the gaussian and lorentzian resolution
-        output: two column vectors, each row corresponds to each mass"""
-
-        gaussianResWidth = self.calcGaussianResolution(centers)
-        lorentzianResWidth = self.calcLorentzianResolution(centers)
-        return gaussianResWidth, lorentzianResWidth
 
 
     def kinematicsAtYCenters(self, centers):
@@ -655,7 +645,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return v0, E0, deltaE, deltaQ
 
 
-    def calcGaussianResolution(self, centers):
+    def calculate_gaussian_resolution(self, centers):
         masses = self._masses.reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
@@ -700,7 +690,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return gaussianResWidth
 
 
-    def calcLorentzianResolution(self, centers):
+    def calculate_lorentzian_resolution(self, centers):
         masses = self._masses.reshape(-1, 1)
         v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
         det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
