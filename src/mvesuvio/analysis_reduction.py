@@ -205,6 +205,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._dataE = self._workspace_being_fit.extractE()
 
         self._set_kinematic_arrays(self._dataX)
+        self._set_gaussian_resolution()
+        self._set_lorentzian_resolution()
         # Calculate y space after kinematics
         self._set_y_space_arrays(self._dataX)
 
@@ -538,7 +540,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             return
 
         result = scipy.optimize.minimize(
-            self.errorFunction,
+            self._error_function,
             self._initial_fit_parameters,
             method="SLSQP",
             bounds=self._initial_fit_bounds,
@@ -570,19 +572,21 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def errorFunction(self, pars):
+    def _error_function(self, pars):
         """Error function to be minimized, in TOF space"""
 
         ncp_for_each_mass, fse_for_each_mass = self._neutron_compton_profiles(pars)
+
         ncp_total = np.sum(ncp_for_each_mass, axis=0)
+        data_y = self._dataY[self._row_being_fit]
+        data_e = self._dataE[self._row_being_fit]
 
-        # Ignore any masked values from Jackknife or masked tof range
-        zerosMask = self._dataY[self._row_being_fit] == 0
-        ncp_total = ncp_total[~zerosMask]
-        data_y = self._dataY[self._row_being_fit, ~zerosMask]
-        data_e = self._dataE[self._row_being_fit, ~zerosMask]
+        # Ignore any masked values on tof range
+        ncp_total = ncp_total[np.nonzero(data_y)]
+        data_y = data_y[np.nonzero(data_y)]
+        data_e = data_e[np.nonzero(data_y)]
 
-        if np.all(self._dataE[self._row_being_fit] == 0):  # When errors not present
+        if np.all(data_e == 0):  # When errors not present
             return np.sum((ncp_total - data_y) ** 2)
 
         return np.sum((ncp_total - data_y) ** 2 / data_e**2)
@@ -602,8 +606,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         E0 = self._E0[self._row_being_fit]
         deltaQ = self._deltaQ[self._row_being_fit]
 
-        gaussian_width = self.calculate_gaussian_resolution(centers)
-        lorentzian_width = self.calculate_lorentzian_resolution(centers)
+        gaussian_width = self._get_gaussian_resolution(centers)
+        lorentzian_width = self._get_lorentzian_resolution(centers)
         total_gaussian_width = np.sqrt(widths**2 + gaussian_width**2)
 
         JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
@@ -619,37 +623,19 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return NCP, FSE
 
 
-    def kinematicsAtYCenters(self, centers):
-        """v0, E0, deltaE, deltaQ at the peak of the ncpTotal for each mass"""
-
-        shapeOfArrays = centers.shape
-        proximityToYCenters = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
-        yClosestToCenters = proximityToYCenters.min(axis=1).reshape(-1, 1)
-        yCentersMask = proximityToYCenters == yClosestToCenters
-
-        v0 = self._v0[self._row_being_fit]
-        E0 = self._E0[self._row_being_fit]
-        deltaE = self._deltaE[self._row_being_fit]
-        deltaQ = self._deltaQ[self._row_being_fit]
-
-        # Expand arrays to match shape of yCentersMask
-        v0 = v0 * np.ones(shapeOfArrays)
-        E0 = E0 * np.ones(shapeOfArrays)
-        deltaE = deltaE * np.ones(shapeOfArrays)
-        deltaQ = deltaQ * np.ones(shapeOfArrays)
-
-        v0 = v0[yCentersMask].reshape(shapeOfArrays)
-        E0 = E0[yCentersMask].reshape(shapeOfArrays)
-        deltaE = deltaE[yCentersMask].reshape(shapeOfArrays)
-        deltaQ = deltaQ[yCentersMask].reshape(shapeOfArrays)
-        return v0, E0, deltaE, deltaQ
+    def _get_gaussian_resolution(self, centers):
+        proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
+        gauss_resolution = self._gaussian_resolution[self._row_being_fit]
+        return np.take_along_axis(gauss_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
 
 
-    def calculate_gaussian_resolution(self, centers):
-        masses = self._masses.reshape(-1, 1)
-        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
-        det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
-        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
+    def _set_gaussian_resolution(self):
+        masses = self._masses.reshape(-1, 1, 1)
+        v0 = self._v0
+        E0 = self._E0
+        delta_Q = self._deltaQ
+        det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)
+        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = np.hsplit(self._resolution_params, 6)
 
         angle = angle * np.pi / 180
 
@@ -663,7 +649,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             + dWdTOF**2 * dTOF**2
             + dWdL1**2 * dL1**2
             + dWdL0**2 * dL0**2
-        )
+        ) * np.ones((masses.size, 1, 1))
         # conversion from meV^2 to A^-2, dydW = (M/q)^2
         dW2 *= (masses / H_BAR**2 / delta_Q) ** 2
 
@@ -687,20 +673,28 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
         gaussianResWidth = np.sqrt(dW2 + dQ2)
-        return gaussianResWidth
+        self._gaussian_resolution = np.swapaxes(gaussianResWidth, 0, 1)
+        return
 
 
-    def calculate_lorentzian_resolution(self, centers):
-        masses = self._masses.reshape(-1, 1)
-        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
-        det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
-        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
+    def _get_lorentzian_resolution(self, centers):
+        proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
+        lorentzian_resolution = self._lorentzian_resolution[self._row_being_fit]
+        return np.take_along_axis(lorentzian_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
+
+
+    def _set_lorentzian_resolution(self):
+        masses = self._masses.reshape(-1, 1, 1)
+        E0 = self._E0
+        delta_Q = self._deltaQ
+        det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)
+        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = np.hsplit(self._resolution_params, 6)
 
         angle = angle * np.pi / 180
 
-        dWdE1_lor = (1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)) ** 2
+        dWdE1_lor = (1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)) ** 2 * np.ones((masses.size, 1, 1))
         # conversion from meV^2 to A^-2
-        dWdE1_lor *= (masses / H_BAR**2 / delta_Q) ** 2
+        dWdE1_lor *= (masses / H_BAR**2 / delta_Q) ** 2 
 
         dQdE1_lor = (
             1.0
@@ -710,7 +704,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         dQdE1_lor *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
 
         lorentzianResWidth = np.sqrt(dWdE1_lor + dQdE1_lor) * dE1_lorz  # in A-1
-        return lorentzianResWidth
+        self._lorentzian_resolution = np.swapaxes(lorentzianResWidth, 0, 1)
+        return
 
 
     def _get_parsed_constraints(self):
