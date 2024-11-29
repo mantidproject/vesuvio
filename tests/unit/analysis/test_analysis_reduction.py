@@ -350,6 +350,35 @@ class TestAnalysisReduction(unittest.TestCase):
         centers = np.array([11.3, 9.6, 14.7]).reshape(-1, 1)
         np.testing.assert_allclose(alg._get_lorentzian_resolution(centers), np.array([11, 12, 15]).reshape(-1, 1))
 
-    
+
+    def test_set_means_and_std(self):
+        alg = VesuvioAnalysisRoutine()
+        alg._create_means_table = MagicMock()
+        alg._profiles_table = MagicMock(rowCount=MagicMock(return_value=2), column=MagicMock(return_value=['1.0', '12.0']))
+        
+        def pick_column(arg):
+            table = {
+                '1.0 width': [5.6, 5.1, 0, 2, 5.4],
+                '12.0 width': [2.1, 1, 0, 2.3, 1.9],
+                '1.0 intensity': [7.8, 7.6, 0, 5, 7.3],
+                '12.0 intensity': [3.1, 2, 0, 3.2, 3.1],
+            }
+            return table[arg]
+
+        alg._table_fit_results = MagicMock(rowCount=MagicMock(return_value=5), column=MagicMock(side_effect=pick_column))
+
+        alg._set_means_and_std()
+
+        self.assertEqual(alg._table_fit_results.column.call_count, 4)
+        self.assertEqual(alg._mean_widths[0], np.mean([5.6, 5.1, 5.4]))
+        self.assertEqual(alg._std_widths[0], np.std([5.6, 5.1, 5.4]))
+        self.assertEqual(alg._mean_widths[1], np.mean([2.1, 2.3, 1.9]))
+        self.assertEqual(alg._std_widths[1], np.std([2.1, 2.3, 1.9]))
+        self.assertEqual(alg._mean_intensity_ratios[0], np.nanmean(np.array([7.8, 7.6, np.nan, np.nan, 7.3]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
+        self.assertEqual(alg._std_intensity_ratios[0], np.nanstd(np.array([7.8, 7.6, np.nan, np.nan, 7.3]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
+        self.assertEqual(alg._mean_intensity_ratios[1], np.nanmean(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
+        self.assertEqual(alg._std_intensity_ratios[1], np.nanstd(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
+
+
 if __name__ == "__main__":
     unittest.main()

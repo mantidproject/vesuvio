@@ -413,31 +413,40 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             )
 
     def _set_means_and_std(self):
-        """Calculate mean widths and intensities from tableWorkspace"""
-
-        fitParsTable = self._table_fit_results
-        widths = np.zeros((self._profiles_table.rowCount(), fitParsTable.rowCount()))
+        widths = np.zeros((self._profiles_table.rowCount(), self._table_fit_results.rowCount()))
         intensities = np.zeros(widths.shape)
+
         for i, label in enumerate(self._profiles_table.column("label")):
-            widths[i] = fitParsTable.column(f"{label} width")
-            intensities[i] = fitParsTable.column(f"{label} intensity")
-        (
-            meanWidths,
-            stdWidths,
-            meanIntensityRatios,
-            stdIntensityRatios,
-        ) = self.calculateMeansAndStds(widths, intensities)
-
-        assert (
-            len(meanWidths) == self._profiles_table.rowCount()
-        ), "Number of mean widths must match number of profiles!"
-
-        self._mean_widths = meanWidths
-        self._std_widths = stdWidths
-        self._mean_intensity_ratios = meanIntensityRatios
-        self._std_intensity_ratios = stdIntensityRatios
+            widths[i] = self._table_fit_results.column(f"{label} width")
+            intensities[i] = self._table_fit_results.column(f"{label} intensity")
+            self._set_means_and_std_arrays(widths, intensities)
 
         self._create_means_table()
+        return
+
+
+    def _set_means_and_std_arrays(self, widths, intensities):
+        # Remove failed fits and masked spectra
+        non_zero_columns = np.any(widths!=0, axis=0)
+        widths = widths[:, non_zero_columns]
+        intensities = intensities[:, non_zero_columns]
+
+        widths_mean = np.mean(widths, axis=1).reshape(-1, 1)
+        widths_std = np.std(widths, axis=1).reshape(-1, 1)
+
+        widths_deviations = np.abs(widths - widths_mean)
+
+        # Remove width outliers
+        widths[widths_deviations > widths_std] = np.nan
+        intensities[widths_deviations > widths_std] = np.nan
+
+        # Use sum instead of nansum to propagate nans
+        intensities = intensities / intensities.sum(axis=0)
+
+        self._mean_widths = np.nanmean(widths, axis=1) 
+        self._std_widths = np.nanstd(widths, axis=1) 
+        self._mean_intensity_ratios = np.nanmean(intensities, axis=1) 
+        self._std_intensity_ratios = np.nanstd(intensities, axis=1) 
         return
 
 
@@ -468,69 +477,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         self.setPropertyValue("OutputMeansTable", table.name())
         return table
-
-
-    def calculateMeansAndStds(self, widthsIn, intensitiesIn):
-        betterWidths, betterIntensities = self.filterWidthsAndIntensities(widthsIn, intensitiesIn)
-
-        meanWidths = np.nanmean(betterWidths, axis=1)
-        stdWidths = np.nanstd(betterWidths, axis=1)
-
-        meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
-        stdIntensityRatios = np.nanstd(betterIntensities, axis=1)
-
-        return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
-
-
-    def filterWidthsAndIntensities(self, widthsIn, intensitiesIn):
-        """Puts nans in places to be ignored"""
-
-        widths = widthsIn.copy()  # Copy to avoid accidental changes in arrays
-        intensities = intensitiesIn.copy()
-
-        zeroSpecs = np.all(
-            widths == 0, axis=0
-        )  # Catches all failed fits, not just masked spectra
-        widths[:, zeroSpecs] = np.nan
-        intensities[:, zeroSpecs] = np.nan
-
-        meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]
-
-        widthDeviation = np.abs(widths - meanWidths)
-        stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]
-
-        # Put nan in places where width deviation is bigger than std
-        filterMask = widthDeviation > stdWidths
-        betterWidths = np.where(filterMask, np.nan, widths)
-
-        maskedIntensities = np.where(filterMask, np.nan, intensities)
-        betterIntensities = maskedIntensities / np.sum(
-            maskedIntensities, axis=0
-        )  # Not nansum()
-
-        # Keep this around in case it is needed again
-        # When trying to estimate HToMassIdxRatio and normalization fails, skip normalization
-        # if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
-        #     assert IC.noOfMSIterations == 0, (
-        #         "Calculation of mean intensities failed, cannot proceed with MS correction."
-        #         "Try to run again with noOfMSIterations=0."
-        #     )
-        #     betterIntensities = maskedIntensities
-        # else:
-        #     pass
-
-        assert np.all(meanWidths != np.nan), "At least one mean of widths is nan!"
-        assert np.sum(filterMask) >= 1, "No widths survive filtering condition"
-        assert not (np.all(np.isnan(betterWidths))), "All filtered widths are nan"
-        assert not (np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
-        assert np.nanmax(betterWidths) != np.nanmin(
-            betterWidths
-        ), f"All filtered widths have the same value: {np.nanmin(betterWidths)}"
-        assert np.nanmax(betterIntensities) != np.nanmin(
-            betterIntensities
-        ), f"All filtered intensities have the same value: {np.nanmin(betterIntensities)}"
-
-        return betterWidths, betterIntensities
 
 
     def _fit_neutron_compton_profiles_to_row(self):
