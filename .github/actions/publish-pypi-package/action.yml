@@ -23,7 +23,6 @@ runs:
     run: |
       conda activate build-env-pypi
       python -m build
-      conda deactivate
 
   - name: Test basic functunality
     shell: bash -l {0}
@@ -33,7 +32,6 @@ runs:
       pip install dist/*.tar.gz
       mvesuvio config
       mvesuvio run
-      conda deactivate
 
   - name: Upload package
     shell: bash -l {0}
