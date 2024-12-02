@@ -12,16 +12,12 @@ runs:
   steps:
   - name: Make build-env-pypi
     shell: bash -l {0}
-    run: |
+    run:
       conda config --set always_yes yes --set changeps1 no
       conda create -n build-env-pypi python=3.10.*
       conda activate build-env-pypi
       mamba install -c conda-forge python-build twine 
       python -m build
-
-  - name: Test basic functunality
-    shell: bash -l {0}
-    run: |
       conda create -n build-mvesuvio-test mantid/label/nightly::mantidworkbench
       conda activate build-mvesuvio-test
       pip install dist/*.tar.gz
@@ -30,7 +26,7 @@ runs:
 
   - name: Upload package
     shell: bash -l {0}
-    run: |
+    run:
       conda activate build-env-pypi
       # twine upload -u __token__ -p ${{ inputs.token }} dist/*
 
