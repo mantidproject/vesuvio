@@ -23,4 +23,20 @@ runs:
     run: |
       conda activate build-env-pypi
       python -m build
-      twine upload -u __token__ -p ${{ inputs.token }} dist/*
+      conda deactivate
+
+  - name: Test basic functunality
+    shell: bash -l {0}
+    run: |
+      conda create -n build-mvesuvio-test mantid/label/nightly::mantidworkbench
+      conda activate build-mvesuvio-test
+      pip install dist/*.tar.gz
+      mvesuvio config
+      mvesuvio run
+      conda deactivate
+
+  - name: Upload package
+    shell: bash -l {0}
+    run: |
+      conda activate build-env-pypi
+      # twine upload -u __token__ -p ${{ inputs.token }} dist/*
