@@ -1,6 +1,11 @@
 name: mvesuvio pull request workflow
 
-on: push
+on: #push
+  workflow_run:
+    workflows: ["mvesuvio nightly build"]
+    branches: [main]
+    types:
+      - completed
 
 jobs:
   test:
