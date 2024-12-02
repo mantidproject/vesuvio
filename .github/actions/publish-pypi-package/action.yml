@@ -14,13 +14,26 @@ runs:
     shell: bash -l {0}
     run: |
       conda config --set always_yes yes --set changeps1 no
-      conda create -n build-env-pypi python=3.10.*
-      conda activate build-env-pypi
-      mamba install -c conda-forge python-build twine 
+      conda create -n build-env-pypi -c conda-forge python=3.10.* python-build twine
 
   - name: Build package
     shell: bash -l {0}
     run: |
       conda activate build-env-pypi
       python -m build
+      conda deactivate
+
+  - name: Test basic functunality of mvesuvio
+    shell: bash -l {0}
+    run: |
+      mamba create -n mvesuvio-test
+      conda activate mvesuvio-test 
+      pip install dist/*.whl
+      mvesuvio config
+      conda deactivate 
+
+  - name: Upload to PyPI
+    shell: bash -l {0}
+    run: |
+      conda activate build-env-pypi
       twine upload -u __token__ -p ${{ inputs.token }} dist/*
