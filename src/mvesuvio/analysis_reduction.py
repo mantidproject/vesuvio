@@ -12,11 +12,15 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
                             CreateWorkspace, CreateSampleWorkspace
 
-from mvesuvio.util.analysis_helpers import loadConstants, numericalThirdDerivative
-
-
+from mvesuvio.util.analysis_helpers import numericalThirdDerivative, load_resolution, load_instrument_params
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
+
+NEUTRON_MASS = 1.008  # a.m.u.
+ENERGY_FINAL = 4906.0  # meV
+ENERGY_TO_VELOCITY = 4.3737 * 1.0e-4
+VELOCITY_FINAL = np.sqrt(ENERGY_FINAL) * ENERGY_TO_VELOCITY  # m/us
+H_BAR = 2.0445
 
 
 class VesuvioAnalysisRoutine(PythonAlgorithm):
@@ -160,8 +164,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._save_figures_path = self.getProperty("FiguresPath").value 
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
-
         self._profiles_table = self.getProperty("InputProfiles").value
+
+        self._instrument_params = load_instrument_params(self._ip_file, self.getProperty("InputWorkspace").value.getSpectrumNumbers())
+        self._resolution_params = load_resolution(self._instrument_params)
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
@@ -192,14 +198,17 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._fit_profiles_workspaces = {}
 
 
-
     def _update_workspace_data(self):
 
         self._dataX = self._workspace_being_fit.extractX()
         self._dataY = self._workspace_being_fit.extractY()
         self._dataE = self._workspace_being_fit.extractE()
 
-        self._set_up_kinematic_arrays()
+        self._set_kinematic_arrays(self._dataX)
+        self._set_gaussian_resolution()
+        self._set_lorentzian_resolution()
+        # Calculate y space after kinematics
+        self._set_y_space_arrays(self._dataX)
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
         self._row_being_fit = 0 
@@ -250,14 +259,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             ParentWorkspace=self._workspace_being_fit,
             Distribution=True
     )
-
-
-    def _set_up_kinematic_arrays(self):
-        resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass = self.prepareFitArgs()
-        self._resolution_params = resolutionPars
-        self._instrument_params = instrPars
-        self._kinematic_arrays = kinematicArrays
-        self._y_space_arrays = ySpacesForEachMass
 
 
     def run(self):
@@ -329,94 +330,38 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def prepareFitArgs(self):
-        instrPars = self.loadInstrParsFileIntoArray()
-        resolutionPars = self.loadResolutionPars(instrPars)
+    def _set_kinematic_arrays(self, dataX):
+        det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)  # each is of len(dataX)
 
-        v0, E0, delta_E, delta_Q = self.calculateKinematicsArrays(instrPars)
-        kinematicArrays = np.array([v0, E0, delta_E, delta_Q])
-        ySpacesForEachMass = self.convertDataXToYSpacesForEachMass(
-            self._dataX, delta_Q, delta_E
-        )
-        kinematicArrays = np.swapaxes(kinematicArrays, 0, 1)
-        ySpacesForEachMass = np.swapaxes(ySpacesForEachMass, 0, 1)
-        return resolutionPars, instrPars, kinematicArrays, ySpacesForEachMass
-
-
-    def loadInstrParsFileIntoArray(self):
-        """Loads instrument parameters into array, from the file in the specified path"""
-
-        data = np.loadtxt(self._ip_file, dtype=str)[1:].astype(float)
-        spectra = data[:, 0]
-
-        workspace_spectrum_list = self._workspace_being_fit.getSpectrumNumbers()
-        first_spec = min(workspace_spectrum_list)
-        last_spec = max(workspace_spectrum_list)
-
-        select_rows = np.where((spectra >= first_spec) & (spectra <= last_spec))
-        instrPars = data[select_rows]
-        return instrPars
-
-
-    @staticmethod
-    def loadResolutionPars(instrPars):
-        """Resolution of parameters to propagate into TOF resolution
-        Output: matrix with each parameter in each column"""
-        spectrums = instrPars[:, 0]
-        L = len(spectrums)
-        # For spec no below 135, back scattering detectors, mode is double difference
-        # For spec no 135 or above, front scattering detectors, mode is single difference
-        dE1 = np.where(spectrums < 135, 88.7, 73)  # meV, STD
-        dE1_lorz = np.where(spectrums < 135, 40.3, 24)  # meV, HFHM
-        dTOF = np.repeat(0.37, L)  # us
-        dTheta = np.repeat(0.016, L)  # rad
-        dL0 = np.repeat(0.021, L)  # meters
-        dL1 = np.repeat(0.023, L)  # meters
-
-        resolutionPars = np.vstack((dE1, dTOF, dTheta, dL0, dL1, dE1_lorz)).transpose()
-        return resolutionPars
-
-
-    def calculateKinematicsArrays(self, instrPars):
-        """Kinematics quantities calculated from TOF data"""
-
-        dataX = self._dataX
-
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
-        det, plick, angle, T0, L0, L1 = np.hsplit(instrPars, 6)  # each is of len(dataX)
-        t_us = dataX - T0  # T0 is electronic delay due to instruments
-        v0 = vf * L0 / (vf * t_us - L1)
-        E0 = np.square(
-            v0 / en_to_vel
-        )  # en_to_vel is a factor used to easily change velocity to energy and vice-versa
-
-        delta_E = E0 - Ef
+        # T0 is electronic delay due to instruments
+        t_us = dataX - T0  
+        self._v0 = VELOCITY_FINAL * L0 / (VELOCITY_FINAL * t_us - L1)
+        # en_to_vel is a factor used to easily change velocity to energy and vice-versa
+        self._E0 = np.square(self._v0 / ENERGY_TO_VELOCITY)  
+        self._deltaE = self._E0 - ENERGY_FINAL
         delta_Q2 = (
             2.0
-            * mN
-            / hbar**2
-            * (E0 + Ef - 2.0 * np.sqrt(E0 * Ef) * np.cos(angle / 180.0 * np.pi))
+            * NEUTRON_MASS 
+            / H_BAR**2
+            * (self._E0 + ENERGY_FINAL - 2.0 * np.sqrt(self._E0 * ENERGY_FINAL) * np.cos(angle / 180.0 * np.pi))
         )
-        delta_Q = np.sqrt(delta_Q2)
-        return v0, E0, delta_E, delta_Q  # shape(no of spectrums, no of bins)
+        self._deltaQ = np.sqrt(delta_Q2)
+        return
 
 
-    def convertDataXToYSpacesForEachMass(self, dataX, delta_Q, delta_E):
-        """"Calculates y spaces from TOF data, each row corresponds to one mass"""
-
+    def _set_y_space_arrays(self, dataX):
         # Prepare arrays to broadcast
         dataX = dataX[np.newaxis, :, :]
-        delta_Q = delta_Q[np.newaxis, :, :]
-        delta_E = delta_E[np.newaxis, :, :]
-
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
+        delta_Q = self._deltaQ[np.newaxis, :, :]
+        delta_E = self._deltaE[np.newaxis, :, :]
         masses = self._masses.reshape(-1, 1, 1)
 
-        energyRecoil = np.square(hbar * delta_Q) / 2.0 / masses
-        ySpacesForEachMass = (
-            masses / hbar**2 / delta_Q * (delta_E - energyRecoil)
-        )  # y-scaling
-        return ySpacesForEachMass
+        energy_recoil = np.square(H_BAR * delta_Q) / 2.0 / masses
+        y_spaces = masses / H_BAR**2 / delta_Q * (delta_E - energy_recoil)
+
+        # Swap axis so that first axis selects spectra
+        self._y_space_arrays = np.swapaxes(y_spaces, 0, 1) 
+        return
 
 
     def _save_plots(self):
@@ -468,31 +413,40 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             )
 
     def _set_means_and_std(self):
-        """Calculate mean widths and intensities from tableWorkspace"""
-
-        fitParsTable = self._table_fit_results
-        widths = np.zeros((self._profiles_table.rowCount(), fitParsTable.rowCount()))
+        widths = np.zeros((self._profiles_table.rowCount(), self._table_fit_results.rowCount()))
         intensities = np.zeros(widths.shape)
+
         for i, label in enumerate(self._profiles_table.column("label")):
-            widths[i] = fitParsTable.column(f"{label} width")
-            intensities[i] = fitParsTable.column(f"{label} intensity")
-        (
-            meanWidths,
-            stdWidths,
-            meanIntensityRatios,
-            stdIntensityRatios,
-        ) = self.calculateMeansAndStds(widths, intensities)
-
-        assert (
-            len(meanWidths) == self._profiles_table.rowCount()
-        ), "Number of mean widths must match number of profiles!"
-
-        self._mean_widths = meanWidths
-        self._std_widths = stdWidths
-        self._mean_intensity_ratios = meanIntensityRatios
-        self._std_intensity_ratios = stdIntensityRatios
+            widths[i] = self._table_fit_results.column(f"{label} width")
+            intensities[i] = self._table_fit_results.column(f"{label} intensity")
+            self._set_means_and_std_arrays(widths, intensities)
 
         self._create_means_table()
+        return
+
+
+    def _set_means_and_std_arrays(self, widths, intensities):
+        # Remove failed fits and masked spectra
+        non_zero_columns = np.any(widths!=0, axis=0)
+        widths = widths[:, non_zero_columns]
+        intensities = intensities[:, non_zero_columns]
+
+        widths_mean = np.mean(widths, axis=1).reshape(-1, 1)
+        widths_std = np.std(widths, axis=1).reshape(-1, 1)
+
+        widths_deviations = np.abs(widths - widths_mean)
+
+        # Remove width outliers
+        widths[widths_deviations > widths_std] = np.nan
+        intensities[widths_deviations > widths_std] = np.nan
+
+        # Use sum instead of nansum to propagate nans
+        intensities = intensities / intensities.sum(axis=0)
+
+        self._mean_widths = np.nanmean(widths, axis=1) 
+        self._std_widths = np.nanstd(widths, axis=1) 
+        self._mean_intensity_ratios = np.nanmean(intensities, axis=1) 
+        self._std_intensity_ratios = np.nanstd(intensities, axis=1) 
         return
 
 
@@ -525,69 +479,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return table
 
 
-    def calculateMeansAndStds(self, widthsIn, intensitiesIn):
-        betterWidths, betterIntensities = self.filterWidthsAndIntensities(widthsIn, intensitiesIn)
-
-        meanWidths = np.nanmean(betterWidths, axis=1)
-        stdWidths = np.nanstd(betterWidths, axis=1)
-
-        meanIntensityRatios = np.nanmean(betterIntensities, axis=1)
-        stdIntensityRatios = np.nanstd(betterIntensities, axis=1)
-
-        return meanWidths, stdWidths, meanIntensityRatios, stdIntensityRatios
-
-
-    def filterWidthsAndIntensities(self, widthsIn, intensitiesIn):
-        """Puts nans in places to be ignored"""
-
-        widths = widthsIn.copy()  # Copy to avoid accidental changes in arrays
-        intensities = intensitiesIn.copy()
-
-        zeroSpecs = np.all(
-            widths == 0, axis=0
-        )  # Catches all failed fits, not just masked spectra
-        widths[:, zeroSpecs] = np.nan
-        intensities[:, zeroSpecs] = np.nan
-
-        meanWidths = np.nanmean(widths, axis=1)[:, np.newaxis]
-
-        widthDeviation = np.abs(widths - meanWidths)
-        stdWidths = np.nanstd(widths, axis=1)[:, np.newaxis]
-
-        # Put nan in places where width deviation is bigger than std
-        filterMask = widthDeviation > stdWidths
-        betterWidths = np.where(filterMask, np.nan, widths)
-
-        maskedIntensities = np.where(filterMask, np.nan, intensities)
-        betterIntensities = maskedIntensities / np.sum(
-            maskedIntensities, axis=0
-        )  # Not nansum()
-
-        # Keep this around in case it is needed again
-        # When trying to estimate HToMassIdxRatio and normalization fails, skip normalization
-        # if np.all(np.isnan(betterIntensities)) & IC.runningPreliminary:
-        #     assert IC.noOfMSIterations == 0, (
-        #         "Calculation of mean intensities failed, cannot proceed with MS correction."
-        #         "Try to run again with noOfMSIterations=0."
-        #     )
-        #     betterIntensities = maskedIntensities
-        # else:
-        #     pass
-
-        assert np.all(meanWidths != np.nan), "At least one mean of widths is nan!"
-        assert np.sum(filterMask) >= 1, "No widths survive filtering condition"
-        assert not (np.all(np.isnan(betterWidths))), "All filtered widths are nan"
-        assert not (np.all(np.isnan(betterIntensities))), "All filtered intensities are nan"
-        assert np.nanmax(betterWidths) != np.nanmin(
-            betterWidths
-        ), f"All filtered widths have the same value: {np.nanmin(betterWidths)}"
-        assert np.nanmax(betterIntensities) != np.nanmin(
-            betterIntensities
-        ), f"All filtered intensities have the same value: {np.nanmin(betterIntensities)}"
-
-        return betterWidths, betterIntensities
-
-
     def _fit_neutron_compton_profiles_to_row(self):
 
         if np.all(self._dataY[self._row_being_fit] == 0):
@@ -595,7 +486,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             return
 
         result = scipy.optimize.minimize(
-            self.errorFunction,
+            self._error_function,
             self._initial_fit_parameters,
             method="SLSQP",
             bounds=self._initial_fit_bounds,
@@ -627,19 +518,21 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def errorFunction(self, pars):
+    def _error_function(self, pars):
         """Error function to be minimized, in TOF space"""
 
         ncp_for_each_mass, fse_for_each_mass = self._neutron_compton_profiles(pars)
+
         ncp_total = np.sum(ncp_for_each_mass, axis=0)
+        data_y = self._dataY[self._row_being_fit]
+        data_e = self._dataE[self._row_being_fit]
 
-        # Ignore any masked values from Jackknife or masked tof range
-        zerosMask = self._dataY[self._row_being_fit] == 0
-        ncp_total = ncp_total[~zerosMask]
-        data_y = self._dataY[self._row_being_fit, ~zerosMask]
-        data_e = self._dataE[self._row_being_fit, ~zerosMask]
+        # Ignore any masked values on tof range
+        ncp_total = ncp_total[np.nonzero(data_y)]
+        data_y = data_y[np.nonzero(data_y)]
+        data_e = data_e[np.nonzero(data_y)]
 
-        if np.all(self._dataE[self._row_being_fit] == 0):  # When errors not present
+        if np.all(data_e == 0):  # When errors not present
             return np.sum((ncp_total - data_y) ** 2)
 
         return np.sum((ncp_total - data_y) ** 2 / data_e**2)
@@ -656,12 +549,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         centers = pars[2::3].reshape(-1, 1)
         masses = self._masses.reshape(-1, 1)
 
-        v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
+        E0 = self._E0[self._row_being_fit]
+        deltaQ = self._deltaQ[self._row_being_fit]
 
-        gaussRes, lorzRes = self.caculateResolutionForEachMass(centers)
-        totalGaussWidth = np.sqrt(widths**2 + gaussRes**2)
+        gaussian_width = self._get_gaussian_resolution(centers)
+        lorentzian_width = self._get_lorentzian_resolution(centers)
+        total_gaussian_width = np.sqrt(widths**2 + gaussian_width**2)
 
-        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, totalGaussWidth, lorzRes)
+        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
 
         FSE = (
             -numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
@@ -669,56 +564,30 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             / deltaQ
             * 0.72
         )
-        scaling_factor = intensities * E0 * E0 ** (-0.92) * masses / deltaQ
-        JOfY *= scaling_factor
-        FSE *= scaling_factor
-        return JOfY+FSE, FSE
+        NCP = intensities * (JOfY+FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
+        FSE = intensities * FSE * E0 * E0 ** (-0.92) * masses / deltaQ
+        return NCP, FSE
 
 
-    def caculateResolutionForEachMass(self, centers):
-        """Calculates the gaussian and lorentzian resolution
-        output: two column vectors, each row corresponds to each mass"""
-
-        gaussianResWidth = self.calcGaussianResolution(centers)
-        lorentzianResWidth = self.calcLorentzianResolution(centers)
-        return gaussianResWidth, lorentzianResWidth
+    def _get_gaussian_resolution(self, centers):
+        proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
+        gauss_resolution = self._gaussian_resolution[self._row_being_fit]
+        return np.take_along_axis(gauss_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
 
 
-    def kinematicsAtYCenters(self, centers):
-        """v0, E0, deltaE, deltaQ at the peak of the ncpTotal for each mass"""
-
-        shapeOfArrays = centers.shape
-        proximityToYCenters = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
-        yClosestToCenters = proximityToYCenters.min(axis=1).reshape(shapeOfArrays)
-        yCentersMask = proximityToYCenters == yClosestToCenters
-
-        v0, E0, deltaE, deltaQ = self._kinematic_arrays[self._row_being_fit]
-
-        # Expand arrays to match shape of yCentersMask
-        v0 = v0 * np.ones(shapeOfArrays)
-        E0 = E0 * np.ones(shapeOfArrays)
-        deltaE = deltaE * np.ones(shapeOfArrays)
-        deltaQ = deltaQ * np.ones(shapeOfArrays)
-
-        v0 = v0[yCentersMask].reshape(shapeOfArrays)
-        E0 = E0[yCentersMask].reshape(shapeOfArrays)
-        deltaE = deltaE[yCentersMask].reshape(shapeOfArrays)
-        deltaQ = deltaQ[yCentersMask].reshape(shapeOfArrays)
-        return v0, E0, deltaE, deltaQ
-
-
-    def calcGaussianResolution(self, centers):
-        masses = self._masses.reshape(-1, 1)
-        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
-        det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
-        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
+    def _set_gaussian_resolution(self):
+        masses = self._masses.reshape(-1, 1, 1)
+        v0 = self._v0
+        E0 = self._E0
+        delta_Q = self._deltaQ
+        det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)
+        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = np.hsplit(self._resolution_params, 6)
 
         angle = angle * np.pi / 180
 
-        dWdE1 = 1.0 + (E0 / Ef) ** 1.5 * (L1 / L0)
+        dWdE1 = 1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)
         dWdTOF = 2.0 * E0 * v0 / L0
-        dWdL1 = 2.0 * E0**1.5 / Ef**0.5 / L0
+        dWdL1 = 2.0 * E0**1.5 / ENERGY_FINAL**0.5 / L0
         dWdL0 = 2.0 * E0 / L0
 
         dW2 = (
@@ -726,55 +595,63 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             + dWdTOF**2 * dTOF**2
             + dWdL1**2 * dL1**2
             + dWdL0**2 * dL0**2
-        )
+        ) * np.ones((masses.size, 1, 1))
         # conversion from meV^2 to A^-2, dydW = (M/q)^2
-        dW2 *= (masses / hbar**2 / delta_Q) ** 2
+        dW2 *= (masses / H_BAR**2 / delta_Q) ** 2
 
         dQdE1 = (
             1.0
-            - (E0 / Ef) ** 1.5 * L1 / L0
-            - np.cos(angle) * ((E0 / Ef) ** 0.5 - L1 / L0 * E0 / Ef)
+            - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0
+            - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 - L1 / L0 * E0 / ENERGY_FINAL)
         )
         dQdTOF = 2.0 * E0 * v0 / L0
-        dQdL1 = 2.0 * E0**1.5 / L0 / Ef**0.5
+        dQdL1 = 2.0 * E0**1.5 / L0 / ENERGY_FINAL**0.5
         dQdL0 = 2.0 * E0 / L0
-        dQdTheta = 2.0 * np.sqrt(E0 * Ef) * np.sin(angle)
+        dQdTheta = 2.0 * np.sqrt(E0 * ENERGY_FINAL) * np.sin(angle)
 
         dQ2 = (
             dQdE1**2 * dE1**2
             + (dQdTOF**2 * dTOF**2 + dQdL1**2 * dL1**2 + dQdL0**2 * dL0**2)
-            * np.abs(Ef / E0 * np.cos(angle) - 1)
+            * np.abs(ENERGY_FINAL / E0 * np.cos(angle) - 1)
             + dQdTheta**2 * dTheta**2
         )
-        dQ2 *= (mN / hbar**2 / delta_Q) ** 2
+        dQ2 *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
 
         # in A-1    #same as dy^2 = (dy/dw)^2*dw^2 + (dy/dq)^2*dq^2
         gaussianResWidth = np.sqrt(dW2 + dQ2)
-        return gaussianResWidth
+        self._gaussian_resolution = np.swapaxes(gaussianResWidth, 0, 1)
+        return
 
 
-    def calcLorentzianResolution(self, centers):
-        masses = self._masses.reshape(-1, 1)
-        v0, E0, delta_E, delta_Q = self.kinematicsAtYCenters(centers)
-        det, plick, angle, T0, L0, L1 = self._instrument_params[self._row_being_fit]
-        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = self._resolution_params[self._row_being_fit]
-        mN, Ef, en_to_vel, vf, hbar = loadConstants()
+    def _get_lorentzian_resolution(self, centers):
+        proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
+        lorentzian_resolution = self._lorentzian_resolution[self._row_being_fit]
+        return np.take_along_axis(lorentzian_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
+
+
+    def _set_lorentzian_resolution(self):
+        masses = self._masses.reshape(-1, 1, 1)
+        E0 = self._E0
+        delta_Q = self._deltaQ
+        det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)
+        dE1, dTOF, dTheta, dL0, dL1, dE1_lorz = np.hsplit(self._resolution_params, 6)
 
         angle = angle * np.pi / 180
 
-        dWdE1_lor = (1.0 + (E0 / Ef) ** 1.5 * (L1 / L0)) ** 2
+        dWdE1_lor = (1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)) ** 2 * np.ones((masses.size, 1, 1))
         # conversion from meV^2 to A^-2
-        dWdE1_lor *= (masses / hbar**2 / delta_Q) ** 2
+        dWdE1_lor *= (masses / H_BAR**2 / delta_Q) ** 2 
 
         dQdE1_lor = (
             1.0
-            - (E0 / Ef) ** 1.5 * L1 / L0
-            - np.cos(angle) * ((E0 / Ef) ** 0.5 + L1 / L0 * E0 / Ef)
+            - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0
+            - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 + L1 / L0 * E0 / ENERGY_FINAL)
         ) ** 2
-        dQdE1_lor *= (mN / hbar**2 / delta_Q) ** 2
+        dQdE1_lor *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
 
         lorentzianResWidth = np.sqrt(dWdE1_lor + dQdE1_lor) * dE1_lorz  # in A-1
-        return lorentzianResWidth
+        self._lorentzian_resolution = np.swapaxes(lorentzianResWidth, 0, 1)
+        return
 
 
     def _get_parsed_constraints(self):
