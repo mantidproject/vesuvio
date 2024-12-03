@@ -10,9 +10,10 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace, CreateSampleWorkspace
+                            CreateWorkspace
 
-from mvesuvio.util.analysis_helpers import numericalThirdDerivative, load_resolution, load_instrument_params
+from mvesuvio.util.analysis_helpers import numericalThirdDerivative, load_resolution, load_instrument_params, \
+                                            extend_range_of_array
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -207,8 +208,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._set_kinematic_arrays(self._dataX)
         self._set_gaussian_resolution()
         self._set_lorentzian_resolution()
-        # Calculate y space after kinematics
-        self._set_y_space_arrays(self._dataX)
+        self._set_y_space_arrays()
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
         self._row_being_fit = 0 
@@ -331,6 +331,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
 
     def _set_kinematic_arrays(self, dataX):
+
+        # Extend range due to third derivative cutting edges
+        dataX = extend_range_of_array(dataX, 6)
+
         det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)  # each is of len(dataX)
 
         # T0 is electronic delay due to instruments
@@ -349,9 +353,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _set_y_space_arrays(self, dataX):
-        # Prepare arrays to broadcast
-        dataX = dataX[np.newaxis, :, :]
+    def _set_y_space_arrays(self):
+
+        # Extend range for better third derivative
         delta_Q = self._deltaQ[np.newaxis, :, :]
         delta_E = self._deltaE[np.newaxis, :, :]
         masses = self._masses.reshape(-1, 1, 1)
@@ -543,14 +547,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         Neutron Compton Profile distribution on TOF space for a single spectrum. 
         Calculated from kinematics, J(y) and resolution functions.
         """
-
         intensities = pars[::3].reshape(-1, 1)
         widths = pars[1::3].reshape(-1, 1)
         centers = pars[2::3].reshape(-1, 1)
         masses = self._masses.reshape(-1, 1)
-
-        E0 = self._E0[self._row_being_fit]
-        deltaQ = self._deltaQ[self._row_being_fit]
 
         gaussian_width = self._get_gaussian_resolution(centers)
         lorentzian_width = self._get_lorentzian_resolution(centers)
@@ -558,12 +558,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
 
-        FSE = (
-            -numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
-            * widths**4
-            / deltaQ
-            * 0.72
-        )
+        JOfY_third_derivative = numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
+
+        deltaQ = self._deltaQ[self._row_being_fit, 6: -6]
+        E0 = self._E0[self._row_being_fit, 6: -6]
+        JOfY = JOfY[:, 6:-6]
+
+        FSE = - JOfY_third_derivative * widths**4 / deltaQ * 0.72
+
         NCP = intensities * (JOfY+FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
         FSE = intensities * FSE * E0 * E0 ** (-0.92) * masses / deltaQ
         return NCP, FSE
@@ -572,6 +574,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def _get_gaussian_resolution(self, centers):
         proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
         gauss_resolution = self._gaussian_resolution[self._row_being_fit]
+        assert proximity_to_y_centers.shape==gauss_resolution.shape
         return np.take_along_axis(gauss_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
 
 
@@ -626,6 +629,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def _get_lorentzian_resolution(self, centers):
         proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
         lorentzian_resolution = self._lorentzian_resolution[self._row_being_fit]
+        assert proximity_to_y_centers.shape==lorentzian_resolution.shape
         return np.take_along_axis(lorentzian_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
 
 

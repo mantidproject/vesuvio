@@ -248,11 +248,7 @@ def numericalThirdDerivative(x, y):
     dev = k1 + k2 + k3 + k4 + k5 + k6
     dev /= np.power(x[:, 7:-5] - x[:, 6:-6], 3)
     dev /= 12**3
-
-    derivative = np.zeros_like(y)
-    # Padded with zeros left and right to return array with same shape
-    derivative[:, 6:-6] = dev
-    return derivative
+    return dev
 
 
 def load_resolution(instrument_params):
@@ -368,3 +364,9 @@ def calculate_h_ratio(means_table):
 
     return sorted_intensities[0] / sorted_intensities[1] 
 
+
+def extend_range_of_array(arr, n_columns):
+    arr = arr.copy()
+    left_extend = arr[:, :n_columns] + (arr[:, 0] - arr[:, n_columns]).reshape(-1, 1)
+    right_extend = arr[:, -n_columns:] + (arr[:, -1] - arr[:, -n_columns-1]).reshape(-1, 1)
+    return np.concatenate([left_extend, arr, right_extend], axis=-1)
