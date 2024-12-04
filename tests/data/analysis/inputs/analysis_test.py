@@ -79,7 +79,7 @@ class ForwardAnalysisInputs(SampleParameters):
             [-3, 1],
         ]
     constraints = ()
-    noOfMSIterations = 3  # 4
+    noOfMSIterations = 1  # 4
     MSCorrectionFlag = True
     GammaCorrectionFlag = True
 

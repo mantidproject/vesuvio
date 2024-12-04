@@ -355,7 +355,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
     def _set_y_space_arrays(self):
 
-        # Extend range for better third derivative
         delta_Q = self._deltaQ[np.newaxis, :, :]
         delta_E = self._deltaE[np.newaxis, :, :]
         masses = self._masses.reshape(-1, 1, 1)
