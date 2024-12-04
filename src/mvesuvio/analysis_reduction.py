@@ -558,6 +558,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
 
+        # Third derivative cuts edges of array by 6 indices
         JOfY_third_derivative = numericalThirdDerivative(self._y_space_arrays[self._row_being_fit], JOfY)
 
         deltaQ = self._deltaQ[self._row_being_fit, 6: -6]
