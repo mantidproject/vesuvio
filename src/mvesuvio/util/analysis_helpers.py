@@ -237,7 +237,7 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
-def numericalThirdDerivative(x, y):
+def numerical_third_derivative(x, y):
     k6 = (- y[:, 12:] + y[:, :-12]) * 1
     k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
     k4 = (- y[:, 10:-2] + y[:, 2:-10]) * 192
