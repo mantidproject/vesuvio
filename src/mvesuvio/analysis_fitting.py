@@ -147,7 +147,7 @@ def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
     mask = np.all(ws.extractY() == 0, axis=0)
     dataY[:, mask] = 0
 
-    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name() + "_Mass0")
+    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name() + "_m0")
     passDataIntoWS(dataX, dataY, dataE, wsSubMass)
     wsMask, maskList = ExtractMask(ws)
     MaskDetectors(Workspace=wsSubMass, MaskedWorkspace=wsMask)
@@ -185,7 +185,7 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
 
             # Normalize spectra of specieal workspace
             wsJoYN = Divide(
-                wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name() + "_Normalised"
+                wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name() + "_norm"
             )
             wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
             return wsJoYN, wsJoYAvg
@@ -208,7 +208,7 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
 
 
 def convertToYSpace(wsTOF, mass0):
-    wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_JoY")
+    wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
     return wsJoY
 
 
@@ -217,10 +217,10 @@ def rebinAndNorm(wsJoY, rebinPars):
         InputWorkspace=wsJoY,
         Params=rebinPars,
         FullBinsOnly=True,
-        OutputWorkspace=wsJoY.name() + "_Rebinned",
+        OutputWorkspace=wsJoY.name() + "_rebin",
     )
-    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name() + "_Integrated")
-    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name() + "_Normalised")
+    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name() + "_integrated")
+    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name() + "_norm")
     return wsJoYNorm, wsJoYInt
 
 
@@ -301,7 +301,7 @@ def weightedAvgXBins(wsXBins, xp):
         DataY=meansY,
         DataE=meansE,
         NSpec=1,
-        OutputWorkspace=wsXBins.name() + "_WeightedAvg",
+        OutputWorkspace=wsXBins.name() + "_wavg",
     )
     return wsYSpaceAvg
 
@@ -365,7 +365,7 @@ def weightedAvgCols(wsYSpace):
         DataY=meanY,
         DataE=meanE,
         NSpec=1,
-        OutputWorkspace=wsYSpace.name() + "_WeightedAvg",
+        OutputWorkspace=wsYSpace.name() + "_wavg",
     )
     return wsYSpaceAvg
 
@@ -474,7 +474,7 @@ def symmetrizeWs(avgYSpace):
     else:
         dataYS, dataES = weightedSymArr(dataY, dataE)
 
-    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_Symmetrised")
+    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_sym")
     wsSym = passDataIntoWS(dataX, dataYS, dataES, wsSym)
     return wsSym
 
@@ -893,14 +893,21 @@ def createFitResultsWorkspace(
 ):
     """Creates workspace similar to the ones created by Mantid Fit."""
 
-    wsMinFit = CreateWorkspace(
+    ws_fit_profile = CreateWorkspace(
+        DataX=dataX,
+        DataY=dataY,
+        DataE=dataE,
+        NSpec=1,
+        OutputWorkspace=wsYSpaceSym.name() + "_minuit",
+    )
+    ws_fit_complete = CreateWorkspace(
         DataX=np.concatenate((dataX, dataX, dataX)),
         DataY=np.concatenate((dataY, dataYFit, Residuals)),
         DataE=np.concatenate((dataE, dataYSigma, np.zeros(len(dataE)))),
         NSpec=3,
-        OutputWorkspace=wsYSpaceSym.name() + "_Fitted_Minuit",
+        OutputWorkspace=wsYSpaceSym.name() + "_minuit_Workspace",
     )
-    return wsMinFit
+    return ws_fit_complete 
 
 
 def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
@@ -927,7 +934,7 @@ def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
 
 def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):
     tableWS = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsYSpaceSym.name() + "_Fitted_Minuit_NormalizedCovarianceMatrix"
+        OutputWorkspace=wsYSpaceSym.name() + "_minuit_NormalizedCovarianceMatrix"
     )
     tableWS.setTitle("Minuit Fit")
     tableWS.addColumn(type="str", name="Name")
@@ -1211,7 +1218,7 @@ def createFitParametersTableWorkspace(
 ):
     # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsYSpaceSym.name() + "_Fitted_Minuit_Parameters"
+        OutputWorkspace=wsYSpaceSym.name() + "_minuit_Parameters"
     )
     tableWS.setTitle("Minuit Fit")
     tableWS.addColumn(type="str", name="Name")
@@ -1297,7 +1304,8 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
         else:
             raise ValueError("fitmodel not recognized.")
 
-        outputName = wsYSpaceSym.name() + "_Fitted_" + minimizer
+        suffix = 'lm' if minimizer=="Levenberg-Marquardt" else minimizer.lower()
+        outputName = wsYSpaceSym.name() + "_" + suffix
         CloneWorkspace(InputWorkspace=wsYSpaceSym, OutputWorkspace=outputName)
 
         Fit(
@@ -1314,17 +1322,17 @@ def printYSpaceFitResults(wsJoYName):
     print("\nFit in Y Space results:")
     foundWS = []
     try:
-        wsFitLM = mtd[wsJoYName + "_Fitted_Levenberg-Marquardt_Parameters"]
+        wsFitLM = mtd[wsJoYName + "_lm_Parameters"]
         foundWS.append(wsFitLM)
     except KeyError:
         pass
     try:
-        wsFitSimplex = mtd[wsJoYName + "_Fitted_Simplex_Parameters"]
+        wsFitSimplex = mtd[wsJoYName + "_simplex_Parameters"]
         foundWS.append(wsFitSimplex)
     except KeyError:
         pass
     try:
-        wsFitMinuit = mtd[wsJoYName + "_Fitted_Minuit_Parameters"]
+        wsFitMinuit = mtd[wsJoYName + "_minuit_Parameters"]
         foundWS.append(wsFitMinuit)
     except KeyError:
         pass
@@ -1353,7 +1361,7 @@ class ResultsYFitObject:
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
 
         wsJoYAvg = mtd[wsYSpaceAvgName]
-        wsSubMassName = wsYSpaceAvgName.split("_JoY_")[0]
+        wsSubMassName = wsYSpaceAvgName.split("_joy_")[0]
         wsMass0 = mtd[wsSubMassName]
 
         self.finalRawDataY = wsFinal.extractY()
@@ -1367,19 +1375,19 @@ class ResultsYFitObject:
         poptList = []
         perrList = []
         try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_Fitted_Minuit_Parameters"]
+            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_Parameters"]
             poptList.append(wsFitMinuit.column("Value"))
             perrList.append(wsFitMinuit.column("Error"))
         except:
             pass
         try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_Fitted_Levenberg-Marquardt_Parameters"]
+            wsFitLM = mtd[wsJoYAvg.name() + "_lm_Parameters"]
             poptList.append(wsFitLM.column("Value"))
             perrList.append(wsFitLM.column("Error"))
         except:
             pass
         try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_Fitted_Simplex_Parameters"]
+            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_Parameters"]
             poptList.append(wsFitSimplex.column("Value"))
             perrList.append(wsFitSimplex.column("Error"))
         except:
