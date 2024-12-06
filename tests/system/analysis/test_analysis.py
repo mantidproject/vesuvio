@@ -37,7 +37,7 @@ class AnalysisRunner:
     def _load_benchmark_results(cls):
         benchmarkPath = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark"
         benchmarkResults = np.load(
-            str(benchmarkPath / "stored_spec_144-182_iter_3_GC_MS.npz")
+            str(benchmarkPath / "stored_spec_144-182_iter_1_GC_MS.npz")
         )
         cls._benchmarkResults = benchmarkResults
 

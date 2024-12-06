@@ -1,10 +1,11 @@
 import unittest
 import numpy as np
+import scipy
 import dill
 import numpy.testing as nptest
 from mock import MagicMock
 from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, numerical_third_derivative
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 
 
@@ -125,6 +126,28 @@ class TestAnalysisHelpers(unittest.TestCase):
         self.assertEqual(converted_constraints[0]['fun']([3, 0, 0, 1]), 3-2.7527)
         self.assertEqual(converted_constraints[1]['fun']([0, 0, 0, 2, 0, 0, 1]), 2-0.7234)
 
+
+    def test_extend_range_of_array_for_increasing_range(self):
+        x = np.arange(10)
+        x = np.vstack([x, 2*x])
+        x_extended = extend_range_of_array(x, 5)
+        np.testing.assert_array_equal(x_extended, np.vstack([np.arange(-5, 15, 1), np.arange(-10, 30, 2)]))
+
+
+    def test_extend_range_of_array_for_decreasing_range(self):
+        x = np.linspace(-5, 5, 21)
+        x = np.vstack([x, 2*x])
+        x_extended = extend_range_of_array(x, 5)
+        np.testing.assert_array_equal(x_extended, np.vstack([np.linspace(-7.5, 7.5, 31), np.linspace(-15, 15, 31)]))
+
+
+    def test_numerical_third_derivative(self):
+        x= np.linspace(-20, 20, 300)    # Workspaces are about 300 points of range
+        x = np.vstack([x, 2*x])
+        y = scipy.special.voigt_profile(x, 5, 5)
+        numerical_derivative = numerical_third_derivative(x, y)
+        expected_derivative = np.array([np.gradient(np.gradient(np.gradient(y_i, x_i), x_i), x_i)[6: -6] for y_i, x_i in zip(y, x) ])
+        np.testing.assert_allclose(numerical_derivative, expected_derivative, atol=1e-6)
 
 if __name__ == "__main__":
     unittest.main()
