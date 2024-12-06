@@ -23,18 +23,15 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
         print(f"Workspace to fit {wsTOF} not found.")
         return
 
-    ncpForEachMass = extractNCPFromWorkspaces(wsTOF, IC)
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
 
-    wsTOFMass0 = subtractAllMassesExceptFirst(IC, wsTOF, ncpForEachMass)
+    wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
 
     if yFitIC.subtractFSE:
         wsFSEMass0 = find_ws_name_fse_first_mass(IC)
         wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
 
-    wsJoY, wsJoYAvg = ySpaceReduction(
-        wsTOFMass0, IC.masses[0], yFitIC, ncpForEachMass[:, 0, :]
-    )
+    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC.masses[0], yFitIC, IC)
 
     if yFitIC.symmetrisationFlag:
         wsJoYAvg = symmetrizeWs(wsJoYAvg)
@@ -69,34 +66,6 @@ def find_ws_name_fse_first_mass(ic):
     return ws_names_fse[np.argmin(ws_masses)]
 
 
-def extractNCPFromWorkspaces(wsFinal, ic):
-    """Extra function to extract ncps from loaded ws in mantid."""
-
-    for ws_name in mtd.getObjectNames():
-        if ws_name.startswith(ic.name+'_'+str(ic.noOfMSIterations)) and ws_name.endswith('ncp'):
-
-            if 'total' in ws_name:
-                continue
-
-            ws = mtd[ws_name]
-            dataY = ws.extractY()[np.newaxis, :, :]
-            try:
-                ncpForEachMass = np.append(ncpForEachMass, dataY, axis=0)
-            except UnboundLocalError:
-                ncpForEachMass = dataY 
-
-    # Ensure shape of ncp matches data
-    shape = ncpForEachMass.shape
-    assert shape[0] == len(ic.masses)
-    assert shape[1] == wsFinal.getNumberHistograms()
-    # Final dimension can be missing last col or not
-    assert (shape[2] == wsFinal.blocksize()) | (shape[2] == wsFinal.blocksize() - 1)
-
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)  # Organizes ncp by spectra
-    print("\nExtracted NCP profiles from workspaces.\n")
-    return ncpForEachMass
-
-
 def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
     mass = IC.masses[0]
 
@@ -125,36 +94,26 @@ def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
     return wsResSum, mtd[resName]
 
 
-def subtractAllMassesExceptFirst(ic, ws, ncpForEachMass):
+def subtract_profiles_except_lightest(ic, ws):
     """
     Isolates TOF data from first mass only.
     Input: ws containing TOF values, NCP for all mass profiles.
     Output: ws with all profiles except first subtracted.
     """
+    if len(ic.masses) == 1:
+        return
 
-    ncpForEachMass = switchFirstTwoAxis(ncpForEachMass)
-    # Select all masses other than the first one
-    ncpForEachMassExceptFirst = ncpForEachMass[1:, :, :]
-    # Sum the ncpTotal for remaining masses
-    ncpTotalExceptFirst = np.sum(ncpForEachMassExceptFirst, axis=0)
+    ws_name_lightest_mass = ic.name + '_' + str(ic.noOfMSIterations) + '_' + str(min(ic.masses)) + '_ncp'
+    ws_name_profiles = ic.name + '_' + str(ic.noOfMSIterations) + '_total_ncp'
 
-    dataX, dataY, dataE = extractWS(ws)
+    wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
+                             OutputWorkspace=ws_name_profiles + '_except_lightest')
 
-    # Adjust for last column missing or not
-    dataY[:, : ncpTotalExceptFirst.shape[1]] -= ncpTotalExceptFirst
+    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_sum")
 
-    # Ignore any masked bins (columns) from initial ws
-    mask = np.all(ws.extractY() == 0, axis=0)
-    dataY[:, mask] = 0
-
-    wsSubMass = CloneWorkspace(InputWorkspace=ws, OutputWorkspace=ws.name() + "_m0")
-    passDataIntoWS(dataX, dataY, dataE, wsSubMass)
-    wsMask, maskList = ExtractMask(ws)
-    MaskDetectors(Workspace=wsSubMass, MaskedWorkspace=wsMask)
-    SumSpectra(
-        InputWorkspace=wsSubMass.name(), OutputWorkspace=wsSubMass.name() + "_Sum"
-    )
-    return wsSubMass
+    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_m0")
+    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_sum")
+    return wsFirstMass
 
 
 def switchFirstTwoAxis(A):
@@ -164,8 +123,11 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def ySpaceReduction(wsTOF, mass0, yFitIC, ncp):
+def ySpaceReduction(wsTOF, mass0, yFitIC, ic):
     """Seperate procedures depending on masking specified."""
+
+    ws_name_lightest_mass = ic.name + '_' + str(ic.noOfMSIterations) + '_' + str(min(ic.masses)) + '_ncp'
+    ncp = mtd[ws_name_lightest_mass].extractY()
 
     rebinPars = yFitIC.rebinParametersForYSpaceFit
 
