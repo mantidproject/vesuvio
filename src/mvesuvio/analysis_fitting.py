@@ -474,7 +474,7 @@ def symmetrizeWs(avgYSpace):
     else:
         dataYS, dataES = weightedSymArr(dataY, dataE)
 
-    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_Symmetrised")
+    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_sym")
     wsSym = passDataIntoWS(dataX, dataYS, dataES, wsSym)
     return wsSym
 
