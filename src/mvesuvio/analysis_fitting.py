@@ -580,9 +580,10 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     dataYSigma *= chi2  # Weight the confidence band
     Residuals = dataY - dataYFit
 
+    wsYSpaceSym = CloneWorkspace(wsYSpaceSym, OutputWorkspace=wsYSpaceSym.name()+'_minuit_'+yFitIC.fitting_model)
     # Create workspace to store best fit curve and errors on the fit
     wsMinFit = createFitResultsWorkspace(
-        wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals
+        wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals 
     )
     saveMinuitPlot(yFitIC, wsMinFit, m)
 
@@ -851,23 +852,16 @@ class MyLeastSquares:
 
 
 def createFitResultsWorkspace(
-    wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals
+    wsYSpaceSym, dataX, dataY, dataE, dataYFit, dataYSigma, Residuals 
 ):
     """Creates workspace similar to the ones created by Mantid Fit."""
 
-    ws_fit_profile = CreateWorkspace(
-        DataX=dataX,
-        DataY=dataY,
-        DataE=dataE,
-        NSpec=1,
-        OutputWorkspace=wsYSpaceSym.name() + "_minuit",
-    )
     ws_fit_complete = CreateWorkspace(
         DataX=np.concatenate((dataX, dataX, dataX)),
         DataY=np.concatenate((dataY, dataYFit, Residuals)),
         DataE=np.concatenate((dataE, dataYSigma, np.zeros(len(dataE)))),
         NSpec=3,
-        OutputWorkspace=wsYSpaceSym.name() + "_minuit_Workspace",
+        OutputWorkspace=wsYSpaceSym.name() + "_Workspace",
     )
     return ws_fit_complete 
 
@@ -896,7 +890,7 @@ def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
 
 def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):
     tableWS = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsYSpaceSym.name() + "_minuit_NormalizedCovarianceMatrix"
+        OutputWorkspace=wsYSpaceSym.name() + "_NormalizedCovarianceMatrix"
     )
     tableWS.setTitle("Minuit Fit")
     tableWS.addColumn(type="str", name="Name")
@@ -1178,7 +1172,7 @@ def createFitParametersTableWorkspace(
 ):
     # Create Parameters workspace
     tableWS = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsYSpaceSym.name() + "_minuit_Parameters"
+        OutputWorkspace=wsYSpaceSym.name() + "_Parameters"
     )
     tableWS.setTitle("Minuit Fit")
     tableWS.addColumn(type="str", name="Name")
@@ -1267,7 +1261,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             )
 
         suffix = 'lm' if minimizer=="Levenberg-Marquardt" else minimizer.lower()
-        outputName = wsYSpaceSym.name() + "_" + suffix
+        outputName = wsYSpaceSym.name() + "_" + suffix + "_" + yFitIC.fitting_model 
         CloneWorkspace(InputWorkspace=wsYSpaceSym, OutputWorkspace=outputName)
 
         Fit(
@@ -1337,19 +1331,19 @@ class ResultsYFitObject:
         poptList = []
         perrList = []
         try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_Parameters"]
+            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + yFitIC.fitting_model + "_Parameters"]
             poptList.append(wsFitMinuit.column("Value"))
             perrList.append(wsFitMinuit.column("Error"))
         except:
             pass
         try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_lm_Parameters"]
+            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + yFitIC.fitting_model + "_Parameters"]
             poptList.append(wsFitLM.column("Value"))
             perrList.append(wsFitLM.column("Error"))
         except:
             pass
         try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_Parameters"]
+            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + yFitIC.fitting_model + "_Parameters"]
             poptList.append(wsFitSimplex.column("Value"))
             perrList.append(wsFitSimplex.column("Error"))
         except:
