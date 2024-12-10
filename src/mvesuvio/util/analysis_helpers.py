@@ -203,13 +203,13 @@ def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectors, maskTOFRange)
         OutputWorkspace=newWsName,
     )
 
-    maskBinsWithZeros(wsCrop, maskTOFRange)  # Used to mask resonance peaks
+    mask_time_of_flight_bins_with_zeros(wsCrop, maskTOFRange)  # Used to mask resonance peaks
 
     MaskDetectors(Workspace=wsCrop, SpectraList=maskedDetectors)
     return wsCrop
 
 
-def maskBinsWithZeros(ws, maskTOFRange):
+def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
     """
     Masks a given TOF range on ws with zeros on dataY.
     Leaves errors dataE unchanged, as they are used by later treatments.
@@ -220,7 +220,7 @@ def maskBinsWithZeros(ws, maskTOFRange):
         return
 
     dataX, dataY, dataE = extractWS(ws)
-    start, end = [int(s) for s in maskTOFRange.split(",")]
+    start, end = [float(s) for s in maskTOFRange.split("-")]
     assert (
         start <= end
     ), "Start value for masking needs to be smaller or equal than end."
