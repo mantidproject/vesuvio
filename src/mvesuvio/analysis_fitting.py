@@ -54,7 +54,7 @@ def find_ws_name_fse_first_mass(ic):
     # Some dirty implementation to be deleted in the future
     ws_names_fse = []
     ws_masses = []
-    prefix = ic.name+'_'+str(ic.noOfMSIterations)
+    prefix = ic.name+'_'+str(ic.number_of_iterations_for_corrections)
     for ws_name in mtd.getObjectNames():
         if ws_name.startswith(prefix) and ws_name.endswith('fse'):
             name_ending = ws_name.replace(prefix, "")
@@ -103,8 +103,8 @@ def subtract_profiles_except_lightest(ic, ws):
     if len(ic.masses) == 1:
         return
 
-    ws_name_lightest_mass = ic.name + '_' + str(ic.noOfMSIterations) + '_' + str(min(ic.masses)) + '_ncp'
-    ws_name_profiles = ic.name + '_' + str(ic.noOfMSIterations) + '_total_ncp'
+    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
+    ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
 
     wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
                              OutputWorkspace=ws_name_profiles + '_except_lightest')
@@ -126,7 +126,7 @@ def switchFirstTwoAxis(A):
 def ySpaceReduction(wsTOF, mass0, yFitIC, ic):
     """Seperate procedures depending on masking specified."""
 
-    ws_name_lightest_mass = ic.name + '_' + str(ic.noOfMSIterations) + '_' + str(min(ic.masses)) + '_ncp'
+    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
     ncp = mtd[ws_name_lightest_mass].extractY()
 
     rebinPars = yFitIC.rebinParametersForYSpaceFit
@@ -1503,9 +1503,10 @@ def extractData(ws, wsRes, ic):
 
 def loadInstrParsFileIntoArray(ic):
     ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
-    data = np.loadtxt(str(ipFilesPath / ic.ipfile), dtype=str)[1:].astype(float)
+    data = np.loadtxt(str(ipFilesPath / ic.instrument_parameters_file), dtype=str)[1:].astype(float)
     spectra = data[:, 0]
-    select_rows = np.where((spectra >= ic.firstSpec) & (spectra <= ic.lastSpec))
+    firstSpec, lastSpec = [int(d) for d in ic.detectors.split('-')]
+    select_rows = np.where((spectra >= firstSpec) & (spectra <= lastSpec))
     instrPars = data[select_rows]
     return instrPars
 
