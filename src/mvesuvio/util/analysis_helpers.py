@@ -23,8 +23,8 @@ def create_profiles_table(name, ai):
     table.addColumn(type="float", name="center")
     table.addColumn(type="str", name="center_bounds")
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-        ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
-        ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
+        ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
+        ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
     ):
         table.addRow(
             [str(float(mass)), float(mass), float(intensity), str(list(intensity_bound)),

@@ -3,10 +3,6 @@ from tests.data.analysis.inputs.analysis_test import (
     ForwardAnalysisInputs,
     YSpaceFitInputs,
 )
-ForwardAnalysisInputs.noOfMSIterations = 1
-ForwardAnalysisInputs.firstSpec = 164
-ForwardAnalysisInputs.lastSpec = 175
-ForwardAnalysisInputs.maskedSpecAllNo = [173, 174]
 ForwardAnalysisInputs.fit_in_y_space = True 
 BackwardAnalysisInputs.fit_in_y_space = False
 ForwardAnalysisInputs.run_this_scattering_type = True 
