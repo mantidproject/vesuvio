@@ -5,7 +5,8 @@ import dill
 import numpy.testing as nptest
 from mock import MagicMock
 from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, numerical_third_derivative
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, numerical_third_derivative,  \
+    mask_time_of_flight_bins_with_zeros
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 
 
@@ -148,6 +149,34 @@ class TestAnalysisHelpers(unittest.TestCase):
         numerical_derivative = numerical_third_derivative(x, y)
         expected_derivative = np.array([np.gradient(np.gradient(np.gradient(y_i, x_i), x_i), x_i)[6: -6] for y_i, x_i in zip(y, x) ])
         np.testing.assert_allclose(numerical_derivative, expected_derivative, atol=1e-6)
+
+
+    def test_mask_time_of_flight_bins_with_zeros(self):
+        data_x = np.arange(10).reshape(1, -1) * np.ones((3, 1))
+        data_y = np.ones((3, 10))
+        data_e = np.ones((3, 10))
+        workspace_mock = MagicMock()
+        workspace_mock.extractX.return_value = data_x
+        workspace_mock.extractY.return_value = data_y
+        workspace_mock.extractE.return_value = data_e
+
+        actual_data_x = np.zeros((3, 10))
+        actual_data_y = np.zeros((3, 10))
+        actual_data_e = np.zeros((3, 10))
+
+        workspace_mock.dataY.side_effect = lambda i: actual_data_y[i]
+        workspace_mock.dataX.side_effect = lambda i: actual_data_x[i]
+        workspace_mock.dataE.side_effect = lambda i: actual_data_e[i]
+
+        workspace_mock.getNumberHistograms.return_value = 3
+        mask_time_of_flight_bins_with_zeros(workspace_mock, '4.5-7.3')
+
+        np.testing.assert_allclose(actual_data_x, data_x)
+        np.testing.assert_allclose(actual_data_e, data_e)
+        expected_data_y = np.ones((3, 10)) 
+        expected_data_y[(data_x >= 4.5) & (data_x <= 7.3)] = 0
+        np.testing.assert_allclose(actual_data_y, expected_data_y)
+
 
 if __name__ == "__main__":
     unittest.main()
