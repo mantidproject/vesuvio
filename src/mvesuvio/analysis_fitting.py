@@ -27,13 +27,13 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
 
     wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
 
-    if yFitIC.subtractFSE:
+    if yFitIC.subtract_calculated_fse_from_data:
         wsFSEMass0 = find_ws_name_fse_first_mass(IC)
         wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
 
     wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC.masses[0], yFitIC, IC)
 
-    if yFitIC.symmetrisationFlag:
+    if yFitIC.do_symmetrisation:
         wsJoYAvg = symmetrizeWs(wsJoYAvg)
 
     fitProfileMinuit(yFitIC, wsJoYAvg, wsResSum)
@@ -44,7 +44,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
     yfitResults = ResultsYFitObject(IC, yFitIC, wsTOF.name(), wsJoYAvg.name())
     yfitResults.save()
 
-    if yFitIC.globalFit:
+    if yFitIC.do_global_fit:
         runGlobalFit(wsJoY, wsRes, IC, yFitIC)
 
     return yfitResults
@@ -76,7 +76,7 @@ def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
         )
         Rebin(
             InputWorkspace="tmp",
-            Params=yFitIC.rebinParametersForYSpaceFit,
+            Params=yFitIC.range_for_rebinning_in_y_space,
             OutputWorkspace="tmp",
         )
 
@@ -129,10 +129,10 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ic):
     ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
     ncp = mtd[ws_name_lightest_mass].extractY()
 
-    rebinPars = yFitIC.rebinParametersForYSpaceFit
+    rebinPars = yFitIC.range_for_rebinning_in_y_space
 
     if np.any(np.all(wsTOF.extractY() == 0, axis=0)):  # Masked columns present
-        if yFitIC.maskTypeProcedure == "NAN":
+        if yFitIC.mask_zeros_with == "nan":
             # Build special workspace to store accumulated points
             wsJoY = convertToYSpace(wsTOF, mass0)
             xp = buildXRangeFromRebinPars(yFitIC)
@@ -152,14 +152,14 @@ def ySpaceReduction(wsTOF, mass0, yFitIC, ic):
             wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
             return wsJoYN, wsJoYAvg
 
-        elif yFitIC.maskTypeProcedure == "NCP":
+        elif yFitIC.mask_zeros_with == "ncp":
             wsTOF = replaceZerosWithNCP(wsTOF, ncp)
 
         else:
             raise ValueError(
                 """
             Masked TOF bins were found but no valid procedure in y-space fit was selected.
-            Options: 'NAN', 'NCP'
+            Options: 'nan', 'ncp'
             """
             )
 
@@ -206,7 +206,7 @@ def replaceZerosWithNCP(ws, ncp):
 def buildXRangeFromRebinPars(yFitIC):
     # Range used in case mask is set to NAN
     first, step, last = [
-        float(s) for s in yFitIC.rebinParametersForYSpaceFit.split(",")
+        float(s) for s in yFitIC.range_for_rebinning_in_y_space.split(",")
     ]
     xp = np.arange(first, last, step) + step / 2  # Correction to match Mantid range
     return xp
@@ -519,7 +519,7 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     resX, resY, resE = extractFirstSpectra(wsRes)
     assert np.all(dataX == resX), "Resolution should operate on the same range as DataX"
 
-    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitting_model)
 
     xDelta, resDense = oddPointsRes(resX, resY)
 
@@ -544,11 +544,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     m = Minuit(costFun, **defaultPars)
 
     m.limits["A"] = (0, None)
-    if yFitIC.fitModel == "DOUBLE_WELL":
+    if yFitIC.fitting_model== "doublewell":
         m.limits["d"] = (0, None)
         m.limits["R"] = (0, None)
 
-    if yFitIC.fitModel == "SINGLE_GAUSSIAN":
+    if yFitIC.fitting_model== "gauss":
         m.simplex()
         m.migrad()
 
@@ -616,7 +616,7 @@ def selectModelAndPars(modelFlag):
     The defaultPars should be in the same order as the signature of the function
     """
 
-    if modelFlag == "SINGLE_GAUSSIAN":
+    if modelFlag == "gauss":
 
         def model(x, A, x0, sigma):
             return (
@@ -629,7 +629,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma": 5}
         sharedPars = ["sigma"]  # Used only in Global fit
 
-    elif modelFlag == "GC_C4_C6":
+    elif modelFlag == "gcc4c6":
 
         def model(x, A, x0, sigma1, c4, c6):
             return (
@@ -659,7 +659,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0}
         sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "GC_C4":
+    elif modelFlag == "gcc4":
 
         def model(x, A, x0, sigma1, c4):
             return (
@@ -681,7 +681,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}
         sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
-    elif modelFlag == "GC_C6":
+    elif modelFlag == "gcc6":
 
         def model(x, A, x0, sigma1, c6):
             return (
@@ -704,7 +704,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}
         sharedPars = ["sigma1", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "DOUBLE_WELL":
+    elif modelFlag == "doublewell":
 
         def model(x, A, d, R, sig1, sig2):
             # h = 2.04
@@ -744,7 +744,7 @@ def selectModelAndPars(modelFlag):
         }  # TODO: Starting parameters and bounds?
         sharedPars = ["d", "R", "sig1", "sig2"]  # Only varying parameter is amplitude A
 
-    elif modelFlag == "ANSIO_GAUSSIAN":
+    elif modelFlag == "ansiogauss":
         # Ansiotropic case
         def model(x, A, sig1, sig2):
             # h = 2.04
@@ -765,7 +765,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "sig1": 3, "sig2": 5}
         sharedPars = ["sig1", "sig2"]
 
-    elif modelFlag == "Gaussian3D":
+    elif modelFlag == "gauss3d":
 
         def model(x, A, sig_x, sig_y, sig_z):
             y = x[:, np.newaxis, np.newaxis]
@@ -795,7 +795,7 @@ def selectModelAndPars(modelFlag):
 
     else:
         raise ValueError(
-            "Fitting Model not recognized, available options: 'SINGLE_GAUSSIAN', 'GC_C4_C6', 'GC_C4'"
+            "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
         )
 
     print("\nShared Parameters: ", [key for key in sharedPars])
@@ -915,7 +915,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
     errors = list(mObj.errors)
 
     # If minos is set not to run, ouput columns with zeros on minos errors
-    if not (yFitIC.runMinos):
+    if not (yFitIC.run_minos):
         minosAutoErr = list(np.zeros((len(parameters), 2)))
         minosManErr = list(np.zeros((len(parameters), 2)))
         return parameters, values, errors, minosAutoErr, minosManErr
@@ -927,7 +927,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         bestFitErrs[p] = e
 
     if (
-        yFitIC.fitModel == "SINGLE_GAUSSIAN"
+        yFitIC.fitting_model== "gauss"
     ):  # Case with no positivity constraint, can use automatic minos()
         mObj.minos()
         me = mObj.merrors
@@ -938,13 +938,13 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
             minosAutoErr.append([me[p].lower, me[p].upper])
         minosManErr = list(np.zeros(np.array(minosAutoErr).shape))
 
-        if yFitIC.showPlots:
+        if yFitIC.show_plots:
             plotAutoMinos(mObj, wsName)
 
     else:  # Case with positivity constraint on function, use manual implementation
         # Changes values of minuit obj m, do not use m below this point
         merrors, fig = runAndPlotManualMinos(
-            mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.showPlots
+            mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.show_plots
         )
 
         # Same as above, but the other way around
@@ -953,7 +953,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
             minosManErr.append(merrors[p])
         minosAutoErr = list(np.zeros(np.array(minosManErr).shape))
 
-        if yFitIC.showPlots:
+        if yFitIC.show_plots:
             fig.canvas.manager.set_window_title(wsName + "_Manual_Implementation_MINOS")
             fig.show()
 
@@ -990,7 +990,6 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
         )
         merrors[p] = np.array([lerr, uerr])
 
-    # if showPlots:
     # Hide plots not in use:
     for ax in axs.flat:
         if not ax.lines:  # If empty list
@@ -999,7 +998,6 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
     # ALl axes share same legend, so set figure legend to first axis
     handle, label = axs[0, 0].get_legend_handles_labels()
     fig.legend(handle, label, loc="lower right")
-    # fig.show()
     return merrors, fig
 
 
@@ -1226,13 +1224,13 @@ def oddPointsRes(x, res):
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     print("\nFitting on the sum of spectra in the West domain ...\n")
     for minimizer in ["Levenberg-Marquardt", "Simplex"]:
-        if yFitIC.fitModel == "SINGLE_GAUSSIAN":
+        if yFitIC.fitting_model== "gauss":
             function = f"""composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()"""
 
-        elif yFitIC.fitModel == "GC_C4_C6":
+        elif yFitIC.fitting_model== "gcc4c6":
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -1241,7 +1239,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
             """
-        elif yFitIC.fitModel == "GC_C4":
+        elif yFitIC.fitting_model== "gcc4":
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -1249,7 +1247,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,ties=()
             """
-        elif yFitIC.fitModel == "GC_C6":
+        elif yFitIC.fitting_model== "gcc6":
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -1258,13 +1256,15 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
         elif (
-            (yFitIC.fitModel == "DOUBLE_WELL")
-            | (yFitIC.fitModel == "ANSIO_GAUSSIAN")
-            | (yFitIC.fitModel == "Gaussian3D")
+            (yFitIC.fitting_model == "doublewell")
+            | (yFitIC.fitting_model == "ansiogauss")
+            | (yFitIC.fitting_model == "gauss3d")
         ):
             return
         else:
-            raise ValueError("fitmodel not recognized.")
+            raise ValueError(
+                "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
+            )
 
         suffix = 'lm' if minimizer=="Levenberg-Marquardt" else minimizer.lower()
         outputName = wsYSpaceSym.name() + "_" + suffix
@@ -1369,7 +1369,7 @@ class ResultsYFitObject:
         self.perr = perr
 
         self.savePath = ic.ySpaceFitSavePath
-        self.fitModel = yFitIC.fitModel
+        self.fitting_model= yFitIC.fitting_model
 
     def save(self):
         np.savez(
@@ -1398,10 +1398,10 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
         dataX, dataY, dataE, dataRes, idxList, yFitIC
     )
 
-    if yFitIC.symmetrisationFlag:
+    if yFitIC.do_symmetrisation:
         dataY, dataE = weightedSymArr(dataY, dataE)
 
-    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitModel)
+    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitting_model)
 
     totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
@@ -1422,12 +1422,12 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     for i in range(len(dataY)):  # Set limits for unshared parameters
         m.limits["A" + str(i)] = (0, np.inf)
 
-    if yFitIC.fitModel == "DOUBLE_WELL":
+    if yFitIC.fitting_model== "doublewell":
         m.limits["d"] = (0, np.inf)  # Shared parameters
         m.limits["R"] = (0, np.inf)
 
     t0 = time.time()
-    if yFitIC.fitModel == "SINGLE_GAUSSIAN":
+    if yFitIC.fitting_model== "gauss":
         m.simplex()
         m.migrad()
 
@@ -1481,7 +1481,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
         print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
     print("\n")
 
-    if yFitIC.showPlots:
+    if yFitIC.show_plots:
         plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name())
 
     return np.array(m.values), np.array(
@@ -1533,7 +1533,7 @@ def groupDetectors(ipData, yFitIC):
 
     checkNGroupsValid(yFitIC, ipData)
 
-    print(f"\nNumber of gropus: {yFitIC.nGlobalFitGroups}")
+    print(f"\nNumber of gropus: {yFitIC.number_of_global_fit_groups}")
 
     L1 = ipData[:, -1].copy()
     theta = ipData[:, 2].copy()
@@ -1547,7 +1547,7 @@ def groupDetectors(ipData, yFitIC):
     points = np.vstack((L1, theta)).T
     assert points.shape == (len(L1), 2), "Wrong shape."
     # Initial centers of groups
-    startingIdxs = np.linspace(0, len(points) - 1, yFitIC.nGlobalFitGroups).astype(int)
+    startingIdxs = np.linspace(0, len(points) - 1, yFitIC.number_of_global_fit_groups).astype(int)
     centers = points[
         startingIdxs, :
     ]  # Centers of cluster groups, NOT fitting parameter
@@ -1558,7 +1558,7 @@ def groupDetectors(ipData, yFitIC):
     clusters = kMeansClustering(points, centers)
     idxList = formIdxList(clusters)
 
-    if yFitIC.showPlots:
+    if yFitIC.show_plots:
         fig, ax = plt.subplots(tight_layout=True, subplot_kw={"projection": "mantid"})
         fig.canvas.manager.set_window_title("Grouping of detectors")
         plotFinalGroups(ax, ipData, idxList)
@@ -1571,17 +1571,17 @@ def checkNGroupsValid(yFitIC, ipData):
 
     nSpectra = len(ipData)  # Number of spectra in the workspace
 
-    if yFitIC.nGlobalFitGroups == "ALL":
-        yFitIC.nGlobalFitGroups = nSpectra
+    if yFitIC.number_of_global_fit_groups == "all":
+        yFitIC.number_of_global_fit_groups = nSpectra
     else:
         assert isinstance(
-            yFitIC.nGlobalFitGroups, int
+            yFitIC.number_of_global_fit_groups, int
         ), "Number of global groups needs to be an integer."
         assert (
-            yFitIC.nGlobalFitGroups <= nSpectra
+            yFitIC.number_of_global_fit_groups <= nSpectra
         ), "Number of global groups needs to be less or equal to the no of unmasked spectra."
         assert (
-            yFitIC.nGlobalFitGroups > 0
+            yFitIC.number_of_global_fit_groups > 0
         ), "NUmber of global groups needs to be bigger than zero"
     return
 
@@ -1721,7 +1721,7 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
         np.all(dataY == 0, axis=1)
     ), f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY==0, axis=1))}"
 
-    if yFitIC.maskTypeProcedure == "NAN":
+    if yFitIC.mask_zeros_with == "nan":
         return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
 
     # Use Default for unmasked or NCP masked

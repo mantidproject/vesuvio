@@ -83,15 +83,15 @@ class ForwardAnalysisInputs(SampleParameters):
 
 
 class YSpaceFitInputs:
-    showPlots = False
-    symmetrisationFlag = True
-    subtractFSE = False
-    rebinParametersForYSpaceFit = "-20, 0.5, 20"  # Needs to be symetric
-    fitModel = "SINGLE_GAUSSIAN"
-    runMinos = True
-    globalFit = None
-    nGlobalFitGroups = 4
-    maskTypeProcedure = None
+    show_plots = False
+    do_symmetrisation = True
+    subtract_calculated_fse_from_data = False
+    range_for_rebinning_in_y_space = "-20, 0.5, 20"  # Needs to be symetric
+    fitting_model = "SINGLE_GAUSSIAN"
+    run_minos = True
+    do_global_fit = None
+    number_of_global_fit_groups = 4
+    mask_zeros_with = None
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
