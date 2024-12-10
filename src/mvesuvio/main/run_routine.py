@@ -39,7 +39,7 @@ class Runner:
         self.classes_to_fit_y_space = []
         for ai_cls in [self.bckwd_ai, self.fwd_ai]:
             if ai_cls.fit_in_y_space:
-                self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + '_' + str(ai_cls.noOfMSIterations))
+                self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + '_' + str(ai_cls.number_of_iterations_for_corrections))
                 self.classes_to_fit_y_space.append(ai_cls)
 
         self.analysis_result = None
@@ -103,14 +103,14 @@ class Runner:
 
         if self.bckwd_ai.run_this_scattering_type:
 
-            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.HToMassIdxRatio==0):
+            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0):
                 self.run_estimate_h_ratio()
                 return
 
             # TODO: make this automatic
             assert is_hydrogen_present(self.fwd_ai.masses) != (
-                self.bckwd_ai.HToMassIdxRatio==0 
-            ), "No Hydrogen detected, HToMassIdxRatio has to be set to 0"
+                self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0 
+            ), "No Hydrogen detected, intensity_ratio_of_hydrogen_to_lowest_mass has to be set to 0"
 
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
             self.run_joint_analysis()
@@ -220,37 +220,38 @@ class Runner:
         ws = loadRawAndEmptyWsFromUserPath(
             userWsRawPath=raw_path,
             userWsEmptyPath=empty_path,
-            tofBinning=ai.tofBinning,
+            tofBinning=ai.time_of_flight_binning,
             name=name_for_starting_ws(ai),
-            scaleRaw=ai.scaleRaw,
-            scaleEmpty=ai.scaleEmpty,
-            subEmptyFromRaw=ai.subEmptyFromRaw
+            scaleRaw=ai.scale_raw_workspace,
+            scaleEmpty=ai.scale_empty_workspace,
+            subEmptyFromRaw=ai.subtract_empty_workspace_from_raw
         )
+        first_detector, last_detector = [int(s) for s in ai.detectors.split('-')]
         cropedWs = cropAndMaskWorkspace(
             ws, 
-            firstSpec=ai.firstSpec,
-            lastSpec=ai.lastSpec,
-            maskedDetectors=ai.maskedSpecAllNo,
-            maskTOFRange=ai.maskTOFRange
+            firstSpec=first_detector,
+            lastSpec=last_detector,
+            maskedDetectors=ai.mask_detectors,
+            maskTOFRange=ai.mask_time_of_flight_range
         )
         profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", ai)
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
         kwargs = {
             "InputWorkspace": cropedWs.name(),
             "InputProfiles": profiles_table.name(),
-            "InstrumentParametersFile": str(ipFilesPath / ai.ipfile),
-            "HRatioToLowestMass": ai.HToMassIdxRatio if hasattr(ai, 'HRatioToLowestMass') else 0,
-            "NumberOfIterations": int(ai.noOfMSIterations),
-            "InvalidDetectors": [int(det) for det in ai.maskedSpecAllNo],
-            "MultipleScatteringCorrection": ai.MSCorrectionFlag,
+            "InstrumentParametersFile": str(ipFilesPath / ai.instrument_parameters_file),
+            "HRatioToLowestMass": ai.intensity_ratio_of_hydrogen_to_lowest_mass if hasattr(ai, 'intensity_ratio_of_hydrogen_to_lowest_mass') else 0,
+            "NumberOfIterations": int(ai.number_of_iterations_for_corrections),
+            "InvalidDetectors": [int(det) for det in ai.mask_detectors],
+            "MultipleScatteringCorrection": ai.do_multiple_scattering_correction,
             "SampleVerticalWidth": ai.vertical_width, 
             "SampleHorizontalWidth": ai.horizontal_width, 
             "SampleThickness": ai.thickness,
-            "GammaCorrection": ai.GammaCorrectionFlag,
+            "GammaCorrection": ai.do_gamma_correction,
             "ModeRunning": scattering_type(ai),
             "TransmissionGuess": ai.transmission_guess,
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
-            "NumberOfEvents": int(ai.number_of_events),
+            "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
             "ResultsPath": str(self.results_save_path),
             "FiguresPath": str(self.fig_save_path),
@@ -271,8 +272,8 @@ class Runner:
     def _make_neutron_profiles(cls, ai):
         profiles = []
         for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-            ai.masses, ai.initPars[::3], ai.initPars[1::3], ai.initPars[2::3],
-            ai.bounds[::3], ai.bounds[1::3], ai.bounds[2::3]
+            ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
+            ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
         ):
             profiles.append(NeutronComptonProfile(
                 label=str(float(mass)), mass=float(mass), intensity=float(intensity), width=float(width), center=float(center),
@@ -294,11 +295,11 @@ class Runner:
 
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
-        if not ws_history_matches_inputs(load_ai.runs, load_ai.mode, load_ai.ipfile, rawPath):
-            save_ws_from_load_vesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), rawPath)
+        if not ws_history_matches_inputs(load_ai.runs, load_ai.mode, load_ai.instrument_parameters_file, rawPath):
+            save_ws_from_load_vesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath/load_ai.instrument_parameters_file), rawPath)
 
-        if not ws_history_matches_inputs(load_ai.empty_runs, load_ai.mode, load_ai.ipfile, emptyPath):
-            save_ws_from_load_vesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath/load_ai.ipfile), emptyPath)
+        if not ws_history_matches_inputs(load_ai.empty_runs, load_ai.mode, load_ai.instrument_parameters_file, emptyPath):
+            save_ws_from_load_vesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath/load_ai.instrument_parameters_file), emptyPath)
         return rawPath, emptyPath
 
 
@@ -309,13 +310,13 @@ class Runner:
 
         # Build Filename based on ic
         corr = ""
-        if ai.GammaCorrectionFlag & (ai.noOfMSIterations > 0):
+        if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
             corr += "_GC"
-        if ai.MSCorrectionFlag & (ai.noOfMSIterations > 0):
+        if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
             corr += "_MS"
 
         fileName = (
-            f"spec_{ai.firstSpec}-{ai.lastSpec}_iter_{ai.noOfMSIterations}{corr}" + ".npz"
+            f"spec_{ai.detectors.strip()}_iter_{ai.number_of_iterations_for_corrections}{corr}" + ".npz"
         )
         fileNameYSpace = fileName + "_ySpaceFit" + ".npz"
 

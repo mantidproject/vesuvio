@@ -1,5 +1,5 @@
 from mvesuvio.main.run_routine import Runner 
-from mantid.simpleapi import Load
+from mantid.simpleapi import Load, Plus, mtd, CreateWorkspace, CloneWorkspace
 from mantid.api import AnalysisDataService
 from pathlib import Path
 import numpy as np
@@ -43,17 +43,19 @@ class AnalysisRunner:
     @classmethod
     def _load_workspaces(cls):
         AnalysisDataService.clear()
-        scriptName = handle_config.get_script_name()
-        wsFinal = Load(
-            str(cls._input_data_path / "wsFinal.nxs"),
-            OutputWorkspace=scriptName + "_fwd_1",
+        Load(
+            str(cls._input_data_path / "yspace_tests_fwd_1.nxs"),
+            OutputWorkspace="yspace_gauss_test_fwd_1"
         )
-        for i in range(4):
-            fileName = "wsFinal_ncp_" + str(i) + ".nxs"
-            Load(
-                str(cls._input_data_path / fileName),
-                OutputWorkspace=wsFinal.name() + "_label" + str(i) +"_ncp",
-            )
+        Load(
+            str(cls._input_data_path / "yspace_tests_fwd_1_total_ncp.nxs"),
+            OutputWorkspace="yspace_gauss_test_fwd_1_total_ncp"
+        )
+        Load(
+            str(cls._input_data_path / "yspace_tests_fwd_1_1.0079_ncp.nxs"),
+            OutputWorkspace="yspace_gauss_test_fwd_1_1.0079_ncp"
+        )
+        return
 
     @classmethod
     def _run(cls):
@@ -63,7 +65,7 @@ class AnalysisRunner:
 
     @classmethod
     def _load_benchmark_results(cls):
-        cls._benchmarkResults = np.load(str(cls._benchmark_path / "stored_yspace_fit.npz"))
+        cls._benchmarkResults = np.load(str(cls._benchmark_path / "yspace_gauss_test.npz"))
 
 
 class TestSymSumYSpace(unittest.TestCase):

@@ -2,6 +2,5 @@
 __pycache__/
 *.py[cod]
 
-src/vesuvio_analysis/core_functions/bootstrap_ws/
 figures/
-tests/analysis/data/inputs/sample_test/output_files/
+tests/**/output_files/
