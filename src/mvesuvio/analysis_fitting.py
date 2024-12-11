@@ -876,6 +876,7 @@ def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
     fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
     ax.errorbar(wsMinuitFit, "k.", wkspIndex=0, label="Weighted Avg")
     ax.errorbar(wsMinuitFit, "r-", wkspIndex=1, label=leg)
+    ax.plot(wsMinuitFit, "b.", wkspIndex=2, label="Residuals")
     ax.set_xlabel("YSpace")
     ax.set_ylabel("Counts")
     ax.set_title("Minuit Fit")
@@ -933,12 +934,12 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         minosManErr = list(np.zeros(np.array(minosAutoErr).shape))
 
         if yFitIC.show_plots:
-            plotAutoMinos(mObj, wsName)
+            plotAutoMinos(mObj, wsName, yFitIC)
 
     else:  # Case with positivity constraint on function, use manual implementation
         # Changes values of minuit obj m, do not use m below this point
         merrors, fig = runAndPlotManualMinos(
-            mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.show_plots
+            mObj, constrFunc, bestFitVals, bestFitErrs, yFitIC.show_plots, yFitIC, wsName
         )
 
         # Same as above, but the other way around
@@ -948,13 +949,12 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         minosAutoErr = list(np.zeros(np.array(minosManErr).shape))
 
         if yFitIC.show_plots:
-            fig.canvas.manager.set_window_title(wsName + "_Manual_Implementation_MINOS")
             fig.show()
 
     return parameters, values, errors, minosAutoErr, minosManErr
 
 
-def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showPlots):
+def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showPlots, yFitIC, wsName):
     """
     Runs brute implementation of minos algorithm and
     plots the profile for each parameter along the way.
@@ -975,7 +975,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
         figsize=figsize,
         subplot_kw={"projection": "mantid"},
     )  # subplot_kw={'projection':'mantid'}
-    # fig.canvas.manager.set_window_title("Plot of Manual Implementation MINOS")
+    fig.canvas.manager.set_window_title(wsName + "_minos")
 
     merrors = {}
     for p, ax in zip(minuitObj.parameters, axs.flat):
@@ -992,6 +992,8 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
     # ALl axes share same legend, so set figure legend to first axis
     handle, label = axs[0, 0].get_legend_handles_labels()
     fig.legend(handle, label, loc="lower right")
+    savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title() 
+    plt.savefig(savePath, bbox_inches="tight")
     return merrors, fig
 
 
@@ -1104,7 +1106,7 @@ def errsFromMinosCurve(varSpace, varVal, fValsScipy, fValsMin, dChi2=1):
     return lerr, uerr
 
 
-def plotAutoMinos(minuitObj, wsName):
+def plotAutoMinos(minuitObj, wsName, yFitIC):
     # Set format of subplots
     height = 2
     width = int(np.ceil(len(minuitObj.parameters) / 2))
@@ -1117,7 +1119,7 @@ def plotAutoMinos(minuitObj, wsName):
         figsize=figsize,
         subplot_kw={"projection": "mantid"},
     )
-    fig.canvas.manager.set_window_title(wsName + "_Plot_Automatic_MINOS")
+    fig.canvas.manager.set_window_title(wsName + "_autominos")
 
     for p, ax in zip(minuitObj.parameters, axs.flat):
         loc, fvals, status = minuitObj.mnprofile(p, bound=2)
@@ -1137,6 +1139,8 @@ def plotAutoMinos(minuitObj, wsName):
     # ALl axes share same legend, so set figure legend to first axis
     handle, label = axs[0, 0].get_legend_handles_labels()
     fig.legend(handle, label, loc="lower right")
+    savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title() 
+    plt.savefig(savePath, bbox_inches="tight")
     fig.show()
 
 
@@ -1476,7 +1480,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     print("\n")
 
     if yFitIC.show_plots:
-        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name())
+        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), yFitIC)
 
     return np.array(m.values), np.array(
         m.errors
@@ -1847,7 +1851,7 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
     return initPars
 
 
-def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
+def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
     if len(dataY) > 10:
         print("\nToo many axes to show in figure, skipping the plot ...\n")
         return
@@ -1860,7 +1864,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
         tight_layout=True,
         subplot_kw={"projection": "mantid"},
     )
-    fig.canvas.manager.set_window_title(wsName + "_Plot_of_Global_Fit")
+    fig.canvas.manager.set_window_title(wsName + "_fitglobal")
 
     # Data used in Global Fit
     for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
@@ -1882,5 +1886,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName):
 
         ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
         ax.legend()
+    savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title() 
+    plt.savefig(savePath, bbox_inches="tight")
     fig.show()
     return
