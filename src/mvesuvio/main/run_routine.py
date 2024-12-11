@@ -49,7 +49,7 @@ class Runner:
         inputs_script_path = Path(handle_config.read_config_var("caching.inputs"))
         script_name = handle_config.get_script_name()
         self.experiment_path = inputs_script_path.parent / script_name
-        self.input_ws_path =  self.experiment_path / "input_ws"
+        self.input_ws_path =  self.experiment_path / "input_workspaces"
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
         # TODO: Output paths should probably not be set like this 

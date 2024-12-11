@@ -47,6 +47,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
     if yFitIC.do_global_fit:
         runGlobalFit(wsJoY, wsRes, IC, yFitIC)
 
+    save_workspaces(yFitIC)
     return yfitResults
 
 
@@ -880,7 +881,10 @@ def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
     ax.set_xlabel("YSpace")
     ax.set_ylabel("Counts")
     ax.set_title("Minuit Fit")
+    ax.grid()
     ax.legend()
+
+
 
     fileName = wsMinuitFit.name() + ".pdf"
     savePath = yFitIC.figSavePath / fileName
@@ -1468,23 +1472,16 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     # Explicitly calculate errors
     m.hesse()
 
-    chi2 = m.fval / (
-        np.sum(dataE != 0) - m.nfit
-    )  # Number of non zero points (considered in the fit) minus no of parameters
-    print(f"Value of Chi2/ndof: {chi2:.2f}")
-    print(f"Migrad Minimum valid: {m.valid}")
+    # Number of non zero points (considered in the fit) minus no of parameters
+    chi2 = m.fval / (np.sum(dataE != 0) - m.nfit)  
 
-    print("\nResults of Global Fit:\n")
-    for p, v, e in zip(m.parameters, m.values, m.errors):
-        print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
-    print("\n")
+    create_table_for_global_fit_parameters(wsYSpace.name(), m, chi2)
 
     if yFitIC.show_plots:
         plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), yFitIC)
 
-    return np.array(m.values), np.array(
-        m.errors
-    )  # Pass into array to store values in variable
+    # Pass into array to store values in variable
+    return np.array(m.values), np.array(m.errors)  
 
 
 def extractData(ws, wsRes, ic):
@@ -1850,6 +1847,24 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
             initPars[up + str(i)] = defaultPars[up]
     return initPars
 
+def create_table_for_global_fit_parameters(wsName, m, chi2):
+    t = CreateEmptyTableWorkspace(
+        OutputWorkspace=wsName + "_gloabalfit_Parameters"
+    )
+    t.setTitle("Global Fit Parameters")
+    t.addColumn(type="str", name="Name")
+    t.addColumn(type="float", name="Value")
+    t.addColumn(type="float", name="Error")
+
+    print(f"Value of Chi2/ndof: {chi2:.2f}")
+    print(f"Migrad Minimum valid: {m.valid}")
+    print("\nResults of Global Fit:\n")
+    for p, v, e in zip(m.parameters, m.values, m.errors):
+        print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
+        t.addRow([p, v, e])
+
+    t.addRow(["Cost function", chi2, 0])
+
 
 def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
     if len(dataY) > 10:
@@ -1884,9 +1899,16 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
         for p, v, e in zip(signature, values, errors):
             leg.append(f"${p} = {v:.3f} \\pm {e:.3f}$")
 
-        ax.fill_between(x, yfit, label="\n".join(leg), alpha=0.4)
+        ax.plot(x, yfit, "r-", label="\n".join(leg))
+        ax.plot(x, y-yfit, "b.", label=f"Residuals")
+        ax.grid()
         ax.legend()
     savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title() 
     plt.savefig(savePath, bbox_inches="tight")
     fig.show()
     return
+
+def save_workspaces(yFitIC):
+    for ws_name in mtd.getObjectNames():
+        if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
+            SaveAscii(ws_name, str(yFitIC.figSavePath.parent / "output_files" / ws_name))
