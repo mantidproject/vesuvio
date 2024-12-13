@@ -59,9 +59,9 @@ def find_ws_name_fse_first_mass(ic):
     for ws_name in mtd.getObjectNames():
         if ws_name.startswith(prefix) and ws_name.endswith('fse'):
             name_ending = ws_name.replace(prefix, "")
-            match = re.search(r'\d+\.?\d*', name_ending)
+            match = re.search(r'_(\d+(?:\.\d+)?)_', name_ending)
             if match:   # If float found in ws name ending
-                ws_masses.append(float(match.group()))
+                ws_masses.append(float(match.group().replace('_', '')))
                 ws_names_fse.append(ws_name)
 
     return ws_names_fse[np.argmin(ws_masses)]
