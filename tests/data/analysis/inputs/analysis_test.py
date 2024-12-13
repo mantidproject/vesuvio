@@ -94,3 +94,10 @@ class YSpaceFitInputs:
     globalFit = None
     nGlobalFitGroups = 4
     maskTypeProcedure = None
+
+
+if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
+    import mvesuvio
+    from pathlib import Path
+    mvesuvio.set_config(inputs_file=Path(__file__))
+    mvesuvio.run()
