@@ -9,6 +9,7 @@ from iminuit.util import make_func_code, describe
 import jacobi
 import time
 import re
+from mantid.kernel import logger
 
 from mvesuvio.util import handle_config
 
@@ -20,7 +21,7 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
     try:
         wsTOF = mtd[wsTOF]
     except KeyError: 
-        print(f"Workspace to fit {wsTOF} not found.")
+        logger.notice(f"Workspace to fit {wsTOF} not found.")
         return
 
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
@@ -800,9 +801,9 @@ def selectModelAndPars(modelFlag):
             "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
         )
 
-    print("\nShared Parameters: ", [key for key in sharedPars])
-    print(
-        "\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars]
+    logger.notice(f"\nShared Parameters: {[key for key in sharedPars]}")
+    logger.notice(
+        f"\nUnshared Parameters: {[key for key in defaultPars if key not in sharedPars]}"
     )
 
     assert all(
@@ -965,7 +966,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
     """
     # Reason for two distinct operations inside the same function is that its easier
     # to build the minos plots for each parameter as they are being calculated.
-    print("\nRunning Minos ... \n")
+    logger.notice("\nRunning Minos ... \n")
 
     # Set format of subplots
     height = 2
@@ -1224,7 +1225,7 @@ def oddPointsRes(x, res):
 
 
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
-    print("\nFitting on the sum of spectra in the West domain ...\n")
+    logger.notice("\nFitting on the sum of spectra in the West domain ...\n")
     for minimizer in ["Levenberg-Marquardt", "Simplex"]:
         if yFitIC.fitting_model== "gauss":
             function = f"""composite=Convolution,FixResolution=true,NumDeriv=true;
@@ -1283,7 +1284,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
 
 
 def printYSpaceFitResults(wsJoYName):
-    print("\nFit in Y Space results:")
+    logger.notice("\nFit in Y Space results:")
     foundWS = []
     try:
         wsFitLM = mtd[wsJoYName + "_lm_Parameters"]
@@ -1302,20 +1303,19 @@ def printYSpaceFitResults(wsJoYName):
         pass
 
     for tableWS in foundWS:
-        print("\n" + " ".join(tableWS.getName().split("_")[-3:]) + ":")
-        # print("    ".join(tableWS.keys()))
+        logger.notice("\n" + " ".join(tableWS.getName().split("_")[-3:]) + ":")
         for key in tableWS.keys():
             if key == "Name":
-                print(
+                logger.notice(
                     f"{key:>20s}:  "
                     + "  ".join([f"{elem:7.8s}" for elem in tableWS.column(key)])
                 )
             else:
-                print(
+                logger.notice(
                     f"{key:>20s}: "
                     + "  ".join([f"{elem:7.4f}" for elem in tableWS.column(key)])
                 )
-    print("\n")
+    logger.notice("\n")
 
 
 class ResultsYFitObject:
@@ -1388,7 +1388,7 @@ class ResultsYFitObject:
 
 
 def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
-    print("\nRunning GLobal Fit ...\n")
+    logger.notice("\nRunning GLobal Fit ...\n")
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(
@@ -1418,7 +1418,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     # Minuit Fit with global cost function and local+global parameters
     initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
 
-    print("\nRunning Global Fit ...\n")
+    logger.notice("\nRunning Global Fit ...\n")
     m = Minuit(totCost, **initPars)
 
     for i in range(len(dataY)):  # Set limits for unshared parameters
@@ -1467,7 +1467,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
         m.scipy(constraints=optimize.NonlinearConstraint(constr, 0, np.inf))
 
     t1 = time.time()
-    print(f"\nTime of fitting: {t1-t0:.2f} seconds")
+    logger.notice(f"\nTime of fitting: {t1-t0:.2f} seconds")
 
     # Explicitly calculate errors
     m.hesse()
@@ -1528,7 +1528,7 @@ def groupDetectors(ipData, yFitIC):
 
     checkNGroupsValid(yFitIC, ipData)
 
-    print(f"\nNumber of gropus: {yFitIC.number_of_global_fit_groups}")
+    logger.notice(f"\nNumber of gropus: {yFitIC.number_of_global_fit_groups}")
 
     L1 = ipData[:, -1].copy()
     theta = ipData[:, 2].copy()
@@ -1661,11 +1661,11 @@ def formIdxList(clusters):
         idxList.append(list(idxs))
 
     # Print groupings information
-    print("\nGroups formed successfully:\n")
+    logger.notice("\nGroups formed successfully:\n")
     groupLen = np.array([len(group) for group in idxList])
     unique, counts = np.unique(groupLen, return_counts=True)
     for length, no in zip(unique, counts):
-        print(f"{no} groups with {length} detectors.")
+        logger.notice(f"{no} groups with {length} detectors.")
 
     return idxList
 
@@ -1856,11 +1856,11 @@ def create_table_for_global_fit_parameters(wsName, m, chi2):
     t.addColumn(type="float", name="Value")
     t.addColumn(type="float", name="Error")
 
-    print(f"Value of Chi2/ndof: {chi2:.2f}")
-    print(f"Migrad Minimum valid: {m.valid}")
-    print("\nResults of Global Fit:\n")
+    logger.notice(f"Value of Chi2/ndof: {chi2:.2f}")
+    logger.notice(f"Migrad Minimum valid: {m.valid}")
+    logger.notice("\nResults of Global Fit:\n")
     for p, v, e in zip(m.parameters, m.values, m.errors):
-        print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
+        logger.notice(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
         t.addRow([p, v, e])
 
     t.addRow(["Cost function", chi2, 0])
@@ -1868,7 +1868,7 @@ def create_table_for_global_fit_parameters(wsName, m, chi2):
 
 def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
     if len(dataY) > 10:
-        print("\nToo many axes to show in figure, skipping the plot ...\n")
+        logger.notice("\nToo many axes to show in figure, skipping the plot ...\n")
         return
 
     rows = 2

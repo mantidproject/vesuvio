@@ -108,6 +108,9 @@ class Runner:
                     if "VesuvioAnalysisRoutine" in line:
                         outfile.write(line)       
 
+                    if "Notice Python" in line:  # For Fitting notices
+                        outfile.write(line)
+
                     if not pattern.match(line):
                         outfile.write(line)
         except OSError:
