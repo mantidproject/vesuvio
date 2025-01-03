@@ -59,7 +59,7 @@ def is_hydrogen_present(masses) -> bool:
 def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
     if not (ws_path.is_file()):
-        logger.notice("Cached workspace not found")
+        logger.notice(f"Cached workspace not found at {ws_path}")
         return False
 
     ws = Load(Filename=str(ws_path))
