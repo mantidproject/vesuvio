@@ -17,6 +17,7 @@ from pathlib import Path
 import importlib
 import sys
 import dill         # To convert constraints to string
+import re
 
 
 class Runner:
@@ -65,6 +66,7 @@ class Runner:
         figSavePath.mkdir(exist_ok=True)
         self.yFitIC.figSavePath = figSavePath
 
+        self.mantid_log_file = "mantid.log"
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -78,20 +80,40 @@ class Runner:
     def run(self):
         if not self.bckwd_ai.run_this_scattering_type and not self.fwd_ai.run_this_scattering_type:
             return
-        # Default workflow for procedure + fit in y space
+
+        # Erase previous log
+        with open(self.mantid_log_file, 'w') as file:
+            file.write('')
 
         # If any ws for y fit already loaded
         wsInMtd = [ws in mtd for ws in self.ws_to_fit_y_space]  # Bool list
         if (len(wsInMtd) > 0) and all(wsInMtd):
             self.runAnalysisFitting()
+            self.make_clean_log_file()
             return self.analysis_result, self.fitting_result  
 
         self.runAnalysisRoutine()
         self.runAnalysisFitting()
 
         # Return results used only in tests
+        self.make_clean_log_file()
         return self.analysis_result, self.fitting_result  
 
+
+    def make_clean_log_file(self):
+        pattern = re.compile(r"^\d{4}-\d{2}-\d{2}")
+        try:
+            with open(self.mantid_log_file, "r") as infile, open(self.log_file_save_path, "w") as outfile:
+                for line in infile:
+                    if "VesuvioAnalysisRoutine" in line:
+                        outfile.write(line)       
+
+                    if not pattern.match(line):
+                        outfile.write(line)
+        except OSError:
+            print("Mantid log file not available. Unable to produce a summarized log file for this routine.")
+        return 
+        
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
@@ -327,6 +349,8 @@ class Runner:
         figSavePath = experimentPath / "figures"
         figSavePath.mkdir(exist_ok=True)
         self.fig_save_path = figSavePath
+
+        self.log_file_save_path = self.experiment_path / "test.log"
         return
 
 
