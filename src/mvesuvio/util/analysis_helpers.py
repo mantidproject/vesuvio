@@ -13,13 +13,19 @@ import ntpath
 
 
 def print_table_workspace(table):
-    max_spacing = [max([len(str(i)) for i in table.column(key)] + [len(key)]) for key in table.keys()]
+    table_dict = table.toDict()
+    # Convert floats into strings 
+    for key, values in table_dict.items():
+        new_column = [int(item) if (not isinstance(item, str) and item.is_integer()) else item for item in values]
+        table_dict[key] = [f"{item:.3f}" if isinstance(item, float) else str(item) for item in new_column]
+
+    max_spacing = [max([len(item) for item in values] + [len(key)]) for key, values in table_dict.items()]
     header = "|" + "|".join(f"{item}{' '*(spacing-len(item))}" for item, spacing in zip(table.keys(), max_spacing)) + "|"
     logger.notice(f"Table {table.name()}:")
     logger.notice(' '+'-'*(len(header)-2)+' ')
     logger.notice(header)
     for i in range(table.rowCount()):
-        table_row = "|".join(f"{item}{' '*(spacing-len(str(item)))}" for item, spacing in zip(table.row(i).values(), max_spacing))
+        table_row = "|".join(f"{values[i]}{' '*(spacing-len(str(values[i])))}" for values, spacing in zip(table_dict.values(), max_spacing))
         logger.notice("|" + table_row + "|")
     logger.notice(' '+'-'*(len(header)-2)+' ')
     return

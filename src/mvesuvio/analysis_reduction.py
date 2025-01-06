@@ -13,7 +13,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CreateWorkspace
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
-                                            extend_range_of_array
+                                            extend_range_of_array, print_table_workspace
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -238,13 +238,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             OutputWorkspace=self._workspace_being_fit.name()+ "_fit_results"
         )
         table.setTitle("SciPy Fit Parameters")
-        table.addColumn(type="float", name="Spectrum")
+        table.addColumn(type="float", name="Spec")
         for label in self._profiles_table.column("label"):
-            table.addColumn(type="float", name=f"{label} intensity")
-            table.addColumn(type="float", name=f"{label} width")
-            table.addColumn(type="float", name=f"{label} center ")
-        table.addColumn(type="float", name="normalised chi2")
-        table.addColumn(type="float", name="no of iterations")
+            table.addColumn(type="float", name=f"{label} i")
+            table.addColumn(type="float", name=f"{label} w")
+            table.addColumn(type="float", name=f"{label} c")
+        table.addColumn(type="float", name="NChi2")
+        table.addColumn(type="float", name="Iter")
         return table
 
 
@@ -324,9 +324,11 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._row_being_fit = 0
         while self._row_being_fit != len(self._dataY):
             self._fit_neutron_compton_profiles_to_row()
+            self.log().notice('')
             self._row_being_fit += 1
 
         assert np.any(self._fit_parameters), "Fitting parameters cannot be zero for all spectra!"
+        print_table_workspace(self._table_fit_results)
         return
 
 
@@ -486,6 +488,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         if np.all(self._dataY[self._row_being_fit] == 0):
             self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
+            spectrum_number = self._instrument_params[self._row_being_fit, 0]
+            self.log().notice(f"Skip spectrum {int(spectrum_number):3d}")
             return
 
         result = scipy.optimize.minimize(
@@ -508,7 +512,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # Store results for easier access when calculating means
         self._fit_parameters[self._row_being_fit] = tableRow 
 
-        self.log().notice(' '.join(str(tableRow).split(",")).replace('[', '').replace(']', ''))
+        self.log().notice(f"Fit spectrum {int(spectrum_number):3d}: \u2713")
 
         # Pass fit profiles into workspaces
         ncp_for_each_mass, fse_for_each_mass = self._neutron_compton_profiles(fitPars)
