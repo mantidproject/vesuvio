@@ -12,6 +12,19 @@ from mvesuvio.util import handle_config
 import ntpath
 
 
+def print_table_workspace(table):
+    max_spacing = [max([len(str(i)) for i in table.column(key)] + [len(key)]) for key in table.keys()]
+    header = "|" + "|".join(f"{item}{' '*(spacing-len(item))}" for item, spacing in zip(table.keys(), max_spacing)) + "|"
+    logger.notice(f"Table {table.name()}:")
+    logger.notice(' '+'-'*(len(header)-2)+' ')
+    logger.notice(header)
+    for i in range(table.rowCount()):
+        table_row = "|".join(f"{item}{' '*(spacing-len(str(item)))}" for item, spacing in zip(table.row(i).values(), max_spacing))
+        logger.notice("|" + table_row + "|")
+    logger.notice(' '+'-'*(len(header)-2)+' ')
+    return
+    
+
 def create_profiles_table(name, ai):
     table = CreateEmptyTableWorkspace(OutputWorkspace=name)
     table.addColumn(type="str", name="label")
