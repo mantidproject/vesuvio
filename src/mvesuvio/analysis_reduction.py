@@ -422,8 +422,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         intensities = np.zeros(widths.shape)
 
         for i, label in enumerate(self._profiles_table.column("label")):
-            widths[i] = self._table_fit_results.column(f"{label} width")
-            intensities[i] = self._table_fit_results.column(f"{label} intensity")
+            widths[i] = self._table_fit_results.column(f"{label} w")
+            intensities[i] = self._table_fit_results.column(f"{label} i")
             self._set_means_and_std_arrays(widths, intensities)
 
         self._create_means_table()
