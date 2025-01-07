@@ -93,6 +93,8 @@ def __set_logging_properties():
     ConfigService.setString("logging.channels.fileChannel.path", "mantid.log")
     ConfigService.setString("logging.channels.fileChannel.formatter.class", "PatternFormatter")
     ConfigService.setString("logging.channels.fileChannel.formatter.pattern", "%Y-%m-%d %H:%M:%S,%i [%I] %p %s - %t")
+    # Set properties on Mantid.user.properties not working due to Mantid bug
+    # Need to set properties on file in Mantid installation
     mantid_properties_file = path.join(ConfigService.getPropertiesDir(), "Mantid.properties")
     ConfigService.saveConfig(mantid_properties_file)
     return
