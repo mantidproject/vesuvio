@@ -1,5 +1,5 @@
 from mvesuvio.main.run_routine import Runner 
-from mantid.simpleapi import Load, Plus, mtd, CreateWorkspace, CloneWorkspace
+from mantid.simpleapi import Load, LoadAscii
 from mantid.api import AnalysisDataService
 from pathlib import Path
 import numpy as np
@@ -54,6 +54,10 @@ class AnalysisRunner:
         Load(
             str(cls._input_data_path / "yspace_tests_fwd_1_1.0079_ncp.nxs"),
             OutputWorkspace="yspace_gauss_test_fwd_1_1.0079_ncp"
+        )
+        Load(
+            str(cls._input_data_path / "yspace_gauss_test_fwd_initial_parameters.nxs"),
+            OutputWorkspace="yspace_gauss_test_fwd_initial_parameters"
         )
         return
 

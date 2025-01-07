@@ -55,6 +55,10 @@ class AnalysisRunner:
             str(cls._input_data_path / "yspace_tests_fwd_1_1.0079_ncp.nxs"),
             OutputWorkspace="yspace_gc_test_fwd_1_1.0079_ncp"
         )
+        Load(
+            str(cls._input_data_path / "yspace_gauss_test_fwd_initial_parameters.nxs"),
+            OutputWorkspace="yspace_gc_test_fwd_initial_parameters"
+        )
         return
 
     @classmethod
