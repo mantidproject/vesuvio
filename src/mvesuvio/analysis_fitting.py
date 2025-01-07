@@ -13,7 +13,7 @@ from mantid.kernel import logger
 from mantid.simpleapi import AnalysisDataService
 
 from mvesuvio.util import handle_config
-from mvesuvio.util.analysis_helpers import print_table_workspace, passDataIntoWS
+from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
 
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
@@ -207,7 +207,7 @@ def replaceZerosWithNCP(ws, ncp):
     ]  # mask of ncp adjusted for last col present or not
 
     wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_NCPMasked")
-    passDataIntoWS(dataX, dataY, dataE, wsMasked)
+    pass_data_into_ws(dataX, dataY, dataE, wsMasked)
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name() + "_Sum")
     return wsMasked
 
@@ -257,7 +257,7 @@ def dataXBining(ws, xp):
     dataE[dataY == 0] = 0
 
     wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_XBinned")
-    wsXBins = passDataIntoWS(dataX, dataY, dataE, wsXBins)
+    wsXBins = pass_data_into_ws(dataX, dataY, dataE, wsXBins)
     return wsXBins
 
 
@@ -437,7 +437,7 @@ def symmetrizeWs(avgYSpace):
         dataYS, dataES = weightedSymArr(dataY, dataE)
 
     wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_sym")
-    wsSym = passDataIntoWS(dataX, dataYS, dataES, wsSym)
+    wsSym = pass_data_into_ws(dataX, dataYS, dataES, wsSym)
     return wsSym
 
 
@@ -1880,5 +1880,5 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
+        if ws_name.endswith('Parameters') or ws_name.endswith('parameters') or ws_name.endswith('Workspace'):
             SaveAscii(ws_name, str(yFitIC.figSavePath.parent / "output_files" / ws_name))

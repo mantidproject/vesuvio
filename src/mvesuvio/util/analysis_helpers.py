@@ -11,7 +11,7 @@ from mvesuvio.util import handle_config
 import ntpath
 
 
-def passDataIntoWS(dataX, dataY, dataE, ws):
+def pass_data_into_ws(dataX, dataY, dataE, ws):
     "Modifies ws data to input data"
     for i in range(ws.getNumberHistograms()):
         ws.dataX(i)[:] = dataX[i, :]
@@ -24,11 +24,11 @@ def print_table_workspace(table, precision=3):
     table_dict = table.toDict()
     # Convert floats into strings 
     for key, values in table_dict.items():
-        new_column = [int(item) if (not isinstance(item, str) and item.is_integer()) else item for item in values]
+        new_column = [int(item) if (isinstance(item, float) and item.is_integer()) else item for item in values]
         table_dict[key] = [f"{item:.{precision}f}" if isinstance(item, float) else str(item) for item in new_column]
 
     max_spacing = [max([len(item) for item in values] + [len(key)]) for key, values in table_dict.items()]
-    header = "|" + "|".join(f"{item}{' '*(spacing-len(item))}" for item, spacing in zip(table.keys(), max_spacing)) + "|"
+    header = "|" + "|".join(f"{item}{' '*(spacing-len(item))}" for item, spacing in zip(table_dict.keys(), max_spacing)) + "|"
     logger.notice(f"Table {table.name()}:")
     logger.notice(' '+'-'*(len(header)-2)+' ')
     logger.notice(header)
@@ -255,7 +255,7 @@ def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
 
     dataY[mask] = 0
 
-    passDataIntoWS(dataX, dataY, dataE, ws)
+    pass_data_into_ws(dataX, dataY, dataE, ws)
     return
 
 
