@@ -324,7 +324,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._row_being_fit = 0
         while self._row_being_fit != len(self._dataY):
             self._fit_neutron_compton_profiles_to_row()
-            self.log().notice('')
             self._row_being_fit += 1
 
         assert np.any(self._fit_parameters), "Fitting parameters cannot be zero for all spectra!"
@@ -466,7 +465,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         table.addColumn(type="float", name="mean_intensity")
         table.addColumn(type="float", name="std_intensity")
 
-        self.log().notice("\nmass    mean widths    mean intensities\n")
         for label, mass, mean_width, std_width, mean_intensity, std_intensity in zip(
             self._profiles_table.column("label"),
             self._masses,
@@ -477,10 +475,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         ):
             # Explicit conversion to float required to match profiles table
             table.addRow([label, float(mass), float(mean_width), float(std_width), float(mean_intensity), float(std_intensity)])
-            self.log().notice(f"{label:6s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}" + \
-                f"{mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
 
         self.setPropertyValue("OutputMeansTable", table.name())
+        print_table_workspace(table, precision=5)
         return table
 
 

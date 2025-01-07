@@ -6,18 +6,26 @@ from mantid.kernel import logger
 import numpy as np
 import numbers
 
-from mvesuvio.analysis_fitting import passDataIntoWS
 from mvesuvio.util import handle_config
 
 import ntpath
 
 
-def print_table_workspace(table):
+def passDataIntoWS(dataX, dataY, dataE, ws):
+    "Modifies ws data to input data"
+    for i in range(ws.getNumberHistograms()):
+        ws.dataX(i)[:] = dataX[i, :]
+        ws.dataY(i)[:] = dataY[i, :]
+        ws.dataE(i)[:] = dataE[i, :]
+    return ws
+
+
+def print_table_workspace(table, precision=3):
     table_dict = table.toDict()
     # Convert floats into strings 
     for key, values in table_dict.items():
         new_column = [int(item) if (not isinstance(item, str) and item.is_integer()) else item for item in values]
-        table_dict[key] = [f"{item:.3f}" if isinstance(item, float) else str(item) for item in new_column]
+        table_dict[key] = [f"{item:.{precision}f}" if isinstance(item, float) else str(item) for item in new_column]
 
     max_spacing = [max([len(item) for item in values] + [len(key)]) for key, values in table_dict.items()]
     header = "|" + "|".join(f"{item}{' '*(spacing-len(item))}" for item, spacing in zip(table.keys(), max_spacing)) + "|"
