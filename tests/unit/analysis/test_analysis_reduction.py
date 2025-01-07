@@ -92,6 +92,7 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._dataY = np.array([[1, 1], [2, 2], [3, 3]])
         alg._fit_parameters = np.ones(3)   # To avoid assertion error
         alg._fit_neutron_compton_profiles_to_row = MagicMock(return_value=None)
+        alg._table_fit_results = MagicMock(return_value=None)
         alg._fit_neutron_compton_profiles()
         self.assertEqual(alg._fit_neutron_compton_profiles_to_row.call_count, 3)
         
@@ -366,10 +367,10 @@ class TestAnalysisReduction(unittest.TestCase):
         
         def pick_column(arg):
             table = {
-                '1.0 width': [5.6, 5.1, 0, 2, 5.4],
-                '12.0 width': [2.1, 1, 0, 2.3, 1.9],
-                '1.0 intensity': [7.8, 7.6, 0, 5, 7.3],
-                '12.0 intensity': [3.1, 2, 0, 3.2, 3.1],
+                '1.0 w': [5.6, 5.1, 0, 2, 5.4],
+                '12.0 w': [2.1, 1, 0, 2.3, 1.9],
+                '1.0 i': [7.8, 7.6, 0, 5, 7.3],
+                '12.0 i': [3.1, 2, 0, 3.2, 3.1],
             }
             return table[arg]
 
