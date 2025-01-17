@@ -19,6 +19,7 @@ import importlib
 import sys
 import dill         # To convert constraints to string
 import re
+import os
 
 
 class Runner:
@@ -83,8 +84,10 @@ class Runner:
             return
 
         # Erase previous log
-        with open(self.mantid_log_file, 'w') as file:
-            file.write('')
+        # Not working on Windows due to shared file locks
+        if os.name == 'posix': 
+            with open(self.mantid_log_file, 'w') as file:
+                file.write('')
 
         # If any ws for y fit already loaded
         wsInMtd = [ws in mtd for ws in self.ws_to_fit_y_space]  # Bool list
