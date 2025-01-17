@@ -44,7 +44,6 @@ class BackwardAnalysisInputs(SampleParameters):
     multiple_scattering_number_of_events = 1.0e5
     do_gamma_correction = False
 
-
     show_plots = True
     do_symmetrisation = False
     subtract_calculated_fse_from_data = True
@@ -102,7 +101,6 @@ class ForwardAnalysisInputs(SampleParameters):
     multiple_scattering_order = 2
     multiple_scattering_number_of_events = 1.0e5
     do_gamma_correction = True
-
 
     show_plots = True
     do_symmetrisation = False
