@@ -619,7 +619,6 @@ def selectModelAndPars(modelFlag):
     """
 
     if modelFlag == "gauss":
-
         def model(x, A, x0, sigma):
             return (
                 A
@@ -627,12 +626,21 @@ def selectModelAndPars(modelFlag):
                 / sigma
                 * np.exp(-((x - x0) ** 2) / 2 / sigma**2)
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma": 5}
         sharedPars = ["sigma"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4c6":
+    elif modelFlag == "gauss_cntr":
+        def model(x, A, sigma):
+            return (
+                A
+                / (2 * np.pi) ** 0.5
+                / sigma
+                * np.exp(-x**2 / 2 / sigma**2)
+            )
+        defaultPars = {"A": 1, "sigma": 5}
+        sharedPars = ["sigma"]  # Used only in Global fit
 
+    elif modelFlag == "gcc4c6":
         def model(x, A, x0, sigma1, c4, c6):
             return (
                 A
@@ -657,12 +665,38 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0}
         sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4":
+    elif modelFlag == "gcc4c6_cntr":
+        def model(x, A, sigma1, c4, c6):
+            return (
+                A
+                * np.exp(- x**2 / 2 / sigma1**2)
+                / (np.sqrt(2 * np.pi * sigma1**2))
+                * (
+                    1
+                    + c4
+                    / 32
+                    * (
+                        16 * (x / np.sqrt(2) / sigma1) ** 4
+                        - 48 * (x / np.sqrt(2) / sigma1) ** 2
+                        + 12
+                    )
+                    + c6
+                    / 384
+                    * (
+                        64 * (x / np.sqrt(2) / sigma1) ** 6
+                        - 480 * (x / np.sqrt(2) / sigma1) ** 4
+                        + 720 * (x / np.sqrt(2) / sigma1) ** 2
+                        - 120
+                    )
+                )
+            )
+        defaultPars = {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}
+        sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
+    elif modelFlag == "gcc4":
         def model(x, A, x0, sigma1, c4):
             return (
                 A
@@ -679,12 +713,30 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}
         sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
-    elif modelFlag == "gcc6":
+    elif modelFlag == "gcc4_cntr":
+        def model(x, A, sigma1, c4):
+            return (
+                A
+                * np.exp(-x**2 / 2 / sigma1**2)
+                / (np.sqrt(2 * np.pi * sigma1**2))
+                * (
+                    1
+                    + c4
+                    / 32
+                    * (
+                        16 * (x / np.sqrt(2) / sigma1) ** 4
+                        - 48 * (x / np.sqrt(2) / sigma1) ** 2
+                        + 12
+                    )
+                )
+            )
+        defaultPars = {"A": 1, "sigma1": 6, "c4": 0}
+        sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
+    elif modelFlag == "gcc6":
         def model(x, A, x0, sigma1, c6):
             return (
                 A
@@ -702,8 +754,28 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}
+        sharedPars = ["sigma1", "c6"]  # Used only in Global fit
+
+    elif modelFlag == "gcc6_cntr":
+        def model(x, A, sigma1, c6):
+            return (
+                A
+                * np.exp(-x**2 / 2 / sigma1**2)
+                / (np.sqrt(2 * np.pi * sigma1**2))
+                * (
+                    1
+                    + +c6
+                    / 384
+                    * (
+                        64 * (x / np.sqrt(2) / sigma1) ** 6
+                        - 480 * (x / np.sqrt(2) / sigma1) ** 4
+                        + 720 * (x / np.sqrt(2) / sigma1) ** 2
+                        - 120
+                    )
+                )
+            )
+        defaultPars = {"A": 1, "sigma1": 6, "c6": 0}
         sharedPars = ["sigma1", "c6"]  # Used only in Global fit
 
     elif modelFlag == "doublewell":
@@ -797,7 +869,10 @@ def selectModelAndPars(modelFlag):
 
     else:
         raise ValueError(
-            "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
+        """
+        Fitting Model not recognized, available options: 
+        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+        """
         )
 
     print("\nShared Parameters: ", [key for key in sharedPars])
@@ -1261,11 +1336,18 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (yFitIC.fitting_model == "doublewell")
             | (yFitIC.fitting_model == "ansiogauss")
             | (yFitIC.fitting_model == "gauss3d")
+            | (yFitIC.fitting_model == "gauss_cntr")
+            | (yFitIC.fitting_model == "gcc4c6_cntr")
+            | (yFitIC.fitting_model == "gcc4_cntr")
+            | (yFitIC.fitting_model == "gcc6_cntr")
         ):
             return
         else:
             raise ValueError(
-                "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
+            """
+            Fitting Model not recognized, available options: 
+            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+            """
             )
 
         suffix = 'lm' if minimizer=="Levenberg-Marquardt" else minimizer.lower()
