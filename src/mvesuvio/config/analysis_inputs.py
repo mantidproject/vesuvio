@@ -89,8 +89,11 @@ class YSpaceFitInputs:
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric
     # Fitting model options
     # 'gauss': Single Gaussian
+    # 'gauss_cntr': Single Gaussian with fixed center at zero
     # 'gcc4': Gram-Charlier with C4 parameter
+    # 'gcc4_cntr': Gram-Charlier with C4 parameter with fixed center at zero
     # 'gcc6': Gram-Charlier with C6 parameter
+    # 'gcc6_cntr': Gram-Charlier with C6 parameter with fixed center at zero
     # 'doublewell': Double Well function 
     # 'gauss3D': 3-Dimensional Gaussian 
     fitting_model = "gauss"
