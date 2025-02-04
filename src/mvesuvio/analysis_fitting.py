@@ -635,7 +635,7 @@ def selectModelAndPars(modelFlag):
                 A
                 / (2 * np.pi) ** 0.5
                 / sigma
-                * np.exp(-(x ** 2) / 2 / sigma**2)
+                * np.exp(-x**2 / 2 / sigma**2)
             )
         defaultPars = {"A": 1, "sigma": 5}
         sharedPars = ["sigma"]  # Used only in Global fit
@@ -733,7 +733,7 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-        defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}
+        defaultPars = {"A": 1, "sigma1": 6, "c4": 0}
         sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
     elif modelFlag == "gcc6":
@@ -761,7 +761,7 @@ def selectModelAndPars(modelFlag):
         def model(x, A, sigma1, c6):
             return (
                 A
-                * np.exp(-x**2) / 2 / sigma1**2)
+                * np.exp(-x**2 / 2 / sigma1**2)
                 / (np.sqrt(2 * np.pi * sigma1**2))
                 * (
                     1
@@ -871,7 +871,7 @@ def selectModelAndPars(modelFlag):
         raise ValueError(
         """
         Fitting Model not recognized, available options: 
-        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'ansiogauss' gauss3d'"
+        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
         """
         )
 
@@ -1336,11 +1336,18 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (yFitIC.fitting_model == "doublewell")
             | (yFitIC.fitting_model == "ansiogauss")
             | (yFitIC.fitting_model == "gauss3d")
+            | (yFitIC.fitting_model == "gauss_cntr")
+            | (yFitIC.fitting_model == "gcc4c6_cntr")
+            | (yFitIC.fitting_model == "gcc4_cntr")
+            | (yFitIC.fitting_model == "gcc6_cntr")
         ):
             return
         else:
             raise ValueError(
-                "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
+            """
+            Fitting Model not recognized, available options: 
+            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+            """
             )
 
         suffix = 'lm' if minimizer=="Levenberg-Marquardt" else minimizer.lower()

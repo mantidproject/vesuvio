@@ -94,7 +94,10 @@ class YSpaceFitInputs:
     # 'gcc4_cntr': Gram-Charlier with C4 parameter with fixed center at zero
     # 'gcc6': Gram-Charlier with C6 parameter
     # 'gcc6_cntr': Gram-Charlier with C6 parameter with fixed center at zero
+    # 'gcc4c6': Gram-Charlier with C4 and C6 parameter
+    # 'gcc4c6_cntr': Gram-Charlier with C4 and C6 parameter and fixed center at zero 
     # 'doublewell': Double Well function 
+    # 'ansiogauss': Ansiotropic Gaussian 
     # 'gauss3D': 3-Dimensional Gaussian 
     fitting_model = "gauss"
     run_minos = True
