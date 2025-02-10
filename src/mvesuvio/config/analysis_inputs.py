@@ -11,8 +11,8 @@ class SampleParameters:
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
-    run_this_scattering_type = False
-    fit_in_y_space = False
+    run_this_scattering_type = True
+    fit_in_y_space = True
 
     runs = "43066-43076"
     empty_runs = "41876-41923" 
@@ -43,6 +43,28 @@ class BackwardAnalysisInputs(SampleParameters):
     multiple_scattering_order = 2
     multiple_scattering_number_of_events = 1.0e5
     do_gamma_correction = False
+
+    show_plots = True
+    do_symmetrisation = False
+    subtract_calculated_fse_from_data = True
+    range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric
+    # Fitting model options
+    # 'gauss': Single Gaussian
+    # 'gcc4': Gram-Charlier with C4 parameter
+    # 'gcc6': Gram-Charlier with C6 parameter
+    # 'doublewell': Double Well function 
+    # 'gauss3D': 3-Dimensional Gaussian 
+    fitting_model = "gauss"
+    run_minos = True
+    do_global_fit = True   # Performs global fit with Minuit by default
+    # Number of groups of detectors to perform global (simultaneous) fit on
+    # Either an integer less than the number of detectors 
+    # or option 'all', which does not form groups and fits all spectra simultaneously and individualy 
+    number_of_global_fit_groups = 4
+    # Type of masking 
+    # 'nan': Zeros in workspace being fit are ignored
+    # 'ncp': Zeros in workspace being fit are replaced by the fitted neutron compton profile 
+    mask_zeros_with = "nan"   
 
 
 @dataclass
@@ -80,9 +102,6 @@ class ForwardAnalysisInputs(SampleParameters):
     multiple_scattering_number_of_events = 1.0e5
     do_gamma_correction = True
 
-
-@dataclass
-class YSpaceFitInputs:
     show_plots = True
     do_symmetrisation = False
     subtract_calculated_fse_from_data = True
