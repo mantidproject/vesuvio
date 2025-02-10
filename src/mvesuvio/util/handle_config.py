@@ -91,8 +91,7 @@ def setup_config_dir(config_dir):
 
 
 def setup_default_inputs():
-    if not os.path.isfile(VESUVIO_INPUTS_PATH):
-        copyfile(
+    _ = copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE),
             os.path.join(VESUVIO_INPUTS_PATH),
         )
@@ -107,15 +106,13 @@ def setup_default_ipfile_dir():
         )
 
 
-def __mk_dir(type, path):
-    success = False
-    if not os.path.isdir(path):
-        try:
-            os.makedirs(path)
-            success = True
-        except:
-            print(f"Unable to make {type} directory at location: {path}")
-    return success
+def __mk_dir(type:str, path: str):
+    try:
+        os.makedirs(path, exist_ok=True)
+        return True
+    except:
+        print(f"Unable to make {type} directory at location: {path}")
+        return False 
 
 
 def config_set():
