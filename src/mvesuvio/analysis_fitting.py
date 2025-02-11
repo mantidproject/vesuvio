@@ -18,21 +18,10 @@ from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(IC, wsTOF):
+def fitInYSpaceProcedure(IC, wsTOFMass0, wsRes):
 
-    try:
-        wsTOF = mtd[wsTOF]
-    except KeyError: 
-        logger.notice(f"Workspace to fit {wsTOF} not found.")
-        return
-
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, wsTOF)
-
-    wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
-
-    if IC.subtract_calculated_fse_from_data:
-        wsFSEMass0 = find_ws_name_fse_first_mass(IC)
-        wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
+    wsResSum = SumSpectra(InputWorkspace=wsRes, OutputWorkspace=wsRes.name() + "_Sum")
+    normalise_workspace(wsResSum)
 
     wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
 
@@ -44,14 +33,15 @@ def fitInYSpaceProcedure(IC, wsTOF):
 
     printYSpaceFitResults()
 
-    yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
-    yfitResults.save()
+    # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
+    # yfitResults.save()
 
     if IC.do_global_fit:
         runGlobalFit(wsJoY, wsRes, IC)
 
     save_workspaces(IC)
-    return yfitResults
+    # return yfitResults
+    return
 
 
 def find_ws_name_fse_first_mass(ic):
@@ -70,57 +60,8 @@ def find_ws_name_fse_first_mass(ic):
     return ws_names_fse[np.argmin(ws_masses)]
 
 
-def calculateMantidResolutionFirstMass(IC, ws):
-    mass = IC.masses[0]
-
-    resName = ws.name() + "_Resolution"
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
-        )
-        Rebin(
-            InputWorkspace="tmp",
-            Params=IC.range_for_rebinning_in_y_space,
-            OutputWorkspace="tmp",
-        )
-
-        if index == 0:  # Ensures that workspace has desired units
-            RenameWorkspace("tmp", resName)
-        else:
-            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
-
-    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
-    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
-    wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName + "_Sum")
-
-    normalise_workspace(wsResSum)
-    DeleteWorkspace("tmp")
-    return wsResSum, mtd[resName]
 
 
-def subtract_profiles_except_lightest(ic, ws):
-    """
-    Isolates TOF data from first mass only.
-    Input: ws containing TOF values, NCP for all mass profiles.
-    Output: ws with all profiles except first subtracted.
-    """
-    if len(ic.masses) == 1:
-        return
-
-    # TODO: Make the fetching of these workspaces more robust, prone to error
-    profiles_table = mtd[ic.name + '_initial_parameters']
-    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-    ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
-
-    wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
-                             OutputWorkspace=ws_name_profiles + '_except_lightest')
-
-    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_sum")
-
-    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_m0")
-    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_sum")
-    return wsFirstMass
 
 
 def switchFirstTwoAxis(A):

@@ -4,13 +4,13 @@ import scipy
 import dill      # Only for converting constraints from string
 from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
      IntBoundedValidator, FloatBoundedValidator
-from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty, WorkspaceGroupProperty 
 from mantid.dataobjects import TableWorkspaceProperty
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace
+                            CreateWorkspace, GroupWorkspaces
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
                                             extend_range_of_array, print_table_workspace
@@ -140,7 +140,20 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             name="OutputMeansTable",
             defaultValue="",
             direction=Direction.Output),
-            doc="TableWorkspace containing final means of intensity and widths.")
+            doc="TableWorkspace containing final means of intensity and widths."
+        )
+        self.declareProperty(WorkspaceGroupProperty(
+            name="OutputNCPGroup",
+            defaultValue="ncp",
+            direction=Direction.Output),
+            doc="GroupWorkspace containing Neutron Compton Profiles for each mass and sum."
+        )
+        self.declareProperty(WorkspaceGroupProperty(
+            name="OutputFSEGroup",
+            defaultValue="fse",
+            direction=Direction.Output),
+            doc="GroupWorkspace containing fitted Final State Effects for each mass."
+        )
 
                                     
     def PyExec(self):
@@ -220,11 +233,17 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
-        # Initialise workspaces for fitted ncp 
+        ws_group_ncp = GroupWorkspaces(list(self._fit_profiles_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_ncps")
+        self.setPropertyGroup("OutputNCPGroup", ws_group_ncp.name())
+
+        # Initialise workspaces for fitted fse
         self._fit_fse_workspaces = {}
         for element in self._profiles_table.column("label"):
             self._fit_fse_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_fse')
         self._fit_fse_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_fse')
+
+        ws_group_fse = GroupWorkspaces(list(self._fit_fse_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_fses")
+        self.setPropertyGroup("OutputFSEGroup", ws_group_fse.name())
 
         # Initialise empty means
         self._mean_widths = None

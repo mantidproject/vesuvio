@@ -1,6 +1,6 @@
 from mvesuvio.analysis_fitting import fitInYSpaceProcedure
 from mvesuvio.util import handle_config
-from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
+from mvesuvio.util.analysis_helpers import calculateVesuvioResolution, fix_profile_parameters, isolate_lighest_mass_data,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
                             calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
@@ -10,7 +10,7 @@ from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import mtd, RenameWorkspace
+from mantid.simpleapi import mtd, RenameWorkspace, Minus, SumSpectra
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
 import numpy as np
@@ -136,7 +136,11 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            self.fitting_result = fitInYSpaceProcedure(i_cls, wsName)
+            ws_group_ncp = wsName + "_ncps"
+            ws_group_fse = wsName + "_fses"
+            ws_lighest_data  = isolate_lighest_mass_data(mtd[wsName], mtd[ws_group_ncp], mtd[ws_group_fse], i_cls.subtract_calculated_fse_from_data) 
+            ws_resolution = calculateVesuvioResolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
+            self.fitting_result = fitInYSpaceProcedure(i_cls, ws_lighest_data, ws_resolution)
         return
 
 
