@@ -15,40 +15,30 @@ from mvesuvio.util import handle_config
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
+def fitInYSpaceProcedure(IC, wsTOFMass0, wsRes):
 
-    try:
-        wsTOF = mtd[wsTOF]
-    except KeyError: 
-        print(f"Workspace to fit {wsTOF} not found.")
-        return
+    wsResSum = SumSpectra(InputWorkspace=wsRes, OutputWorkspace=wsRes.name() + "_Sum")
+    normalise_workspace(wsResSum)
 
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
+    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
 
-    wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
-
-    if yFitIC.subtract_calculated_fse_from_data:
-        wsFSEMass0 = find_ws_name_fse_first_mass(IC)
-        wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
-
-    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC.masses[0], yFitIC, IC)
-
-    if yFitIC.do_symmetrisation:
+    if IC.do_symmetrisation:
         wsJoYAvg = symmetrizeWs(wsJoYAvg)
 
-    fitProfileMinuit(yFitIC, wsJoYAvg, wsResSum)
-    fitProfileMantidFit(yFitIC, wsJoYAvg, wsResSum)
+    fitProfileMinuit(IC, wsJoYAvg, wsResSum)
+    fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
 
     printYSpaceFitResults(wsJoYAvg.name())
 
-    yfitResults = ResultsYFitObject(IC, yFitIC, wsTOF.name(), wsJoYAvg.name())
-    yfitResults.save()
+    # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
+    # yfitResults.save()
 
-    if yFitIC.do_global_fit:
-        runGlobalFit(wsJoY, wsRes, IC, yFitIC)
+    if IC.do_global_fit:
+        runGlobalFit(wsJoY, wsRes, IC)
 
-    save_workspaces(yFitIC)
-    return yfitResults
+    save_workspaces(IC)
+    # return yfitResults
+    return
 
 
 def find_ws_name_fse_first_mass(ic):
@@ -67,54 +57,8 @@ def find_ws_name_fse_first_mass(ic):
     return ws_names_fse[np.argmin(ws_masses)]
 
 
-def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
-    mass = IC.masses[0]
-
-    resName = ws.name() + "_Resolution"
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
-        )
-        Rebin(
-            InputWorkspace="tmp",
-            Params=yFitIC.range_for_rebinning_in_y_space,
-            OutputWorkspace="tmp",
-        )
-
-        if index == 0:  # Ensures that workspace has desired units
-            RenameWorkspace("tmp", resName)
-        else:
-            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
-
-    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
-    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
-    wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName + "_Sum")
-
-    normalise_workspace(wsResSum)
-    DeleteWorkspace("tmp")
-    return wsResSum, mtd[resName]
 
 
-def subtract_profiles_except_lightest(ic, ws):
-    """
-    Isolates TOF data from first mass only.
-    Input: ws containing TOF values, NCP for all mass profiles.
-    Output: ws with all profiles except first subtracted.
-    """
-    if len(ic.masses) == 1:
-        return
-
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
-    ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
-
-    wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
-                             OutputWorkspace=ws_name_profiles + '_except_lightest')
-
-    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_sum")
-
-    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_m0")
-    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_sum")
-    return wsFirstMass
 
 
 def switchFirstTwoAxis(A):
@@ -124,19 +68,20 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def ySpaceReduction(wsTOF, mass0, yFitIC, ic):
+def ySpaceReduction(wsTOF, ic):
     """Seperate procedures depending on masking specified."""
 
+    mass0 = ic.masses[0]
     ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
     ncp = mtd[ws_name_lightest_mass].extractY()
 
-    rebinPars = yFitIC.range_for_rebinning_in_y_space
+    rebinPars = ic.range_for_rebinning_in_y_space
 
     if np.any(np.all(wsTOF.extractY() == 0, axis=0)):  # Masked columns present
-        if yFitIC.mask_zeros_with == "nan":
+        if ic.mask_zeros_with == "nan":
             # Build special workspace to store accumulated points
             wsJoY = convertToYSpace(wsTOF, mass0)
-            xp = buildXRangeFromRebinPars(yFitIC)
+            xp = buildXRangeFromRebinPars(ic)
             wsJoYB = dataXBining(
                 wsJoY, xp
             )  # Unusual ws with several dataY points per each dataX point
@@ -1401,7 +1346,7 @@ def printYSpaceFitResults(wsJoYName):
 
 
 class ResultsYFitObject:
-    def __init__(self, ic, yFitIC, wsFinalName, wsYSpaceAvgName):
+    def __init__(self, ic, wsFinalName, wsYSpaceAvgName):
         # Extract most relevant information from ws
         wsFinal = mtd[wsFinalName]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
@@ -1421,19 +1366,19 @@ class ResultsYFitObject:
         poptList = []
         perrList = []
         try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + yFitIC.fitting_model + "_Parameters"]
+            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + ic.fitting_model + "_Parameters"]
             poptList.append(wsFitMinuit.column("Value"))
             perrList.append(wsFitMinuit.column("Error"))
         except:
             pass
         try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + yFitIC.fitting_model + "_Parameters"]
+            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + ic.fitting_model + "_Parameters"]
             poptList.append(wsFitLM.column("Value"))
             perrList.append(wsFitLM.column("Error"))
         except:
             pass
         try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + yFitIC.fitting_model + "_Parameters"]
+            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + ic.fitting_model + "_Parameters"]
             poptList.append(wsFitSimplex.column("Value"))
             perrList.append(wsFitSimplex.column("Error"))
         except:
@@ -1453,7 +1398,7 @@ class ResultsYFitObject:
         self.perr = perr
 
         self.savePath = ic.ySpaceFitSavePath
-        self.fitting_model= yFitIC.fitting_model
+        self.fitting_model= ic.fitting_model
 
     def save(self):
         np.savez(
@@ -1469,7 +1414,7 @@ class ResultsYFitObject:
         )
 
 
-def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
+def runGlobalFit(wsYSpace, wsRes, IC):
     print("\nRunning GLobal Fit ...\n")
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)
@@ -1477,15 +1422,15 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
         dataX, dataY, dataE, dataRes, instrPars
     )
 
-    idxList = groupDetectors(instrPars, yFitIC)
+    idxList = groupDetectors(instrPars, IC)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(
-        dataX, dataY, dataE, dataRes, idxList, yFitIC
+        dataX, dataY, dataE, dataRes, idxList, IC
     )
 
-    if yFitIC.do_symmetrisation:
+    if IC.do_symmetrisation:
         dataY, dataE = weightedSymArr(dataY, dataE)
 
-    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitting_model)
+    model, defaultPars, sharedPars = selectModelAndPars(IC.fitting_model)
 
     totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
@@ -1506,12 +1451,12 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     for i in range(len(dataY)):  # Set limits for unshared parameters
         m.limits["A" + str(i)] = (0, np.inf)
 
-    if yFitIC.fitting_model== "doublewell":
+    if IC.fitting_model== "doublewell":
         m.limits["d"] = (0, np.inf)  # Shared parameters
         m.limits["R"] = (0, np.inf)
 
     t0 = time.time()
-    if yFitIC.fitting_model== "gauss":
+    if IC.fitting_model== "gauss":
         m.simplex()
         m.migrad()
 
@@ -1559,8 +1504,8 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
 
     create_table_for_global_fit_parameters(wsYSpace.name(), m, chi2)
 
-    if yFitIC.show_plots:
-        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), yFitIC)
+    if IC.show_plots:
+        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
 
     # Pass into array to store values in variable
     return np.array(m.values), np.array(m.errors)  

@@ -1,7 +1,8 @@
 
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
                             MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
-                            DeleteWorkspace, SaveNexus, LoadVesuvio, mtd
+                            DeleteWorkspace, SaveNexus, LoadVesuvio, mtd, VesuvioResolution, \
+                            AppendSpectra, RenameWorkspace, CloneWorkspace
 from mantid.kernel import logger
 import numpy as np
 import numbers
@@ -10,6 +11,57 @@ from mvesuvio.analysis_fitting import passDataIntoWS
 from mvesuvio.util import handle_config
 
 import ntpath
+
+def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
+    # NOTE: Minus() is not used so it doesn't change dataE
+
+    ws_ncp_names = ws_group_ncp.getNames()
+    masses = [float(n.split('_')[-2]) for n in ws_ncp_names if 'total' not in n]
+    ws_name_lightest_profile = ws_ncp_names[masses.index(min(masses))]
+    ws_name_profiles = [n for n in ws_ncp_names if n.endswith('_total_ncp')][0]
+
+    ws_lighest_data = CloneWorkspace(initial_ws, OutputWorkspace=initial_ws.name()+"_m0")
+
+    isolated_data_y = ws_lighest_data.extractY() - (mtd[ws_name_profiles].extractY() - mtd[ws_name_lightest_profile].extractY())
+
+    for i in range(ws_lighest_data.getNumberHistograms()):
+        ws_lighest_data.dataY(i)[:] = isolated_data_y[i, :] 
+    SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
+
+    if subtract_fse:
+
+        isolated_data_y -= mtd[ws_name_lightest_profile.replace('ncp', 'fse')].extractY()
+        ws_lighest_data = CloneWorkspace(ws_lighest_data, OutputWorkspace=ws_lighest_data.name()+"_fse")
+
+        for i in range(ws_lighest_data.getNumberHistograms()):
+            ws_lighest_data.dataY(i)[:] = isolated_data_y[i, :] 
+        SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
+
+    return ws_lighest_data
+
+
+def calculate_resolution(mass, ws, rebin_range):
+
+    resName = ws.name() + f"_resolution"
+    for index in range(ws.getNumberHistograms()):
+        VesuvioResolution(
+            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
+        )
+        Rebin(
+            InputWorkspace="tmp",
+            Params=rebin_range,
+            OutputWorkspace="tmp",
+        )
+
+        if index == 0:  # Ensures that workspace has desired units
+            RenameWorkspace("tmp", resName)
+        else:
+            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
+
+    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
+    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
+    DeleteWorkspace("tmp")
+    return mtd[resName]
 
 
 def create_profiles_table(name, ai):
