@@ -1,13 +1,15 @@
 import unittest
 import numpy as np
+from numpy.testing._private.utils import assert_allclose
 import scipy
 import dill
+from pathlib import Path
 import numpy.testing as nptest
-from mock import MagicMock, patch, call
-from mvesuvio.util.analysis_helpers import extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, pass_data_into_ws, print_table_workspace
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+from mock import MagicMock, patch
+from mvesuvio.util.analysis_helpers import calculate_resolution, extractWS, _convert_dict_to_table,  \
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, isolate_lighest_mass_data, numerical_third_derivative,  \
+    mask_time_of_flight_bins_with_zeros
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
 
 class TestAnalysisHelpers(unittest.TestCase):
@@ -178,54 +180,10 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(actual_data_y, expected_data_y)
 
 
-    def test_pass_data_into_ws(self):
-
-        dataX = np.arange(20).reshape(4, 5)
-        dataY = np.arange(20, 40).reshape(4, 5)
-        dataE = np.arange(40, 60).reshape(4, 5)
-
-        dataX_mock = np.zeros_like(dataX)
-        dataY_mock = np.zeros_like(dataY)
-        dataE_mock = np.zeros_like(dataE)
-
-        ws_mock = MagicMock(
-            dataY=lambda row: dataY_mock[row],
-            dataX=lambda row: dataX_mock[row],
-            dataE=lambda row: dataE_mock[row],
-            getNumberHistograms=MagicMock(return_value=4)
-        )
-
-        pass_data_into_ws(dataX, dataY, dataE, ws_mock)
-
-        np.testing.assert_allclose(dataX_mock, dataX)
-        np.testing.assert_allclose(dataY_mock, dataY)
-        np.testing.assert_allclose(dataE_mock, dataE)
-
-
-    @patch('mantid.kernel.logger.notice')
-    def test_print_table_workspace(self, mock_notice):
-        mock_table = MagicMock()
-        mock_table.name.return_value = "my_table"
-        mock_table.rowCount.return_value = 3
-        mock_table.toDict.return_value = {
-            "names": ["1.0", "12.0", "16.0"],
-            "mass": [1, 12.0, 16.00000],
-            "width": [5, 10.3456, 15.23], 
-            "bounds": ["[3, 6]", "[8, 13]", "[9, 17]"]
-        } 
-
-        print_table_workspace(mock_table, precision=2)
-
-        mock_notice.assert_has_calls(
-            [call('Table my_table:'),
-             call(' ------------------------ '),
-             call('|names|mass|width|bounds |'),
-             call('|1.0  |1   |5    |[3, 6] |'),
-             call('|12.0 |12  |10.35|[8, 13]|'),
-             call('|16.0 |16  |15.23|[9, 17]|'),
-             call(' ------------------------ ')]
-        )
-
-
 if __name__ == "__main__":
     unittest.main()
+
+        # import matplotlib.pyplot as plt
+        # plt.plot(dataX[0], ws_data.extractY()[0])
+        # plt.plot(dataX[0], ws_fse1.extractY()[0])
+        # plt.show()
