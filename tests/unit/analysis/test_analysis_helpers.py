@@ -238,11 +238,5 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(ws_res.dataY(30)[:], np.array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]), rtol=1e-3)
 
 
-
 if __name__ == "__main__":
     unittest.main()
-
-        # import matplotlib.pyplot as plt
-        # plt.plot(dataX[0], ws_data.extractY()[0])
-        # plt.plot(dataX[0], ws_fse1.extractY()[0])
-        # plt.show()
