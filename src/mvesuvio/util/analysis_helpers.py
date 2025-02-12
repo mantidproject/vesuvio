@@ -2,7 +2,7 @@
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
                             MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
                             DeleteWorkspace, SaveNexus, LoadVesuvio, mtd, VesuvioResolution, \
-                            AppendSpectra, RenameWorkspace
+                            AppendSpectra, RenameWorkspace, CloneWorkspace
 from mantid.kernel import logger
 import numpy as np
 import numbers
@@ -11,33 +11,37 @@ from mvesuvio.util import handle_config
 
 import ntpath
 
-def isolate_lighest_mass_data(initial_ws, ws_group_ncp, ws_group_fse, subtract_fse=True):
+def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
+    # NOTE: Minus() is not used so it doesn't change dataE
 
     ws_ncp_names = ws_group_ncp.getNames()
     masses = [float(n.split('_')[-2]) for n in ws_ncp_names if 'total' not in n]
     ws_name_lightest_profile = ws_ncp_names[masses.index(min(masses))]
     ws_name_profiles = [n for n in ws_ncp_names if n.endswith('_total_ncp')][0]
 
-    # ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
-    # ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
+    ws_lighest_data = CloneWorkspace(initial_ws, OutputWorkspace=initial_ws.name()+"_m0")
 
-    ws_ncp_except_lightest = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_profile], 
-                             OutputWorkspace=ws_name_profiles + '_except_lightest')
-    SumSpectra(ws_ncp_except_lightest.name(), OutputWorkspace=ws_ncp_except_lightest.name() + "_sum")
+    isolated_data_y = ws_lighest_data.extractY() - (mtd[ws_name_profiles].extractY() - mtd[ws_name_lightest_profile].extractY())
 
-    ws_lighest_data = Minus(initial_ws, ws_ncp_except_lightest, OutputWorkspace=initial_ws.name()+"_m0")
+    for i in range(ws_lighest_data.getNumberHistograms()):
+        ws_lighest_data.dataY(i)[:] = isolated_data_y[i, :] 
     SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
 
     if subtract_fse:
-        ws_lighest_data = Minus(ws_lighest_data, ws_name_lightest_profile.replace('ncp', 'fse'), 
-                                OutputWorkspace=ws_lighest_data.name() + "_fse")
+
+        isolated_data_y -= mtd[ws_name_lightest_profile.replace('ncp', 'fse')].extractY()
+        ws_lighest_data = CloneWorkspace(ws_lighest_data, OutputWorkspace=ws_lighest_data.name()+"_fse")
+
+        for i in range(ws_lighest_data.getNumberHistograms()):
+            ws_lighest_data.dataY(i)[:] = isolated_data_y[i, :] 
+        SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
 
     return ws_lighest_data
 
 
-def calculateVesuvioResolution(mass, ws, rebin_range):
+def calculate_resolution(mass, ws, rebin_range):
 
-    resName = ws.name() + f"_{mass}_resolution"
+    resName = ws.name() + f"_resolution"
     for index in range(ws.getNumberHistograms()):
         VesuvioResolution(
             Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
