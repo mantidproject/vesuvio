@@ -52,29 +52,6 @@ class FitInYSpace():
         return
 
 
-def find_ws_name_fse_first_mass(ic):
-    # Some dirty implementation to be deleted in the future
-    ws_names_fse = []
-    ws_masses = []
-    prefix = ic.name+'_'+str(ic.number_of_iterations_for_corrections)
-    for ws_name in mtd.getObjectNames():
-        if ws_name.startswith(prefix) and ws_name.endswith('fse'):
-            name_ending = ws_name.replace(prefix, "")
-            match = re.search(r'_(\d+(?:\.\d+)?)_', name_ending)
-            if match:   # If float found in ws name ending
-                ws_masses.append(float(match.group().replace('_', '')))
-                ws_names_fse.append(ws_name)
-
-    return ws_names_fse[np.argmin(ws_masses)]
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
-
-
 def ySpaceReduction(wsTOF, ic):
     """Seperate procedures depending on masking specified."""
 
@@ -108,7 +85,7 @@ def ySpaceReduction(wsTOF, ic):
             wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
             return wsJoYN, wsJoYAvg
 
-        elif yFitIC.mask_zeros_with == "ncp":
+        elif ic.mask_zeros_with == "ncp":
             wsTOF = replaceZerosWithNCP(wsTOF, ncp)
 
         else:
