@@ -15,30 +15,38 @@ from mvesuvio.util import handle_config
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(IC, wsTOFMass0, wsRes):
+class FitInYSpace():
 
-    wsResSum = SumSpectra(InputWorkspace=wsRes, OutputWorkspace=wsRes.name() + "_Sum")
-    normalise_workspace(wsResSum)
+    def __init__(self, fi, ws_to_fit, ws_res):
 
-    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
+        self.fitting_inputs = fi
+        self.ws_to_fit = ws_to_fit
+        self.ws_resolution = ws_res 
 
-    if IC.do_symmetrisation:
-        wsJoYAvg = symmetrizeWs(wsJoYAvg)
+    def run(self):
 
-    fitProfileMinuit(IC, wsJoYAvg, wsResSum)
-    fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
+        wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
+        normalise_workspace(wsResSum)
 
-    printYSpaceFitResults(wsJoYAvg.name())
+        wsJoY, wsJoYAvg = ySpaceReduction(self.ws_to_fit, self.fitting_inputs)
 
-    # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
-    # yfitResults.save()
+        if self.fitting_inputs.do_symmetrisation:
+            wsJoYAvg = symmetrizeWs(wsJoYAvg)
 
-    if IC.do_global_fit:
-        runGlobalFit(wsJoY, wsRes, IC)
+        fitProfileMinuit(self.fitting_inputs, wsJoYAvg, wsResSum)
+        fitProfileMantidFit(self.fitting_inputs, wsJoYAvg, wsResSum)
 
-    save_workspaces(IC)
-    # return yfitResults
-    return
+        printYSpaceFitResults(wsJoYAvg.name())
+
+        # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
+        # yfitResults.save()
+
+        if self.fitting_inputs.do_global_fit:
+            runGlobalFit(wsJoY, self.ws_resolution, self.fitting_inputs)
+
+        save_workspaces(self.fitting_inputs)
+        # return yfitResults
+        return
 
 
 def find_ws_name_fse_first_mass(ic):
@@ -55,10 +63,6 @@ def find_ws_name_fse_first_mass(ic):
                 ws_names_fse.append(ws_name)
 
     return ws_names_fse[np.argmin(ws_masses)]
-
-
-
-
 
 
 def switchFirstTwoAxis(A):
