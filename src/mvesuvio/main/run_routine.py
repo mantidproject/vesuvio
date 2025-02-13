@@ -1,4 +1,4 @@
-from mvesuvio.analysis_fitting import fitInYSpaceProcedure
+from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import calculate_resolution, fix_profile_parameters, isolate_lighest_mass_data,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
@@ -138,7 +138,7 @@ class Runner:
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
             ws_lighest_data  = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncps"], i_cls.subtract_calculated_fse_from_data) 
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
-            self.fitting_result = fitInYSpaceProcedure(i_cls, ws_lighest_data, ws_resolution)
+            self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_resolution).run()
         return
 
 
