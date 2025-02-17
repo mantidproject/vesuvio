@@ -15,113 +15,38 @@ from mvesuvio.util import handle_config
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(IC, wsTOF):
+class FitInYSpace():
 
-    try:
-        wsTOF = mtd[wsTOF]
-    except KeyError: 
-        print(f"Workspace to fit {wsTOF} not found.")
+    def __init__(self, fi, ws_to_fit, ws_res):
+
+        self.fitting_inputs = fi
+        self.ws_to_fit = ws_to_fit
+        self.ws_resolution = ws_res 
+
+    def run(self):
+
+        wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
+        normalise_workspace(wsResSum)
+
+        wsJoY, wsJoYAvg = ySpaceReduction(self.ws_to_fit, self.fitting_inputs)
+
+        if self.fitting_inputs.do_symmetrisation:
+            wsJoYAvg = symmetrizeWs(wsJoYAvg)
+
+        fitProfileMinuit(self.fitting_inputs, wsJoYAvg, wsResSum)
+        fitProfileMantidFit(self.fitting_inputs, wsJoYAvg, wsResSum)
+
+        printYSpaceFitResults(wsJoYAvg.name())
+
+        # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
+        # yfitResults.save()
+
+        if self.fitting_inputs.do_global_fit:
+            runGlobalFit(wsJoY, self.ws_resolution, self.fitting_inputs)
+
+        save_workspaces(self.fitting_inputs)
+        # return yfitResults
         return
-
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, wsTOF)
-
-    wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
-
-    if IC.subtract_calculated_fse_from_data:
-        wsFSEMass0 = find_ws_name_fse_first_mass(IC)
-        wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
-
-    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
-
-    if IC.do_symmetrisation:
-        wsJoYAvg = symmetrizeWs(wsJoYAvg)
-
-    fitProfileMinuit(IC, wsJoYAvg, wsResSum)
-    fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
-
-    printYSpaceFitResults(wsJoYAvg.name())
-
-    yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
-    yfitResults.save()
-
-    if IC.do_global_fit:
-        runGlobalFit(wsJoY, wsRes, IC)
-
-    save_workspaces(IC)
-    return yfitResults
-
-
-def find_ws_name_fse_first_mass(ic):
-    # Some dirty implementation to be deleted in the future
-    ws_names_fse = []
-    ws_masses = []
-    prefix = ic.name+'_'+str(ic.number_of_iterations_for_corrections)
-    for ws_name in mtd.getObjectNames():
-        if ws_name.startswith(prefix) and ws_name.endswith('fse'):
-            name_ending = ws_name.replace(prefix, "")
-            match = re.search(r'_(\d+(?:\.\d+)?)_', name_ending)
-            if match:   # If float found in ws name ending
-                ws_masses.append(float(match.group().replace('_', '')))
-                ws_names_fse.append(ws_name)
-
-    return ws_names_fse[np.argmin(ws_masses)]
-
-
-def calculateMantidResolutionFirstMass(IC, ws):
-    mass = IC.masses[0]
-
-    resName = ws.name() + "_Resolution"
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
-        )
-        Rebin(
-            InputWorkspace="tmp",
-            Params=IC.range_for_rebinning_in_y_space,
-            OutputWorkspace="tmp",
-        )
-
-        if index == 0:  # Ensures that workspace has desired units
-            RenameWorkspace("tmp", resName)
-        else:
-            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
-
-    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
-    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
-    wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName + "_Sum")
-
-    normalise_workspace(wsResSum)
-    DeleteWorkspace("tmp")
-    return wsResSum, mtd[resName]
-
-
-def subtract_profiles_except_lightest(ic, ws):
-    """
-    Isolates TOF data from first mass only.
-    Input: ws containing TOF values, NCP for all mass profiles.
-    Output: ws with all profiles except first subtracted.
-    """
-    if len(ic.masses) == 1:
-        return
-
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
-    ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
-
-    wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
-                             OutputWorkspace=ws_name_profiles + '_except_lightest')
-
-    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_sum")
-
-    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_m0")
-    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_sum")
-    return wsFirstMass
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
 def ySpaceReduction(wsTOF, ic):
@@ -154,7 +79,7 @@ def ySpaceReduction(wsTOF, ic):
             wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
             return wsJoYN, wsJoYAvg
 
-        elif yFitIC.mask_zeros_with == "ncp":
+        elif ic.mask_zeros_with == "ncp":
             wsTOF = replaceZerosWithNCP(wsTOF, ncp)
 
         else:
