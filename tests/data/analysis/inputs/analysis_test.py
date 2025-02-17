@@ -42,6 +42,17 @@ class BackwardAnalysisInputs(SampleParameters):
     do_gamma_correction = False
 
 
+    show_plots = False
+    do_symmetrisation = True
+    subtract_calculated_fse_from_data = False
+    range_for_rebinning_in_y_space = "-20, 0.5, 20"  # Needs to be symetric
+    fitting_model = "SINGLE_GAUSSIAN"
+    run_minos = True
+    do_global_fit = None
+    number_of_global_fit_groups = 4
+    mask_zeros_with = None
+
+
 class ForwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
     fit_in_y_space = False
@@ -82,7 +93,6 @@ class ForwardAnalysisInputs(SampleParameters):
     do_gamma_correction= True
 
 
-class YSpaceFitInputs:
     show_plots = False
     do_symmetrisation = True
     subtract_calculated_fse_from_data = False
