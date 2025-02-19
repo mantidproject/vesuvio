@@ -101,13 +101,17 @@ def create_profiles_table(name, ai):
     table.addColumn(type="str", name="width_bounds")
     table.addColumn(type="float", name="center")
     table.addColumn(type="str", name="center_bounds")
+
+    def bounds_to_str(bounds):
+        return " : ".join([str(i) for i in list(bounds)])
+
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
         ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
         ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
     ):
         table.addRow(
-            [str(float(mass)), float(mass), float(intensity), str(list(intensity_bound)),
-            float(width), str(list(width_bound)), float(center), str(list(center_bound))]
+            [str(float(mass)), float(mass), float(intensity), bounds_to_str(intensity_bound),
+             float(width), bounds_to_str(width_bound), float(center), bounds_to_str(center_bound)]
         )
     return table
 

@@ -55,8 +55,8 @@ class Runner:
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
         # TODO: Output paths should probably not be set like this 
-        self._set_output_paths(self.bckwd_ai) 
-        self._set_output_paths(self.fwd_ai) 
+        # self._set_output_paths(self.bckwd_ai) 
+        # self._set_output_paths(self.fwd_ai) 
 
         # TODO: remove this by fixing circular import 
         self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
@@ -298,8 +298,8 @@ class Runner:
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
-            "ResultsPath": str(self.results_save_path),
-            "FiguresPath": str(self.fig_save_path),
+            "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
+            "FiguresPath": str(self.experiment_path / "figures"),
             "OutputMeansTable":" Final_Means"
         }
 
@@ -348,30 +348,32 @@ class Runner:
         return rawPath, emptyPath
 
 
-    def _set_output_paths(self, ai):
-        experimentPath = self.experiment_path
-        outputPath = experimentPath / "output_files"
-        outputPath.mkdir(parents=True, exist_ok=True)
-
-        # Build Filename based on ic
-        corr = ""
-        if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
-            corr += "MS"
-        if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
-            corr += "GC"
-
-        fileName = (
-            f"{ai.detectors.strip()}_{ai.number_of_iterations_for_corrections}{corr}"
-        )
-        self.results_save_path = outputPath / (fileName + ".npz")
-        ai.ySpaceFitSavePath = outputPath / (fileName + "_yfit.npz")
-
-        # Set directories for figures
-        figSavePath = experimentPath / "figures"
-        figSavePath.mkdir(exist_ok=True)
-        self.fig_save_path = figSavePath
-        return
-
+    # def _set_output_paths(self, ai):
+    #     experimentPath = self.experiment_path
+    #     outputPath = experimentPath / "output_files"
+    #     outputPath.mkdir(parents=True, exist_ok=True)
+    #
+    #     # Build Filename based on ic
+    #     corr = ""
+    #     if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
+    #         corr += "_GC"
+    #     if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
+    #         corr += "_MS"
+    #
+    #     fileName = (
+    #         f"spec_{ai.detectors.strip()}_iter_{ai.number_of_iterations_for_corrections}{corr}" + ".npz"
+    #     )
+    #     fileNameYSpace = fileName + "_ySpaceFit" + ".npz"
+    #
+    #     self.results_save_path = outputPath / fileName
+    #     ai.ySpaceFitSavePath = outputPath / fileNameYSpace
+    #
+    #     # Set directories for figures
+    #     figSavePath = experimentPath / "figures"
+    #     figSavePath.mkdir(exist_ok=True)
+    #     self.fig_save_path = figSavePath
+    #     return
+    #
 
 if __name__ == "__main__":
     Runner().run()

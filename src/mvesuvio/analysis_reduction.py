@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 import dill      # Only for converting constraints from string
+from pathlib import Path
 from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
      IntBoundedValidator, FloatBoundedValidator
 from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty, WorkspaceGroupProperty 
@@ -10,7 +11,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace, GroupWorkspaces
+                            CreateWorkspace, GroupWorkspaces, SaveAscii
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
                                             extend_range_of_array, print_table_workspace
@@ -193,12 +194,17 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._initial_fit_parameters.extend([intensity, width, center])
 
         self._initial_fit_bounds = []
+
+        def bounds_str_to_list(bounds_str):
+            # Use eval to correctly evaluate None
+            return [eval(i) for i in bounds_str.split(':')]
+
         for intensity_bounds, width_bounds, center_bounds in zip(
             self._profiles_table.column("intensity_bounds"),
             self._profiles_table.column("width_bounds"),
             self._profiles_table.column("center_bounds")
         ):
-            self._initial_fit_bounds.extend([eval(intensity_bounds), eval(width_bounds), eval(center_bounds)])
+            self._initial_fit_bounds.extend([bounds_str_to_list(intensity_bounds), bounds_str_to_list(width_bounds), bounds_str_to_list(center_bounds)])
 
         # Masses need to be defined in the same order
         self._masses = np.array(self._profiles_table.column("mass"))
@@ -234,7 +240,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
         ws_group_ncp = GroupWorkspaces(list(self._fit_profiles_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_ncps")
-        self.setPropertyGroup("OutputNCPGroup", ws_group_ncp.name())
+        self.setPropertyValue("OutputNCPGroup", ws_group_ncp.name())
 
         # Initialise workspaces for fitted fse
         self._fit_fse_workspaces = {}
@@ -243,7 +249,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._fit_fse_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_fse')
 
         ws_group_fse = GroupWorkspaces(list(self._fit_fse_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_fses")
-        self.setPropertyGroup("OutputFSEGroup", ws_group_fse.name())
+        self.setPropertyValue("OutputFSEGroup", ws_group_fse.name())
 
         # Initialise empty means
         self._mean_widths = None
@@ -328,7 +334,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 OutputWorkspace=self._name + '_' + str(iteration + 1)
             )
 
-        self._set_results()
+        # self._set_results()
         self._save_results()
         return self 
 
@@ -911,85 +917,97 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 str(profiles).replace(';', '\n\n').replace(',', '\n'))
         return profiles
 
-
-    def _set_results(self):
-        """Used to collect results from workspaces and store them in .npz files for testing."""
-
-        self.wsFinal = mtd[self._name + '_' + str(self._number_of_iterations)]
-
-        allIterNcp = []
-        allFitWs = []
-        allTotNcp = []
-        allBestPar = []
-        allMeanWidhts = []
-        allMeanIntensities = []
-        allStdWidths = []
-        allStdIntensities = []
-        j = 0
-        while True:
-            try:
-                wsIterName = self._name + '_' + str(j)
-
-                # Extract ws that were fitted
-                ws = mtd[wsIterName]
-                allFitWs.append(ws.extractY())
-
-                # Extract total ncp
-                totNcpWs = mtd[wsIterName + "_total_ncp"]
-                allTotNcp.append(totNcpWs.extractY())
-
-                # Extract best fit parameters
-                fitParTable = mtd[wsIterName + "_fit_results"]
-                bestFitPars = []
-                for key in fitParTable.keys():
-                    bestFitPars.append(fitParTable.column(key))
-                allBestPar.append(np.array(bestFitPars).T)
-
-                # Extract individual ncp
-                allNCP = []
-                for label in self._profiles_table.column("label"):
-                    ncpWsToAppend = mtd[
-                        wsIterName + f"_{label}_ncp"
-                    ]
-                    allNCP.append(ncpWsToAppend.extractY())
-                allNCP = np.swapaxes(np.array(allNCP), 0, 1)
-                allIterNcp.append(allNCP)
-
-                # Extract Mean and Std Widths, Intensities
-                meansTable = mtd[wsIterName + "_means"]
-                allMeanWidhts.append(meansTable.column("mean_width"))
-                allStdWidths.append(meansTable.column("std_width"))
-                allMeanIntensities.append(meansTable.column("mean_intensity"))
-                allStdIntensities.append(meansTable.column("std_intensity"))
-
-                j += 1
-            except KeyError:
-                break
-
-        self.all_fit_workspaces = np.array(allFitWs)
-        self.all_spec_best_par_chi_nit = np.array(allBestPar)
-        self.all_tot_ncp = np.array(allTotNcp)
-        self.all_ncp_for_each_mass = np.array(allIterNcp)
-        self.all_mean_widths = np.array(allMeanWidhts)
-        self.all_mean_intensities = np.array(allMeanIntensities)
-        self.all_std_widths = np.array(allStdWidths)
-        self.all_std_intensities = np.array(allStdIntensities)
+    #
+    # def _set_results(self):
+    #     """Used to collect results from workspaces and store them in .npz files for testing."""
+    #
+    #     self.wsFinal = mtd[self._name + '_' + str(self._number_of_iterations)]
+    #
+    #     allIterNcp = []
+    #     allFitWs = []
+    #     allTotNcp = []
+    #     allBestPar = []
+    #     allMeanWidhts = []
+    #     allMeanIntensities = []
+    #     allStdWidths = []
+    #     allStdIntensities = []
+    #     j = 0
+    #
+    #
+        # while True:
+        #     try:
+        #         wsIterName = self._name + '_' + str(j)
+        #
+        #         # Extract ws that were fitted
+        #         ws = mtd[wsIterName]
+        #         allFitWs.append(ws.extractY())
+        #
+        #         # Extract total ncp
+        #         totNcpWs = mtd[wsIterName + "_total_ncp"]
+        #         allTotNcp.append(totNcpWs.extractY())
+        #
+        #         # Extract best fit parameters
+        #         fitParTable = mtd[wsIterName + "_fit_results"]
+        #         bestFitPars = []
+        #         for key in fitParTable.keys():
+        #             bestFitPars.append(fitParTable.column(key))
+        #         allBestPar.append(np.array(bestFitPars).T)
+        #
+        #         # Extract individual ncp
+        #         allNCP = []
+        #         for label in self._profiles_table.column("label"):
+        #             ncpWsToAppend = mtd[
+        #                 wsIterName + f"_{label}_ncp"
+        #             ]
+        #             allNCP.append(ncpWsToAppend.extractY())
+        #         allNCP = np.swapaxes(np.array(allNCP), 0, 1)
+        #         allIterNcp.append(allNCP)
+        #
+        #         # Extract Mean and Std Widths, Intensities
+        #         meansTable = mtd[wsIterName + "_means"]
+        #         allMeanWidhts.append(meansTable.column("mean_width"))
+        #         allStdWidths.append(meansTable.column("std_width"))
+        #         allMeanIntensities.append(meansTable.column("mean_intensity"))
+        #         allStdIntensities.append(meansTable.column("std_intensity"))
+        #
+        #         j += 1
+        #     except KeyError:
+        #         break
+        #
+        # self.all_fit_workspaces = np.array(allFitWs)
+        # self.all_spec_best_par_chi_nit = np.array(allBestPar)
+        # self.all_tot_ncp = np.array(allTotNcp)
+        # self.all_ncp_for_each_mass = np.array(allIterNcp)
+        # self.all_mean_widths = np.array(allMeanWidhts)
+        # self.all_mean_intensities = np.array(allMeanIntensities)
+        # self.all_std_widths = np.array(allStdWidths)
+        # self.all_std_intensities = np.array(allStdIntensities)
 
     def _save_results(self):
         """Saves all of the arrays stored in this object"""
 
-        if not self._save_results_path:
-            return 
+        # if not self._save_results_path:
+        #     return 
+        #
+        # Create if not there already
+        save_dir = Path(self._save_results_path)
+        save_dir.mkdir(parents=True, exist_ok=True)
 
-        np.savez(
-            self._save_results_path,
-            all_fit_workspaces=self.all_fit_workspaces,
-            all_spec_best_par_chi_nit=self.all_spec_best_par_chi_nit,
-            all_mean_widths=self.all_mean_widths,
-            all_mean_intensities=self.all_mean_intensities,
-            all_std_widths=self.all_std_widths,
-            all_std_intensities=self.all_std_intensities,
-            all_tot_ncp=self.all_tot_ncp,
-            all_ncp_for_each_mass=self.all_ncp_for_each_mass,
-        )
+        for ws_name in mtd.getObjectNames():
 
+            if ws_name.endswith(('ncp', 'fse', 'fit_results', 'means', 'initial_parameters') + tuple([str(i) for i in range(10)])):
+                SaveAscii(ws_name, str(save_dir / ws_name))
+
+
+        # np.savez(
+        #     self._save_results_path,
+        #     all_fit_workspaces=self.all_fit_workspaces,
+        #     all_spec_best_par_chi_nit=self.all_spec_best_par_chi_nit,
+        #     all_mean_widths=self.all_mean_widths,
+        #     all_mean_intensities=self.all_mean_intensities,
+        #     all_std_widths=self.all_std_widths,
+        #     all_std_intensities=self.all_std_intensities,
+        #     all_tot_ncp=self.all_tot_ncp,
+        #     all_ncp_for_each_mass=self.all_ncp_for_each_mass,
+        # )
+        #
