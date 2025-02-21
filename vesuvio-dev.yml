@@ -6,7 +6,6 @@ channels:
 
 dependencies:
   - mantidworkbench
-  - numpy==2.*     # Fix issue where numpy might downgrade 
   - flake8
   - conda-wrappers
   - pre-commit
