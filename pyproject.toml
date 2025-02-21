@@ -10,7 +10,6 @@ dynamic = ["version"]
 authors = [
   {name = "The Mantid Project", email = "mantid-help@mantidproject.org"},
   {name = "Guilherme Pereira", email = "gui.maciel-pereira@stfc.ac.uk"},
-  {name = "More Credit", email = "here@stfc.ac.uk"},
 ]
 description = "Analyse Vesuvio instrument data"
 readme = "README.md"
@@ -21,19 +20,11 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering",
 ]
+# Only these few, package meant to be installed alongside vesuvio-dev.yml 
 dependencies = [
-    "matplotlib",
     "iminuit",
-    "h5py",
     "jacobi==0.4.2",
     "dill",
-]
-
-[project.optional-dependencies]
-tests_require = [
-    "coverage",
-    "mock>=2.0",
-    "pytest",
 ]
 
 [project.urls]

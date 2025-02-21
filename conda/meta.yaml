@@ -27,7 +27,6 @@ requirements:
     - mantid {{ mantid }}
     - matplotlib
     - iminuit
-    - h5py
     - jacobi {{ jacobi }}
     - dill
 
