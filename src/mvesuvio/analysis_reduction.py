@@ -14,7 +14,6 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
                                             extend_range_of_array
-
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 NEUTRON_MASS = 1.008  # a.m.u.
