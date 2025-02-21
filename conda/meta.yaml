@@ -24,7 +24,7 @@ requirements:
 
   run:
     - python {{ python }}
-    - mantid {{ mantid }}
+    - mantid
     - matplotlib
     - iminuit
     - jacobi {{ jacobi }}

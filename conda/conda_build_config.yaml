@@ -1,8 +1,5 @@
 python:
   - 3.10
 
-mantid:
-  - 6.11
-
 jacobi:
   - 0.4.2 #pinned until later versions are proven.
