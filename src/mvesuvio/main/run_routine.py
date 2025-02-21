@@ -35,7 +35,6 @@ class Runner:
 
         self.bckwd_ai = ai.BackwardAnalysisInputs
         self.fwd_ai = ai.ForwardAnalysisInputs
-        self.yFitIC = ai.YSpaceFitInputs
 
         # Names of workspaces to check if they exist to skip analysis
         self.ws_to_fit_y_space = []
@@ -66,7 +65,8 @@ class Runner:
         # TODO: sort out yfit inputs
         figSavePath = self.experiment_path / "figures"
         figSavePath.mkdir(exist_ok=True)
-        self.yFitIC.figSavePath = figSavePath
+        self.fwd_ai.figSavePath = figSavePath
+        self.bckwd_ai.figSavePath = figSavePath
 
         self.mantid_log_file = "mantid.log"
 
@@ -137,7 +137,7 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            self.fitting_result = fitInYSpaceProcedure(self.yFitIC, i_cls, wsName)
+            self.fitting_result = fitInYSpaceProcedure(i_cls, wsName)
         return
 
 

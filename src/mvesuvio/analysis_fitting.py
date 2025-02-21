@@ -18,7 +18,7 @@ from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
+def fitInYSpaceProcedure(IC, wsTOF):
 
     try:
         wsTOF = mtd[wsTOF]
@@ -26,31 +26,31 @@ def fitInYSpaceProcedure(yFitIC, IC, wsTOF):
         logger.notice(f"Workspace to fit {wsTOF} not found.")
         return
 
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, yFitIC, wsTOF)
+    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, wsTOF)
 
     wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
 
-    if yFitIC.subtract_calculated_fse_from_data:
+    if IC.subtract_calculated_fse_from_data:
         wsFSEMass0 = find_ws_name_fse_first_mass(IC)
         wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
 
-    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC.masses[0], yFitIC, IC)
+    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
 
-    if yFitIC.do_symmetrisation:
+    if IC.do_symmetrisation:
         wsJoYAvg = symmetrizeWs(wsJoYAvg)
 
-    fitProfileMinuit(yFitIC, wsJoYAvg, wsResSum)
-    fitProfileMantidFit(yFitIC, wsJoYAvg, wsResSum)
+    fitProfileMinuit(IC, wsJoYAvg, wsResSum)
+    fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
 
     printYSpaceFitResults()
 
-    yfitResults = ResultsYFitObject(IC, yFitIC, wsTOF.name(), wsJoYAvg.name())
+    yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
     yfitResults.save()
 
-    if yFitIC.do_global_fit:
-        runGlobalFit(wsJoY, wsRes, IC, yFitIC)
+    if IC.do_global_fit:
+        runGlobalFit(wsJoY, wsRes, IC)
 
-    save_workspaces(yFitIC)
+    save_workspaces(IC)
     return yfitResults
 
 
@@ -70,7 +70,7 @@ def find_ws_name_fse_first_mass(ic):
     return ws_names_fse[np.argmin(ws_masses)]
 
 
-def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
+def calculateMantidResolutionFirstMass(IC, ws):
     mass = IC.masses[0]
 
     resName = ws.name() + "_Resolution"
@@ -80,7 +80,7 @@ def calculateMantidResolutionFirstMass(IC, yFitIC, ws):
         )
         Rebin(
             InputWorkspace="tmp",
-            Params=yFitIC.range_for_rebinning_in_y_space,
+            Params=IC.range_for_rebinning_in_y_space,
             OutputWorkspace="tmp",
         )
 
@@ -130,21 +130,22 @@ def switchFirstTwoAxis(A):
     return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
 
 
-def ySpaceReduction(wsTOF, mass0, yFitIC, ic):
+def ySpaceReduction(wsTOF, ic):
     """Seperate procedures depending on masking specified."""
 
     profiles_table = mtd[ic.name + '_initial_parameters']
     lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
     ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
+
     ncp = mtd[ws_name_lightest_mass].extractY()
 
-    rebinPars = yFitIC.range_for_rebinning_in_y_space
+    rebinPars = ic.range_for_rebinning_in_y_space
 
     if np.any(np.all(wsTOF.extractY() == 0, axis=0)):  # Masked columns present
-        if yFitIC.mask_zeros_with == "nan":
+        if ic.mask_zeros_with == "nan":
             # Build special workspace to store accumulated points
             wsJoY = convertToYSpace(wsTOF, mass0)
-            xp = buildXRangeFromRebinPars(yFitIC)
+            xp = buildXRangeFromRebinPars(ic)
             wsJoYB = dataXBining(
                 wsJoY, xp
             )  # Unusual ws with several dataY points per each dataX point
@@ -618,7 +619,6 @@ def selectModelAndPars(modelFlag):
     """
 
     if modelFlag == "gauss":
-
         def model(x, A, x0, sigma):
             return (
                 A
@@ -626,12 +626,21 @@ def selectModelAndPars(modelFlag):
                 / sigma
                 * np.exp(-((x - x0) ** 2) / 2 / sigma**2)
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma": 5}
         sharedPars = ["sigma"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4c6":
+    elif modelFlag == "gauss_cntr":
+        def model(x, A, sigma):
+            return (
+                A
+                / (2 * np.pi) ** 0.5
+                / sigma
+                * np.exp(-x**2 / 2 / sigma**2)
+            )
+        defaultPars = {"A": 1, "sigma": 5}
+        sharedPars = ["sigma"]  # Used only in Global fit
 
+    elif modelFlag == "gcc4c6":
         def model(x, A, x0, sigma1, c4, c6):
             return (
                 A
@@ -656,12 +665,38 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0}
         sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4":
+    elif modelFlag == "gcc4c6_cntr":
+        def model(x, A, sigma1, c4, c6):
+            return (
+                A
+                * np.exp(- x**2 / 2 / sigma1**2)
+                / (np.sqrt(2 * np.pi * sigma1**2))
+                * (
+                    1
+                    + c4
+                    / 32
+                    * (
+                        16 * (x / np.sqrt(2) / sigma1) ** 4
+                        - 48 * (x / np.sqrt(2) / sigma1) ** 2
+                        + 12
+                    )
+                    + c6
+                    / 384
+                    * (
+                        64 * (x / np.sqrt(2) / sigma1) ** 6
+                        - 480 * (x / np.sqrt(2) / sigma1) ** 4
+                        + 720 * (x / np.sqrt(2) / sigma1) ** 2
+                        - 120
+                    )
+                )
+            )
+        defaultPars = {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}
+        sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
+    elif modelFlag == "gcc4":
         def model(x, A, x0, sigma1, c4):
             return (
                 A
@@ -678,12 +713,30 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}
         sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
-    elif modelFlag == "gcc6":
+    elif modelFlag == "gcc4_cntr":
+        def model(x, A, sigma1, c4):
+            return (
+                A
+                * np.exp(-x**2 / 2 / sigma1**2)
+                / (np.sqrt(2 * np.pi * sigma1**2))
+                * (
+                    1
+                    + c4
+                    / 32
+                    * (
+                        16 * (x / np.sqrt(2) / sigma1) ** 4
+                        - 48 * (x / np.sqrt(2) / sigma1) ** 2
+                        + 12
+                    )
+                )
+            )
+        defaultPars = {"A": 1, "sigma1": 6, "c4": 0}
+        sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
+    elif modelFlag == "gcc6":
         def model(x, A, x0, sigma1, c6):
             return (
                 A
@@ -701,8 +754,28 @@ def selectModelAndPars(modelFlag):
                     )
                 )
             )
-
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}
+        sharedPars = ["sigma1", "c6"]  # Used only in Global fit
+
+    elif modelFlag == "gcc6_cntr":
+        def model(x, A, sigma1, c6):
+            return (
+                A
+                * np.exp(-x**2 / 2 / sigma1**2)
+                / (np.sqrt(2 * np.pi * sigma1**2))
+                * (
+                    1
+                    + +c6
+                    / 384
+                    * (
+                        64 * (x / np.sqrt(2) / sigma1) ** 6
+                        - 480 * (x / np.sqrt(2) / sigma1) ** 4
+                        + 720 * (x / np.sqrt(2) / sigma1) ** 2
+                        - 120
+                    )
+                )
+            )
+        defaultPars = {"A": 1, "sigma1": 6, "c6": 0}
         sharedPars = ["sigma1", "c6"]  # Used only in Global fit
 
     elif modelFlag == "doublewell":
@@ -796,7 +869,10 @@ def selectModelAndPars(modelFlag):
 
     else:
         raise ValueError(
-            "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
+        """
+        Fitting Model not recognized, available options: 
+        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+        """
         )
 
     logger.notice(f"\nShared Parameters: {[key for key in sharedPars]}")
@@ -1262,11 +1338,18 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (yFitIC.fitting_model == "doublewell")
             | (yFitIC.fitting_model == "ansiogauss")
             | (yFitIC.fitting_model == "gauss3d")
+            | (yFitIC.fitting_model == "gauss_cntr")
+            | (yFitIC.fitting_model == "gcc4c6_cntr")
+            | (yFitIC.fitting_model == "gcc4_cntr")
+            | (yFitIC.fitting_model == "gcc6_cntr")
         ):
             return
         else:
             raise ValueError(
-                "Fitting Model not recognized, available options: 'gauss', 'gcc4c6', 'gcc4', 'gcc6', 'ansiogauss' gauss3d'"
+            """
+            Fitting Model not recognized, available options: 
+            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+            """
             )
 
         suffix = 'lm' if minimizer=="Levenberg-Marquardt" else minimizer.lower()
@@ -1290,7 +1373,7 @@ def printYSpaceFitResults():
 
 
 class ResultsYFitObject:
-    def __init__(self, ic, yFitIC, wsFinalName, wsYSpaceAvgName):
+    def __init__(self, ic, wsFinalName, wsYSpaceAvgName):
         # Extract most relevant information from ws
         wsFinal = mtd[wsFinalName]
         wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
@@ -1310,19 +1393,19 @@ class ResultsYFitObject:
         poptList = []
         perrList = []
         try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + yFitIC.fitting_model + "_Parameters"]
+            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + ic.fitting_model + "_Parameters"]
             poptList.append(wsFitMinuit.column("Value"))
             perrList.append(wsFitMinuit.column("Error"))
         except:
             pass
         try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + yFitIC.fitting_model + "_Parameters"]
+            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + ic.fitting_model + "_Parameters"]
             poptList.append(wsFitLM.column("Value"))
             perrList.append(wsFitLM.column("Error"))
         except:
             pass
         try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + yFitIC.fitting_model + "_Parameters"]
+            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + ic.fitting_model + "_Parameters"]
             poptList.append(wsFitSimplex.column("Value"))
             perrList.append(wsFitSimplex.column("Error"))
         except:
@@ -1342,7 +1425,7 @@ class ResultsYFitObject:
         self.perr = perr
 
         self.savePath = ic.ySpaceFitSavePath
-        self.fitting_model= yFitIC.fitting_model
+        self.fitting_model= ic.fitting_model
 
     def save(self):
         np.savez(
@@ -1358,6 +1441,7 @@ class ResultsYFitObject:
         )
 
 
+
 def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
@@ -1366,15 +1450,15 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
         dataX, dataY, dataE, dataRes, instrPars
     )
 
-    idxList = groupDetectors(instrPars, yFitIC)
+    idxList = groupDetectors(instrPars, IC)
     dataX, dataY, dataE, dataRes = avgWeightDetGroups(
-        dataX, dataY, dataE, dataRes, idxList, yFitIC
+        dataX, dataY, dataE, dataRes, idxList, IC
     )
 
-    if yFitIC.do_symmetrisation:
+    if IC.do_symmetrisation:
         dataY, dataE = weightedSymArr(dataY, dataE)
 
-    model, defaultPars, sharedPars = selectModelAndPars(yFitIC.fitting_model)
+    model, defaultPars, sharedPars = selectModelAndPars(IC.fitting_model)
 
     totCost = 0
     for i, (x, y, yerr, res) in enumerate(zip(dataX, dataY, dataE, dataRes)):
@@ -1395,12 +1479,12 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     for i in range(len(dataY)):  # Set limits for unshared parameters
         m.limits["A" + str(i)] = (0, np.inf)
 
-    if yFitIC.fitting_model== "doublewell":
+    if IC.fitting_model== "doublewell":
         m.limits["d"] = (0, np.inf)  # Shared parameters
         m.limits["R"] = (0, np.inf)
 
     t0 = time.time()
-    if yFitIC.fitting_model== "gauss":
+    if IC.fitting_model== "gauss":
         m.simplex()
         m.migrad()
 
@@ -1448,8 +1532,8 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
 
     create_table_for_global_fit_parameters(wsYSpace.name(), m, chi2)
 
-    if yFitIC.show_plots:
-        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), yFitIC)
+    if IC.show_plots:
+        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
 
     # Pass into array to store values in variable
     return np.array(m.values), np.array(m.errors)  
