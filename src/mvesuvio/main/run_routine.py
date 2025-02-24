@@ -4,7 +4,8 @@ from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
                             calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
-                            is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios
+                            is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios, \
+                            print_table_workspace
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
@@ -17,6 +18,8 @@ from pathlib import Path
 import importlib
 import sys
 import dill         # To convert constraints to string
+import re
+import os
 
 
 class Runner:
@@ -65,6 +68,7 @@ class Runner:
         self.fwd_ai.figSavePath = figSavePath
         self.bckwd_ai.figSavePath = figSavePath
 
+        self.mantid_log_file = "mantid.log"
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -78,19 +82,56 @@ class Runner:
     def run(self):
         if not self.bckwd_ai.run_this_scattering_type and not self.fwd_ai.run_this_scattering_type:
             return
-        # Default workflow for procedure + fit in y space
+
+        # Erase previous log
+        # Not working on Windows due to shared file locks
+        if os.name == 'posix': 
+            with open(self.mantid_log_file, 'w') as file:
+                file.write('')
 
         # If any ws for y fit already loaded
         wsInMtd = [ws in mtd for ws in self.ws_to_fit_y_space]  # Bool list
         if (len(wsInMtd) > 0) and all(wsInMtd):
             self.runAnalysisFitting()
+            self.make_summarised_log_file()
             return self.analysis_result, self.fitting_result  
 
         self.runAnalysisRoutine()
         self.runAnalysisFitting()
 
         # Return results used only in tests
+        self.make_summarised_log_file()
         return self.analysis_result, self.fitting_result  
+
+
+    def make_summarised_log_file(self):
+        pattern = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+        log_file_save_path = self.make_log_file_name()
+
+        try:
+            with open(self.mantid_log_file, "r") as infile, open(log_file_save_path, "w") as outfile:
+                for line in infile:
+                    if "VesuvioAnalysisRoutine" in line:
+                        outfile.write(line)       
+
+                    if "Notice Python" in line:  # For Fitting notices
+                        outfile.write(line)
+
+                    if not pattern.match(line):
+                        outfile.write(line)
+        except OSError:
+            print("Mantid log file not available. Unable to produce a summarized log file for this routine.")
+        return 
+
+        
+    def make_log_file_name(self):
+        filename = ''
+        if self.bckwd_ai.run_this_scattering_type:
+            filename += 'bckwd_' + self.bckwd_ai.fitting_model
+        if self.fwd_ai.run_this_scattering_type:
+            filename += 'fwd_' + self.fwd_ai.fitting_model
+        return self.experiment_path / (filename+ ".log")
 
 
     def runAnalysisFitting(self):
@@ -157,6 +198,7 @@ class Runner:
 
         # Update original profiles table
         RenameWorkspace(fixed_profiles_table, receiving_profiles_table.name())
+        print_table_workspace(mtd[receiving_profiles_table.name()])
         # Even if the name is the same, need to trigger update
         front_alg.setPropertyValue("InputProfiles", receiving_profiles_table.name())
 
@@ -235,6 +277,7 @@ class Runner:
             maskTOFRange=ai.mask_time_of_flight_range
         )
         profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", ai)
+        print_table_workspace(profiles_table)
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
         kwargs = {
             "InputWorkspace": cropedWs.name(),
@@ -310,18 +353,16 @@ class Runner:
 
         # Build Filename based on ic
         corr = ""
-        if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
-            corr += "_GC"
         if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
-            corr += "_MS"
+            corr += "MS"
+        if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
+            corr += "GC"
 
         fileName = (
-            f"spec_{ai.detectors.strip()}_iter_{ai.number_of_iterations_for_corrections}{corr}" + ".npz"
+            f"{ai.detectors.strip()}_{ai.number_of_iterations_for_corrections}{corr}"
         )
-        fileNameYSpace = fileName + "_ySpaceFit" + ".npz"
-
-        self.results_save_path = outputPath / fileName
-        ai.ySpaceFitSavePath = outputPath / fileNameYSpace
+        self.results_save_path = outputPath / (fileName + ".npz")
+        ai.ySpaceFitSavePath = outputPath / (fileName + "_yfit.npz")
 
         # Set directories for figures
         figSavePath = experimentPath / "figures"

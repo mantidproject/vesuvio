@@ -9,8 +9,11 @@ from iminuit.util import make_func_code, describe
 import jacobi
 import time
 import re
+from mantid.kernel import logger
+from mantid.simpleapi import AnalysisDataService
 
 from mvesuvio.util import handle_config
+from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
 
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
@@ -20,7 +23,7 @@ def fitInYSpaceProcedure(IC, wsTOF):
     try:
         wsTOF = mtd[wsTOF]
     except KeyError: 
-        print(f"Workspace to fit {wsTOF} not found.")
+        logger.notice(f"Workspace to fit {wsTOF} not found.")
         return
 
     wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, wsTOF)
@@ -39,7 +42,7 @@ def fitInYSpaceProcedure(IC, wsTOF):
     fitProfileMinuit(IC, wsJoYAvg, wsResSum)
     fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
 
-    printYSpaceFitResults(wsJoYAvg.name())
+    printYSpaceFitResults()
 
     yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
     yfitResults.save()
@@ -104,7 +107,10 @@ def subtract_profiles_except_lightest(ic, ws):
     if len(ic.masses) == 1:
         return
 
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
+    # TODO: Make the fetching of these workspaces more robust, prone to error
+    profiles_table = mtd[ic.name + '_initial_parameters']
+    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
+    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
     ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
 
     wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
@@ -128,7 +134,10 @@ def ySpaceReduction(wsTOF, ic):
     """Seperate procedures depending on masking specified."""
 
     mass0 = ic.masses[0]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + str(min(ic.masses)) + '_ncp'
+    profiles_table = mtd[ic.name + '_initial_parameters']
+    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
+    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
+
     ncp = mtd[ws_name_lightest_mass].extractY()
 
     rebinPars = ic.range_for_rebinning_in_y_space
@@ -200,7 +209,7 @@ def replaceZerosWithNCP(ws, ncp):
     ]  # mask of ncp adjusted for last col present or not
 
     wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_NCPMasked")
-    passDataIntoWS(dataX, dataY, dataE, wsMasked)
+    pass_data_into_ws(dataX, dataY, dataE, wsMasked)
     SumSpectra(wsMasked, OutputWorkspace=wsMasked.name() + "_Sum")
     return wsMasked
 
@@ -250,7 +259,7 @@ def dataXBining(ws, xp):
     dataE[dataY == 0] = 0
 
     wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_XBinned")
-    wsXBins = passDataIntoWS(dataX, dataY, dataE, wsXBins)
+    wsXBins = pass_data_into_ws(dataX, dataY, dataE, wsXBins)
     return wsXBins
 
 
@@ -415,15 +424,6 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
-def passDataIntoWS(dataX, dataY, dataE, ws):
-    "Modifies ws data to input data"
-    for i in range(ws.getNumberHistograms()):
-        ws.dataX(i)[:] = dataX[i, :]
-        ws.dataY(i)[:] = dataY[i, :]
-        ws.dataE(i)[:] = dataE[i, :]
-    return ws
-
-
 def symmetrizeWs(avgYSpace):
     """
     Symmetrizes workspace after weighted average.
@@ -439,7 +439,7 @@ def symmetrizeWs(avgYSpace):
         dataYS, dataES = weightedSymArr(dataY, dataE)
 
     wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_sym")
-    wsSym = passDataIntoWS(dataX, dataYS, dataES, wsSym)
+    wsSym = pass_data_into_ws(dataX, dataYS, dataES, wsSym)
     return wsSym
 
 
@@ -876,9 +876,9 @@ def selectModelAndPars(modelFlag):
         """
         )
 
-    print("\nShared Parameters: ", [key for key in sharedPars])
-    print(
-        "\nUnshared Parameters: ", [key for key in defaultPars if key not in sharedPars]
+    logger.notice(f"\nShared Parameters: {[key for key in sharedPars]}")
+    logger.notice(
+        f"\nUnshared Parameters: {[key for key in defaultPars if key not in sharedPars]}"
     )
 
     assert all(
@@ -979,6 +979,8 @@ def createCorrelationTableWorkspace(wsYSpaceSym, parameters, corrMatrix):
         tableWS.addColumn(type="float", name=p)
     for p, arr in zip(parameters, corrMatrix):
         tableWS.addRow([p] + list(arr))
+    print_table_workspace(tableWS)
+    
 
 
 def runMinos(mObj, yFitIC, constrFunc, wsName):
@@ -1041,7 +1043,7 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
     """
     # Reason for two distinct operations inside the same function is that its easier
     # to build the minos plots for each parameter as they are being calculated.
-    print("\nRunning Minos ... \n")
+    logger.notice("\nRunning Minos ... \n")
 
     # Set format of subplots
     height = 2
@@ -1300,7 +1302,7 @@ def oddPointsRes(x, res):
 
 
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
-    print("\nFitting on the sum of spectra in the West domain ...\n")
+    logger.notice("\nFitting on the sum of spectra in the West domain ...\n")
     for minimizer in ["Levenberg-Marquardt", "Simplex"]:
         if yFitIC.fitting_model== "gauss":
             function = f"""composite=Convolution,FixResolution=true,NumDeriv=true;
@@ -1365,40 +1367,10 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     return
 
 
-def printYSpaceFitResults(wsJoYName):
-    print("\nFit in Y Space results:")
-    foundWS = []
-    try:
-        wsFitLM = mtd[wsJoYName + "_lm_Parameters"]
-        foundWS.append(wsFitLM)
-    except KeyError:
-        pass
-    try:
-        wsFitSimplex = mtd[wsJoYName + "_simplex_Parameters"]
-        foundWS.append(wsFitSimplex)
-    except KeyError:
-        pass
-    try:
-        wsFitMinuit = mtd[wsJoYName + "_minuit_Parameters"]
-        foundWS.append(wsFitMinuit)
-    except KeyError:
-        pass
-
-    for tableWS in foundWS:
-        print("\n" + " ".join(tableWS.getName().split("_")[-3:]) + ":")
-        # print("    ".join(tableWS.keys()))
-        for key in tableWS.keys():
-            if key == "Name":
-                print(
-                    f"{key:>20s}:  "
-                    + "  ".join([f"{elem:7.8s}" for elem in tableWS.column(key)])
-                )
-            else:
-                print(
-                    f"{key:>20s}: "
-                    + "  ".join([f"{elem:7.4f}" for elem in tableWS.column(key)])
-                )
-    print("\n")
+def printYSpaceFitResults():
+    for ws_name in mtd.getObjectNames():
+        if ws_name.endswith('Parameters'):
+            print_table_workspace(mtd[ws_name])
 
 
 class ResultsYFitObject:
@@ -1470,8 +1442,9 @@ class ResultsYFitObject:
         )
 
 
-def runGlobalFit(wsYSpace, wsRes, IC):
-    print("\nRunning GLobal Fit ...\n")
+
+def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
+    logger.notice("\nRunning GLobal Fit ...\n")
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)
     dataX, dataY, dataE, dataRes, instrPars = takeOutMaskedSpectra(
@@ -1501,7 +1474,7 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     # Minuit Fit with global cost function and local+global parameters
     initPars = minuitInitialParameters(defaultPars, sharedPars, len(dataY))
 
-    print("\nRunning Global Fit ...\n")
+    logger.notice("\nRunning Global Fit ...\n")
     m = Minuit(totCost, **initPars)
 
     for i in range(len(dataY)):  # Set limits for unshared parameters
@@ -1550,7 +1523,7 @@ def runGlobalFit(wsYSpace, wsRes, IC):
         m.scipy(constraints=optimize.NonlinearConstraint(constr, 0, np.inf))
 
     t1 = time.time()
-    print(f"\nTime of fitting: {t1-t0:.2f} seconds")
+    logger.notice(f"\nTime of fitting: {t1-t0:.2f} seconds")
 
     # Explicitly calculate errors
     m.hesse()
@@ -1611,7 +1584,7 @@ def groupDetectors(ipData, yFitIC):
 
     checkNGroupsValid(yFitIC, ipData)
 
-    print(f"\nNumber of gropus: {yFitIC.number_of_global_fit_groups}")
+    logger.notice(f"\nNumber of gropus: {yFitIC.number_of_global_fit_groups}")
 
     L1 = ipData[:, -1].copy()
     theta = ipData[:, 2].copy()
@@ -1744,11 +1717,11 @@ def formIdxList(clusters):
         idxList.append(list(idxs))
 
     # Print groupings information
-    print("\nGroups formed successfully:\n")
+    logger.notice("\nGroups formed successfully:\n")
     groupLen = np.array([len(group) for group in idxList])
     unique, counts = np.unique(groupLen, return_counts=True)
     for length, no in zip(unique, counts):
-        print(f"{no} groups with {length} detectors.")
+        logger.notice(f"{no} groups with {length} detectors.")
 
     return idxList
 
@@ -1939,19 +1912,18 @@ def create_table_for_global_fit_parameters(wsName, m, chi2):
     t.addColumn(type="float", name="Value")
     t.addColumn(type="float", name="Error")
 
-    print(f"Value of Chi2/ndof: {chi2:.2f}")
-    print(f"Migrad Minimum valid: {m.valid}")
-    print("\nResults of Global Fit:\n")
+    logger.notice(f"Value of Chi2/ndof: {chi2:.2f}")
+    logger.notice(f"Migrad Minimum valid: {m.valid}")
     for p, v, e in zip(m.parameters, m.values, m.errors):
-        print(f"{p:>7s} = {v:>8.4f} \u00B1 {e:<8.4f}")
         t.addRow([p, v, e])
 
     t.addRow(["Cost function", chi2, 0])
+    print_table_workspace(t)
 
 
 def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
     if len(dataY) > 10:
-        print("\nToo many axes to show in figure, skipping the plot ...\n")
+        logger.notice("\nToo many axes to show in figure, skipping the plot ...\n")
         return
 
     rows = 2
@@ -1993,5 +1965,5 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
+        if ws_name.endswith('Parameters') or ws_name.endswith('parameters') or ws_name.endswith('Workspace'):
             SaveAscii(ws_name, str(yFitIC.figSavePath.parent / "output_files" / ws_name))

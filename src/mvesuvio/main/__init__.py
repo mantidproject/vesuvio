@@ -44,6 +44,9 @@ def __set_up_parser():
 
 
 def __setup_config(args):
+
+    __set_logging_properties()
+
     config_dir = handle_config.VESUVIO_CONFIG_PATH
     handle_config.setup_config_dir(config_dir)
     ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
@@ -80,10 +83,24 @@ def __setup_config(args):
     handle_config.check_dir_exists("IP folder", ipfolder_dir)
 
 
+def __set_logging_properties():
+    from mantid.kernel import ConfigService
+    ConfigService.setString("logging.loggers.root.channel.class", "SplitterChannel")
+    ConfigService.setString("logging.loggers.root.channel.channel1", "consoleChannel")
+    ConfigService.setString("logging.loggers.root.channel.channel2", "fileChannel")
+    ConfigService.setString("logging.channels.consoleChannel.class", "ConsoleChannel")
+    ConfigService.setString("logging.channels.fileChannel.class", "FileChannel")
+    ConfigService.setString("logging.channels.fileChannel.path", "mantid.log")
+    ConfigService.setString("logging.channels.fileChannel.formatter.class", "PatternFormatter")
+    ConfigService.setString("logging.channels.fileChannel.formatter.pattern", "%Y-%m-%d %H:%M:%S,%i [%I] %p %s - %t")
+    # Set properties on Mantid.user.properties not working due to Mantid bug
+    # Need to set properties on file in Mantid installation
+    mantid_properties_file = path.join(ConfigService.getPropertiesDir(), "Mantid.properties")
+    ConfigService.saveConfig(mantid_properties_file)
+    return
+            
+
 def __run_analysis():
-    environ["MANTIDPROPERTIES"] = path.join(
-        handle_config.VESUVIO_CONFIG_PATH, "Mantid.user.properties"
-    )
     from mvesuvio.main.run_routine import Runner 
     Runner().run()
 
