@@ -128,10 +128,9 @@ class Runner:
     def make_log_file_name(self):
         filename = ''
         if self.bckwd_ai.run_this_scattering_type:
-            filename += 'bckwd_'
+            filename += 'bckwd_' + self.bckwd_ai.fitting_model
         if self.fwd_ai.run_this_scattering_type:
-            filename += 'fwd_'
-        filename += self.yFitIC.fitting_model
+            filename += 'fwd_' + self.bckwd_ai.fitting_model
         return self.experiment_path / (filename+ ".log")
 
 
