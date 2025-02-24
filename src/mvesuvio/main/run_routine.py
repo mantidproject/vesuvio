@@ -130,7 +130,7 @@ class Runner:
         if self.bckwd_ai.run_this_scattering_type:
             filename += 'bckwd_' + self.bckwd_ai.fitting_model
         if self.fwd_ai.run_this_scattering_type:
-            filename += 'fwd_' + self.bckwd_ai.fitting_model
+            filename += 'fwd_' + self.fwd_ai.fitting_model
         return self.experiment_path / (filename+ ".log")
 
 
