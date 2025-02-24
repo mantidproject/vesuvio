@@ -1453,7 +1453,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     # Number of non zero points (considered in the fit) minus no of parameters
     chi2 = m.fval / (np.sum(dataE != 0) - m.nfit)  
 
-    create_table_for_global_fit_parameters(wsYSpace.name(), m, chi2)
+    create_table_for_global_fit_parameters(wsYSpace.name(), IC.fitting_model, m, chi2)
 
     if IC.show_plots:
         plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
@@ -1825,9 +1825,9 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
             initPars[up + str(i)] = defaultPars[up]
     return initPars
 
-def create_table_for_global_fit_parameters(wsName, m, chi2):
+def create_table_for_global_fit_parameters(wsName, model, m, chi2):
     t = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsName + "_gloabalfit_Parameters"
+        OutputWorkspace=wsName + f"_globalfit_{model}_Parameters"
     )
     t.setTitle("Global Fit Parameters")
     t.addColumn(type="str", name="Name")
@@ -1887,5 +1887,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        if ws_name.endswith('Parameters') or ws_name.endswith('parameters') or ws_name.endswith('Workspace'):
-            SaveAscii(ws_name, str(yFitIC.figSavePath.parent / "output_files" / ws_name))
+        if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
+            save_path = yFitIC.figSavePath.parent / "output_files" / f"{yFitIC.fitting_model}_fit" / ws_name
+            save_path.parent.mkdir(exist_ok=True, parents=True)
+            SaveAscii(ws_name, str(save_path))
