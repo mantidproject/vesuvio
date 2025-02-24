@@ -13,7 +13,8 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CreateWorkspace
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
-                                            extend_range_of_array
+                                            extend_range_of_array, print_table_workspace
+
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 NEUTRON_MASS = 1.008  # a.m.u.
@@ -237,13 +238,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             OutputWorkspace=self._workspace_being_fit.name()+ "_fit_results"
         )
         table.setTitle("SciPy Fit Parameters")
-        table.addColumn(type="float", name="Spectrum")
+        table.addColumn(type="float", name="Spec")
         for label in self._profiles_table.column("label"):
-            table.addColumn(type="float", name=f"{label} intensity")
-            table.addColumn(type="float", name=f"{label} width")
-            table.addColumn(type="float", name=f"{label} center ")
-        table.addColumn(type="float", name="normalised chi2")
-        table.addColumn(type="float", name="no of iterations")
+            table.addColumn(type="float", name=f"{label} i")
+            table.addColumn(type="float", name=f"{label} w")
+            table.addColumn(type="float", name=f"{label} c")
+        table.addColumn(type="float", name="NChi2")
+        table.addColumn(type="float", name="Iter")
         return table
 
 
@@ -326,6 +327,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._row_being_fit += 1
 
         assert np.any(self._fit_parameters), "Fitting parameters cannot be zero for all spectra!"
+        print_table_workspace(self._table_fit_results)
         return
 
 
@@ -419,8 +421,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         intensities = np.zeros(widths.shape)
 
         for i, label in enumerate(self._profiles_table.column("label")):
-            widths[i] = self._table_fit_results.column(f"{label} width")
-            intensities[i] = self._table_fit_results.column(f"{label} intensity")
+            widths[i] = self._table_fit_results.column(f"{label} w")
+            intensities[i] = self._table_fit_results.column(f"{label} i")
             self._set_means_and_std_arrays(widths, intensities)
 
         self._create_means_table()
@@ -463,7 +465,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         table.addColumn(type="float", name="mean_intensity")
         table.addColumn(type="float", name="std_intensity")
 
-        self.log().notice("\nmass    mean widths    mean intensities\n")
         for label, mass, mean_width, std_width, mean_intensity, std_intensity in zip(
             self._profiles_table.column("label"),
             self._masses,
@@ -474,10 +475,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         ):
             # Explicit conversion to float required to match profiles table
             table.addRow([label, float(mass), float(mean_width), float(std_width), float(mean_intensity), float(std_intensity)])
-            self.log().notice(f"{label:6s}  {mean_width:10.5f} \u00B1 {std_width:7.5f}" + \
-                f"{mean_intensity:10.5f} \u00B1 {std_intensity:7.5f}\n")
 
         self.setPropertyValue("OutputMeansTable", table.name())
+        print_table_workspace(table, precision=5)
         return table
 
 
@@ -485,6 +485,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         if np.all(self._dataY[self._row_being_fit] == 0):
             self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
+            spectrum_number = self._instrument_params[self._row_being_fit, 0]
+            self.log().notice(f"Skip spectrum {int(spectrum_number):3d}")
             return
 
         result = scipy.optimize.minimize(
@@ -507,7 +509,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # Store results for easier access when calculating means
         self._fit_parameters[self._row_being_fit] = tableRow 
 
-        self.log().notice(' '.join(str(tableRow).split(",")).replace('[', '').replace(']', ''))
+        self.log().notice(f"Fit spectrum {int(spectrum_number):3d}: \u2713")
 
         # Pass fit profiles into workspaces
         ncp_for_each_mass, fse_for_each_mass = self._neutron_compton_profiles(fitPars)
