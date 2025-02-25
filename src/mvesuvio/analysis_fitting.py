@@ -13,424 +13,52 @@ from mantid.kernel import logger
 from mantid.simpleapi import AnalysisDataService
 
 from mvesuvio.util import handle_config
-from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
+from mvesuvio.util.analysis_helpers import buildXRangeFromRebinPars, print_table_workspace, pass_data_into_ws, normalise_workspace, weightedAvgXBinsArr
 
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(IC, wsTOF):
+class FitInYSpace():
 
-    try:
-        wsTOF = mtd[wsTOF]
-    except KeyError: 
-        logger.notice(f"Workspace to fit {wsTOF} not found.")
+    def __init__(self, fi, ws_joy_avg, ws_joy, ws_res):
+
+        self.fitting_inputs = fi
+        self.ws_joy_avg = ws_joy_avg
+        self.ws_joy = ws_joy
+        self.ws_resolution = ws_res 
+
+        # NOTE: Temporary mess until I convert this to full OOP
+        fi.figSavePath = fi.save_path / "figures"
+        fi.figSavePath.mkdir(exist_ok=True, parents=True)
+
+    def run(self):
+
+        wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
+        normalise_workspace(wsResSum)
+
+        if self.fitting_inputs.do_symmetrisation:
+            self.ws_joy_avg = symmetrizeWs(self.ws_joy_avg)
+
+        fitProfileMinuit(self.fitting_inputs, self.ws_joy_avg, wsResSum)
+        fitProfileMantidFit(self.fitting_inputs, self.ws_joy_avg, wsResSum)
+
+        printYSpaceFitResults()
+
+        if self.fitting_inputs.do_global_fit:
+            runGlobalFit(self.ws_joy, self.ws_resolution, self.fitting_inputs)
+
+        save_workspaces(self.fitting_inputs)
         return
 
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, wsTOF)
 
-    wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
-
-    if IC.subtract_calculated_fse_from_data:
-        wsFSEMass0 = find_ws_name_fse_first_mass(IC)
-        wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
-
-    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
-
-    if IC.do_symmetrisation:
-        wsJoYAvg = symmetrizeWs(wsJoYAvg)
-
-    fitProfileMinuit(IC, wsJoYAvg, wsResSum)
-    fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
-
-    printYSpaceFitResults()
-
-    yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
-    yfitResults.save()
-
-    if IC.do_global_fit:
-        runGlobalFit(wsJoY, wsRes, IC)
-
-    save_workspaces(IC)
-    return yfitResults
-
-
-def find_ws_name_fse_first_mass(ic):
-    # Some dirty implementation to be deleted in the future
-    ws_names_fse = []
-    ws_masses = []
-    prefix = ic.name+'_'+str(ic.number_of_iterations_for_corrections)
-    for ws_name in mtd.getObjectNames():
-        if ws_name.startswith(prefix) and ws_name.endswith('fse'):
-            name_ending = ws_name.replace(prefix, "")
-            match = re.search(r'_(\d+(?:\.\d+)?)_', name_ending)
-            if match:   # If float found in ws name ending
-                ws_masses.append(float(match.group().replace('_', '')))
-                ws_names_fse.append(ws_name)
-
-    return ws_names_fse[np.argmin(ws_masses)]
-
-
-def calculateMantidResolutionFirstMass(IC, ws):
-    mass = IC.masses[0]
-
-    resName = ws.name() + "_Resolution"
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
-        )
-        Rebin(
-            InputWorkspace="tmp",
-            Params=IC.range_for_rebinning_in_y_space,
-            OutputWorkspace="tmp",
-        )
-
-        if index == 0:  # Ensures that workspace has desired units
-            RenameWorkspace("tmp", resName)
-        else:
-            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
-
-    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
-    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
-    wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName + "_Sum")
-
-    normalise_workspace(wsResSum)
-    DeleteWorkspace("tmp")
-    return wsResSum, mtd[resName]
-
-
-def subtract_profiles_except_lightest(ic, ws):
-    """
-    Isolates TOF data from first mass only.
-    Input: ws containing TOF values, NCP for all mass profiles.
-    Output: ws with all profiles except first subtracted.
-    """
-    if len(ic.masses) == 1:
-        return
-
-    # TODO: Make the fetching of these workspaces more robust, prone to error
-    profiles_table = mtd[ic.name + '_initial_parameters']
-    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-    ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
-
-    wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
-                             OutputWorkspace=ws_name_profiles + '_except_lightest')
-
-    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_sum")
-
-    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_m0")
-    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_sum")
-    return wsFirstMass
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
-
-
-def ySpaceReduction(wsTOF, ic):
-    """Seperate procedures depending on masking specified."""
-
-    mass0 = ic.masses[0]
-    profiles_table = mtd[ic.name + '_initial_parameters']
-    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-
-    ncp = mtd[ws_name_lightest_mass].extractY()
-
-    rebinPars = ic.range_for_rebinning_in_y_space
-
-    if np.any(np.all(wsTOF.extractY() == 0, axis=0)):  # Masked columns present
-        if ic.mask_zeros_with == "nan":
-            # Build special workspace to store accumulated points
-            wsJoY = convertToYSpace(wsTOF, mass0)
-            xp = buildXRangeFromRebinPars(ic)
-            wsJoYB = dataXBining(
-                wsJoY, xp
-            )  # Unusual ws with several dataY points per each dataX point
-
-            # Need normalisation values from NCP masked workspace
-            wsTOFNCP = replaceZerosWithNCP(wsTOF, ncp)
-            wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
-            wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
-
-            # Normalize spectra of specieal workspace
-            wsJoYN = Divide(
-                wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name() + "_norm"
-            )
-            wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
-            return wsJoYN, wsJoYAvg
-
-        elif yFitIC.mask_zeros_with == "ncp":
-            wsTOF = replaceZerosWithNCP(wsTOF, ncp)
-
-        else:
-            raise ValueError(
-                """
-            Masked TOF bins were found but no valid procedure in y-space fit was selected.
-            Options: 'nan', 'ncp'
-            """
-            )
-
-    wsJoY = convertToYSpace(wsTOF, mass0)
-    wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
-    wsJoYAvg = weightedAvgCols(wsJoYN)
-    return wsJoYN, wsJoYAvg
-
-
-def convertToYSpace(wsTOF, mass0):
-    wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
-    return wsJoY
-
-
-def rebinAndNorm(wsJoY, rebinPars):
-    wsJoYR = Rebin(
-        InputWorkspace=wsJoY,
-        Params=rebinPars,
-        FullBinsOnly=True,
-        OutputWorkspace=wsJoY.name() + "_rebin",
-    )
-    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name() + "_integrated")
-    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name() + "_norm")
-    return wsJoYNorm, wsJoYInt
-
-
-def replaceZerosWithNCP(ws, ncp):
-    """
-    Replaces columns of bins with zeros on dataY with NCP provided.
-    """
-    dataX, dataY, dataE = extractWS(ws)
-    mask = np.all(dataY == 0, axis=0)  # Masked Cols
-
-    dataY[:, mask] = ncp[
-        :, mask[: ncp.shape[1]]
-    ]  # mask of ncp adjusted for last col present or not
-
-    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_NCPMasked")
-    pass_data_into_ws(dataX, dataY, dataE, wsMasked)
-    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name() + "_Sum")
-    return wsMasked
-
-
-def buildXRangeFromRebinPars(yFitIC):
-    # Range used in case mask is set to NAN
-    first, step, last = [
-        float(s) for s in yFitIC.range_for_rebinning_in_y_space.split(",")
-    ]
-    xp = np.arange(first, last, step) + step / 2  # Correction to match Mantid range
-    return xp
-
-
-def dataXBining(ws, xp):
-    """
-    Changes dataX of a workspace to values in range of bin centers xp.
-    Same as shifting dataY values to closest bin center.
-    Output ws has several dataY values per dataX point.
-    """
-
-    assert np.min(xp[:-1] - xp[1:]) == np.max(
-        xp[:-1] - xp[1:]
-    ), "Bin widths need to be the same."
-    step = xp[1] - xp[0]  # Calculate step from first two numbers
-    # Form bins with xp being the centers
-    bins = np.append(xp, [xp[-1] + step]) - step / 2
-
-    dataX, dataY, dataE = extractWS(ws)
-    # Loop below changes only the values of DataX
-    for i, x in enumerate(dataX):
-        # Select only valid range xr
-        mask = (x < np.min(bins)) | (x > np.max(bins))
-        xr = x[~mask]
-
-        idxs = np.digitize(xr, bins)
-        newXR = np.array(
-            [xp[idx] for idx in idxs - 1]
-        )  # Bin idx 1 refers to first bin ie idx 0 of centers
-
-        # Pad invalid values with nans
-        newX = x
-        newX[mask] = np.nan  # Cannot use 0 as to not be confused with a dataX value
-        newX[~mask] = newXR
-        dataX[i] = newX  # Update DataX
-
-    # Mask DataE values in same places as DataY values
-    dataE[dataY == 0] = 0
-
-    wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_XBinned")
-    wsXBins = pass_data_into_ws(dataX, dataY, dataE, wsXBins)
-    return wsXBins
-
-
-def weightedAvgXBins(wsXBins, xp):
-    """Weighted average on ws where dataY points are grouped per dataX bin centers."""
-    dataX, dataY, dataE = extractWS(wsXBins)
-
-    meansY, meansE = weightedAvgXBinsArr(dataX, dataY, dataE, xp)
-
-    wsYSpaceAvg = CreateWorkspace(
-        DataX=xp,
-        DataY=meansY,
-        DataE=meansE,
-        NSpec=1,
-        OutputWorkspace=wsXBins.name() + "_wavg",
-    )
-    return wsYSpaceAvg
-
-
-def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
-    """
-    Weighted Average on arrays where several dataY points correspond to a single dataX point.
-    xp is the range over which to perform the average.
-    dataX points can only take values in xp.
-    Ignores any zero or NaN value.
-    """
-    meansY = np.zeros(len(xp))
-    meansE = np.zeros(len(xp))
-
-    for i in range(len(xp)):
-        # Perform weighted average over all dataY and dataE values with the same xp[i]
-        # Change shape to column to match weighted average function
-        pointMask = dataX == xp[i]
-        allY = dataY[pointMask][:, np.newaxis]
-        allE = dataE[pointMask][:, np.newaxis]
-
-        # If no points were found for a given abcissae
-        if np.sum(pointMask) == 0:
-            mY, mE = 0, 0  # Mask with zeros
-
-        # If one point was found, set to that point
-        elif np.sum(pointMask) == 1:
-            mY, mE = allY.flatten(), allE.flatten()
-
-        # Weighted avg over all spectra and several points per spectra
-        else:
-            # Case of bootstrap replica with no errors
-            if np.all(dataE == 0):
-                mY = avgArr(allY)
-                mE = 0
-
-            # Default for most cases
-            else:
-                mY, mE = weightedAvgArr(allY, allE)  # Outputs masked values as zeros
-
-        # DataY and DataE should never reach NaN, but safeguard in case they do
-        if (mE == np.nan) | (mY == np.nan):
-            mY, mE = 0, 0
-
-        meansY[i] = mY
-        meansE[i] = mE
-
-    return meansY, meansE
-
-
-def weightedAvgCols(wsYSpace):
-    """Returns ws with weighted avg of columns of input ws"""
-    dataX, dataY, dataE = extractWS(wsYSpace)
-    if np.all(dataE == 0):  # Bootstrap case where errors are not used
-        meanY = avgArr(dataY)
-        meanE = np.zeros(meanY.shape)
-    else:
-        meanY, meanE = weightedAvgArr(dataY, dataE)
-    wsYSpaceAvg = CreateWorkspace(
-        DataX=dataX[0, :],
-        DataY=meanY,
-        DataE=meanE,
-        NSpec=1,
-        OutputWorkspace=wsYSpace.name() + "_wavg",
-    )
-    return wsYSpaceAvg
-
-
-def avgArr(dataYO):
-    """
-    Average over columns of 2D dataY.
-    Ignores any zero values as being masked.
-    """
-
-    assert len(dataYO) > 1, "Averaging needs more than one element."
-
-    dataY = dataYO.copy()
-    dataY[dataY == 0] = np.nan
-    meanY = np.nanmean(dataY, axis=0)
-    meanY[meanY == np.nan] = 0
-
-    assert np.all(
-        np.all(dataYO == 0, axis=0) == (meanY == 0)
-    ), "Columns of zeros should give zero."
-    return meanY
-
-
-def weightedAvgArr(dataYO, dataEO):
-    """
-    Weighted average over columns of 2D arrays.
-    Ignores any zero or NaN value.
-    """
-
-    # Run some tests
-    assert (
-        dataYO.shape == dataEO.shape
-    ), "Y and E arrays should have same shape for weighted average."
-    assert np.all(
-        (dataYO == 0) == (dataEO == 0)
-    ), f"Masked zeros should match in DataY and DataE: {np.argwhere((dataYO==0)!=(dataEO==0))}"
-    assert np.all(
-        np.isnan(dataYO) == np.isnan(dataEO)
-    ), "Masked nans should match in DataY and DataE."
-    assert (
-        len(dataYO) > 1
-    ), "Weighted average needs more than one element to be performed."
-
-    dataY = dataYO.copy()  # Copy arrays not to change original data
-    dataE = dataEO.copy()
-
-    # Ignore invalid data by changing zeros to nans
-    # If data is already masked with nans, it remains unaltered
-    zerosMask = dataY == 0
-    dataY[zerosMask] = np.nan
-    dataE[zerosMask] = np.nan
-
-    meanY = np.nansum(dataY / np.square(dataE), axis=0) / np.nansum(
-        1 / np.square(dataE), axis=0
-    )
-    meanE = np.sqrt(1 / np.nansum(1 / np.square(dataE), axis=0))
-
-    # Change invalid data back to original masking format with zeros
-    nanInfMask = (meanE == np.inf) | (meanE == np.nan) | (meanY == np.nan)
-    meanY[nanInfMask] = 0
-    meanE[nanInfMask] = 0
-
-    # Test that columns of zeros are left unchanged
-    assert np.all(
-        (meanY == 0) == (meanE == 0)
-    ), "Weighted avg output should have masks in the same DataY and DataE."
-    assert np.all(
-        (np.all(dataYO == 0, axis=0) | np.all(np.isnan(dataYO), axis=0)) == (meanY == 0)
-    ), "Masked cols should be ignored."
-
-    return meanY, meanE
-
-
-def normalise_workspace(ws_name):
-    """Updates workspace with the normalised version."""
-    tmp_norm = Integration(ws_name)
-    Divide(LHSWorkspace=ws_name, RHSWorkspace=tmp_norm, OutputWorkspace=ws_name)
-    DeleteWorkspace("tmp_norm")
-
-
-def extractWS(ws):
-    """Directly exctracts data from workspace into arrays"""
-    return ws.extractX(), ws.extractY(), ws.extractE()
-
-
-def symmetrizeWs(avgYSpace):
+def symmetrizeWs(ws):
     """
     Symmetrizes workspace after weighted average.
     Needs to have symmetric binning.
     """
-
-    dataX, dataY, dataE = extractWS(avgYSpace)
+    dataX = ws.extractX()
+    dataY = ws.extractY()
+    dataE = ws.extractE()
 
     if np.all(dataE == 0):
         dataYS = symArr(dataY)
@@ -438,7 +66,7 @@ def symmetrizeWs(avgYSpace):
     else:
         dataYS, dataES = weightedSymArr(dataY, dataE)
 
-    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_sym")
+    wsSym = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_sym")
     wsSym = pass_data_into_ws(dataX, dataYS, dataES, wsSym)
     return wsSym
 
@@ -1373,77 +1001,7 @@ def printYSpaceFitResults():
             print_table_workspace(mtd[ws_name])
 
 
-class ResultsYFitObject:
-    def __init__(self, ic, wsFinalName, wsYSpaceAvgName):
-        # Extract most relevant information from ws
-        wsFinal = mtd[wsFinalName]
-        wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
-
-        wsJoYAvg = mtd[wsYSpaceAvgName]
-        wsSubMassName = wsYSpaceAvgName.split("_joy_")[0]
-        wsMass0 = mtd[wsSubMassName]
-
-        self.finalRawDataY = wsFinal.extractY()
-        self.finalRawDataE = wsFinal.extractE()
-        self.HdataY = wsMass0.extractY()
-        self.YSpaceSymSumDataY = wsJoYAvg.extractY()
-        self.YSpaceSymSumDataE = wsJoYAvg.extractE()
-        self.resolution = wsResSum.extractY()
-
-        # Extract best fit parameters from workspaces
-        poptList = []
-        perrList = []
-        try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitMinuit.column("Value"))
-            perrList.append(wsFitMinuit.column("Error"))
-        except:
-            pass
-        try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitLM.column("Value"))
-            perrList.append(wsFitLM.column("Error"))
-        except:
-            pass
-        try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitSimplex.column("Value"))
-            perrList.append(wsFitSimplex.column("Error"))
-        except:
-            pass
-
-        # Number of parameters might not be the same, need to add zeros to some lists to match length
-        maxLen = max([len(l) for l in poptList])
-        for pList in [poptList, perrList]:
-            for l in pList:
-                while len(l) < maxLen:
-                    l.append(0)
-
-        popt = np.array(poptList)
-        perr = np.array(perrList)
-
-        self.popt = popt
-        self.perr = perr
-
-        self.savePath = ic.ySpaceFitSavePath
-        self.fitting_model= ic.fitting_model
-
-    def save(self):
-        np.savez(
-            self.savePath,
-            YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-            YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-            resolution=self.resolution,
-            HdataY=self.HdataY,
-            finalRawDataY=self.finalRawDataY,
-            finalRawDataE=self.finalRawDataE,
-            popt=self.popt,
-            perr=self.perr,
-        )
-
-
-
-def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
+def runGlobalFit(wsYSpace, wsRes, IC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)
@@ -1531,7 +1089,7 @@ def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
     # Number of non zero points (considered in the fit) minus no of parameters
     chi2 = m.fval / (np.sum(dataE != 0) - m.nfit)  
 
-    create_table_for_global_fit_parameters(wsYSpace.name(), m, chi2)
+    create_table_for_global_fit_parameters(wsYSpace.name(), IC.fitting_model, m, chi2)
 
     if IC.show_plots:
         plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
@@ -1903,9 +1461,9 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
             initPars[up + str(i)] = defaultPars[up]
     return initPars
 
-def create_table_for_global_fit_parameters(wsName, m, chi2):
+def create_table_for_global_fit_parameters(wsName, model, m, chi2):
     t = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsName + "_gloabalfit_Parameters"
+        OutputWorkspace=wsName + f"_globalfit_{model}_Parameters"
     )
     t.setTitle("Global Fit Parameters")
     t.addColumn(type="str", name="Name")
@@ -1965,5 +1523,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        if ws_name.endswith('Parameters') or ws_name.endswith('parameters') or ws_name.endswith('Workspace'):
-            SaveAscii(ws_name, str(yFitIC.figSavePath.parent / "output_files" / ws_name))
+        if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
+            save_path = yFitIC.save_path / f"{yFitIC.fitting_model}_fit" / ws_name
+            save_path.parent.mkdir(exist_ok=True, parents=True)
+            SaveAscii(ws_name, str(save_path))

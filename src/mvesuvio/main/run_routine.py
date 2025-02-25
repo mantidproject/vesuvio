@@ -1,16 +1,16 @@
-from mvesuvio.analysis_fitting import fitInYSpaceProcedure
+from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.util import handle_config
-from mvesuvio.util.analysis_helpers import fix_profile_parameters,  \
+from mvesuvio.util.analysis_helpers import calculate_resolution, fix_profile_parameters, isolate_lighest_mass_data,  \
                             loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
                             calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
                             is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios, \
-                            print_table_workspace
+                            print_table_workspace, ySpaceReduction
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import mtd, RenameWorkspace
+from mantid.simpleapi import mtd, RenameWorkspace, Minus, SumSpectra
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
 import numpy as np
@@ -55,8 +55,8 @@ class Runner:
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
         # TODO: Output paths should probably not be set like this 
-        self._set_output_paths(self.bckwd_ai) 
-        self._set_output_paths(self.fwd_ai) 
+        # self._set_output_paths(self.bckwd_ai) 
+        # self._set_output_paths(self.fwd_ai) 
 
         # TODO: remove this by fixing circular import 
         self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
@@ -136,7 +136,16 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            self.fitting_result = fitInYSpaceProcedure(i_cls, wsName)
+            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncps"], i_cls.subtract_calculated_fse_from_data) 
+            ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
+
+            # NOTE: Do the average reduction, probably put this into its own file later
+            ws_joy, ws_joy_avg = ySpaceReduction(ws_lighest_data, ws_lighest_ncp, min(i_cls.masses), i_cls)
+
+            # NOTE: Set saving path like this for now
+            i_cls.save_path = self.experiment_path / "output_files" / "fitting"
+            i_cls.save_path.mkdir(exist_ok=True, parents=True)
+            self.fitting_result = FitInYSpace(i_cls, ws_joy_avg, ws_joy, ws_resolution).run()
         return
 
 
@@ -296,8 +305,8 @@ class Runner:
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
-            "ResultsPath": str(self.results_save_path),
-            "FiguresPath": str(self.fig_save_path),
+            "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
+            "FiguresPath": str(self.experiment_path / "figures"),
             "OutputMeansTable":" Final_Means"
         }
 
@@ -346,30 +355,32 @@ class Runner:
         return rawPath, emptyPath
 
 
-    def _set_output_paths(self, ai):
-        experimentPath = self.experiment_path
-        outputPath = experimentPath / "output_files"
-        outputPath.mkdir(parents=True, exist_ok=True)
-
-        # Build Filename based on ic
-        corr = ""
-        if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
-            corr += "MS"
-        if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
-            corr += "GC"
-
-        fileName = (
-            f"{ai.detectors.strip()}_{ai.number_of_iterations_for_corrections}{corr}"
-        )
-        self.results_save_path = outputPath / (fileName + ".npz")
-        ai.ySpaceFitSavePath = outputPath / (fileName + "_yfit.npz")
-
-        # Set directories for figures
-        figSavePath = experimentPath / "figures"
-        figSavePath.mkdir(exist_ok=True)
-        self.fig_save_path = figSavePath
-        return
-
+    # def _set_output_paths(self, ai):
+    #     experimentPath = self.experiment_path
+    #     outputPath = experimentPath / "output_files"
+    #     outputPath.mkdir(parents=True, exist_ok=True)
+    #
+    #     # Build Filename based on ic
+    #     corr = ""
+    #     if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
+    #         corr += "_GC"
+    #     if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
+    #         corr += "_MS"
+    #
+    #     fileName = (
+    #         f"spec_{ai.detectors.strip()}_iter_{ai.number_of_iterations_for_corrections}{corr}" + ".npz"
+    #     )
+    #     fileNameYSpace = fileName + "_ySpaceFit" + ".npz"
+    #
+    #     self.results_save_path = outputPath / fileName
+    #     ai.ySpaceFitSavePath = outputPath / fileNameYSpace
+    #
+    #     # Set directories for figures
+    #     figSavePath = experimentPath / "figures"
+    #     figSavePath.mkdir(exist_ok=True)
+    #     self.fig_save_path = figSavePath
+    #     return
+    #
 
 if __name__ == "__main__":
     Runner().run()

@@ -1,0 +1,6 @@
+# label , mass , intensity , intensity_bounds , width , width_bounds , center , center_bounds 
+# str , float , float , str , float , str , float , str 
+1.0079,1.0079,1,0 : None,4.7,3 : 6,0,-3 : 1
+12.0,12,1,0 : None,12.71,12.71 : 12.71,0,-3 : 1
+16.0,16,1,0 : None,8.76,8.76 : 8.76,0,-3 : 1
+27.0,27,1,0 : None,13.897,13.897 : 13.897,0,-3 : 1

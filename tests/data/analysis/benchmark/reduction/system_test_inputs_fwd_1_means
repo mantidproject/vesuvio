@@ -1,0 +1,6 @@
+# label , mass , mean_width , std_width , mean_intensity , std_intensity 
+# str , float , float , float , float , float 
+1.0079,1.0079,4.7,0,0.25,0
+12.0,12,12.71,0,0.25,0
+16.0,16,8.76,0,0.25,0
+27.0,27,13.897,0,0.25,0
