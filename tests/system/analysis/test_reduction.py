@@ -25,7 +25,8 @@ class TestReduction(unittest.TestCase):
         )
 
         # Delete outputs from previous runs
-        shutil.rmtree(str(results_path))
+        if results_path.exists():
+            shutil.rmtree(str(results_path))
 
         Runner(True).run()
 
