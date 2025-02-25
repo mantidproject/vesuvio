@@ -26,6 +26,9 @@ class FitInYSpace():
         self.ws_to_fit = ws_to_fit
         self.ws_resolution = ws_res 
 
+        # NOTE: Temporary mess until I convert this to full OOP
+        fi.figSavePath = fi.save_path / "figures"
+
     def run(self):
 
         wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
@@ -41,14 +44,10 @@ class FitInYSpace():
 
         printYSpaceFitResults()
 
-        # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
-        # yfitResults.save()
-
         if self.fitting_inputs.do_global_fit:
             runGlobalFit(wsJoY, self.ws_resolution, self.fitting_inputs)
 
         save_workspaces(self.fitting_inputs)
-        # return yfitResults
         return
 
 
@@ -1295,76 +1294,6 @@ def printYSpaceFitResults():
             print_table_workspace(mtd[ws_name])
 
 
-class ResultsYFitObject:
-    def __init__(self, ic, wsFinalName, wsYSpaceAvgName):
-        # Extract most relevant information from ws
-        wsFinal = mtd[wsFinalName]
-        wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
-
-        wsJoYAvg = mtd[wsYSpaceAvgName]
-        wsSubMassName = wsYSpaceAvgName.split("_joy_")[0]
-        wsMass0 = mtd[wsSubMassName]
-
-        self.finalRawDataY = wsFinal.extractY()
-        self.finalRawDataE = wsFinal.extractE()
-        self.HdataY = wsMass0.extractY()
-        self.YSpaceSymSumDataY = wsJoYAvg.extractY()
-        self.YSpaceSymSumDataE = wsJoYAvg.extractE()
-        self.resolution = wsResSum.extractY()
-
-        # Extract best fit parameters from workspaces
-        poptList = []
-        perrList = []
-        try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitMinuit.column("Value"))
-            perrList.append(wsFitMinuit.column("Error"))
-        except:
-            pass
-        try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitLM.column("Value"))
-            perrList.append(wsFitLM.column("Error"))
-        except:
-            pass
-        try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitSimplex.column("Value"))
-            perrList.append(wsFitSimplex.column("Error"))
-        except:
-            pass
-
-        # Number of parameters might not be the same, need to add zeros to some lists to match length
-        maxLen = max([len(l) for l in poptList])
-        for pList in [poptList, perrList]:
-            for l in pList:
-                while len(l) < maxLen:
-                    l.append(0)
-
-        popt = np.array(poptList)
-        perr = np.array(perrList)
-
-        self.popt = popt
-        self.perr = perr
-
-        self.savePath = ic.ySpaceFitSavePath
-        self.fitting_model= ic.fitting_model
-
-    def save(self):
-        np.savez(
-            self.savePath,
-            YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-            YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-            resolution=self.resolution,
-            HdataY=self.HdataY,
-            finalRawDataY=self.finalRawDataY,
-            finalRawDataE=self.finalRawDataE,
-            popt=self.popt,
-            perr=self.perr,
-        )
-
-
-
 def runGlobalFit(wsYSpace, wsRes, IC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
@@ -1888,6 +1817,6 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
         if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
-            save_path = yFitIC.figSavePath.parent / "output_files" / f"{yFitIC.fitting_model}_fit" / ws_name
+            save_path = yFitIC.save_path / f"{yFitIC.fitting_model}_fit" / ws_name
             save_path.parent.mkdir(exist_ok=True, parents=True)
             SaveAscii(ws_name, str(save_path))
