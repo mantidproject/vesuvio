@@ -1442,8 +1442,7 @@ class ResultsYFitObject:
         )
 
 
-
-def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
+def runGlobalFit(wsYSpace, wsRes, IC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)
