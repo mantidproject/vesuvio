@@ -39,7 +39,7 @@ class FitInYSpace():
         fitProfileMinuit(self.fitting_inputs, wsJoYAvg, wsResSum)
         fitProfileMantidFit(self.fitting_inputs, wsJoYAvg, wsResSum)
 
-        printYSpaceFitResults(wsJoYAvg.name())
+        printYSpaceFitResults()
 
         # yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
         # yfitResults.save()
@@ -1365,7 +1365,7 @@ class ResultsYFitObject:
 
 
 
-def runGlobalFit(wsYSpace, wsRes, IC, yFitIC):
+def runGlobalFit(wsYSpace, wsRes, IC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
     dataX, dataY, dataE, dataRes, instrPars = extractData(wsYSpace, wsRes, IC)
