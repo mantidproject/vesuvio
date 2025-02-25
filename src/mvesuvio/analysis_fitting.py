@@ -1442,7 +1442,6 @@ class ResultsYFitObject:
         )
 
 
-
 def runGlobalFit(wsYSpace, wsRes, IC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
