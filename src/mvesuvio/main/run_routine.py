@@ -5,7 +5,7 @@ from mvesuvio.util.analysis_helpers import calculate_resolution, fix_profile_par
                             calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
                             is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios, \
-                            print_table_workspace
+                            print_table_workspace, ySpaceReduction
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
@@ -136,12 +136,16 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            ws_lighest_data  = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncps"], i_cls.subtract_calculated_fse_from_data) 
+            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncps"], i_cls.subtract_calculated_fse_from_data) 
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
+
+            # NOTE: Do the average reduction, probably put this into its own file later
+            ws_joy, ws_joy_avg = ySpaceReduction(ws_lighest_data, ws_lighest_ncp, min(i_cls.masses), i_cls)
+
             # NOTE: Set saving path like this for now
             i_cls.save_path = self.experiment_path / "output_files" / "fitting"
             i_cls.save_path.mkdir(exist_ok=True, parents=True)
-            self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_resolution).run()
+            self.fitting_result = FitInYSpace(i_cls, ws_joy_avg, ws_joy, ws_resolution).run()
         return
 
 
