@@ -1,0 +1,15 @@
+name: vesuvio-dev
+
+channels:
+  - conda-forge
+  - mantid
+
+dependencies:
+  - mantidworkbench
+  - flake8
+  - conda-wrappers
+  - pre-commit
+  - coveralls
+  - mock
+  - pytest
+  - coverage

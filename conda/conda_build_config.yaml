@@ -3,6 +3,3 @@ python:
 
 jacobi:
   - 0.4.2 #pinned until later versions are proven.
-
-mantid:
-  - '>=6.7' #pinned until upgrade to python 3.10.

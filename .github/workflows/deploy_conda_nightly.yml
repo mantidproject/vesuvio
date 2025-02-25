@@ -30,8 +30,8 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
-          activate-environment: vesuvio-env
-          environment-file: environment.yml
+          activate-environment: vesuvio-dev 
+          environment-file: vesuvio-dev.yml
           auto-activate-base: false
 
       - name: Build mvesuvio nightly conda package
@@ -40,9 +40,3 @@ jobs:
         with:
           label: nightly
           token: ${{ secrets.ANACONDA_API_TOKEN }}
-
-      - name: Build mvesuvio nightly PyPI package
-        if: ${{ env.recentCommits == 'true'}}
-        uses: ./.github/actions/publish-pypi-package
-        with:
-          token: ${{ secrets.PYPI_API_TOKEN }}

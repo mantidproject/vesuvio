@@ -24,10 +24,9 @@ requirements:
 
   run:
     - python {{ python }}
-    - mantid {{ mantid }}
+    - mantid
     - matplotlib
     - iminuit
-    - h5py
     - jacobi {{ jacobi }}
     - dill
 
