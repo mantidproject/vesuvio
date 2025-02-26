@@ -141,17 +141,20 @@ class TestAnalysisReduction(unittest.TestCase):
 
         alg._dataE = np.zeros_like(alg._dataX)
         chi2_without_errors = alg._error_function(example_fit_parameters)
+        self.assertEqual(chi2_without_errors, 
+                         np.sum((alg._dataY - np.sum(NCP, axis=0))**2))
 
         alg._dataE = np.full_like(alg._dataX, 0.0015, dtype=np.double)
         chi2_with_errors = alg._error_function(example_fit_parameters)
+        self.assertEqual(chi2_with_errors, 
+                         np.sum((alg._dataY - np.sum(NCP, axis=0))**2 / alg._dataE**2))
 
-        alg._dataY[:, 5:15] = 0
+        alg._dataY[0, :20] = 0
         chi2_with_errors_with_tof_masked = alg._error_function(example_fit_parameters)
+        self.assertEqual(chi2_with_errors_with_tof_masked, 
+                         np.sum((alg._dataY[0, 20:] - np.sum(NCP, axis=0)[20:])**2 / alg._dataE[0, 20:]**2))
 
         self.assertAlmostEqual(chi2_without_errors, chi2_with_errors * 0.0015**2, places=15)
-        self.assertEqual(chi2_without_errors, 1.7627158500114776e-05)
-        self.assertEqual(chi2_with_errors, 7.834292666717679)
-        self.assertEqual(chi2_with_errors_with_tof_masked, 5.5864483595799195)
 
 
     def test_fit_neutron_compton_profiles_to_row(self):
