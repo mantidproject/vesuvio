@@ -91,7 +91,7 @@ def setup_config_dir(config_dir):
 
 
 def setup_default_inputs():
-    _ = copyfile(
+    copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE),
             os.path.join(VESUVIO_INPUTS_PATH),
         )
