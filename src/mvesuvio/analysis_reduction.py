@@ -532,9 +532,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         data_e = self._dataE[self._row_being_fit]
 
         # Ignore any masked values on tof range
-        ncp_total = ncp_total[np.nonzero(data_y)]
-        data_y = data_y[np.nonzero(data_y)]
-        data_e = data_e[np.nonzero(data_y)]
+        nonzero_mask = np.nonzero(data_y)
+        ncp_total = ncp_total[nonzero_mask]
+        data_y = data_y[nonzero_mask]
+        data_e = data_e[nonzero_mask]
 
         if np.all(data_e == 0):  # When errors not present
             return np.sum((ncp_total - data_y) ** 2)
