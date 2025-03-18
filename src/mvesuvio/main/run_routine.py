@@ -136,12 +136,12 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            ws_lighest_data  = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncps"], i_cls.subtract_calculated_fse_from_data) 
+            ws_lighest_data, ws_lighest_ncp  = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncps"], i_cls.subtract_calculated_fse_from_data) 
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
             # NOTE: Set saving path like this for now
             i_cls.save_path = self.experiment_path / "output_files" / "fitting"
             i_cls.save_path.mkdir(exist_ok=True, parents=True)
-            self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_resolution).run()
+            self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_lighest_ncp, ws_resolution).run()
         return
 
 

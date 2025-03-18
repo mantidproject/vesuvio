@@ -20,8 +20,9 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
     ws_name_profiles = [n for n in ws_ncp_names if n.endswith('_total_ncp')][0]
 
     ws_lighest_data = CloneWorkspace(initial_ws, OutputWorkspace=initial_ws.name()+"_m0")
+    ws_lighest_ncp = mtd[ws_name_lightest_profile]
 
-    isolated_data_y = ws_lighest_data.extractY() - (mtd[ws_name_profiles].extractY() - mtd[ws_name_lightest_profile].extractY())
+    isolated_data_y = ws_lighest_data.extractY() - (mtd[ws_name_profiles].extractY() - ws_lighest_ncp.extractY())
 
     for i in range(ws_lighest_data.getNumberHistograms()):
         ws_lighest_data.dataY(i)[:] = isolated_data_y[i, :] 
@@ -29,14 +30,24 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
 
     if subtract_fse:
 
-        isolated_data_y -= mtd[ws_name_lightest_profile.replace('ncp', 'fse')].extractY()
-        ws_lighest_data = CloneWorkspace(ws_lighest_data, OutputWorkspace=ws_lighest_data.name()+"_fse")
+        ws_lighest_fse = mtd[ws_name_lightest_profile.replace('ncp', 'fse')]
 
+        isolated_data_y -= ws_lighest_fse.extractY()
+        ws_lighest_data = CloneWorkspace(ws_lighest_data, OutputWorkspace=ws_lighest_data.name()+"_-fse")
         for i in range(ws_lighest_data.getNumberHistograms()):
             ws_lighest_data.dataY(i)[:] = isolated_data_y[i, :] 
         SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
 
-    return ws_lighest_data
+        # Subtract fse from fitted profile to match data
+        # TODO: Find a better solution later
+        ws_lighest_ncp_y = ws_lighest_ncp.extractY()
+        ws_lighest_ncp_y -= ws_lighest_fse.extractY()
+        ws_lighest_ncp = CloneWorkspace(ws_lighest_ncp, OutputWorkspace=ws_lighest_ncp.name()+"_-fse")
+        for i in range(ws_lighest_ncp.getNumberHistograms()):
+            ws_lighest_ncp.dataY(i)[:] = ws_lighest_ncp_y[i, :] 
+        SumSpectra(ws_lighest_ncp.name(), OutputWorkspace=ws_lighest_ncp.name() + "_sum")
+
+    return ws_lighest_data, ws_lighest_ncp
 
 
 def calculate_resolution(mass, ws, rebin_range):

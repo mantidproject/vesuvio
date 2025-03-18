@@ -20,10 +20,11 @@ repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 class FitInYSpace():
 
-    def __init__(self, fi, ws_to_fit, ws_res):
+    def __init__(self, fi, ws_to_fit, ws_to_fit_ncp, ws_res):
 
         self.fitting_inputs = fi
         self.ws_to_fit = ws_to_fit
+        self.ws_to_fit_ncp = ws_to_fit_ncp
         self.ws_resolution = ws_res 
 
         # NOTE: Temporary mess until I convert this to full OOP
@@ -34,7 +35,7 @@ class FitInYSpace():
         wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
         normalise_workspace(wsResSum)
 
-        wsJoY, wsJoYAvg = ySpaceReduction(self.ws_to_fit, self.fitting_inputs)
+        wsJoY, wsJoYAvg = ySpaceReduction(self.ws_to_fit, self.ws_to_fit_ncp, self.fitting_inputs)
 
         if self.fitting_inputs.do_symmetrisation:
             wsJoYAvg = symmetrizeWs(wsJoYAvg)
@@ -51,15 +52,15 @@ class FitInYSpace():
         return
 
 
-def ySpaceReduction(wsTOF, ic):
+def ySpaceReduction(wsTOF, ws_ncp, ic):
     """Seperate procedures depending on masking specified."""
-
     mass0 = ic.masses[0]
-    profiles_table = mtd[ic.name + '_initial_parameters']
-    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-
-    ncp = mtd[ws_name_lightest_mass].extractY()
+    # profiles_table = mtd[ic.name + '_initial_parameters']
+    # lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
+    # ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
+    #
+    # ncp = mtd[ws_name_lightest_mass].extractY()
+    ncp = ws_ncp.extractY()
 
     rebinPars = ic.range_for_rebinning_in_y_space
 
