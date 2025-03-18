@@ -194,7 +194,7 @@ class TestAnalysisHelpers(unittest.TestCase):
         ws_data = CreateWorkspace(DataX=dataX, DataY=data, DataE=1.5*dataE, NSpec=1, UnitX="some_unit")
         ncp_group = GroupWorkspaces([ws_ncp3, ws_ncp2, ws_ncp1, ws_total])
 
-        ws_res, _ = isolate_lighest_mass_data(ws_data, ncp_group, False)
+        ws_res = isolate_lighest_mass_data(ws_data, ncp_group, False)
 
         ws_expected = ws_data - ws_ncp2 - ws_ncp3
         # ws_expected = ws_data - (ws_total - ws_ncp1) 
@@ -218,7 +218,7 @@ class TestAnalysisHelpers(unittest.TestCase):
         ncp_group = GroupWorkspaces([ws_ncp3, ws_ncp2, ws_ncp1, ws_total])
         ws_fse1 = CreateWorkspace(DataX=dataX, DataY=0.4*np.sin(dataX)*np.exp(-(dataX-3)**2), DataE=0.5*dataE, NSpec=1, UnitX="some_unit", OutputWorkspace="_1_fse")
 
-        ws_res, _ = isolate_lighest_mass_data(ws_data, ncp_group, True)
+        ws_res = isolate_lighest_mass_data(ws_data, ncp_group, True)
 
         ws_expected = ws_data - ws_ncp2 - ws_ncp3 - ws_fse1
         np.testing.assert_allclose(ws_res.extractY(), ws_expected.extractY())
