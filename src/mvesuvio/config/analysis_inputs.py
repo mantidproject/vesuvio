@@ -11,7 +11,7 @@ class SampleParameters:
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
-    run_this_scattering_type = True
+    run_this_scattering_type = False
     fit_in_y_space = True
 
     runs = "43066-43076"
