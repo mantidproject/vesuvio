@@ -9,6 +9,7 @@ from pathlib import Path
 import mvesuvio
 import tempfile
 from textwrap import dedent
+import os
 
 class TestRunRoutine(unittest.TestCase):
     @classmethod
@@ -66,5 +67,7 @@ class TestRunRoutine(unittest.TestCase):
             2025-01-08 10:48:49,391 [0] Notice Python - 
             Unshared Parameters: ['A', 'x0']
                          """).encode(), current_log_file_content)
+        os.remove(mock_mantid_log_file.name)
+        os.remove(mock_log_file.name)
 
 

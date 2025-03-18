@@ -40,6 +40,15 @@ jobs:
         run: |
           echo "calibration-changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q -e '^tools/calibration_scripts/' -e '^tests/' && echo true || echo false)" >> $GITHUB_ENV
 
+      - name: Check if first workflow to run on PR 
+        run: |
+          # Check if the base commit (before the PR) exists in the history
+          if ! git merge-base --is-ancestor ${{ github.event.pull_request.base.sha }} HEAD; then
+            echo "First push detected (or force push), running all tests."
+            echo "analysis-changed=true" >> $GITHUB_ENV
+            echo "calibration-changed=true" >> $GITHUB_ENV
+          fi
+
       - name: Run mvesuvio Analysis Unit Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |

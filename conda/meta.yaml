@@ -38,6 +38,7 @@ test:
     - mock 
   source_files:
     - tests/unit/
+    - tests/data/analysis/inputs/analysis_test.py   # Not a test, used by log file unit test
     - tools/
   commands:
     - pytest
