@@ -42,7 +42,8 @@ class TestReduction(unittest.TestCase):
 
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
-                self.assertTrue(CompareWorkspaces(ws_name, ws_name.replace("bench_", "")))
+                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""))
+                self.assertTrue(result)
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
