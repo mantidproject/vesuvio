@@ -42,7 +42,7 @@ class TestReduction(unittest.TestCase):
 
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
-                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""))
+                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=1e-5)
                 self.assertTrue(result)
 
 

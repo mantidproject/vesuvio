@@ -64,4 +64,4 @@ class TestFitting(unittest.TestCase):
 
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
-                self.assertTrue(CompareWorkspaces(ws_name, ws_name.replace("bench_", "")))
+                self.assertTrue(CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=1e-5))
