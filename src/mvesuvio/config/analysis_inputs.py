@@ -14,6 +14,7 @@ class BackwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = False
     fit_in_y_space = False
 
+
     runs = "43066-43076"
     empty_runs = "41876-41923" 
     mode = "DoubleDifference"
