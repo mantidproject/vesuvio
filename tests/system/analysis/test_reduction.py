@@ -42,7 +42,7 @@ class TestReduction(unittest.TestCase):
 
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
-                if ws_name.endswith(['fit_results']):
+                if ws_name.endswith('fit_results'):
                     tol = 1e-3
                 else:
                     tol = 1e-5
