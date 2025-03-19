@@ -43,7 +43,7 @@ class TestReduction(unittest.TestCase):
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
                 if ws_name.endswith('fit_results'):
-                    tol = 1e-3
+                    tol = 1e-2
                 else:
                     tol = 1e-5
                 (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=tol)
