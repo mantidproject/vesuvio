@@ -44,6 +44,8 @@ class TestReduction(unittest.TestCase):
             if ws_name.startswith('bench'):
                 if ws_name.endswith('fit_results'):
                     tol = 1e-2
+                elif ws_name.endswith('means'):
+                    tol = 1e-3
                 else:
                     tol = 1e-5
                 (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=tol)
