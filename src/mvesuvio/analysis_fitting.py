@@ -29,6 +29,7 @@ class FitInYSpace():
 
         # NOTE: Temporary mess until I convert this to full OOP
         fi.figSavePath = fi.save_path / "figures"
+        fi.figSavePath.mkdir(exist_ok=True, parents=True)
 
     def run(self):
 
