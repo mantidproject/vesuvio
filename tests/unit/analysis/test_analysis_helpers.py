@@ -191,12 +191,16 @@ class TestAnalysisHelpers(unittest.TestCase):
         ws_total = ws_ncp1 + ws_ncp2 + ws_ncp3
         RenameWorkspace(ws_total, "_total_ncp")
         data = ws_total.extractY() + (np.random.random(100)-0.5) * 0.5
+        data[0, :10] = 0
         ws_data = CreateWorkspace(DataX=dataX, DataY=data, DataE=1.5*dataE, NSpec=1, UnitX="some_unit")
         ncp_group = GroupWorkspaces([ws_ncp3, ws_ncp2, ws_ncp1, ws_total])
 
         ws_res, ws_res_ncp = isolate_lighest_mass_data(ws_data, ncp_group, False)
 
         ws_expected = ws_data - ws_ncp2 - ws_ncp3
+        # Expected workspace should have masked values with zeros
+        ws_expected.dataY(0)[:10] = 0
+
         np.testing.assert_allclose(ws_res.extractY(), ws_expected.extractY())
         np.testing.assert_allclose(ws_res.extractE(), ws_data.extractE())
         np.testing.assert_allclose(ws_res.extractX(), ws_data.extractX())
