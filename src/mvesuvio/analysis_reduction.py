@@ -229,7 +229,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._set_lorentzian_resolution()
         self._set_y_space_arrays()
 
-        self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
+        self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 2))
         self._row_being_fit = 0 
         self._table_fit_results = self._initialize_table_fit_parameters()
 
@@ -269,7 +269,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             table.addColumn(type="float", name=f"{label} w")
             table.addColumn(type="float", name=f"{label} c")
         table.addColumn(type="float", name="NChi2")
-        table.addColumn(type="float", name="Iter")
         return table
 
 
@@ -509,7 +508,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def _fit_neutron_compton_profiles_to_row(self):
 
         if np.all(self._dataY[self._row_being_fit] == 0):
-            self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
+            self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+2))
             spectrum_number = self._instrument_params[self._row_being_fit, 0]
             self.log().notice(f"Skip spectrum {int(spectrum_number):3d}")
             return
@@ -526,9 +525,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # Pass fit parameters to results table
         noDegreesOfFreedom = len(self._dataY[self._row_being_fit]) - len(fitPars)
         normalised_chi2 = result["fun"] / noDegreesOfFreedom
-        number_iterations = result["nit"]
         spectrum_number = self._instrument_params[self._row_being_fit, 0]
-        tableRow = np.hstack((spectrum_number, fitPars, normalised_chi2, number_iterations))
+        tableRow = np.hstack((spectrum_number, fitPars, normalised_chi2))
         self._table_fit_results.addRow(tableRow)
 
         # Store results for easier access when calculating means
