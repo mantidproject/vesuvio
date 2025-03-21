@@ -46,10 +46,10 @@ class TestAnalysisHelpers(unittest.TestCase):
         profiles_table_mock = MagicMock()
         profiles_table_mock.rowCount.return_value = 4
         profiles_table_mock.row.side_effect = [
-            {'label': '1.0079', 'mass': 1.0078, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 4.699, 'width_bounds': '[3, 6]', 'center': 0.0, 'center_bounds': '[-3, 1]'},
-            {'label': '16.0', 'mass': 16.0, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 12, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'},
-            {'label': '12.0', 'mass': 12.0, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 8, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'},
-            {'label': '27.0', 'mass': 27.0, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 13, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '1.0079', 'mass': 1.0078, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 4.699, 'width_bounds': '3 : 6', 'center': 0.0, 'center_bounds': '-3 : 1'},
+            {'label': '16.0', 'mass': 16.0, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 12, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'},
+            {'label': '12.0', 'mass': 12.0, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 8, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'},
+            {'label': '27.0', 'mass': 27.0, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 13, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'}
         ]
 
         result_table = fix_profile_parameters(means_table_mock, profiles_table_mock, h_ratio=14.7)
@@ -58,19 +58,19 @@ class TestAnalysisHelpers(unittest.TestCase):
         # TODO: Fix floating positions eg. 8.973999977111816 -> 8.974
         self.assertEqual(
             result_table.row(0),
-            {'label': '1.0079', 'mass': 1.0077999830245972, 'intensity': 0.8839251399040222, 'intensity_bounds': '[0, None]', 'width': 4.698999881744385, 'width_bounds': '[3, 6]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '1.0079', 'mass': 1.0077999830245972, 'intensity': 0.8839251399040222, 'intensity_bounds': '0 : None', 'width': 4.698999881744385, 'width_bounds': '3 : 6', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
         self.assertEqual(
             result_table.row(1),
-            {'label': '16.0', 'mass': 16.0, 'intensity': 0.020470114424824715, 'intensity_bounds': '[0, None]', 'width': 8.973999977111816, 'width_bounds': '[8.974, 8.974]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '16.0', 'mass': 16.0, 'intensity': 0.020470114424824715, 'intensity_bounds': '0 : None', 'width': 8.973999977111816, 'width_bounds': '8.974 : 8.974', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
         self.assertEqual(
             result_table.row(2),
-            {'label': '12.0', 'mass': 12.0, 'intensity': 0.06013096123933792, 'intensity_bounds': '[0, None]', 'width': 13.932000160217285, 'width_bounds': '[13.932, 13.932]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '12.0', 'mass': 12.0, 'intensity': 0.06013096123933792, 'intensity_bounds': '0 : None', 'width': 13.932000160217285, 'width_bounds': '13.932 : 13.932', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
         self.assertEqual(
             result_table.row(3),
-            {'label': '27.0', 'mass': 27.0, 'intensity': 0.0354737788438797, 'intensity_bounds': '[0, None]', 'width': 15.397000312805176, 'width_bounds': '[15.397, 15.397]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '27.0', 'mass': 27.0, 'intensity': 0.0354737788438797, 'intensity_bounds': '0 : None', 'width': 15.397000312805176, 'width_bounds': '15.397 : 15.397', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
         
 
@@ -89,9 +89,9 @@ class TestAnalysisHelpers(unittest.TestCase):
         profiles_table_mock = MagicMock()
         profiles_table_mock.rowCount.return_value = 3
         profiles_table_mock.row.side_effect = [
-            {'label': '16.0', 'mass': 16.0, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 12, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'},
-            {'label': '12.0', 'mass': 12.0, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 8, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'},
-            {'label': '27.0', 'mass': 27.0, 'intensity': 1.0, 'intensity_bounds': '[0, None]', 'width': 13, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '16.0', 'mass': 16.0, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 12, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'},
+            {'label': '12.0', 'mass': 12.0, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 8, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'},
+            {'label': '27.0', 'mass': 27.0, 'intensity': 1.0, 'intensity_bounds': '0 : None', 'width': 13, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'}
         ]
 
         result_table = fix_profile_parameters(means_table_mock, profiles_table_mock, h_ratio=14.7)
@@ -100,15 +100,15 @@ class TestAnalysisHelpers(unittest.TestCase):
         # TODO: Fix floating positions eg. 8.973999977111816 -> 8.974
         self.assertEqual(
             result_table.row(0),
-            {'label': '16.0', 'mass': 16.0, 'intensity': 0.17635270953178406, 'intensity_bounds': '[0, None]', 'width': 8.973999977111816, 'width_bounds': '[8.974, 8.974]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '16.0', 'mass': 16.0, 'intensity': 0.17635270953178406, 'intensity_bounds': '0 : None', 'width': 8.973999977111816, 'width_bounds': '8.974 : 8.974', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
         self.assertEqual(
             result_table.row(1),
-            {'label': '12.0', 'mass': 12.0, 'intensity': 0.5180360674858093, 'intensity_bounds': '[0, None]', 'width': 13.932000160217285, 'width_bounds': '[0, None]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '12.0', 'mass': 12.0, 'intensity': 0.5180360674858093, 'intensity_bounds': '0 : None', 'width': 13.932000160217285, 'width_bounds': '0 : None', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
         self.assertEqual(
             result_table.row(2),
-            {'label': '27.0', 'mass': 27.0, 'intensity': 0.3056112229824066, 'intensity_bounds': '[0, None]', 'width': 15.397000312805176, 'width_bounds': '[15.397, 15.397]', 'center': 0.0, 'center_bounds': '[-3, 1]'}
+            {'label': '27.0', 'mass': 27.0, 'intensity': 0.3056112229824066, 'intensity_bounds': '0 : None', 'width': 15.397000312805176, 'width_bounds': '15.397 : 15.397', 'center': 0.0, 'center_bounds': '-3 : 1'}
         )
 
 
