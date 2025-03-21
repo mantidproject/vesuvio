@@ -417,7 +417,7 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
     for p in profiles_dict.values():
         if p == _get_lightest_profile(profiles_dict):
             continue
-        p['width_bounds'] = str([p['width'] , p['width']])
+        p['width_bounds'] = " : ".join([str(p['width']) , str(p['width'])])
 
     result_profiles_table = _convert_dict_to_table(profiles_dict)
     return result_profiles_table
