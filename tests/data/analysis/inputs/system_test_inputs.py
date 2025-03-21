@@ -11,7 +11,7 @@ class SampleParameters:
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
-    run_this_scattering_type = False
+    run_this_scattering_type = True
     fit_in_y_space = False
 
     runs = "43066-43076"
@@ -70,7 +70,7 @@ class BackwardAnalysisInputs(SampleParameters):
 @dataclass
 class ForwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
-    fit_in_y_space = False 
+    fit_in_y_space = False
 
     runs = "43066-43076"
     empty_runs = "43868-43911"
@@ -79,7 +79,7 @@ class ForwardAnalysisInputs(SampleParameters):
     detectors = '144-182'
     mask_detectors = [173, 174, 179]
     time_of_flight_binning = "110,1,430"
-    mask_time_of_flight_range = "115-125" 
+    mask_time_of_flight_range = "110-140" 
     subtract_empty_workspace_from_raw = False
     scale_empty_workspace = 1  # None or scaling factor
     scale_raw_workspace = 1
