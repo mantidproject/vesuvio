@@ -17,7 +17,7 @@ class TestRunRoutine(unittest.TestCase):
         # TODO: Avoid doing this in the future, can probably replace it with mock
         mvesuvio.set_config(
             ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-            inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "analysis_test.py")
+            inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
         )
         pass
 
