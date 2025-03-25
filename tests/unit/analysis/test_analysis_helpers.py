@@ -100,15 +100,15 @@ class TestAnalysisHelpers(unittest.TestCase):
         # TODO: Fix floating positions eg. 8.973999977111816 -> 8.974
         self.assertEqual(
             result_table.row(0),
-            {'label': '16.0', 'mass': 16.0, 'intensity': 0.17635270953178406, 'intensity_lb': 0 , 'intensity_ub': np.inf, 'width': 8.973999977111816, 'width_lb': 8.974 , 'width_ub': 8.974, 'center': 0.0, 'center_lb': -3 , 'center_ub': 1}
+            {'label': '16.0', 'mass': 16.0, 'intensity': 0.17635270953178406, 'intensity_lb': 0.0, 'intensity_ub': np.inf, 'width': 8.973999977111816, 'width_lb': 8.973999977111816, 'width_ub': 8.973999977111816, 'center': 0.0, 'center_lb': -3.0 , 'center_ub': 1.0}
         )
         self.assertEqual(
             result_table.row(1),
-            {'label': '12.0', 'mass': 12.0, 'intensity': 0.5180360674858093, 'intensity_lb': 0 , 'intensity_ub': np.inf, 'width': 13.932000160217285, 'width_lb': 0 , 'width_ub': np.inf, 'center': 0.0, 'center_lb': -3 , 'center_ub': 1}
+            {'label': '12.0', 'mass': 12.0, 'intensity': 0.5180360674858093, 'intensity_lb': 0.0, 'intensity_ub': np.inf, 'width': 13.932000160217285, 'width_lb': 0.0, 'width_ub': np.inf, 'center': 0.0, 'center_lb': -3.0, 'center_ub': 1.0}
         )
         self.assertEqual(
             result_table.row(2),
-            {'label': '27.0', 'mass': 27.0, 'intensity': 0.3056112229824066, 'intensity_lb': 0 , 'intensity_ub': np.inf, 'width': 15.397000312805176, 'width_lb': 15.397 , 'width_ub': 15.397, 'center': 0.0, 'center_lb': -3 , 'center_ub': 1}
+            {'label': '27.0', 'mass': 27.0, 'intensity': 0.3056112229824066, 'intensity_lb': 0.0, 'intensity_ub': np.inf, 'width': 15.397000312805176, 'width_lb': 15.397000312805176, 'width_ub': 15.397000312805176, 'center': 0.0, 'center_lb': -3.0, 'center_ub': 1.0}
         )
 
 
