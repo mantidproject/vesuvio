@@ -519,6 +519,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             method="SLSQP",
             bounds=self._initial_fit_bounds,
             constraints=self._constraints,
+            tol=1e-6
         )
         fitPars = result["x"]
 
