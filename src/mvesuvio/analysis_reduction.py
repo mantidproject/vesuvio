@@ -195,16 +195,15 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         self._initial_fit_bounds = []
 
-        def bounds_str_to_list(bounds_str):
-            # Use eval to correctly evaluate None
-            return [eval(i) for i in bounds_str.split(':')]
-
-        for intensity_bounds, width_bounds, center_bounds in zip(
-            self._profiles_table.column("intensity_bounds"),
-            self._profiles_table.column("width_bounds"),
-            self._profiles_table.column("center_bounds")
+        for intensity_lb, intensity_ub, width_lb, width_ub, center_lb, center_ub in zip(
+            self._profiles_table.column("intensity_lb"),
+            self._profiles_table.column("intensity_ub"),
+            self._profiles_table.column("width_lb"),
+            self._profiles_table.column("width_ub"),
+            self._profiles_table.column("center_lb"),
+            self._profiles_table.column("center_ub")
         ):
-            self._initial_fit_bounds.extend([bounds_str_to_list(intensity_bounds), bounds_str_to_list(width_bounds), bounds_str_to_list(center_bounds)])
+            self._initial_fit_bounds.extend([[intensity_lb, intensity_ub], [width_lb, width_ub], [center_lb, center_ub]])
 
         # Masses need to be defined in the same order
         self._masses = np.array(self._profiles_table.column("mass"))

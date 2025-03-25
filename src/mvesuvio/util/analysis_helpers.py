@@ -111,22 +111,28 @@ def create_profiles_table(name, ai):
     table.addColumn(type="str", name="label")
     table.addColumn(type="float", name="mass")
     table.addColumn(type="float", name="intensity")
-    table.addColumn(type="str", name="intensity_bounds")
+    table.addColumn(type="float", name="intensity_lb")
+    table.addColumn(type="float", name="intensity_ub")
     table.addColumn(type="float", name="width")
-    table.addColumn(type="str", name="width_bounds")
+    table.addColumn(type="float", name="width_lb")
+    table.addColumn(type="float", name="width_ub")
     table.addColumn(type="float", name="center")
-    table.addColumn(type="str", name="center_bounds")
+    table.addColumn(type="float", name="center_lb")
+    table.addColumn(type="float", name="center_ub")
 
-    def bounds_to_str(bounds):
-        return " : ".join([str(i) for i in list(bounds)])
+    def wrapb(bound):
+        # Literally to just account for NoneType
+        if bound == None:
+            return np.inf
+        return bound
 
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
         ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
         ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
     ):
         table.addRow(
-            [str(float(mass)), float(mass), float(intensity), bounds_to_str(intensity_bound),
-             float(width), bounds_to_str(width_bound), float(center), bounds_to_str(center_bound)]
+            [str(float(mass)), float(mass), float(intensity), float(wrapb(intensity_bound[0])), float(wrapb(intensity_bound[1])),
+             float(width), float(wrapb(width_bound[0])), float(wrapb(width_bound[1])), float(center), float(wrapb(center_bound[0])), float(wrapb(center_bound[1]))]
         )
     return table
 
@@ -417,7 +423,8 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
     for p in profiles_dict.values():
         if p == _get_lightest_profile(profiles_dict):
             continue
-        p['width_bounds'] = " : ".join([str(p['width']) , str(p['width'])])
+        p['width_lb'] = p['width']
+        p['width_ub'] = p['width']
 
     result_profiles_table = _convert_dict_to_table(profiles_dict)
     return result_profiles_table
