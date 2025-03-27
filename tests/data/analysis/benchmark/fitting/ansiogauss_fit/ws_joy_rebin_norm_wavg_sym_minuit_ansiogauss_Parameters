@@ -1,0 +1,7 @@
+# Name , Value , Error , Auto Minos Error- , Auto Minos Error+ , Manual Minos Error- , Manual Minos Error+ 
+# str , float , float , float , float , float , float 
+y0,-8.79329e-06,8.44304e-09,0,0,0,0
+A,6.02251e-08,0.000850908,0,0,0,0
+sig1,2.14959,46.2589,0,0,0,0
+sig2,6.49676,39.3582,0,0,0,0
+Cost function,1918.34,0,0,0,0,0

@@ -36,7 +36,14 @@ class TestFitting(unittest.TestCase):
         cls.ws_to_fit_ncp_path = cls.inputs_path / "system_test_inputs_fwd_1_1.0079_ncp_-fse.nxs"
         cls.ws_resolution_path = cls.inputs_path / "system_test_inputs_fwd_1_resolution.nxs"
 
-        ipfile_path = Path(handle_config.VESUVIO_IPFOLDER_PATH) / "ip2018_3.par"
+        cls.ipfile_path = Path(handle_config.VESUVIO_IPFOLDER_PATH) / "ip2018_3.par"
+
+        return
+
+    def setUp(self):
+        self.ws_to_fit = Load(str(self.ws_to_fit_path), OutputWorkspace="ws")
+        self.ws_to_fit_ncp = Load(str(self.ws_to_fit_ncp_path), OutputWorkspace="ws_ncp")
+        self.ws_resolution = Load(str(self.ws_resolution_path), OutputWorkspace="resolution")
 
         @dataclass
         class FitInputs:
@@ -50,18 +57,12 @@ class TestFitting(unittest.TestCase):
             number_of_global_fit_groups = 4
             mask_zeros_with = "nan"   
 
-            save_path = cls.target_dir
+            save_path = self.target_dir
             masses = [1.0079, 12, 16, 27]
-            instrument_parameters_file = ipfile_path 
+            instrument_parameters_file = self.ipfile_path 
             detectors = '144-182'
 
-        cls.fi = FitInputs()
-        return
-
-    def setUp(self):
-        self.ws_to_fit = Load(str(self.ws_to_fit_path), OutputWorkspace="ws")
-        self.ws_to_fit_ncp = Load(str(self.ws_to_fit_ncp_path), OutputWorkspace="ws_ncp")
-        self.ws_resolution = Load(str(self.ws_resolution_path), OutputWorkspace="resolution")
+        self.fi = FitInputs()
         return
         
     def tearDown(self) -> None:
@@ -73,18 +74,18 @@ class TestFitting(unittest.TestCase):
         fi.fitting_model = "gauss"
         fi.do_symmetrisation = True 
         fi.subtract_calculated_fse_from_data = True
-        alg = FitInYSpace(self.fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
+        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
         alg.run()
         self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gauss_fit", self.target_dir / "gauss_fit"))
 
-    def test_gcc4c6_no_symmetrisation_and_fse(self):
+    def test_gcc4_no_symmetrisation_and_fse(self):
         fi = self.fi
-        fi.fitting_model = "gcc4c6"
+        fi.fitting_model = "gcc4"
         fi.do_symmetrisation = False
         fi.subtract_calculated_fse_from_data = True
         alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
         alg.run()
-        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gcc4c6_fit", self.target_dir / "gcc4c6_fit"))
+        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gcc4_fit", self.target_dir / "gcc4_fit"))
 
     def test_ansiogauss_with_symmetrisation_no_fse(self):
         fi = self.fi
