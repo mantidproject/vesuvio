@@ -132,11 +132,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             defaultValue="",
             doc="Directory to store results, to be deleted later."
         )
-        self.declareProperty(
-            name="FiguresPath",
-            defaultValue="",
-            doc="Directory to store figures, to be deleted later."
-        )
         # Outputs
         self.declareProperty(TableWorkspaceProperty(
             name="OutputMeansTable",
@@ -177,7 +172,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
         self._gamma_correction = self.getProperty("GammaCorrection").value 
         self._save_results_path = Path(self.getProperty("ResultsPath").value)
-        self._save_figures_path = Path(self.getProperty("FiguresPath").value)
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
         self._profiles_table = self.getProperty("InputProfiles").value
@@ -187,6 +181,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         # Create paths if not there already
         self._save_results_path.mkdir(parents=True, exist_ok=True)
+        self._save_figures_path = self._save_results_path / "figures"
         self._save_figures_path.mkdir(parents=True, exist_ok=True) 
 
         # Need to transform profiles table into parameter array for optimize.minimize()

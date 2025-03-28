@@ -292,7 +292,6 @@ class Runner:
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
             "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
-            "FiguresPath": str(self.experiment_path / "output_files" / "reduction" / "figures"),
             "OutputMeansTable":" Final_Means"
         }
 
