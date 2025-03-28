@@ -54,19 +54,9 @@ class Runner:
         self.input_ws_path =  self.experiment_path / "input_workspaces"
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
-        # TODO: Output paths should probably not be set like this 
-        # self._set_output_paths(self.bckwd_ai) 
-        # self._set_output_paths(self.fwd_ai) 
-
         # TODO: remove this by fixing circular import 
         self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
         self.bckwd_ai.name = name_for_starting_ws(self.bckwd_ai)
-
-        # TODO: sort out yfit inputs
-        figSavePath = self.experiment_path / "figures"
-        figSavePath.mkdir(exist_ok=True)
-        self.fwd_ai.figSavePath = figSavePath
-        self.bckwd_ai.figSavePath = figSavePath
 
         self.mantid_log_file = "mantid.log"
 
@@ -302,7 +292,7 @@ class Runner:
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
             "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
-            "FiguresPath": str(self.experiment_path / "figures"),
+            "FiguresPath": str(self.experiment_path / "output_files" / "reduction" / "figures"),
             "OutputMeansTable":" Final_Means"
         }
 

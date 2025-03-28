@@ -1,3 +1,4 @@
+from fileinput import filename
 import numpy as np 
 import matplotlib.pyplot as plt
 import scipy
@@ -175,14 +176,18 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._mode_running = self.getProperty("ModeRunning").value 
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
         self._gamma_correction = self.getProperty("GammaCorrection").value 
-        self._save_results_path = self.getProperty("ResultsPath").value
-        self._save_figures_path = self.getProperty("FiguresPath").value 
+        self._save_results_path = Path(self.getProperty("ResultsPath").value)
+        self._save_figures_path = Path(self.getProperty("FiguresPath").value)
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
         self._profiles_table = self.getProperty("InputProfiles").value
 
         self._instrument_params = load_instrument_params(self._ip_file, self.getProperty("InputWorkspace").value.getSpectrumNumbers())
         self._resolution_params = load_resolution(self._instrument_params)
+
+        # Create paths if not there already
+        self._save_results_path.mkdir(parents=True, exist_ok=True)
+        self._save_figures_path.mkdir(parents=True, exist_ok=True) 
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
@@ -386,10 +391,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
 
     def _save_plots(self):
-        # if IC.runningSampleWS:  # Skip saving figure if running bootstrap
-        #     return
 
-        if not self._save_figures_path:
+        if not self._save_figures_path.exists():
             return
 
         lw = 2
@@ -409,7 +412,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         ax.legend()
 
         fileName = self._workspace_being_fit.name() + "_profiles_sum.pdf"
-        savePath = self._save_figures_path + '/' + fileName
+        savePath = self._save_figures_path / fileName
         plt.savefig(savePath, bbox_inches="tight")
         plt.close(fig)
         return
@@ -912,12 +915,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
 
     def _save_results(self):
-        """Saves main Ascii workspaces"""
-
-        # Create if not there already
-        save_dir = Path(self._save_results_path)
-        save_dir.mkdir(parents=True, exist_ok=True)
-
         for ws_name in mtd.getObjectNames():
             if ws_name.endswith(('ncp', 'fse', 'fit_results', 'means', 'initial_parameters') + tuple([str(i) for i in range(10)])):
-                SaveAscii(ws_name, str(save_dir / ws_name))
+                SaveAscii(ws_name, str(self._save_results_path / ws_name))
