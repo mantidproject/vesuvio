@@ -56,11 +56,6 @@ class FitInYSpace():
 def ySpaceReduction(wsTOF, ws_ncp, ic):
     """Seperate procedures depending on masking specified."""
     mass0 = ic.masses[0]
-    # profiles_table = mtd[ic.name + '_initial_parameters']
-    # lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    # ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-    #
-    # ncp = mtd[ws_name_lightest_mass].extractY()
     ncp = ws_ncp.extractY()
 
     rebinPars = ic.range_for_rebinning_in_y_space
