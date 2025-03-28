@@ -38,6 +38,8 @@ class TestReduction(unittest.TestCase):
             LoadAscii(str(p), Separator="CSV", OutputWorkspace="bench_"+p.name)
 
         for p in results_path.iterdir():
+            if p.suffix == '.py' or p.is_dir():
+                pass
             LoadAscii(str(p), Separator="CSV", OutputWorkspace=p.name)
 
         for ws_name in mtd.getObjectNames():
