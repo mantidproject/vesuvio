@@ -351,32 +351,5 @@ class Runner:
         return rawPath, emptyPath
 
 
-    # def _set_output_paths(self, ai):
-    #     experimentPath = self.experiment_path
-    #     outputPath = experimentPath / "output_files"
-    #     outputPath.mkdir(parents=True, exist_ok=True)
-    #
-    #     # Build Filename based on ic
-    #     corr = ""
-    #     if ai.do_gamma_correction & (ai.number_of_iterations_for_corrections > 0):
-    #         corr += "_GC"
-    #     if ai.do_multiple_scattering_correction & (ai.number_of_iterations_for_corrections > 0):
-    #         corr += "_MS"
-    #
-    #     fileName = (
-    #         f"spec_{ai.detectors.strip()}_iter_{ai.number_of_iterations_for_corrections}{corr}" + ".npz"
-    #     )
-    #     fileNameYSpace = fileName + "_ySpaceFit" + ".npz"
-    #
-    #     self.results_save_path = outputPath / fileName
-    #     ai.ySpaceFitSavePath = outputPath / fileNameYSpace
-    #
-    #     # Set directories for figures
-    #     figSavePath = experimentPath / "figures"
-    #     figSavePath.mkdir(exist_ok=True)
-    #     self.fig_save_path = figSavePath
-    #     return
-    #
-
 if __name__ == "__main__":
     Runner().run()
