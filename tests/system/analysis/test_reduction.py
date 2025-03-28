@@ -33,7 +33,7 @@ class TestReduction(unittest.TestCase):
         AnalysisDataService.clear()
 
         for p in benchmark_path.iterdir():
-            if p.suffix == '.py':
+            if p.suffix == '.py' or p.is_dir():
                 pass
             LoadAscii(str(p), Separator="CSV", OutputWorkspace="bench_"+p.name)
 
