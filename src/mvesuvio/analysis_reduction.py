@@ -1,16 +1,18 @@
+from fileinput import filename
 import numpy as np 
 import matplotlib.pyplot as plt
 import scipy
 import dill      # Only for converting constraints from string
+from pathlib import Path
 from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
      IntBoundedValidator, FloatBoundedValidator
-from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty, WorkspaceGroupProperty 
 from mantid.dataobjects import TableWorkspaceProperty
 from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
                             VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
                             VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace
+                            CreateWorkspace, GroupWorkspaces, SaveAscii
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
                                             extend_range_of_array, print_table_workspace
@@ -130,17 +132,25 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             defaultValue="",
             doc="Directory to store results, to be deleted later."
         )
-        self.declareProperty(
-            name="FiguresPath",
-            defaultValue="",
-            doc="Directory to store figures, to be deleted later."
-        )
         # Outputs
         self.declareProperty(TableWorkspaceProperty(
             name="OutputMeansTable",
             defaultValue="",
             direction=Direction.Output),
-            doc="TableWorkspace containing final means of intensity and widths.")
+            doc="TableWorkspace containing final means of intensity and widths."
+        )
+        self.declareProperty(WorkspaceGroupProperty(
+            name="OutputNCPGroup",
+            defaultValue="ncp",
+            direction=Direction.Output),
+            doc="GroupWorkspace containing Neutron Compton Profiles for each mass and sum."
+        )
+        self.declareProperty(WorkspaceGroupProperty(
+            name="OutputFSEGroup",
+            defaultValue="fse",
+            direction=Direction.Output),
+            doc="GroupWorkspace containing fitted Final State Effects for each mass."
+        )
 
                                     
     def PyExec(self):
@@ -161,14 +171,18 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._mode_running = self.getProperty("ModeRunning").value 
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
         self._gamma_correction = self.getProperty("GammaCorrection").value 
-        self._save_results_path = self.getProperty("ResultsPath").value
-        self._save_figures_path = self.getProperty("FiguresPath").value 
+        self._save_results_path = Path(self.getProperty("ResultsPath").value)
         self._h_ratio = self.getProperty("HRatioToLowestMass").value 
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
         self._profiles_table = self.getProperty("InputProfiles").value
 
         self._instrument_params = load_instrument_params(self._ip_file, self.getProperty("InputWorkspace").value.getSpectrumNumbers())
         self._resolution_params = load_resolution(self._instrument_params)
+
+        # Create paths if not there already
+        self._save_results_path.mkdir(parents=True, exist_ok=True)
+        self._save_figures_path = self._save_results_path / "figures"
+        self._save_figures_path.mkdir(parents=True, exist_ok=True) 
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
@@ -180,12 +194,16 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._initial_fit_parameters.extend([intensity, width, center])
 
         self._initial_fit_bounds = []
-        for intensity_bounds, width_bounds, center_bounds in zip(
-            self._profiles_table.column("intensity_bounds"),
-            self._profiles_table.column("width_bounds"),
-            self._profiles_table.column("center_bounds")
+
+        for intensity_lb, intensity_ub, width_lb, width_ub, center_lb, center_ub in zip(
+            self._profiles_table.column("intensity_lb"),
+            self._profiles_table.column("intensity_ub"),
+            self._profiles_table.column("width_lb"),
+            self._profiles_table.column("width_ub"),
+            self._profiles_table.column("center_lb"),
+            self._profiles_table.column("center_ub")
         ):
-            self._initial_fit_bounds.extend([eval(intensity_bounds), eval(width_bounds), eval(center_bounds)])
+            self._initial_fit_bounds.extend([[intensity_lb, intensity_ub], [width_lb, width_ub], [center_lb, center_ub]])
 
         # Masses need to be defined in the same order
         self._masses = np.array(self._profiles_table.column("mass"))
@@ -210,7 +228,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._set_lorentzian_resolution()
         self._set_y_space_arrays()
 
-        self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 3))
+        self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 2))
         self._row_being_fit = 0 
         self._table_fit_results = self._initialize_table_fit_parameters()
 
@@ -220,11 +238,17 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
         self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
 
-        # Initialise workspaces for fitted ncp 
+        ws_group_ncp = GroupWorkspaces(list(self._fit_profiles_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_ncps")
+        self.setPropertyValue("OutputNCPGroup", ws_group_ncp.name())
+
+        # Initialise workspaces for fitted fse
         self._fit_fse_workspaces = {}
         for element in self._profiles_table.column("label"):
             self._fit_fse_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_fse')
         self._fit_fse_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_fse')
+
+        ws_group_fse = GroupWorkspaces(list(self._fit_fse_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_fses")
+        self.setPropertyValue("OutputFSEGroup", ws_group_fse.name())
 
         # Initialise empty means
         self._mean_widths = None
@@ -244,7 +268,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             table.addColumn(type="float", name=f"{label} w")
             table.addColumn(type="float", name=f"{label} c")
         table.addColumn(type="float", name="NChi2")
-        table.addColumn(type="float", name="Iter")
         return table
 
 
@@ -264,12 +287,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def run(self):
 
         assert self._profiles_table.rowCount() > 0, "Need at least one profile to run the routine!"
-
-        # Legacy code from Bootstrap
-        # if self.runningSampleWS:
-        #     initialWs = RenameWorkspace(
-        #         InputWorkspace=ic.sampleWS, OutputWorkspace=initialWs.name()
-        #     )
 
         CloneWorkspace(
             InputWorkspace=self._workspace_being_fit.name(), 
@@ -309,7 +326,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 OutputWorkspace=self._name + '_' + str(iteration + 1)
             )
 
-        self._set_results()
+        # self._set_results()
         self._save_results()
         return self 
 
@@ -369,10 +386,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
 
     def _save_plots(self):
-        # if IC.runningSampleWS:  # Skip saving figure if running bootstrap
-        #     return
 
-        if not self._save_figures_path:
+        if not self._save_figures_path.exists():
             return
 
         lw = 2
@@ -392,7 +407,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         ax.legend()
 
         fileName = self._workspace_being_fit.name() + "_profiles_sum.pdf"
-        savePath = self._save_figures_path + '/' + fileName
+        savePath = self._save_figures_path / fileName
         plt.savefig(savePath, bbox_inches="tight")
         plt.close(fig)
         return
@@ -484,7 +499,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def _fit_neutron_compton_profiles_to_row(self):
 
         if np.all(self._dataY[self._row_being_fit] == 0):
-            self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+3))
+            self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+2))
             spectrum_number = self._instrument_params[self._row_being_fit, 0]
             self.log().notice(f"Skip spectrum {int(spectrum_number):3d}")
             return
@@ -495,15 +510,15 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             method="SLSQP",
             bounds=self._initial_fit_bounds,
             constraints=self._constraints,
+            tol=1e-6
         )
         fitPars = result["x"]
 
         # Pass fit parameters to results table
         noDegreesOfFreedom = len(self._dataY[self._row_being_fit]) - len(fitPars)
         normalised_chi2 = result["fun"] / noDegreesOfFreedom
-        number_iterations = result["nit"]
         spectrum_number = self._instrument_params[self._row_being_fit, 0]
-        tableRow = np.hstack((spectrum_number, fitPars, normalised_chi2, number_iterations))
+        tableRow = np.hstack((spectrum_number, fitPars, normalised_chi2))
         self._table_fit_results.addRow(tableRow)
 
         # Store results for easier access when calculating means
@@ -894,84 +909,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return profiles
 
 
-    def _set_results(self):
-        """Used to collect results from workspaces and store them in .npz files for testing."""
-
-        self.wsFinal = mtd[self._name + '_' + str(self._number_of_iterations)]
-
-        allIterNcp = []
-        allFitWs = []
-        allTotNcp = []
-        allBestPar = []
-        allMeanWidhts = []
-        allMeanIntensities = []
-        allStdWidths = []
-        allStdIntensities = []
-        j = 0
-        while True:
-            try:
-                wsIterName = self._name + '_' + str(j)
-
-                # Extract ws that were fitted
-                ws = mtd[wsIterName]
-                allFitWs.append(ws.extractY())
-
-                # Extract total ncp
-                totNcpWs = mtd[wsIterName + "_total_ncp"]
-                allTotNcp.append(totNcpWs.extractY())
-
-                # Extract best fit parameters
-                fitParTable = mtd[wsIterName + "_fit_results"]
-                bestFitPars = []
-                for key in fitParTable.keys():
-                    bestFitPars.append(fitParTable.column(key))
-                allBestPar.append(np.array(bestFitPars).T)
-
-                # Extract individual ncp
-                allNCP = []
-                for label in self._profiles_table.column("label"):
-                    ncpWsToAppend = mtd[
-                        wsIterName + f"_{label}_ncp"
-                    ]
-                    allNCP.append(ncpWsToAppend.extractY())
-                allNCP = np.swapaxes(np.array(allNCP), 0, 1)
-                allIterNcp.append(allNCP)
-
-                # Extract Mean and Std Widths, Intensities
-                meansTable = mtd[wsIterName + "_means"]
-                allMeanWidhts.append(meansTable.column("mean_width"))
-                allStdWidths.append(meansTable.column("std_width"))
-                allMeanIntensities.append(meansTable.column("mean_intensity"))
-                allStdIntensities.append(meansTable.column("std_intensity"))
-
-                j += 1
-            except KeyError:
-                break
-
-        self.all_fit_workspaces = np.array(allFitWs)
-        self.all_spec_best_par_chi_nit = np.array(allBestPar)
-        self.all_tot_ncp = np.array(allTotNcp)
-        self.all_ncp_for_each_mass = np.array(allIterNcp)
-        self.all_mean_widths = np.array(allMeanWidhts)
-        self.all_mean_intensities = np.array(allMeanIntensities)
-        self.all_std_widths = np.array(allStdWidths)
-        self.all_std_intensities = np.array(allStdIntensities)
-
     def _save_results(self):
-        """Saves all of the arrays stored in this object"""
-
-        if not self._save_results_path:
-            return 
-
-        np.savez(
-            self._save_results_path,
-            all_fit_workspaces=self.all_fit_workspaces,
-            all_spec_best_par_chi_nit=self.all_spec_best_par_chi_nit,
-            all_mean_widths=self.all_mean_widths,
-            all_mean_intensities=self.all_mean_intensities,
-            all_std_widths=self.all_std_widths,
-            all_std_intensities=self.all_std_intensities,
-            all_tot_ncp=self.all_tot_ncp,
-            all_ncp_for_each_mass=self.all_ncp_for_each_mass,
-        )
-
+        for ws_name in mtd.getObjectNames():
+            if ws_name.endswith(('ncp', 'fse', 'fit_results', 'means', 'initial_parameters') + tuple([str(i) for i in range(10)])):
+                SaveAscii(ws_name, str(self._save_results_path / ws_name))

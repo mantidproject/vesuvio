@@ -1,7 +1,8 @@
 
 from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
                             MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
-                            DeleteWorkspace, SaveNexus, LoadVesuvio, mtd
+                            DeleteWorkspace, SaveNexus, LoadVesuvio, mtd, VesuvioResolution, \
+                            AppendSpectra, RenameWorkspace, CloneWorkspace
 from mantid.kernel import logger
 import numpy as np
 import numbers
@@ -9,6 +10,72 @@ import numbers
 from mvesuvio.util import handle_config
 
 import ntpath
+
+def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
+    # NOTE: Minus() is not used so it doesn't change dataE
+
+    ws_ncp_names = ws_group_ncp.getNames()
+    masses = [float(n.split('_')[-2]) for n in ws_ncp_names if 'total' not in n]
+    ws_total_ncp_name = [n for n in ws_ncp_names if n.endswith('_total_ncp')][0]
+    ws_lighest_ncp_name = ws_ncp_names[masses.index(min(masses))]
+    ws_lighest_ncp = mtd[ws_lighest_ncp_name]
+    ws_total_ncp = mtd[ws_total_ncp_name]
+    suffix = "_m0"
+
+    # Main subtraction
+    isolated_data_y = initial_ws.extractY() - (ws_total_ncp.extractY() - ws_lighest_ncp.extractY())
+
+    if subtract_fse:
+        suffix += "_-fse"
+        ws_lighest_fse = mtd[ws_lighest_ncp_name.replace('ncp', 'fse')]
+
+        isolated_data_y -= ws_lighest_fse.extractY()
+
+        # Subtract from fitted ncp
+        # TODO: Find a better solution later
+        ws_lighest_ncp_y = ws_lighest_ncp.extractY()
+        ws_lighest_ncp_y -= ws_lighest_fse.extractY()
+        ws_lighest_ncp = CloneWorkspace(ws_lighest_ncp, OutputWorkspace=ws_lighest_ncp.name()+"_-fse")
+        write_data_y_into_ws(ws_lighest_ncp_y, ws_lighest_ncp)
+        SumSpectra(ws_lighest_ncp.name(), OutputWorkspace=ws_lighest_ncp.name() + "_sum")
+
+    # TODO: Find a better way to propagate masked values
+    isolated_data_y[initial_ws.extractY() == 0] = 0
+    ws_lighest_data = CloneWorkspace(initial_ws, OutputWorkspace=initial_ws.name()+suffix)
+    write_data_y_into_ws(isolated_data_y, ws_lighest_data)
+    SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
+
+    return ws_lighest_data, ws_lighest_ncp
+
+
+def write_data_y_into_ws(data_y, ws):
+    for i in range(ws.getNumberHistograms()):
+        ws.dataY(i)[:] = data_y[i, :] 
+    return
+
+
+def calculate_resolution(mass, ws, rebin_range):
+
+    resName = ws.name() + f"_resolution"
+    for index in range(ws.getNumberHistograms()):
+        VesuvioResolution(
+            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
+        )
+        Rebin(
+            InputWorkspace="tmp",
+            Params=rebin_range,
+            OutputWorkspace="tmp",
+        )
+
+        if index == 0:  # Ensures that workspace has desired units
+            RenameWorkspace("tmp", resName)
+        else:
+            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
+
+    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
+    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
+    DeleteWorkspace("tmp")
+    return mtd[resName]
 
 
 def pass_data_into_ws(dataX, dataY, dataE, ws):
@@ -44,18 +111,28 @@ def create_profiles_table(name, ai):
     table.addColumn(type="str", name="label")
     table.addColumn(type="float", name="mass")
     table.addColumn(type="float", name="intensity")
-    table.addColumn(type="str", name="intensity_bounds")
+    table.addColumn(type="float", name="intensity_lb")
+    table.addColumn(type="float", name="intensity_ub")
     table.addColumn(type="float", name="width")
-    table.addColumn(type="str", name="width_bounds")
+    table.addColumn(type="float", name="width_lb")
+    table.addColumn(type="float", name="width_ub")
     table.addColumn(type="float", name="center")
-    table.addColumn(type="str", name="center_bounds")
+    table.addColumn(type="float", name="center_lb")
+    table.addColumn(type="float", name="center_ub")
+
+    def wrapb(bound):
+        # Literally to just account for NoneType
+        if bound == None:
+            return np.inf
+        return bound
+
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
         ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
         ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
     ):
         table.addRow(
-            [str(float(mass)), float(mass), float(intensity), str(list(intensity_bound)),
-            float(width), str(list(width_bound)), float(center), str(list(center_bound))]
+            [str(float(mass)), float(mass), float(intensity), float(wrapb(intensity_bound[0])), float(wrapb(intensity_bound[1])),
+             float(width), float(wrapb(width_bound[0])), float(wrapb(width_bound[1])), float(center), float(wrapb(center_bound[0])), float(wrapb(center_bound[1]))]
         )
     return table
 
@@ -346,7 +423,8 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
     for p in profiles_dict.values():
         if p == _get_lightest_profile(profiles_dict):
             continue
-        p['width_bounds'] = str([p['width'] , p['width']])
+        p['width_lb'] = p['width']
+        p['width_ub'] = p['width']
 
     result_profiles_table = _convert_dict_to_table(profiles_dict)
     return result_profiles_table

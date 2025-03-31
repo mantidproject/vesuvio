@@ -18,127 +18,44 @@ from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 
-def fitInYSpaceProcedure(IC, wsTOF):
+class FitInYSpace():
 
-    try:
-        wsTOF = mtd[wsTOF]
-    except KeyError: 
-        logger.notice(f"Workspace to fit {wsTOF} not found.")
+    def __init__(self, fi, ws_to_fit, ws_to_fit_ncp, ws_res):
+
+        self.fitting_inputs = fi
+        self.ws_to_fit = ws_to_fit
+        self.ws_to_fit_ncp = ws_to_fit_ncp
+        self.ws_resolution = ws_res 
+
+        fi.figSavePath = fi.save_path / "figures"
+        fi.figSavePath.mkdir(exist_ok=True, parents=True)
+
+    def run(self):
+
+        wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
+        normalise_workspace(wsResSum)
+
+        wsJoY, wsJoYAvg = ySpaceReduction(self.ws_to_fit, self.ws_to_fit_ncp, self.fitting_inputs)
+
+        if self.fitting_inputs.do_symmetrisation:
+            wsJoYAvg = symmetrizeWs(wsJoYAvg)
+
+        fitProfileMinuit(self.fitting_inputs, wsJoYAvg, wsResSum)
+        fitProfileMantidFit(self.fitting_inputs, wsJoYAvg, wsResSum)
+
+        printYSpaceFitResults()
+
+        if self.fitting_inputs.do_global_fit:
+            runGlobalFit(wsJoY, self.ws_resolution, self.fitting_inputs)
+
+        save_workspaces(self.fitting_inputs)
         return
 
-    wsResSum, wsRes = calculateMantidResolutionFirstMass(IC, wsTOF)
 
-    wsTOFMass0 = subtract_profiles_except_lightest(IC, wsTOF)
-
-    if IC.subtract_calculated_fse_from_data:
-        wsFSEMass0 = find_ws_name_fse_first_mass(IC)
-        wsTOFMass0 = Minus(wsTOFMass0, wsFSEMass0, OutputWorkspace=wsTOFMass0.name() + "_fse")
-
-    wsJoY, wsJoYAvg = ySpaceReduction(wsTOFMass0, IC)
-
-    if IC.do_symmetrisation:
-        wsJoYAvg = symmetrizeWs(wsJoYAvg)
-
-    fitProfileMinuit(IC, wsJoYAvg, wsResSum)
-    fitProfileMantidFit(IC, wsJoYAvg, wsResSum)
-
-    printYSpaceFitResults()
-
-    yfitResults = ResultsYFitObject(IC, wsTOF.name(), wsJoYAvg.name())
-    yfitResults.save()
-
-    if IC.do_global_fit:
-        runGlobalFit(wsJoY, wsRes, IC)
-
-    save_workspaces(IC)
-    return yfitResults
-
-
-def find_ws_name_fse_first_mass(ic):
-    # Some dirty implementation to be deleted in the future
-    ws_names_fse = []
-    ws_masses = []
-    prefix = ic.name+'_'+str(ic.number_of_iterations_for_corrections)
-    for ws_name in mtd.getObjectNames():
-        if ws_name.startswith(prefix) and ws_name.endswith('fse'):
-            name_ending = ws_name.replace(prefix, "")
-            match = re.search(r'_(\d+(?:\.\d+)?)_', name_ending)
-            if match:   # If float found in ws name ending
-                ws_masses.append(float(match.group().replace('_', '')))
-                ws_names_fse.append(ws_name)
-
-    return ws_names_fse[np.argmin(ws_masses)]
-
-
-def calculateMantidResolutionFirstMass(IC, ws):
-    mass = IC.masses[0]
-
-    resName = ws.name() + "_Resolution"
-    for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
-        )
-        Rebin(
-            InputWorkspace="tmp",
-            Params=IC.range_for_rebinning_in_y_space,
-            OutputWorkspace="tmp",
-        )
-
-        if index == 0:  # Ensures that workspace has desired units
-            RenameWorkspace("tmp", resName)
-        else:
-            AppendSpectra(resName, "tmp", OutputWorkspace=resName)
-
-    masked_idx = [ws.spectrumInfo().isMasked(i) for i in range(ws.getNumberHistograms())]
-    MaskDetectors(resName, WorkspaceIndexList=np.flatnonzero(masked_idx))
-    wsResSum = SumSpectra(InputWorkspace=resName, OutputWorkspace=resName + "_Sum")
-
-    normalise_workspace(wsResSum)
-    DeleteWorkspace("tmp")
-    return wsResSum, mtd[resName]
-
-
-def subtract_profiles_except_lightest(ic, ws):
-    """
-    Isolates TOF data from first mass only.
-    Input: ws containing TOF values, NCP for all mass profiles.
-    Output: ws with all profiles except first subtracted.
-    """
-    if len(ic.masses) == 1:
-        return
-
-    # TODO: Make the fetching of these workspaces more robust, prone to error
-    profiles_table = mtd[ic.name + '_initial_parameters']
-    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-    ws_name_profiles = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_total_ncp'
-
-    wsNcpExceptFirst = Minus(mtd[ws_name_profiles], mtd[ws_name_lightest_mass], 
-                             OutputWorkspace=ws_name_profiles + '_except_lightest')
-
-    SumSpectra(wsNcpExceptFirst.name(), OutputWorkspace=wsNcpExceptFirst.name() + "_sum")
-
-    wsFirstMass = Minus(ws, wsNcpExceptFirst, OutputWorkspace=ws.name()+"_m0")
-    SumSpectra(wsFirstMass.name(), OutputWorkspace=wsFirstMass.name() + "_sum")
-    return wsFirstMass
-
-
-def switchFirstTwoAxis(A):
-    """Exchanges the first two indices of an array A,
-    rearranges matrices per spectrum for iteration of main fitting procedure
-    """
-    return np.stack(np.split(A, len(A), axis=0), axis=2)[0]
-
-
-def ySpaceReduction(wsTOF, ic):
+def ySpaceReduction(wsTOF, ws_ncp, ic):
     """Seperate procedures depending on masking specified."""
-
     mass0 = ic.masses[0]
-    profiles_table = mtd[ic.name + '_initial_parameters']
-    lightest_mass_str = profiles_table.column('label')[np.argmin(profiles_table.column('mass'))]
-    ws_name_lightest_mass = ic.name + '_' + str(ic.number_of_iterations_for_corrections) + '_' + lightest_mass_str + '_ncp'
-
-    ncp = mtd[ws_name_lightest_mass].extractY()
+    ncp = ws_ncp.extractY()
 
     rebinPars = ic.range_for_rebinning_in_y_space
 
@@ -163,7 +80,7 @@ def ySpaceReduction(wsTOF, ic):
             wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
             return wsJoYN, wsJoYAvg
 
-        elif yFitIC.mask_zeros_with == "ncp":
+        elif ic.mask_zeros_with == "ncp":
             wsTOF = replaceZerosWithNCP(wsTOF, ncp)
 
         else:
@@ -1373,75 +1290,6 @@ def printYSpaceFitResults():
             print_table_workspace(mtd[ws_name])
 
 
-class ResultsYFitObject:
-    def __init__(self, ic, wsFinalName, wsYSpaceAvgName):
-        # Extract most relevant information from ws
-        wsFinal = mtd[wsFinalName]
-        wsResSum = mtd[wsFinalName + "_Resolution_Sum"]
-
-        wsJoYAvg = mtd[wsYSpaceAvgName]
-        wsSubMassName = wsYSpaceAvgName.split("_joy_")[0]
-        wsMass0 = mtd[wsSubMassName]
-
-        self.finalRawDataY = wsFinal.extractY()
-        self.finalRawDataE = wsFinal.extractE()
-        self.HdataY = wsMass0.extractY()
-        self.YSpaceSymSumDataY = wsJoYAvg.extractY()
-        self.YSpaceSymSumDataE = wsJoYAvg.extractE()
-        self.resolution = wsResSum.extractY()
-
-        # Extract best fit parameters from workspaces
-        poptList = []
-        perrList = []
-        try:
-            wsFitMinuit = mtd[wsJoYAvg.name() + "_minuit_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitMinuit.column("Value"))
-            perrList.append(wsFitMinuit.column("Error"))
-        except:
-            pass
-        try:
-            wsFitLM = mtd[wsJoYAvg.name() + "_lm_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitLM.column("Value"))
-            perrList.append(wsFitLM.column("Error"))
-        except:
-            pass
-        try:
-            wsFitSimplex = mtd[wsJoYAvg.name() + "_simplex_" + ic.fitting_model + "_Parameters"]
-            poptList.append(wsFitSimplex.column("Value"))
-            perrList.append(wsFitSimplex.column("Error"))
-        except:
-            pass
-
-        # Number of parameters might not be the same, need to add zeros to some lists to match length
-        maxLen = max([len(l) for l in poptList])
-        for pList in [poptList, perrList]:
-            for l in pList:
-                while len(l) < maxLen:
-                    l.append(0)
-
-        popt = np.array(poptList)
-        perr = np.array(perrList)
-
-        self.popt = popt
-        self.perr = perr
-
-        self.savePath = ic.ySpaceFitSavePath
-        self.fitting_model= ic.fitting_model
-
-    def save(self):
-        np.savez(
-            self.savePath,
-            YSpaceSymSumDataY=self.YSpaceSymSumDataY,
-            YSpaceSymSumDataE=self.YSpaceSymSumDataE,
-            resolution=self.resolution,
-            HdataY=self.HdataY,
-            finalRawDataY=self.finalRawDataY,
-            finalRawDataE=self.finalRawDataE,
-            popt=self.popt,
-            perr=self.perr,
-        )
-
-
 def runGlobalFit(wsYSpace, wsRes, IC):
     logger.notice("\nRunning GLobal Fit ...\n")
 
@@ -1530,7 +1378,7 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     # Number of non zero points (considered in the fit) minus no of parameters
     chi2 = m.fval / (np.sum(dataE != 0) - m.nfit)  
 
-    create_table_for_global_fit_parameters(wsYSpace.name(), m, chi2)
+    create_table_for_global_fit_parameters(wsYSpace.name(), IC.fitting_model, m, chi2)
 
     if IC.show_plots:
         plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
@@ -1902,9 +1750,9 @@ def minuitInitialParameters(defaultPars, sharedPars, nSpec):
             initPars[up + str(i)] = defaultPars[up]
     return initPars
 
-def create_table_for_global_fit_parameters(wsName, m, chi2):
+def create_table_for_global_fit_parameters(wsName, model, m, chi2):
     t = CreateEmptyTableWorkspace(
-        OutputWorkspace=wsName + "_gloabalfit_Parameters"
+        OutputWorkspace=wsName + f"_globalfit_{model}_Parameters"
     )
     t.setTitle("Global Fit Parameters")
     t.addColumn(type="str", name="Name")
@@ -1964,5 +1812,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        if ws_name.endswith('Parameters') or ws_name.endswith('parameters') or ws_name.endswith('Workspace'):
-            SaveAscii(ws_name, str(yFitIC.figSavePath.parent / "output_files" / ws_name))
+        if ws_name.endswith('Parameters') or ws_name.endswith('Workspace'):
+            save_path = yFitIC.save_path / f"{yFitIC.fitting_model}_fit" / ws_name
+            save_path.parent.mkdir(exist_ok=True, parents=True)
+            SaveAscii(ws_name, str(save_path))

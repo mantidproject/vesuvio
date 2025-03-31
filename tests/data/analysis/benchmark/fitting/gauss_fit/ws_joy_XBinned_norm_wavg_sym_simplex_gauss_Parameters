@@ -1,0 +1,7 @@
+# Name , Value , Error 
+# str , double , double 
+f1.y0,7.98756e-05,6.99597e-05
+f1.A,0.989837,0.0034017
+f1.x0,-0.00746421,0.0167033
+f1.sigma,5.02701,0.018208
+Cost function value,0.458452,0

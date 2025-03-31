@@ -1,0 +1,5 @@
+# label , mass , intensity , intensity_lb , intensity_ub , width , width_lb , width_ub , center , center_lb , center_ub 
+# str , float , float , float , float , float , float , float , float , float , float 
+12.0,12,1,0,inf,12,8,16,0,-3,1
+16.0,16,1,0,inf,12,8,16,0,-3,1
+27.0,27,1,0,inf,12.5,11,14,0,-3,1
