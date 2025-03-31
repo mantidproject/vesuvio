@@ -4,10 +4,13 @@ import numpy.testing as nptest
 from mock import MagicMock, patch, call
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine 
 from mvesuvio.util.analysis_helpers import load_resolution
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+from mvesuvio.util import handle_config
+from mantid.api import AlgorithmFactory, AlgorithmManager
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
 import inspect
 import scipy
 import re
+from pathlib import Path
 
 np.set_printoptions(suppress=True, precision=6, linewidth=200)
 np.random.seed(4)
@@ -16,6 +19,36 @@ np.random.seed(4)
 class TestAnalysisReduction(unittest.TestCase):
     def setUp(self):
         pass
+
+    def test_properites_vesuvio_analysis_algorithm(self):
+
+        kwargs = {
+            "InputWorkspace": CreateSampleWorkspace(OutputWorkspace="input-ws").name(),
+            "InputProfiles": CreateEmptyTableWorkspace(OutputWorkspace="profiles-table").name(),
+            "InstrumentParametersFile": str(Path(handle_config.VESUVIO_IPFOLDER_PATH) / "ip2018.par"),
+            "HRatioToLowestMass": 0,
+            "NumberOfIterations": 4,
+            "InvalidDetectors": [3],
+            "MultipleScatteringCorrection": False,
+            "SampleVerticalWidth": 1, 
+            "SampleHorizontalWidth": 1, 
+            "SampleThickness": 1,
+            "GammaCorrection": True,
+            "ModeRunning": "BACKWARD",
+            "TransmissionGuess": 0,
+            "MultipleScatteringOrder": 2,
+            "NumberOfEvents": 2,
+            "Constraints": "()",
+            "ResultsPath": "some-path",
+            "OutputMeansTable":"output-table"
+        }
+        alg = VesuvioAnalysisRoutine()
+        alg.initialize()
+        alg.setProperties(kwargs)
+
+        for prop in kwargs.keys():
+            # Only check is that it should not raise any errors
+            alg.getPropertyValue(prop)
 
     def test_calculate_kinematics(self):
         alg = VesuvioAnalysisRoutine()
