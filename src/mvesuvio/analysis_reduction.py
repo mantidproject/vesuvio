@@ -326,7 +326,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 OutputWorkspace=self._name + '_' + str(iteration + 1)
             )
 
-        # self._set_results()
         self._save_results()
         return self 
 
