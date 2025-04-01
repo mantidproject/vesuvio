@@ -8,6 +8,7 @@ from mvesuvio.util import handle_config
 from mantid.api import AlgorithmFactory, AlgorithmManager
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
 import inspect
+import dill         # To convert constraints to string
 import scipy
 import re
 from pathlib import Path
@@ -49,6 +50,58 @@ class TestAnalysisReduction(unittest.TestCase):
         for prop in kwargs.keys():
             # Only check is that it should not raise any errors
             alg.getPropertyValue(prop)
+
+    
+    @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.getPropertyValue')
+    @patch('mvesuvio.analysis_reduction.load_instrument_params')
+    @patch('mvesuvio.analysis_reduction.load_resolution')
+    def test_setup_vesuvio_analysis_algorithm(self, mock_load_resolution, mock_load_instrument_params, mock_get_prop_value):
+
+        mock_load_instrument_params.return_value = None
+
+        # Tests only unpacking of profiles and bounds
+
+        table_dict = {
+            "mass" : [1, 12, 16],
+            "intensity" : [1.0, 1.1, 1.2],
+            "intensity_lb" : [1, 1, 1],
+            "intensity_ub" : [None, np.nan, None],
+            "width" : [5, 10, 12],
+            "width_lb" : [2, 3, 4],
+            "width_ub": [6, 7, 8],
+            "center" : [0.0, 0.1, 0.2],
+            "center_lb" : [-1, -1, -1],
+            "center_ub" : [3.0, 3.0, 3.0]
+        }
+        mock_table_profiles = MagicMock()
+        mock_table_profiles.column.side_effect = lambda key: table_dict[key]
+
+
+        with patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.getProperty') as mock_get_prop:
+
+            def mock_properties(key):
+                if key == "InputProfiles":
+                    return MagicMock(value=mock_table_profiles)
+                if key == "InputWorkspace":
+                    return MagicMock(value=MagicMock(getSpectrumNumbers=MagicMock(return_value=3)))
+                if key == "InstrumentParametersFile" or key == "ResultsPath":
+                    return MagicMock(value="")
+                if key == "Constraints":
+                    return MagicMock(value=str(dill.dumps(({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }))))
+                else:
+                    return MagicMock(value=None)
+
+            mock_get_prop.side_effect = mock_properties 
+
+            alg = VesuvioAnalysisRoutine()
+            alg._save_results_path = MagicMock()
+            alg._setup()
+
+            self.assertEqual(alg._initial_fit_parameters, [1.0, 5, 0.0, 1.1, 10, 0.1, 1.2, 12, 0.2])
+            self.assertEqual(alg._initial_fit_bounds, [[1, None], [2, 6], [-1, 3.0], [1, np.nan], [3, 7], [-1, 3.0], [1, None], [4, 8], [-1, 3.0]])
+            self.assertEqual(list(alg._constraints[0].keys()), ['type', 'fun'])   # Difficult to test actual constraint because function created lives inside alg
+            np.testing.assert_allclose(alg._masses, np.array([1, 12, 16]))
+
 
     def test_calculate_kinematics(self):
         alg = VesuvioAnalysisRoutine()
