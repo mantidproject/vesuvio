@@ -103,6 +103,52 @@ class TestAnalysisReduction(unittest.TestCase):
             np.testing.assert_allclose(alg._masses, np.array([1, 12, 16]))
 
 
+    def test_update_workspace_data(self):
+
+        alg = VesuvioAnalysisRoutine()
+
+        # Not possible to mock because required for ParentWorkspace arg
+        alg._workspace_being_fit = CreateWorkspace(
+            DataX=np.arange(10),
+            DataY=np.arange(10),
+            DataE=np.ones(10),
+            Nspec=1,
+            OutputWorkspace="test_ws",
+        )
+
+        label = ['1.01', '5', '12']
+        alg._profiles_table = MagicMock(
+            rowCount=MagicMock(return_value=3),
+            column=MagicMock(side_effect=lambda key: label if key=="label" else None)
+        )
+
+        alg._set_kinematic_arrays = MagicMock()
+        alg._set_gaussian_resolution = MagicMock()
+        alg._set_lorentzian_resolution = MagicMock()
+        alg._set_y_space_arrays = MagicMock()
+        alg.setPropertyValue = MagicMock()
+
+        alg._update_workspace_data()
+            
+        self.assertEqual(alg._fit_parameters.sum(), 0)
+        self.assertEqual(alg._row_being_fit, 0)
+        self.assertEqual(alg._table_fit_results.rowCount(), 0)
+
+        for lab in label:
+            ws_ncp = alg._fit_profiles_workspaces[lab]
+            ws_fse = alg._fit_fse_workspaces[lab]
+            np.testing.assert_allclose(ws_ncp.dataX(0), np.arange(10))
+            np.testing.assert_allclose(ws_ncp.dataY(0), np.zeros(10))
+            np.testing.assert_allclose(ws_ncp.dataE(0), np.zeros(10))
+            self.assertEqual(ws_ncp.isDistribution(), True)
+            self.assertEqual(ws_ncp.getNumberHistograms(), 1)
+            np.testing.assert_allclose(ws_fse.dataX(0), np.arange(10))
+            np.testing.assert_allclose(ws_fse.dataY(0), np.zeros(10))
+            np.testing.assert_allclose(ws_fse.dataE(0), np.zeros(10))
+            self.assertEqual(ws_fse.isDistribution(), True)
+            self.assertEqual(ws_fse.getNumberHistograms(), 1)
+
+
     def test_calculate_kinematics(self):
         alg = VesuvioAnalysisRoutine()
         alg._instrument_params = np.array(
