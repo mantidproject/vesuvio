@@ -675,38 +675,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _get_parsed_constraints(self):
-
-        parsed_constraints = []
-
-        for constraint in  self._constraints:
-            constraint['fun'] = self._get_parsed_constraint_function(constraint['fun']) 
-
-            parsed_constraints.append(constraint)
-
-        return parsed_constraints
-
-
-    def _get_parsed_constraint_function(self, function_string: str):
-
-        profile_order = [label for label in self._profiles_table.column("label")]
-        attribute_order = ['intensity', 'width', 'center']
-
-        words = function_string.split(' ')
-        for i, word in enumerate(words):
-            if '.' in word:
-
-                try:    # Skip floats 
-                    float(word) 
-                except ValueError: 
-                    continue
-
-                profile, attribute = word
-                words[i] = f"pars[{profile_order.index(profile) + attribute_order.index(attribute)}]" 
-
-        return eval(f"lambda pars: {' '.join(words)}")
-        
-
     def _replace_zero_columns_with_ncp_fit(self):
         """
         If the initial input contains columns with zeros 
