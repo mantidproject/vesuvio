@@ -1,3 +1,4 @@
+from typing_extensions import override
 import unittest
 import numpy as np
 import numpy.testing as nptest
@@ -7,6 +8,7 @@ from mvesuvio.util.analysis_helpers import load_resolution
 from mvesuvio.util import handle_config
 from mantid.api import AlgorithmFactory, AlgorithmManager
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
+from mantid.simpleapi import Load, mtd, CompareWorkspaces, AnalysisDataService, SaveNexus
 import inspect
 import dill         # To convert constraints to string
 import scipy
@@ -522,6 +524,34 @@ class TestAnalysisReduction(unittest.TestCase):
         self.assertEqual(alg._std_intensity_ratios[0], np.nanstd(np.array([7.8, 7.6, np.nan, np.nan, 7.3]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
         self.assertEqual(alg._mean_intensity_ratios[1], np.nanmean(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
         self.assertEqual(alg._std_intensity_ratios[1], np.nanstd(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
+
+
+    def test_create_multiple_scattering_workspaces(self):
+        unit_test_dir = Path(__file__).parent.parent.parent / "data/analysis/unit"
+        ws_input = Load(str(unit_test_dir / "system_test_inputs_bckwd_cropped.nxs"))
+        bench_tot_sctr = Load(str(unit_test_dir / "bench_system_test_inputs_bckwd_cropped_tot_sctr.nxs"))
+        bench_mltp_sctr = Load(str(unit_test_dir / "bench_system_test_inputs_bckwd_cropped_mltp_sctr.nxs"))
+
+        alg = VesuvioAnalysisRoutine()
+        alg._workspace_for_corrections = ws_input
+        alg._vertical_width = 0.1 
+        alg._horizontal_width = 0.1 
+        alg._thickness = 0.001
+        alg._masses = np.array([12.0, 16.0, 27.0])
+        alg._mean_widths = np.array([15.35080, 8.72859, 13.89955])
+        alg._mean_intensity_ratios = np.array([0.53110, 0.17667, 0.29223])
+        alg._mode_running = "BACKWARD"
+        alg._h_ratio = 19.0620008206
+        alg._transmission_guess = 0.8537
+        alg._number_of_events = 1.0e5
+        alg._multiple_scattering_order= 2
+
+        alg.create_multiple_scattering_workspaces()
+
+        (result, messages) = CompareWorkspaces(mtd["ws_input_mltp_sctr"], bench_mltp_sctr, Tolerance=1e-5)
+        self.assertTrue(result)
+        (result, messages) = CompareWorkspaces(mtd["ws_input_tot_sctr"], bench_tot_sctr, Tolerance=1e-5)
+        self.assertTrue(result)
 
 
 if __name__ == "__main__":
