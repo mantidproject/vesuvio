@@ -555,5 +555,23 @@ class TestAnalysisReduction(unittest.TestCase):
         self.assertTrue(result)
 
 
+    def test_create_gamma_workspaces(self):
+        unit_test_dir = Path(__file__).parent.parent.parent / "data/analysis/unit"
+        ws_input = Load(str(unit_test_dir / "system_test_inputs_fwd_cropped.nxs"))
+        bench_gamma_backgr = Load(str(unit_test_dir / "bench_system_test_inputs_fwd_cropped_gamma_backgr.nxs"))
+
+        alg = VesuvioAnalysisRoutine()
+        alg._workspace_for_corrections = ws_input
+        alg._masses = np.array([1.0078, 12.0, 16.0, 27.0])
+        alg._mean_widths = np.array([5.27454, 15.35080, 8.72859, 13.89955])
+        alg._mean_intensity_ratios = np.array([0.91184, 0.06548, 0.00782, 0.01486])
+
+        alg.create_gamma_workspaces()
+
+        (result, messages) = CompareWorkspaces(mtd["ws_input_gamma_backgr"], bench_gamma_backgr, Tolerance=1e-5)
+        self.assertTrue(result)
+
+
+
 if __name__ == "__main__":
     unittest.main()
