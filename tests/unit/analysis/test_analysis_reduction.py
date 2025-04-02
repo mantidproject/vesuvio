@@ -119,6 +119,7 @@ class TestAnalysisReduction(unittest.TestCase):
         )
 
         label = ['1.01', '5', '12']
+        alg._masses = np.array([1.01, 5, 12])
         alg._profiles_table = MagicMock(
             rowCount=MagicMock(return_value=3),
             column=MagicMock(side_effect=lambda key: label if key=="label" else None)

@@ -492,3 +492,13 @@ def make_gamma_correction_input_string(masses, mean_widths, mean_intensity_ratio
     logger.notice("\nThe sample properties for Gamma Correction are:\n\n" + \
             str(profiles).replace(';', '\n\n').replace(',', '\n'))
     return profiles
+
+
+def make_multiple_scattering_input_string(masses, meanWidths, meanIntensityRatios):
+    atomic_properties_list = np.vstack([masses, meanIntensityRatios, meanWidths]).transpose().flatten().tolist()
+    logger.notice(
+        "\nSample properties for multiple scattering correction:\n\n" + \
+        "mass   intensity   width\n" + \
+        str(np.array(atomic_properties_list).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
+    )
+    return atomic_properties_list 

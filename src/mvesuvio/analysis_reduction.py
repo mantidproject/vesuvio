@@ -15,7 +15,8 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CreateWorkspace, GroupWorkspaces, SaveAscii
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
-                                            extend_range_of_array, print_table_workspace, make_gamma_correction_input_string
+                                            extend_range_of_array, print_table_workspace, make_gamma_correction_input_string, \
+                                            make_multiple_scattering_input_string
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -251,10 +252,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self.setPropertyValue("OutputFSEGroup", ws_group_fse.name())
 
         # Initialise empty means
-        self._mean_widths = None
-        self._std_widths = None
-        self._mean_intensity_ratios = None
-        self._std_intensity_ratios = None
+        self._mean_widths = np.zeros(self._masses.size) 
+        self._std_widths = np.zeros(self._masses.size)
+        self._mean_intensity_ratios = np.zeros(self._masses.size)
+        self._std_intensity_ratios = np.zeros(self._masses.size)
 
 
     def _initialize_table_fit_parameters(self):
@@ -765,20 +766,65 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
     def create_multiple_scattering_workspaces(self):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
+        self.log().notice("\nEvaluating multiple scattering correction ...\n")
 
-        self.createSlabGeometry(self._workspace_for_corrections)  # Sample properties for MS correction
+        self._create_slab_geometry()  # Sample properties for MS correction
 
-        sampleProperties = self.calcMSCorrectionSampleProperties(self._mean_widths, self._mean_intensity_ratios)
-        self.log().notice(
-            "\nSample properties for multiple scattering correction:\n\n" + \
-            "mass   intensity   width\n" + \
-            str(np.array(sampleProperties).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
+        # Make local variables
+        masses = self._masses
+        mean_widths = self._mean_widths
+        mean_intensity_ratios = self._mean_intensity_ratios
+
+        # If Backscattering mode and H is present in the sample, add H to MS properties
+        if self._mode_running == "BACKWARD":
+            if self._h_ratio > 0:  # If H is present, ratio is a number
+                HIntensity = self._h_ratio * mean_intensity_ratios[np.argmin(masses)]
+                mean_intensity_ratios = np.append(mean_intensity_ratios, HIntensity)
+                mean_intensity_ratios /= np.sum(mean_intensity_ratios)
+                masses = np.append(masses, 1.0079)
+                mean_widths = np.append(mean_widths, 5.0)
+
+        dens, trans = VesuvioThickness(
+            Masses=masses,
+            Amplitudes=mean_intensity_ratios,
+            TransmissionGuess=self._transmission_guess,
+            Thickness=0.1,
         )
+        ws_corrections_name = self._workspace_for_corrections.name()
+        atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
+        VesuvioCalculateMS(
+            InputWorkspace=ws_corrections_name,
+            NoOfMasses=len(masses),
+            SampleDensity=dens.cell(9, 1),
+            AtomicProperties=atomic_properties_list,
+            BeamRadius=2.5,
+            NumScatters=self._multiple_scattering_order,
+            NumEventsPerRun=int(self._number_of_events),
+            TotalScatteringWS=ws_corrections_name + "_tot_sctr",
+            MultipleScatteringWS=ws_corrections_name + "_mltp_sctr"
+        )
+        data_normalisation = Integration(ws_corrections_name)
+        simulation_normalisation = Integration(ws_corrections_name + "_tot_sctr")
+        for ws_sctr_name in (ws_corrections_name + "_mltp_sctr", ws_corrections_name + "_tot_sctr"):
+            Divide(
+                LHSWorkspace=ws_sctr_name,
+                RHSWorkspace=simulation_normalisation,
+                OutputWorkspace=ws_sctr_name,
+            )
+            Multiply(
+                LHSWorkspace=ws_sctr_name,
+                RHSWorkspace=data_normalisation,
+                OutputWorkspace=ws_sctr_name,
+            )
+            # Sum spectra for vizualisation
+            SumSpectra(ws_sctr_name, OutputWorkspace=ws_sctr_name + "_sum")
 
-        return self.createMulScatWorkspaces(self._workspace_for_corrections, sampleProperties)
+        DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
+        # The only remaining workspaces are the _mltp_sctr and _tot_sctr
+        return mtd[ws_corrections_name + "_mltp_sctr"]
 
 
-    def createSlabGeometry(self, wsNCPM):
+    def _create_slab_geometry(self):
         half_height, half_width, half_thick = (
             0.5 * self._vertical_width,
             0.5 * self._horizontal_width,
@@ -796,79 +842,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             % (-half_width, -half_height, half_thick)
             + "</cuboid>"
         )
-
         CreateSampleShape(self._workspace_for_corrections, xml_str)
-
-
-    def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
-        masses = self._masses
-
-        # If Backscattering mode and H is present in the sample, add H to MS properties
-        if self._mode_running == "BACKWARD":
-            if self._h_ratio > 0:  # If H is present, ratio is a number
-                HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(masses)]
-                meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
-                meanIntensityRatios /= np.sum(meanIntensityRatios)
-
-                masses = np.append(masses, 1.0079)
-                meanWidths = np.append(meanWidths, 5.0)
-
-        MSProperties = np.zeros(3 * len(masses))
-        MSProperties[::3] = masses
-        MSProperties[1::3] = meanIntensityRatios
-        MSProperties[2::3] = meanWidths
-        sampleProperties = list(MSProperties)
-
-        return sampleProperties
-
-
-    def createMulScatWorkspaces(self, ws, sampleProperties):
-        """Uses the Mantid algorithm for the MS correction to create two Workspaces _tot_sctr and _mltp_sctr"""
-
-        self.log().notice("\nEvaluating multiple scattering correction ...\n")
-        # selects only the masses, every 3 numbers
-        MS_masses = sampleProperties[::3]
-        # same as above, but starts at first intensities
-        MS_amplitudes = sampleProperties[1::3]
-
-        dens, trans = VesuvioThickness(
-            Masses=MS_masses,
-            Amplitudes=MS_amplitudes,
-            TransmissionGuess=self._transmission_guess,
-            Thickness=0.1,
-        )
-
-        _tot_sctr, _mltp_sctr = VesuvioCalculateMS(
-            ws,
-            NoOfMasses=len(MS_masses),
-            SampleDensity=dens.cell(9, 1),
-            AtomicProperties=sampleProperties,
-            BeamRadius=2.5,
-            NumScatters=self._multiple_scattering_order,
-            NumEventsPerRun=int(self._number_of_events),
-        )
-
-        data_normalisation = Integration(ws)
-        simulation_normalisation = Integration("_tot_sctr")
-        for workspace in ("_mltp_sctr", "_tot_sctr"):
-            Divide(
-                LHSWorkspace=workspace,
-                RHSWorkspace=simulation_normalisation,
-                OutputWorkspace=workspace,
-            )
-            Multiply(
-                LHSWorkspace=workspace,
-                RHSWorkspace=data_normalisation,
-                OutputWorkspace=workspace,
-            )
-            RenameWorkspace(InputWorkspace=workspace, OutputWorkspace=ws.name() + workspace)
-            SumSpectra(
-                ws.name() + workspace, OutputWorkspace=ws.name() + workspace + "_sum"
-            )
-
-        DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
-        # The only remaining workspaces are the _mltp_sctr and _tot_sctr
-        return mtd[ws.name() + "_mltp_sctr"]
+        return
 
 
     def create_gamma_workspaces(self):
