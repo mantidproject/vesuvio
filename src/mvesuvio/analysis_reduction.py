@@ -15,7 +15,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CreateWorkspace, GroupWorkspaces, SaveAscii
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
-                                            extend_range_of_array, print_table_workspace
+                                            extend_range_of_array, print_table_workspace, make_gamma_correction_input_string
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -874,38 +874,19 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def create_gamma_workspaces(self):
         """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
-        inputWS = self._workspace_for_corrections.name()
+        ws_corrections_name = self._workspace_for_corrections.name()
+        profiles_string = make_gamma_correction_input_string(self._masses, self._mean_widths, self._mean_intensity_ratios)
 
-        profiles = self.calcGammaCorrectionProfiles(self._mean_widths, self._mean_intensity_ratios)
-
-        background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
+        background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=ws_corrections_name, ComptonFunction=profiles_string)
         DeleteWorkspace(corrected)
-        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_gamma_backgr")
-
+        RenameWorkspace(InputWorkspace= background, OutputWorkspace = ws_corrections_name + "_gamma_backgr")
         Scale(
-            InputWorkspace=inputWS + "_gamma_backgr",
-            OutputWorkspace=inputWS + "_gamma_backgr",
+            InputWorkspace=ws_corrections_name + "_gamma_backgr",
+            OutputWorkspace=ws_corrections_name + "_gamma_backgr",
             Factor=0.9,
             Operation="Multiply",
         )
-        return mtd[inputWS + "_gamma_backgr"]
-
-
-    def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
-        profiles = ""
-        for mass, width, intensity in zip(self._masses, meanWidths, meanIntensityRatios):
-            profiles += (
-                "name=GaussianComptonProfile,Mass="
-                + str(mass)
-                + ",Width="
-                + str(width)
-                + ",Intensity="
-                + str(intensity)
-                + ";"
-            )
-        self.log().notice("\nThe sample properties for Gamma Correction are:\n\n" + \
-                str(profiles).replace(';', '\n\n').replace(',', '\n'))
-        return profiles
+        return mtd[ws_corrections_name + "_gamma_backgr"]
 
 
     def _save_results(self):

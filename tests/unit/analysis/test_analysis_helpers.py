@@ -8,7 +8,7 @@ import numpy.testing as nptest
 from mock import MagicMock, patch
 from mvesuvio.util.analysis_helpers import calculate_resolution, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, isolate_lighest_mass_data, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
 
@@ -246,6 +246,15 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(ws_res.dataY(15)[:], np.array([8.188e-05, 1.555e-04, 3.137e-04, 9.517e-04, 9.811e-02, 9.812e-02, 9.517e-04, 3.137e-04, 1.555e-04, 9.288e-05]), rtol=1e-3)
         np.testing.assert_allclose(ws_res.dataY(30)[:], np.array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0.]), rtol=1e-3)
 
+
+    def test_make_gamma_correction_input_string(self):
+        masses = [1, 12]
+        mean_widths = [5, 10]
+        mean_intensity_ratios = [0.6, 0.4]
+
+        profiles_string = make_gamma_correction_input_string(masses, mean_widths, mean_intensity_ratios)
+
+        self.assertEqual(profiles_string, "name=GaussianComptonProfile,Mass=1,Width=5,Intensity=0.6;name=GaussianComptonProfile,Mass=12,Width=10,Intensity=0.4;")
 
 if __name__ == "__main__":
     unittest.main()
