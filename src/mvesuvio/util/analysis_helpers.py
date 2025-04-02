@@ -475,3 +475,30 @@ def extend_range_of_array(arr, n_columns):
     left_extend = arr[:, :n_columns] + (arr[:, 0] - arr[:, n_columns]).reshape(-1, 1)
     right_extend = arr[:, -n_columns:] + (arr[:, -1] - arr[:, -n_columns-1]).reshape(-1, 1)
     return np.concatenate([left_extend, arr, right_extend], axis=-1)
+
+
+def make_gamma_correction_input_string(masses, mean_widths, mean_intensity_ratios):
+    profiles = ""
+    for mass, width, intensity in zip(masses, mean_widths, mean_intensity_ratios):
+        profiles += (
+            "name=GaussianComptonProfile,Mass="
+            + str(mass)
+            + ",Width="
+            + str(width)
+            + ",Intensity="
+            + str(intensity)
+            + ";"
+        )
+    logger.notice("\nThe sample properties for Gamma Correction are:\n\n" + \
+            str(profiles).replace(';', '\n\n').replace(',', '\n'))
+    return profiles
+
+
+def make_multiple_scattering_input_string(masses, meanWidths, meanIntensityRatios):
+    atomic_properties_list = np.vstack([masses, meanIntensityRatios, meanWidths]).transpose().flatten().tolist()
+    logger.notice(
+        "\nSample properties for multiple scattering correction:\n\n" + \
+        "mass   intensity   width\n" + \
+        str(np.array(atomic_properties_list).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
+    )
+    return atomic_properties_list 
