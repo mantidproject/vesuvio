@@ -311,7 +311,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
             # Do this because MS and Gamma corrections do not accept zero columns 
             if iteration==0:
-                self._replace_zero_columns_with_ncp_fit()
+                self._replace_zeros_with_ncp_for_corrections()
 
             CloneWorkspace(
                 InputWorkspace=self._workspace_for_corrections.name(), 
@@ -675,7 +675,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _replace_zero_columns_with_ncp_fit(self):
+    def _replace_zeros_with_ncp_for_corrections(self):
         """
         If the initial input contains columns with zeros 
         (to mask resonance peaks) then these sections must be approximated 

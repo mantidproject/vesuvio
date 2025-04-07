@@ -572,6 +572,33 @@ class TestAnalysisReduction(unittest.TestCase):
         self.assertTrue(result)
 
 
+    def test_replace_zeros_with_ncp_for_corrections(self):
+
+        dataY = np.random.random((3, 10))
+        dataY[:, 5:8] = 0
+        ncp = np.arange(30).reshape((3, 10))
+
+        alg = VesuvioAnalysisRoutine()
+        alg._fit_profiles_workspaces = {
+            "total": MagicMock(
+                extractY=MagicMock(return_value=ncp),
+            )
+        }
+        alg._workspace_for_corrections = MagicMock(
+            extractY=MagicMock(return_value=dataY),
+            dataY=MagicMock(side_effect=lambda i: dataY[i]),
+            getNumberHistograms=MagicMock(return_value=3)
+        )
+
+        expected_dataY = dataY.copy()
+        expected_dataY[expected_dataY==0] = ncp[expected_dataY==0]
+
+        with patch('mvesuvio.analysis_reduction.SumSpectra') as mock_sum_spectra:
+            alg._replace_zeros_with_ncp_for_corrections()
+            mock_sum_spectra.assert_called_once()
+            np.testing.assert_allclose(dataY, expected_dataY)
+
+
 
 if __name__ == "__main__":
     unittest.main()
