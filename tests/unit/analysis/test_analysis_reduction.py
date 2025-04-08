@@ -46,7 +46,7 @@ class TestAnalysisReduction(unittest.TestCase):
             "OutputMeansTable":"output-table"
         }
         alg = VesuvioAnalysisRoutine()
-        alg.initialize()
+        alg.PyInit()
         alg.setProperties(kwargs)
 
         for prop in kwargs.keys():
