@@ -758,5 +758,67 @@ class TestAnalysisReduction(unittest.TestCase):
                 call.name()]
             )
 
+
+    def test_correct_for_gamma_and_multiple_scattering(self):
+        mock_gamma_ws = MagicMock()
+        mock_gamma_ws.name.side_effect = lambda: "ws_gamma"
+        mock_ms_ws = MagicMock()
+        mock_ms_ws.name.side_effect = lambda: "ws_mlp_sctr"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._gamma_correction = True
+        alg.create_gamma_workspaces = MagicMock(return_value=mock_gamma_ws)
+        alg._multiple_scattering_correction = True
+        alg.create_multiple_scattering_workspaces = MagicMock(return_value=mock_ms_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_gamma', OutputWorkspace='ws_to_correct'),
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
+            ])
+
+
+    def test_correct_for_gamma(self):
+        mock_gamma_ws = MagicMock()
+        mock_gamma_ws.name.side_effect = lambda: "ws_gamma"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._multiple_scattering_correction = False
+        alg._gamma_correction = True
+        alg.create_gamma_workspaces = MagicMock(return_value=mock_gamma_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_gamma', OutputWorkspace='ws_to_correct'),
+            ])
+
+
+    def test_correct_for_multiple_scattering(self):
+        mock_ms_ws = MagicMock()
+        mock_ms_ws.name.side_effect = lambda: "ws_mlp_sctr"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._multiple_scattering_correction = True
+        alg._gamma_correction = False
+        alg.create_multiple_scattering_workspaces = MagicMock(return_value=mock_ms_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
+            ])
+
+
 if __name__ == "__main__":
     unittest.main()
