@@ -599,6 +599,26 @@ class TestAnalysisReduction(unittest.TestCase):
             np.testing.assert_allclose(dataY, expected_dataY)
 
 
+    def test_calculate_summed_workspaces(self):
+
+        alg = VesuvioAnalysisRoutine()
+
+        alg._workspace_being_fit = MagicMock(name=MagicMock(return_value="_ws"))
+        alg._fit_profiles_workspaces = {
+                "1": MagicMock(name=MagicMock(return_value="_ncp1")),
+                "2": MagicMock(name=MagicMock(return_value="_ncp2"))
+        } 
+        alg._fit_fse_workspaces = {
+                "1": MagicMock(name=MagicMock(return_value="_fse1")),
+                "2": MagicMock(name=MagicMock(return_value="_fse2"))
+        } 
+        with patch('mvesuvio.analysis_reduction.SumSpectra') as mock_sum_spectra:
+            alg._calculate_summed_workspaces()
+            # Asserting mock calls is complicated because return values might not execute
+            # So I just gave up and assert the number of calls instead
+            self.assertEqual(mock_sum_spectra.call_count, 5)
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -305,7 +305,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
             self._fit_neutron_compton_profiles()
 
-            self._create_summed_workspaces()
+            self._calculate_summed_workspaces()
             self._save_plots()
             self._set_means_and_std()
 
@@ -417,7 +417,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _create_summed_workspaces(self):
+    def _calculate_summed_workspaces(self):
 
         SumSpectra(
             InputWorkspace=self._workspace_being_fit.name(), 
