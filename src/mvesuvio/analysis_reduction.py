@@ -235,27 +235,31 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         # Initialise workspaces for fitted ncp 
         self._fit_profiles_workspaces = {}
-        for element in self._profiles_table.column("label"):
-            self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
-        self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
-
-        ws_group_ncp = GroupWorkspaces(list(self._fit_profiles_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_ncps")
-        self.setPropertyValue("OutputNCPGroup", ws_group_ncp.name())
+        ws_ncp_group = self._initialize_and_group_workspaces("ncp", self._fit_profiles_workspaces)
+        self.setPropertyValue("OutputNCPGroup", ws_ncp_group.name())
 
         # Initialise workspaces for fitted fse
         self._fit_fse_workspaces = {}
-        for element in self._profiles_table.column("label"):
-            self._fit_fse_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_fse')
-        self._fit_fse_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_fse')
-
-        ws_group_fse = GroupWorkspaces(list(self._fit_fse_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_fses")
-        self.setPropertyValue("OutputFSEGroup", ws_group_fse.name())
+        ws_fse_group = self._initialize_and_group_workspaces("fse", self._fit_fse_workspaces)
+        self.setPropertyValue("OutputFSEGroup", ws_fse_group.name())
 
         # Initialise empty means
         self._mean_widths = np.zeros(self._masses.size) 
         self._std_widths = np.zeros(self._masses.size)
         self._mean_intensity_ratios = np.zeros(self._masses.size)
         self._std_intensity_ratios = np.zeros(self._masses.size)
+
+
+    def _initialize_and_group_workspaces(self, suffix, result_dict):
+        # Helper to initialize either ncp of fse workspaces and group them together
+        assert not result_dict   # Check dict is empty
+        for element in self._profiles_table.column("label"):
+            result_dict[element] = self._create_emtpy_ncp_workspace(f'_{element}_{suffix}')
+        result_dict['total'] = self._create_emtpy_ncp_workspace(f'_total_{suffix}')
+
+        empty_sum_ws = [SumSpectra(ws, OutputWorkspace=ws.name()+"_sum") for ws in result_dict.values()]
+        ws_to_group = list(result_dict.values()) + empty_sum_ws
+        return GroupWorkspaces(ws_to_group, OutputWorkspace=self._workspace_being_fit.name()+f"_{suffix}_group")
 
 
     def _initialize_table_fit_parameters(self):
