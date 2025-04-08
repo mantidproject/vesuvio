@@ -2,7 +2,7 @@ from typing_extensions import override
 import unittest
 import numpy as np
 import numpy.testing as nptest
-from mock import MagicMock, patch, call
+from mock import MagicMock, Mock, patch, call
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine 
 from mvesuvio.util.analysis_helpers import load_resolution
 from mvesuvio.util import handle_config
@@ -619,6 +619,35 @@ class TestAnalysisReduction(unittest.TestCase):
             self.assertEqual(mock_sum_spectra.call_count, 5)
 
 
+    @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.setPropertyValue')
+    @patch('mvesuvio.analysis_reduction.print_table_workspace')
+    def test_means_table(self, _mock1, _mock2):
+
+        alg = VesuvioAnalysisRoutine()
+        alg._profiles_table = MagicMock(column=MagicMock(return_value=['1', '2', '3']))
+        alg._masses = np.array([1, 2, 3])
+        alg._mean_widths = [5.1, 10.1, 12.3]
+        alg._std_widths = [0.1, 0.2, 0.3]
+        alg._mean_intensity_ratios = [0.7, 0.2, 0.3]
+        alg._std_intensity_ratios = [0.01, 0.02, 0.03]
+        alg._workspace_being_fit = MagicMock(name=MagicMock(return_value="_ws"))
+
+        with patch('mvesuvio.analysis_reduction.CreateEmptyTableWorkspace') as mock_create_table_ws:
+            table_mock = Mock(addRow=Mock())
+            mock_create_table_ws.return_value = table_mock
+            alg._create_means_table()
+            table_mock.assert_has_calls([
+                call.addColumn(type='str', name='label'),
+                call.addColumn(type='float', name='mass'),
+                call.addColumn(type='float', name='mean_width'),
+                call.addColumn(type='float', name='std_width'),
+                call.addColumn(type='float', name='mean_intensity'),
+                call.addColumn(type='float', name='std_intensity'),
+                call.addRow(['1', 1.0, 5.1, 0.1, 0.7, 0.01]),
+                call.addRow(['2', 2.0, 10.1, 0.2, 0.2, 0.02]),
+                call.addRow(['3', 3.0, 12.3, 0.3, 0.3, 0.03]),
+                call.name()]
+            )
 
 if __name__ == "__main__":
     unittest.main()
