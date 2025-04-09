@@ -189,7 +189,7 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
         )
         return False
 
-    print("\nLocally saved workspace metadata matched with analysis inputs.\n")
+    logger.notice("\nLocally saved workspace metadata matched with analysis inputs.\n")
     DeleteWorkspace(ws)
     return True
 

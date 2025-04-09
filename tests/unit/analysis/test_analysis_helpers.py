@@ -365,6 +365,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             mock_logger.notice.assert_has_calls([call('Cached workspace not found at notthere.nxs')])
             self.assertFalse(match)
 
+
     @patch('mvesuvio.util.analysis_helpers.Load')
     def test_ws_history_matches_inputs_bad_runs(self, mock_load):
         path = Mock()
@@ -386,6 +387,75 @@ class TestAnalysisHelpers(unittest.TestCase):
             match = ws_history_matches_inputs("0000", "SingleDifference", "ip_par.txt", path)
             mock_logger.notice.assert_has_calls([call('Filename in saved workspace did not match: 1234-1235 and 0000')])
             self.assertFalse(match)
+
+
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("1234-1235", "DoubleDifference", "ip_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('Mode in saved workspace did not match: SingleDifference and DoubleDifference')])
+            self.assertFalse(match)
+
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("1234-1235", "SingleDifference", "new_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('IP files in saved workspace did not match: ip_par.txt and new_par.txt')])
+            self.assertFalse(match)
+
+    @patch('mvesuvio.util.analysis_helpers.DeleteWorkspace')
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_good_inputs(self, mock_load, mock_delete):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("1234-1235", "SingleDifference", "ip_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('\nLocally saved workspace metadata matched with analysis inputs.\n')])
+            self.assertTrue(match)
+
 
 if __name__ == "__main__":
     unittest.main()
