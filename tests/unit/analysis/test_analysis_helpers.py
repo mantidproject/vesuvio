@@ -8,7 +8,7 @@ import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, ws_history_matches_inputs
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
 
@@ -455,6 +455,30 @@ class TestAnalysisHelpers(unittest.TestCase):
             match = ws_history_matches_inputs("1234-1235", "SingleDifference", "ip_par.txt", path)
             mock_logger.notice.assert_has_calls([call('\nLocally saved workspace metadata matched with analysis inputs.\n')])
             self.assertTrue(match)
+
+
+    @patch('mvesuvio.util.analysis_helpers.SaveNexus')
+    @patch('mvesuvio.util.analysis_helpers.LoadVesuvio')
+    def test_save_ws_from_load_vesuvio_backward(self, mock_load_vesuvio, mock_save_nexus):
+        path = Path('notthere/raw_backward.nxs')
+        save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
+        mock_load_vesuvio.assert_has_calls([
+            call(Filename='1234', SpectrumList='3-134', Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_backward.nxs', LoadLogFiles=False)
+        ])
+        args, kwargs = mock_save_nexus.call_args
+        self.assertEqual(kwargs["Filename"], '/home/ljg28444/Work/vesuvio/notthere/raw_backward.nxs')
+
+
+    @patch('mvesuvio.util.analysis_helpers.SaveNexus')
+    @patch('mvesuvio.util.analysis_helpers.LoadVesuvio')
+    def test_save_ws_from_load_vesuvio_forward(self, mock_load_vesuvio, mock_save_nexus):
+        path = Path('notthere/raw_forward.nxs')
+        save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
+        mock_load_vesuvio.assert_has_calls([
+            call(Filename='1234', SpectrumList="135-198", Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_forward.nxs', LoadLogFiles=False)
+        ])
+        args, kwargs = mock_save_nexus.call_args
+        self.assertEqual(kwargs["Filename"], '/home/ljg28444/Work/vesuvio/notthere/raw_forward.nxs')
 
 
 if __name__ == "__main__":
