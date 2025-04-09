@@ -1,13 +1,19 @@
+from typing_extensions import override
 import unittest
 import numpy as np
 import numpy.testing as nptest
-from mock import MagicMock, patch, call
+from mock import MagicMock, Mock, patch, call
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine 
 from mvesuvio.util.analysis_helpers import load_resolution
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+from mvesuvio.util import handle_config
+from mantid.api import AlgorithmFactory, AlgorithmManager
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
+from mantid.simpleapi import Load, mtd, CompareWorkspaces, AnalysisDataService, SaveNexus
 import inspect
+import dill         # To convert constraints to string
 import scipy
 import re
+from pathlib import Path
 
 np.set_printoptions(suppress=True, precision=6, linewidth=200)
 np.random.seed(4)
@@ -16,6 +22,135 @@ np.random.seed(4)
 class TestAnalysisReduction(unittest.TestCase):
     def setUp(self):
         pass
+
+    def test_properites_vesuvio_analysis_algorithm(self):
+
+        kwargs = {
+            "InputWorkspace": CreateSampleWorkspace(OutputWorkspace="input-ws").name(),
+            "InputProfiles": CreateEmptyTableWorkspace(OutputWorkspace="profiles-table").name(),
+            "InstrumentParametersFile": str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files", "ip2018_3.par")),
+            "HRatioToLowestMass": 0,
+            "NumberOfIterations": 4,
+            "InvalidDetectors": [3],
+            "MultipleScatteringCorrection": False,
+            "SampleVerticalWidth": 1, 
+            "SampleHorizontalWidth": 1, 
+            "SampleThickness": 1,
+            "GammaCorrection": True,
+            "ModeRunning": "BACKWARD",
+            "TransmissionGuess": 0,
+            "MultipleScatteringOrder": 2,
+            "NumberOfEvents": 2,
+            "Constraints": "()",
+            "ResultsPath": "some-path",
+            "OutputMeansTable":"output-table"
+        }
+        alg = VesuvioAnalysisRoutine()
+        alg.PyInit()
+        alg.setProperties(kwargs)
+
+        for prop in kwargs.keys():
+            # Only check is that it should not raise any errors
+            alg.getPropertyValue(prop)
+
+    
+    @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.getPropertyValue')
+    @patch('mvesuvio.analysis_reduction.load_instrument_params')
+    @patch('mvesuvio.analysis_reduction.load_resolution')
+    def test_setup_vesuvio_analysis_algorithm(self, mock_load_resolution, mock_load_instrument_params, mock_get_prop_value):
+
+        mock_load_instrument_params.return_value = None
+
+        # Tests only unpacking of profiles and bounds
+
+        table_dict = {
+            "mass" : [1, 12, 16],
+            "intensity" : [1.0, 1.1, 1.2],
+            "intensity_lb" : [1, 1, 1],
+            "intensity_ub" : [None, np.nan, None],
+            "width" : [5, 10, 12],
+            "width_lb" : [2, 3, 4],
+            "width_ub": [6, 7, 8],
+            "center" : [0.0, 0.1, 0.2],
+            "center_lb" : [-1, -1, -1],
+            "center_ub" : [3.0, 3.0, 3.0]
+        }
+        mock_table_profiles = MagicMock()
+        mock_table_profiles.column.side_effect = lambda key: table_dict[key]
+
+
+        with patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.getProperty') as mock_get_prop:
+
+            def mock_properties(key):
+                if key == "InputProfiles":
+                    return MagicMock(value=mock_table_profiles)
+                if key == "InputWorkspace":
+                    return MagicMock(value=MagicMock(getSpectrumNumbers=MagicMock(return_value=3)))
+                if key == "InstrumentParametersFile" or key == "ResultsPath":
+                    return MagicMock(value="")
+                if key == "Constraints":
+                    return MagicMock(value=str(dill.dumps(({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }))))
+                else:
+                    return MagicMock(value=None)
+
+            mock_get_prop.side_effect = mock_properties 
+
+            alg = VesuvioAnalysisRoutine()
+            alg._save_results_path = MagicMock()
+            alg._setup()
+
+            self.assertEqual(alg._initial_fit_parameters, [1.0, 5, 0.0, 1.1, 10, 0.1, 1.2, 12, 0.2])
+            self.assertEqual(alg._initial_fit_bounds, [[1, None], [2, 6], [-1, 3.0], [1, np.nan], [3, 7], [-1, 3.0], [1, None], [4, 8], [-1, 3.0]])
+            self.assertEqual(list(alg._constraints[0].keys()), ['type', 'fun'])   # Difficult to test actual constraint because function created lives inside alg
+            np.testing.assert_allclose(alg._masses, np.array([1, 12, 16]))
+
+
+    def test_update_workspace_data(self):
+
+        alg = VesuvioAnalysisRoutine()
+
+        # Not possible to mock because required for ParentWorkspace arg
+        alg._workspace_being_fit = CreateWorkspace(
+            DataX=np.arange(10),
+            DataY=np.arange(10),
+            DataE=np.ones(10),
+            Nspec=1,
+            OutputWorkspace="test_ws",
+        )
+
+        label = ['1.01', '5', '12']
+        alg._masses = np.array([1.01, 5, 12])
+        alg._profiles_table = MagicMock(
+            rowCount=MagicMock(return_value=3),
+            column=MagicMock(side_effect=lambda key: label if key=="label" else None)
+        )
+
+        alg._set_kinematic_arrays = MagicMock()
+        alg._set_gaussian_resolution = MagicMock()
+        alg._set_lorentzian_resolution = MagicMock()
+        alg._set_y_space_arrays = MagicMock()
+        alg.setPropertyValue = MagicMock()
+
+        alg._update_workspace_data()
+            
+        self.assertEqual(alg._fit_parameters.sum(), 0)
+        self.assertEqual(alg._row_being_fit, 0)
+        self.assertEqual(alg._table_fit_results.rowCount(), 0)
+
+        for lab in label:
+            ws_ncp = alg._fit_profiles_workspaces[lab]
+            ws_fse = alg._fit_fse_workspaces[lab]
+            np.testing.assert_allclose(ws_ncp.dataX(0), np.arange(10))
+            np.testing.assert_allclose(ws_ncp.dataY(0), np.zeros(10))
+            np.testing.assert_allclose(ws_ncp.dataE(0), np.zeros(10))
+            self.assertEqual(ws_ncp.isDistribution(), True)
+            self.assertEqual(ws_ncp.getNumberHistograms(), 1)
+            np.testing.assert_allclose(ws_fse.dataX(0), np.arange(10))
+            np.testing.assert_allclose(ws_fse.dataY(0), np.zeros(10))
+            np.testing.assert_allclose(ws_fse.dataE(0), np.zeros(10))
+            self.assertEqual(ws_fse.isDistribution(), True)
+            self.assertEqual(ws_fse.getNumberHistograms(), 1)
+
 
     def test_calculate_kinematics(self):
         alg = VesuvioAnalysisRoutine()
@@ -390,6 +525,208 @@ class TestAnalysisReduction(unittest.TestCase):
         self.assertEqual(alg._std_intensity_ratios[0], np.nanstd(np.array([7.8, 7.6, np.nan, np.nan, 7.3]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
         self.assertEqual(alg._mean_intensity_ratios[1], np.nanmean(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
         self.assertEqual(alg._std_intensity_ratios[1], np.nanstd(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
+
+
+    def test_create_multiple_scattering_workspaces(self):
+        unit_test_dir = Path(__file__).parent.parent.parent / "data/analysis/unit"
+        ws_input = Load(str(unit_test_dir / "system_test_inputs_bckwd_cropped.nxs"))
+        bench_tot_sctr = Load(str(unit_test_dir / "bench_system_test_inputs_bckwd_cropped_tot_sctr.nxs"))
+        bench_mltp_sctr = Load(str(unit_test_dir / "bench_system_test_inputs_bckwd_cropped_mltp_sctr.nxs"))
+
+        alg = VesuvioAnalysisRoutine()
+        alg._workspace_for_corrections = ws_input
+        alg._vertical_width = 0.1 
+        alg._horizontal_width = 0.1 
+        alg._thickness = 0.001
+        alg._masses = np.array([12.0, 16.0, 27.0])
+        alg._mean_widths = np.array([15.35080, 8.72859, 13.89955])
+        alg._mean_intensity_ratios = np.array([0.53110, 0.17667, 0.29223])
+        alg._mode_running = "BACKWARD"
+        alg._h_ratio = 19.0620008206
+        alg._transmission_guess = 0.8537
+        alg._number_of_events = 1.0e5
+        alg._multiple_scattering_order= 2
+
+        alg.create_multiple_scattering_workspaces()
+
+        (result, messages) = CompareWorkspaces(mtd["ws_input_mltp_sctr"], bench_mltp_sctr, Tolerance=1e-5)
+        self.assertTrue(result)
+        (result, messages) = CompareWorkspaces(mtd["ws_input_tot_sctr"], bench_tot_sctr, Tolerance=1e-5)
+        self.assertTrue(result)
+
+
+    def test_create_gamma_workspaces(self):
+        unit_test_dir = Path(__file__).parent.parent.parent / "data/analysis/unit"
+        ws_input = Load(str(unit_test_dir / "system_test_inputs_fwd_cropped.nxs"))
+        bench_gamma_backgr = Load(str(unit_test_dir / "bench_system_test_inputs_fwd_cropped_gamma_backgr.nxs"))
+
+        alg = VesuvioAnalysisRoutine()
+        alg._workspace_for_corrections = ws_input
+        alg._masses = np.array([1.0078, 12.0, 16.0, 27.0])
+        alg._mean_widths = np.array([5.27454, 15.35080, 8.72859, 13.89955])
+        alg._mean_intensity_ratios = np.array([0.91184, 0.06548, 0.00782, 0.01486])
+
+        alg.create_gamma_workspaces()
+
+        (result, messages) = CompareWorkspaces(mtd["ws_input_gamma_backgr"], bench_gamma_backgr, Tolerance=1e-5)
+        self.assertTrue(result)
+
+
+    def test_replace_zeros_with_ncp_for_corrections(self):
+
+        dataY = np.random.random((3, 10))
+        dataY[:, 5:8] = 0
+        ncp = np.arange(30).reshape((3, 10))
+
+        alg = VesuvioAnalysisRoutine()
+        alg._fit_profiles_workspaces = {
+            "total": MagicMock(
+                extractY=MagicMock(return_value=ncp),
+            )
+        }
+        alg._workspace_for_corrections = MagicMock(
+            extractY=MagicMock(return_value=dataY),
+            dataY=MagicMock(side_effect=lambda i: dataY[i]),
+            getNumberHistograms=MagicMock(return_value=3)
+        )
+
+        expected_dataY = dataY.copy()
+        expected_dataY[expected_dataY==0] = ncp[expected_dataY==0]
+
+        with patch('mvesuvio.analysis_reduction.SumSpectra') as mock_sum_spectra:
+            alg._replace_zeros_with_ncp_for_corrections()
+            mock_sum_spectra.assert_called_once()
+            np.testing.assert_allclose(dataY, expected_dataY)
+
+
+    def test_calculate_summed_workspaces(self):
+
+        alg = VesuvioAnalysisRoutine()
+
+        ws_mock = Mock()
+        ws_mock.name.side_effect=lambda:"_ws"
+        alg._workspace_being_fit = ws_mock 
+
+        mock_ncp1 = Mock()
+        mock_ncp1.name.side_effect=lambda:"_ncp1"
+        mock_ncp2 = Mock()
+        mock_ncp2.name.side_effect=lambda:"_ncp2"
+        mock_fse1= Mock()
+        mock_fse1.name.side_effect=lambda:"_fse1"
+        mock_fse2= Mock()
+        mock_fse2.name.side_effect=lambda:"_fse2"
+
+        alg._fit_profiles_workspaces = {
+            "1": mock_ncp1,
+            "2": mock_ncp2 
+        } 
+        alg._fit_fse_workspaces = {
+            "1": mock_fse1,
+            "2": mock_fse2 
+        } 
+        with patch('mvesuvio.analysis_reduction.SumSpectra') as mock_sum_spectra:
+
+            alg._calculate_summed_workspaces()
+
+            mock_sum_spectra.assert_has_calls([
+                call(InputWorkspace='_ws', OutputWorkspace='_ws_sum'),
+                call(InputWorkspace='_ncp1', OutputWorkspace='_ncp1_sum'),
+                call(InputWorkspace='_ncp2', OutputWorkspace='_ncp2_sum'),
+                call(InputWorkspace='_fse1', OutputWorkspace='_fse1_sum'),
+                call(InputWorkspace='_fse2', OutputWorkspace='_fse2_sum')
+            ])
+
+
+    @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.setPropertyValue')
+    @patch('mvesuvio.analysis_reduction.print_table_workspace')
+    def test_means_table(self, _mock1, _mock2):
+
+        alg = VesuvioAnalysisRoutine()
+        alg._profiles_table = MagicMock(column=MagicMock(return_value=['1', '2', '3']))
+        alg._masses = np.array([1, 2, 3])
+        alg._mean_widths = [5.1, 10.1, 12.3]
+        alg._std_widths = [0.1, 0.2, 0.3]
+        alg._mean_intensity_ratios = [0.7, 0.2, 0.3]
+        alg._std_intensity_ratios = [0.01, 0.02, 0.03]
+        alg._workspace_being_fit = MagicMock(name=MagicMock(return_value="_ws"))
+
+        with patch('mvesuvio.analysis_reduction.CreateEmptyTableWorkspace') as mock_create_table_ws:
+            table_mock = Mock(addRow=Mock())
+            mock_create_table_ws.return_value = table_mock
+            alg._create_means_table()
+            table_mock.assert_has_calls([
+                call.addColumn(type='str', name='label'),
+                call.addColumn(type='float', name='mass'),
+                call.addColumn(type='float', name='mean_width'),
+                call.addColumn(type='float', name='std_width'),
+                call.addColumn(type='float', name='mean_intensity'),
+                call.addColumn(type='float', name='std_intensity'),
+                call.addRow(['1', 1.0, 5.1, 0.1, 0.7, 0.01]),
+                call.addRow(['2', 2.0, 10.1, 0.2, 0.2, 0.02]),
+                call.addRow(['3', 3.0, 12.3, 0.3, 0.3, 0.03]),
+                call.name()]
+            )
+
+
+    def test_correct_for_gamma_and_multiple_scattering(self):
+        mock_gamma_ws = MagicMock()
+        mock_gamma_ws.name.side_effect = lambda: "ws_gamma"
+        mock_ms_ws = MagicMock()
+        mock_ms_ws.name.side_effect = lambda: "ws_mlp_sctr"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._gamma_correction = True
+        alg.create_gamma_workspaces = MagicMock(return_value=mock_gamma_ws)
+        alg._multiple_scattering_correction = True
+        alg.create_multiple_scattering_workspaces = MagicMock(return_value=mock_ms_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_gamma', OutputWorkspace='ws_to_correct'),
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
+            ])
+
+
+    def test_correct_for_gamma(self):
+        mock_gamma_ws = MagicMock()
+        mock_gamma_ws.name.side_effect = lambda: "ws_gamma"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._multiple_scattering_correction = False
+        alg._gamma_correction = True
+        alg.create_gamma_workspaces = MagicMock(return_value=mock_gamma_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_gamma', OutputWorkspace='ws_to_correct'),
+            ])
+
+
+    def test_correct_for_multiple_scattering(self):
+        mock_ms_ws = MagicMock()
+        mock_ms_ws.name.side_effect = lambda: "ws_mlp_sctr"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._multiple_scattering_correction = True
+        alg._gamma_correction = False
+        alg.create_multiple_scattering_workspaces = MagicMock(return_value=mock_ms_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
+            ])
 
 
 if __name__ == "__main__":

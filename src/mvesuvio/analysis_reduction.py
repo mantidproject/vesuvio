@@ -15,7 +15,8 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
                             CreateWorkspace, GroupWorkspaces, SaveAscii
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
-                                            extend_range_of_array, print_table_workspace
+                                            extend_range_of_array, print_table_workspace, make_gamma_correction_input_string, \
+                                            make_multiple_scattering_input_string
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -234,27 +235,31 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         # Initialise workspaces for fitted ncp 
         self._fit_profiles_workspaces = {}
-        for element in self._profiles_table.column("label"):
-            self._fit_profiles_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_ncp')
-        self._fit_profiles_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_ncp')
-
-        ws_group_ncp = GroupWorkspaces(list(self._fit_profiles_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_ncps")
-        self.setPropertyValue("OutputNCPGroup", ws_group_ncp.name())
+        ws_ncp_group = self._initialize_and_group_workspaces("ncp", self._fit_profiles_workspaces)
+        self.setPropertyValue("OutputNCPGroup", ws_ncp_group.name())
 
         # Initialise workspaces for fitted fse
         self._fit_fse_workspaces = {}
-        for element in self._profiles_table.column("label"):
-            self._fit_fse_workspaces[element] = self._create_emtpy_ncp_workspace(f'_{element}_fse')
-        self._fit_fse_workspaces['total'] = self._create_emtpy_ncp_workspace(f'_total_fse')
-
-        ws_group_fse = GroupWorkspaces(list(self._fit_fse_workspaces.values()), OutputWorkspace=self._workspace_being_fit.name()+"_fses")
-        self.setPropertyValue("OutputFSEGroup", ws_group_fse.name())
+        ws_fse_group = self._initialize_and_group_workspaces("fse", self._fit_fse_workspaces)
+        self.setPropertyValue("OutputFSEGroup", ws_fse_group.name())
 
         # Initialise empty means
-        self._mean_widths = None
-        self._std_widths = None
-        self._mean_intensity_ratios = None
-        self._std_intensity_ratios = None
+        self._mean_widths = np.zeros(self._masses.size) 
+        self._std_widths = np.zeros(self._masses.size)
+        self._mean_intensity_ratios = np.zeros(self._masses.size)
+        self._std_intensity_ratios = np.zeros(self._masses.size)
+
+
+    def _initialize_and_group_workspaces(self, suffix, result_dict):
+        # Helper to initialize either ncp of fse workspaces and group them together
+        assert not result_dict   # Check dict is empty
+        for element in self._profiles_table.column("label"):
+            result_dict[element] = self._create_emtpy_ncp_workspace(f'_{element}_{suffix}')
+        result_dict['total'] = self._create_emtpy_ncp_workspace(f'_total_{suffix}')
+
+        empty_sum_ws = [SumSpectra(ws, OutputWorkspace=ws.name()+"_sum") for ws in result_dict.values()]
+        ws_to_group = list(result_dict.values()) + empty_sum_ws
+        return GroupWorkspaces(ws_to_group, OutputWorkspace=self._workspace_being_fit.name()+f"_{suffix}_group")
 
 
     def _initialize_table_fit_parameters(self):
@@ -300,7 +305,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
             self._fit_neutron_compton_profiles()
 
-            self._create_summed_workspaces()
+            self._calculate_summed_workspaces()
             self._save_plots()
             self._set_means_and_std()
 
@@ -310,7 +315,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
             # Do this because MS and Gamma corrections do not accept zero columns 
             if iteration==0:
-                self._replace_zero_columns_with_ncp_fit()
+                self._replace_zeros_with_ncp_for_corrections()
 
             CloneWorkspace(
                 InputWorkspace=self._workspace_for_corrections.name(), 
@@ -326,7 +331,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 OutputWorkspace=self._name + '_' + str(iteration + 1)
             )
 
-        # self._set_results()
         self._save_results()
         return self 
 
@@ -413,7 +417,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _create_summed_workspaces(self):
+    def _calculate_summed_workspaces(self):
 
         SumSpectra(
             InputWorkspace=self._workspace_being_fit.name(), 
@@ -675,39 +679,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
 
-    def _get_parsed_constraints(self):
-
-        parsed_constraints = []
-
-        for constraint in  self._constraints:
-            constraint['fun'] = self._get_parsed_constraint_function(constraint['fun']) 
-
-            parsed_constraints.append(constraint)
-
-        return parsed_constraints
-
-
-    def _get_parsed_constraint_function(self, function_string: str):
-
-        profile_order = [label for label in self._profiles_table.column("label")]
-        attribute_order = ['intensity', 'width', 'center']
-
-        words = function_string.split(' ')
-        for i, word in enumerate(words):
-            if '.' in word:
-
-                try:    # Skip floats 
-                    float(word) 
-                except ValueError: 
-                    continue
-
-                profile, attribute = word
-                words[i] = f"pars[{profile_order.index(profile) + attribute_order.index(attribute)}]" 
-
-        return eval(f"lambda pars: {' '.join(words)}")
-        
-
-    def _replace_zero_columns_with_ncp_fit(self):
+    def _replace_zeros_with_ncp_for_corrections(self):
         """
         If the initial input contains columns with zeros 
         (to mask resonance peaks) then these sections must be approximated 
@@ -766,20 +738,65 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
     def create_multiple_scattering_workspaces(self):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
+        self.log().notice("\nEvaluating multiple scattering correction ...\n")
 
-        self.createSlabGeometry(self._workspace_for_corrections)  # Sample properties for MS correction
+        self._create_slab_geometry()  # Sample properties for MS correction
 
-        sampleProperties = self.calcMSCorrectionSampleProperties(self._mean_widths, self._mean_intensity_ratios)
-        self.log().notice(
-            "\nSample properties for multiple scattering correction:\n\n" + \
-            "mass   intensity   width\n" + \
-            str(np.array(sampleProperties).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
+        # Make local variables
+        masses = self._masses
+        mean_widths = self._mean_widths
+        mean_intensity_ratios = self._mean_intensity_ratios
+
+        # If Backscattering mode and H is present in the sample, add H to MS properties
+        if self._mode_running == "BACKWARD":
+            if self._h_ratio > 0:  # If H is present, ratio is a number
+                HIntensity = self._h_ratio * mean_intensity_ratios[np.argmin(masses)]
+                mean_intensity_ratios = np.append(mean_intensity_ratios, HIntensity)
+                mean_intensity_ratios /= np.sum(mean_intensity_ratios)
+                masses = np.append(masses, 1.0079)
+                mean_widths = np.append(mean_widths, 5.0)
+
+        dens, trans = VesuvioThickness(
+            Masses=masses,
+            Amplitudes=mean_intensity_ratios,
+            TransmissionGuess=self._transmission_guess,
+            Thickness=0.1,
         )
+        ws_corrections_name = self._workspace_for_corrections.name()
+        atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
+        VesuvioCalculateMS(
+            InputWorkspace=ws_corrections_name,
+            NoOfMasses=len(masses),
+            SampleDensity=dens.cell(9, 1),
+            AtomicProperties=atomic_properties_list,
+            BeamRadius=2.5,
+            NumScatters=self._multiple_scattering_order,
+            NumEventsPerRun=int(self._number_of_events),
+            TotalScatteringWS=ws_corrections_name + "_tot_sctr",
+            MultipleScatteringWS=ws_corrections_name + "_mltp_sctr"
+        )
+        data_normalisation = Integration(ws_corrections_name)
+        simulation_normalisation = Integration(ws_corrections_name + "_tot_sctr")
+        for ws_sctr_name in (ws_corrections_name + "_mltp_sctr", ws_corrections_name + "_tot_sctr"):
+            Divide(
+                LHSWorkspace=ws_sctr_name,
+                RHSWorkspace=simulation_normalisation,
+                OutputWorkspace=ws_sctr_name,
+            )
+            Multiply(
+                LHSWorkspace=ws_sctr_name,
+                RHSWorkspace=data_normalisation,
+                OutputWorkspace=ws_sctr_name,
+            )
+            # Sum spectra for vizualisation
+            SumSpectra(ws_sctr_name, OutputWorkspace=ws_sctr_name + "_sum")
 
-        return self.createMulScatWorkspaces(self._workspace_for_corrections, sampleProperties)
+        DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
+        # The only remaining workspaces are the _mltp_sctr and _tot_sctr
+        return mtd[ws_corrections_name + "_mltp_sctr"]
 
 
-    def createSlabGeometry(self, wsNCPM):
+    def _create_slab_geometry(self):
         half_height, half_width, half_thick = (
             0.5 * self._vertical_width,
             0.5 * self._horizontal_width,
@@ -797,116 +814,26 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             % (-half_width, -half_height, half_thick)
             + "</cuboid>"
         )
-
         CreateSampleShape(self._workspace_for_corrections, xml_str)
-
-
-    def calcMSCorrectionSampleProperties(self, meanWidths, meanIntensityRatios):
-        masses = self._masses
-
-        # If Backscattering mode and H is present in the sample, add H to MS properties
-        if self._mode_running == "BACKWARD":
-            if self._h_ratio > 0:  # If H is present, ratio is a number
-                HIntensity = self._h_ratio * meanIntensityRatios[np.argmin(masses)]
-                meanIntensityRatios = np.append(meanIntensityRatios, HIntensity)
-                meanIntensityRatios /= np.sum(meanIntensityRatios)
-
-                masses = np.append(masses, 1.0079)
-                meanWidths = np.append(meanWidths, 5.0)
-
-        MSProperties = np.zeros(3 * len(masses))
-        MSProperties[::3] = masses
-        MSProperties[1::3] = meanIntensityRatios
-        MSProperties[2::3] = meanWidths
-        sampleProperties = list(MSProperties)
-
-        return sampleProperties
-
-
-    def createMulScatWorkspaces(self, ws, sampleProperties):
-        """Uses the Mantid algorithm for the MS correction to create two Workspaces _tot_sctr and _mltp_sctr"""
-
-        self.log().notice("\nEvaluating multiple scattering correction ...\n")
-        # selects only the masses, every 3 numbers
-        MS_masses = sampleProperties[::3]
-        # same as above, but starts at first intensities
-        MS_amplitudes = sampleProperties[1::3]
-
-        dens, trans = VesuvioThickness(
-            Masses=MS_masses,
-            Amplitudes=MS_amplitudes,
-            TransmissionGuess=self._transmission_guess,
-            Thickness=0.1,
-        )
-
-        _tot_sctr, _mltp_sctr = VesuvioCalculateMS(
-            ws,
-            NoOfMasses=len(MS_masses),
-            SampleDensity=dens.cell(9, 1),
-            AtomicProperties=sampleProperties,
-            BeamRadius=2.5,
-            NumScatters=self._multiple_scattering_order,
-            NumEventsPerRun=int(self._number_of_events),
-        )
-
-        data_normalisation = Integration(ws)
-        simulation_normalisation = Integration("_tot_sctr")
-        for workspace in ("_mltp_sctr", "_tot_sctr"):
-            Divide(
-                LHSWorkspace=workspace,
-                RHSWorkspace=simulation_normalisation,
-                OutputWorkspace=workspace,
-            )
-            Multiply(
-                LHSWorkspace=workspace,
-                RHSWorkspace=data_normalisation,
-                OutputWorkspace=workspace,
-            )
-            RenameWorkspace(InputWorkspace=workspace, OutputWorkspace=ws.name() + workspace)
-            SumSpectra(
-                ws.name() + workspace, OutputWorkspace=ws.name() + workspace + "_sum"
-            )
-
-        DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
-        # The only remaining workspaces are the _mltp_sctr and _tot_sctr
-        return mtd[ws.name() + "_mltp_sctr"]
+        return
 
 
     def create_gamma_workspaces(self):
         """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
-        inputWS = self._workspace_for_corrections.name()
+        ws_corrections_name = self._workspace_for_corrections.name()
+        profiles_string = make_gamma_correction_input_string(self._masses, self._mean_widths, self._mean_intensity_ratios)
 
-        profiles = self.calcGammaCorrectionProfiles(self._mean_widths, self._mean_intensity_ratios)
-
-        background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=inputWS, ComptonFunction=profiles)
+        background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=ws_corrections_name, ComptonFunction=profiles_string)
         DeleteWorkspace(corrected)
-        RenameWorkspace(InputWorkspace= background, OutputWorkspace = inputWS + "_gamma_backgr")
-
+        RenameWorkspace(InputWorkspace= background, OutputWorkspace = ws_corrections_name + "_gamma_backgr")
         Scale(
-            InputWorkspace=inputWS + "_gamma_backgr",
-            OutputWorkspace=inputWS + "_gamma_backgr",
+            InputWorkspace=ws_corrections_name + "_gamma_backgr",
+            OutputWorkspace=ws_corrections_name + "_gamma_backgr",
             Factor=0.9,
             Operation="Multiply",
         )
-        return mtd[inputWS + "_gamma_backgr"]
-
-
-    def calcGammaCorrectionProfiles(self, meanWidths, meanIntensityRatios):
-        profiles = ""
-        for mass, width, intensity in zip(self._masses, meanWidths, meanIntensityRatios):
-            profiles += (
-                "name=GaussianComptonProfile,Mass="
-                + str(mass)
-                + ",Width="
-                + str(width)
-                + ",Intensity="
-                + str(intensity)
-                + ";"
-            )
-        self.log().notice("\nThe sample properties for Gamma Correction are:\n\n" + \
-                str(profiles).replace(';', '\n\n').replace(',', '\n'))
-        return profiles
+        return mtd[ws_corrections_name + "_gamma_backgr"]
 
 
     def _save_results(self):
