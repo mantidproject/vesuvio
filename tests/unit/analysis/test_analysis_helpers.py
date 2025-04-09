@@ -6,7 +6,7 @@ import dill
 from pathlib import Path
 import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
-from mvesuvio.util.analysis_helpers import calculate_resolution, extractWS, _convert_dict_to_table,  \
+from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, isolate_lighest_mass_data, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
@@ -292,6 +292,37 @@ class TestAnalysisHelpers(unittest.TestCase):
                 call(' -------------- ')
             ])
 
+    def test_create_profiles_table(self):
+
+        mock_ai = Mock()
+        mock_ai.masses = [1, 12, 16]
+        mock_ai.initial_fitting_parameters = [1, 5, 0, 1, 10, 0, 1, 13, 0]
+        mock_ai.fitting_bounds = [[0, None], [2, 6], [-1, 3], [0, None], [8, 12], [-1, 3], [0, np.inf], [11, 15], [-1, 3]]
+
+        with patch('mvesuvio.util.analysis_helpers.CreateEmptyTableWorkspace') as mock_create_table_ws:
+            table_mock = MagicMock()
+            mock_create_table_ws.return_value = table_mock
+
+            create_profiles_table(table_mock, mock_ai)
+
+            table_mock.addColumn.assert_has_calls([
+                call(type='str', name='label'),
+                call(type='float', name='mass'),
+                call(type='float', name='intensity'),
+                call(type='float', name='intensity_lb'),
+                call(type='float', name='intensity_ub'),
+                call(type='float', name='width'),
+                call(type='float', name='width_lb'),
+                call(type='float', name='width_ub'),
+                call(type='float', name='center'),
+                call(type='float', name='center_lb'),
+                call(type='float', name='center_ub')
+            ])
+            table_mock.addRow.assert_has_calls([
+                call(['1.0', 1.0, 1.0, 0.0, np.inf, 5.0, 2.0, 6.0, 0.0, -1.0, 3.0]),
+                call(['12.0', 12.0, 1.0, 0.0, np.inf, 10.0, 8.0, 12.0, 0.0, -1.0, 3.0]),
+                call(['16.0', 16.0, 1.0, 0.0, np.inf, 13.0, 11.0, 15.0, 0.0, -1.0, 3.0])
+            ])
 
 if __name__ == "__main__":
     unittest.main()
