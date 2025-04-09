@@ -603,20 +603,38 @@ class TestAnalysisReduction(unittest.TestCase):
 
         alg = VesuvioAnalysisRoutine()
 
-        alg._workspace_being_fit = MagicMock(name=MagicMock(return_value="_ws"))
+        ws_mock = Mock()
+        ws_mock.name.side_effect=lambda:"_ws"
+        alg._workspace_being_fit = ws_mock 
+
+        mock_ncp1 = Mock()
+        mock_ncp1.name.side_effect=lambda:"_ncp1"
+        mock_ncp2 = Mock()
+        mock_ncp2.name.side_effect=lambda:"_ncp2"
+        mock_fse1= Mock()
+        mock_fse1.name.side_effect=lambda:"_fse1"
+        mock_fse2= Mock()
+        mock_fse2.name.side_effect=lambda:"_fse2"
+
         alg._fit_profiles_workspaces = {
-                "1": MagicMock(name=MagicMock(return_value="_ncp1")),
-                "2": MagicMock(name=MagicMock(return_value="_ncp2"))
+            "1": mock_ncp1,
+            "2": mock_ncp2 
         } 
         alg._fit_fse_workspaces = {
-                "1": MagicMock(name=MagicMock(return_value="_fse1")),
-                "2": MagicMock(name=MagicMock(return_value="_fse2"))
+            "1": mock_fse1,
+            "2": mock_fse2 
         } 
         with patch('mvesuvio.analysis_reduction.SumSpectra') as mock_sum_spectra:
+
             alg._calculate_summed_workspaces()
-            # Asserting mock calls is complicated because return values might not execute
-            # So I just gave up and assert the number of calls instead
-            self.assertEqual(mock_sum_spectra.call_count, 5)
+
+            mock_sum_spectra.assert_has_calls([
+                call(InputWorkspace='_ws', OutputWorkspace='_ws_sum'),
+                call(InputWorkspace='_ncp1', OutputWorkspace='_ncp1_sum'),
+                call(InputWorkspace='_ncp2', OutputWorkspace='_ncp2_sum'),
+                call(InputWorkspace='_fse1', OutputWorkspace='_fse1_sum'),
+                call(InputWorkspace='_fse2', OutputWorkspace='_fse2_sum')
+            ])
 
 
     @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.setPropertyValue')
