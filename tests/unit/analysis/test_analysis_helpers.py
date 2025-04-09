@@ -5,10 +5,10 @@ import scipy
 import dill
 from pathlib import Path
 import numpy.testing as nptest
-from mock import MagicMock, patch
+from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, isolate_lighest_mass_data, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
 
@@ -265,6 +265,32 @@ class TestAnalysisHelpers(unittest.TestCase):
         profiles_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
 
         self.assertEqual(profiles_list, [1.0, 0.6, 5.0, 12.0, 0.4, 10.0])
+
+
+    def test_print_table_workspace(self):
+
+        mock_table = Mock()
+        mock_table.toDict.return_value = {
+            "col1": ["a", "b", "c"],
+            "col2": [1, 2, 3],
+            "col3": [1.0, 2.0, 3.0]
+        }
+        mock_table.rowCount.return_value = 3
+        mock_table.name.side_effect = lambda: "Mock Table Name"
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+
+            print_table_workspace(mock_table)
+
+            mock_logger.notice.assert_has_calls([
+                call('Table Mock Table Name:'),
+                call(' -------------- '),
+                call('|col1|col2|col3|'),
+                call('|a   |1   |1   |'),
+                call('|b   |2   |2   |'),
+                call('|c   |3   |3   |'),
+                call(' -------------- ')
+            ])
 
 
 if __name__ == "__main__":
