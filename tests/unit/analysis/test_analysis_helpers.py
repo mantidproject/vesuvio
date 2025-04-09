@@ -8,7 +8,7 @@ import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, ws_history_matches_inputs
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
 
@@ -357,6 +357,35 @@ class TestAnalysisHelpers(unittest.TestCase):
         masses = np.array([2.0])
         is_present = is_hydrogen_present(masses)
         self.assertFalse(is_present)
+
+    def test_ws_history_matches_inputs_invalid_path(self):
+        path = Path("notthere.nxs")
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs(0, 0, 0, path)
+            mock_logger.notice.assert_has_calls([call('Cached workspace not found at notthere.nxs')])
+            self.assertFalse(match)
+
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_inputs_bad_runs(self, mock_load):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("0000", "SingleDifference", "ip_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('Filename in saved workspace did not match: 1234-1235 and 0000')])
+            self.assertFalse(match)
 
 if __name__ == "__main__":
     unittest.main()
