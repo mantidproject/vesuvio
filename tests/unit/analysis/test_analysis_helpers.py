@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, isolate_lighest_mass_data, numerical_third_derivative,  \
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
@@ -323,6 +323,40 @@ class TestAnalysisHelpers(unittest.TestCase):
                 call(['12.0', 12.0, 1.0, 0.0, np.inf, 10.0, 8.0, 12.0, 0.0, -1.0, 3.0]),
                 call(['16.0', 16.0, 1.0, 0.0, np.inf, 13.0, 11.0, 15.0, 0.0, -1.0, 3.0])
             ])
+
+    def test_is_hydrogen_present_with_hydrogen(self):
+        masses = np.array([1.0078, 12.0, 16.0])
+        is_present = is_hydrogen_present(masses)
+        self.assertTrue(is_present)
+
+
+    def test_is_hydrogen_present_without_hydrogen(self):
+        masses = np.array([2.0, 12.0, 16.0])
+        is_present = is_hydrogen_present(masses)
+        self.assertFalse(is_present)
+
+
+    def test_is_hydrogen_present_bad_inputs(self):
+        # Function not supposed to be used when only forward scattering should be run
+        masses = np.array([1.01])
+        with self.assertRaises(AssertionError):
+            is_hydrogen_present(masses)
+
+        # Hydrogen not first mass
+        masses = np.array([2.0, 1.0, 12.0])
+        with self.assertRaises(AssertionError):
+            is_hydrogen_present(masses)
+
+        # More than one hydrogen
+        masses = np.array([1.0, 1.0078, 12.0])
+        with self.assertRaises(AssertionError):
+            is_hydrogen_present(masses)
+
+
+    def test_is_hydrogen_present_one_mass_no_hydrogen(self):
+        masses = np.array([2.0])
+        is_present = is_hydrogen_present(masses)
+        self.assertFalse(is_present)
 
 if __name__ == "__main__":
     unittest.main()
