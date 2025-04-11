@@ -466,7 +466,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             call(Filename='1234', SpectrumList='3-134', Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_backward.nxs', LoadLogFiles=False)
         ])
         args, kwargs = mock_save_nexus.call_args
-        self.assertEqual(kwargs["Filename"], '/home/ljg28444/Work/vesuvio/notthere/raw_backward.nxs')
+        self.assertEqual(kwargs["Filename"], str(path.absolute()))
 
 
     @patch('mvesuvio.util.analysis_helpers.SaveNexus')
@@ -478,7 +478,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             call(Filename='1234', SpectrumList="135-198", Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_forward.nxs', LoadLogFiles=False)
         ])
         args, kwargs = mock_save_nexus.call_args
-        self.assertEqual(kwargs["Filename"], '/home/ljg28444/Work/vesuvio/notthere/raw_forward.nxs')
+        self.assertEqual(kwargs["Filename"], str(path.absolute()))
 
 
 if __name__ == "__main__":
