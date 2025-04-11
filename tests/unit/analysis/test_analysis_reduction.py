@@ -728,6 +728,97 @@ class TestAnalysisReduction(unittest.TestCase):
                 call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
             ])
 
+    @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.setPropertyValue')
+    @patch('mvesuvio.analysis_reduction.print_table_workspace')
+    def test_means_table(self, _mock1, _mock2):
+
+        alg = VesuvioAnalysisRoutine()
+        alg._profiles_table = MagicMock(column=MagicMock(return_value=['1', '2', '3']))
+        alg._masses = np.array([1, 2, 3])
+        alg._mean_widths = [5.1, 10.1, 12.3]
+        alg._std_widths = [0.1, 0.2, 0.3]
+        alg._mean_intensity_ratios = [0.7, 0.2, 0.3]
+        alg._std_intensity_ratios = [0.01, 0.02, 0.03]
+        alg._workspace_being_fit = MagicMock(name=MagicMock(return_value="_ws"))
+
+        with patch('mvesuvio.analysis_reduction.CreateEmptyTableWorkspace') as mock_create_table_ws:
+            table_mock = Mock(addRow=Mock())
+            mock_create_table_ws.return_value = table_mock
+            alg._create_means_table()
+            table_mock.assert_has_calls([
+                call.addColumn(type='str', name='label'),
+                call.addColumn(type='float', name='mass'),
+                call.addColumn(type='float', name='mean_width'),
+                call.addColumn(type='float', name='std_width'),
+                call.addColumn(type='float', name='mean_intensity'),
+                call.addColumn(type='float', name='std_intensity'),
+                call.addRow(['1', 1.0, 5.1, 0.1, 0.7, 0.01]),
+                call.addRow(['2', 2.0, 10.1, 0.2, 0.2, 0.02]),
+                call.addRow(['3', 3.0, 12.3, 0.3, 0.3, 0.03]),
+                call.name()]
+            )
+
+
+    def test_correct_for_gamma_and_multiple_scattering(self):
+        mock_gamma_ws = MagicMock()
+        mock_gamma_ws.name.side_effect = lambda: "ws_gamma"
+        mock_ms_ws = MagicMock()
+        mock_ms_ws.name.side_effect = lambda: "ws_mlp_sctr"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._gamma_correction = True
+        alg.create_gamma_workspaces = MagicMock(return_value=mock_gamma_ws)
+        alg._multiple_scattering_correction = True
+        alg.create_multiple_scattering_workspaces = MagicMock(return_value=mock_ms_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_gamma', OutputWorkspace='ws_to_correct'),
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
+            ])
+
+
+    def test_correct_for_gamma(self):
+        mock_gamma_ws = MagicMock()
+        mock_gamma_ws.name.side_effect = lambda: "ws_gamma"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._multiple_scattering_correction = False
+        alg._gamma_correction = True
+        alg.create_gamma_workspaces = MagicMock(return_value=mock_gamma_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_gamma', OutputWorkspace='ws_to_correct'),
+            ])
+
+
+    def test_correct_for_multiple_scattering(self):
+        mock_ms_ws = MagicMock()
+        mock_ms_ws.name.side_effect = lambda: "ws_mlp_sctr"
+
+        alg = VesuvioAnalysisRoutine()
+        alg._multiple_scattering_correction = True
+        alg._gamma_correction = False
+        alg.create_multiple_scattering_workspaces = MagicMock(return_value=mock_ms_ws)
+        alg._workspace_for_corrections = MagicMock(name=MagicMock(return_value="ws_for_corrections"))
+
+        with patch('mvesuvio.analysis_reduction.Minus') as mock_minus:
+
+            alg._correct_for_gamma_and_multiple_scattering("ws_to_correct")
+
+            mock_minus.assert_has_calls([
+                call(LHSWorkspace='ws_to_correct', RHSWorkspace='ws_mlp_sctr', OutputWorkspace='ws_to_correct')
+            ])
+
 
 if __name__ == "__main__":
     unittest.main()

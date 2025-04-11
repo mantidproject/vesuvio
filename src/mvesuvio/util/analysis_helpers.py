@@ -189,7 +189,7 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
         )
         return False
 
-    print("\nLocally saved workspace metadata matched with analysis inputs.\n")
+    logger.notice("\nLocally saved workspace metadata matched with analysis inputs.\n")
     DeleteWorkspace(ws)
     return True
 
@@ -212,7 +212,7 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
         LoadLogFiles=False,
     )
 
-    SaveNexus(vesuvio_ws, str(ws_path.absolute()))
+    SaveNexus(vesuvio_ws, Filename=str(ws_path.absolute()))
     print(f"Workspace saved locally at: {ws_path.absolute()}")
     return
 

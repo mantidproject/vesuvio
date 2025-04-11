@@ -5,10 +5,10 @@ import scipy
 import dill
 from pathlib import Path
 import numpy.testing as nptest
-from mock import MagicMock, patch
-from mvesuvio.util.analysis_helpers import calculate_resolution, extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, isolate_lighest_mass_data, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string
+from mock import MagicMock, Mock, patch, call
+from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, numerical_third_derivative,  \
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
 
@@ -265,6 +265,220 @@ class TestAnalysisHelpers(unittest.TestCase):
         profiles_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
 
         self.assertEqual(profiles_list, [1.0, 0.6, 5.0, 12.0, 0.4, 10.0])
+
+
+    def test_print_table_workspace(self):
+
+        mock_table = Mock()
+        mock_table.toDict.return_value = {
+            "col1": ["a", "b", "c"],
+            "col2": [1, 2, 3],
+            "col3": [1.0, 2.0, 3.0]
+        }
+        mock_table.rowCount.return_value = 3
+        mock_table.name.side_effect = lambda: "Mock Table Name"
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+
+            print_table_workspace(mock_table)
+
+            mock_logger.notice.assert_has_calls([
+                call('Table Mock Table Name:'),
+                call(' -------------- '),
+                call('|col1|col2|col3|'),
+                call('|a   |1   |1   |'),
+                call('|b   |2   |2   |'),
+                call('|c   |3   |3   |'),
+                call(' -------------- ')
+            ])
+
+    def test_create_profiles_table(self):
+
+        mock_ai = Mock()
+        mock_ai.masses = [1, 12, 16]
+        mock_ai.initial_fitting_parameters = [1, 5, 0, 1, 10, 0, 1, 13, 0]
+        mock_ai.fitting_bounds = [[0, None], [2, 6], [-1, 3], [0, None], [8, 12], [-1, 3], [0, np.inf], [11, 15], [-1, 3]]
+
+        with patch('mvesuvio.util.analysis_helpers.CreateEmptyTableWorkspace') as mock_create_table_ws:
+            table_mock = MagicMock()
+            mock_create_table_ws.return_value = table_mock
+
+            create_profiles_table(table_mock, mock_ai)
+
+            table_mock.addColumn.assert_has_calls([
+                call(type='str', name='label'),
+                call(type='float', name='mass'),
+                call(type='float', name='intensity'),
+                call(type='float', name='intensity_lb'),
+                call(type='float', name='intensity_ub'),
+                call(type='float', name='width'),
+                call(type='float', name='width_lb'),
+                call(type='float', name='width_ub'),
+                call(type='float', name='center'),
+                call(type='float', name='center_lb'),
+                call(type='float', name='center_ub')
+            ])
+            table_mock.addRow.assert_has_calls([
+                call(['1.0', 1.0, 1.0, 0.0, np.inf, 5.0, 2.0, 6.0, 0.0, -1.0, 3.0]),
+                call(['12.0', 12.0, 1.0, 0.0, np.inf, 10.0, 8.0, 12.0, 0.0, -1.0, 3.0]),
+                call(['16.0', 16.0, 1.0, 0.0, np.inf, 13.0, 11.0, 15.0, 0.0, -1.0, 3.0])
+            ])
+
+    def test_is_hydrogen_present_with_hydrogen(self):
+        masses = np.array([1.0078, 12.0, 16.0])
+        is_present = is_hydrogen_present(masses)
+        self.assertTrue(is_present)
+
+
+    def test_is_hydrogen_present_without_hydrogen(self):
+        masses = np.array([2.0, 12.0, 16.0])
+        is_present = is_hydrogen_present(masses)
+        self.assertFalse(is_present)
+
+
+    def test_is_hydrogen_present_bad_inputs(self):
+        # Function not supposed to be used when only forward scattering should be run
+        masses = np.array([1.01])
+        with self.assertRaises(AssertionError):
+            is_hydrogen_present(masses)
+
+        # Hydrogen not first mass
+        masses = np.array([2.0, 1.0, 12.0])
+        with self.assertRaises(AssertionError):
+            is_hydrogen_present(masses)
+
+        # More than one hydrogen
+        masses = np.array([1.0, 1.0078, 12.0])
+        with self.assertRaises(AssertionError):
+            is_hydrogen_present(masses)
+
+
+    def test_is_hydrogen_present_one_mass_no_hydrogen(self):
+        masses = np.array([2.0])
+        is_present = is_hydrogen_present(masses)
+        self.assertFalse(is_present)
+
+    def test_ws_history_matches_inputs_invalid_path(self):
+        path = Path("notthere.nxs")
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs(0, 0, 0, path)
+            mock_logger.notice.assert_has_calls([call('Cached workspace not found at notthere.nxs')])
+            self.assertFalse(match)
+
+
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_inputs_bad_runs(self, mock_load):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("0000", "SingleDifference", "ip_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('Filename in saved workspace did not match: 1234-1235 and 0000')])
+            self.assertFalse(match)
+
+
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("1234-1235", "DoubleDifference", "ip_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('Mode in saved workspace did not match: SingleDifference and DoubleDifference')])
+            self.assertFalse(match)
+
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("1234-1235", "SingleDifference", "new_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('IP files in saved workspace did not match: ip_par.txt and new_par.txt')])
+            self.assertFalse(match)
+
+    @patch('mvesuvio.util.analysis_helpers.DeleteWorkspace')
+    @patch('mvesuvio.util.analysis_helpers.Load')
+    def test_ws_history_matches_good_inputs(self, mock_load, mock_delete):
+        path = Mock()
+        path.is_file.return_value = True
+        props = {
+            "Filename": "1234-1235",
+            "Mode": "SingleDifference",
+            "InstrumentParFile": "ip_par.txt"
+        }
+        mock_metadata = Mock()
+        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
+        mock_history = Mock()
+        mock_history.getAlgorithmHistory.return_value = mock_metadata
+        mock_ws = Mock()
+        mock_ws.getHistory.return_value = mock_history
+        mock_load.return_value = mock_ws
+
+        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+            match = ws_history_matches_inputs("1234-1235", "SingleDifference", "ip_par.txt", path)
+            mock_logger.notice.assert_has_calls([call('\nLocally saved workspace metadata matched with analysis inputs.\n')])
+            self.assertTrue(match)
+
+
+    @patch('mvesuvio.util.analysis_helpers.SaveNexus')
+    @patch('mvesuvio.util.analysis_helpers.LoadVesuvio')
+    def test_save_ws_from_load_vesuvio_backward(self, mock_load_vesuvio, mock_save_nexus):
+        path = Path('notthere/raw_backward.nxs')
+        save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
+        mock_load_vesuvio.assert_has_calls([
+            call(Filename='1234', SpectrumList='3-134', Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_backward.nxs', LoadLogFiles=False)
+        ])
+        args, kwargs = mock_save_nexus.call_args
+        self.assertEqual(kwargs["Filename"], str(path.absolute()))
+
+
+    @patch('mvesuvio.util.analysis_helpers.SaveNexus')
+    @patch('mvesuvio.util.analysis_helpers.LoadVesuvio')
+    def test_save_ws_from_load_vesuvio_forward(self, mock_load_vesuvio, mock_save_nexus):
+        path = Path('notthere/raw_forward.nxs')
+        save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
+        mock_load_vesuvio.assert_has_calls([
+            call(Filename='1234', SpectrumList="135-198", Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_forward.nxs', LoadLogFiles=False)
+        ])
+        args, kwargs = mock_save_nexus.call_args
+        self.assertEqual(kwargs["Filename"], str(path.absolute()))
 
 
 if __name__ == "__main__":
