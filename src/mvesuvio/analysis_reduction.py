@@ -95,7 +95,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
                 <left-back-bottom-point x="0.05" y="-0.05" z="-0.005" />
                 <right-front-bottom-point x="-0.05" y="-0.05" z="0.005" /> 
                 </cuboid>''',
-            doc="Constraints to use during fitting profiles."
+            doc="XML string that describes the shape of the sample. Used in MS correction."
         )
         self.declareProperty(
             name="ModeRunning",
