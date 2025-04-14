@@ -759,7 +759,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             Masses=masses,
             Amplitudes=mean_intensity_ratios,
             TransmissionGuess=self._transmission_guess,
-            Thickness=0.1,
+            Thickness=self._vesuvio_thickness,
         )
         ws_corrections_name = self._workspace_for_corrections.name()
         atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
