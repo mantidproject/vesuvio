@@ -7,10 +7,11 @@ from pathlib import Path
 import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_resolution, numerical_third_derivative,  \
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_resolution, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
-
+import tempfile
+from textwrap import dedent
 
 class TestAnalysisHelpers(unittest.TestCase):
     def setUp(self):
@@ -485,7 +486,6 @@ class TestAnalysisHelpers(unittest.TestCase):
 
         instrument_parameters = np.vstack([np.arange(130, 140), np.zeros(10), np.zeros(10)]).T
         res_pars = load_resolution(instrument_parameters)
-        print(str(res_pars).replace('\n', ',\n').replace(' ', ', '))
 
         expected_res_pars = np.array([
             [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
@@ -502,6 +502,32 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(res_pars, expected_res_pars)
 
 
+    def test_load_instrument_params(self):
+
+        ip_file_path = Path(__file__).parent.parent.parent / "data/analysis/unit/ip_example.par"
+        # with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        #     tmp.write(dedent("""
+        #         Det	Plik	theta		t0	L0		L1
+        #         3	3	131.441	-0.2	11.005	0.617619
+        #         4	4	132.836	-0.2	11.005	0.604547
+        #         5	5	133.892	-0.2	11.005	0.587558
+        #         6	6	133.753	-0.2	11.005	0.59536
+        #         7	7	133.246	-0.2	11.005	0.59228
+        #         8	8	131.671	-0.2	11.005	0.619911
+        #         9	9	133.817	-0.2	11.005	0.589136
+        #         10	10	134.897	-0.2	11.005	0.586193
+        #         """).encode())
+
+        ip = load_instrument_params(ip_file_path, np.array([5, 6, 7, 8]))
+
+        print(str(ip).replace('\n', ',\n'))
+        expected_ip = np.array([
+            [ 5., 5., 133.892, -0.2, 11.005, 0.587558],
+            [  6., 6., 133.753, -0.2, 11.005, 0.59536 ],
+            [  7., 7., 133.246, -0.2, 11.005, 0.59228 ],
+            [  8., 8., 131.671, -0.2, 11.005, 0.619911]
+        ])
+        np.testing.assert_allclose(ip, expected_ip)
         
 
 if __name__ == "__main__":
