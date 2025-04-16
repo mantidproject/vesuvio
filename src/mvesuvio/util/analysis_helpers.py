@@ -239,51 +239,42 @@ def scattering_type(load_ai, shorthand=False):
     return scatteringType 
 
 
-def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 
-                                  tofBinning, name, scaleRaw, scaleEmpty, subEmptyFromRaw):
+def load_raw_and_empty_from_path(raw_path, empty_path, 
+                                  tof_binning, name, raw_scale_factor, empty_scale_factor, raw_minus_empty):
     print("\nLoading local workspaces ...\n")
-    Load(Filename=str(userWsRawPath), OutputWorkspace=name + "_raw")
+    Load(Filename=str(raw_path), OutputWorkspace=name + "_raw")
     Rebin(
         InputWorkspace=name + "_raw",
-        Params=tofBinning,
+        Params=tof_binning,
         OutputWorkspace=name + "_raw",
     )
-
-    assert (isinstance(scaleRaw, numbers.Real)), "Scaling factor of raw ws needs to be float or int."
     Scale(
         InputWorkspace=name + "_raw",
         OutputWorkspace=name + "_raw",
-        Factor=str(scaleRaw),
+        Factor=str(raw_scale_factor),
     )
-
     SumSpectra(InputWorkspace=name + "_raw", OutputWorkspace=name + "_raw" + "_sum")
     wsToBeFitted = mtd[name+"_raw"]
 
-    if subEmptyFromRaw:
-        Load(Filename=str(userWsEmptyPath), OutputWorkspace=name + "_empty")
+    if raw_minus_empty:
+        Load(Filename=str(empty_path), OutputWorkspace=name + "_empty")
         Rebin(
             InputWorkspace=name + "_empty",
-            Params=tofBinning,
+            Params=tof_binning,
             OutputWorkspace=name + "_empty",
         )
-
-        assert (isinstance(scaleEmpty, float)) | (
-            isinstance(scaleEmpty, int)
-        ), "Scaling factor of empty ws needs to be float or int"
         Scale(
             InputWorkspace=name + "_empty",
             OutputWorkspace=name + "_empty",
-            Factor=str(scaleEmpty),
+            Factor=str(empty_scale_factor),
         )
-
         SumSpectra(
             InputWorkspace=name + "_empty", OutputWorkspace=name + "_empty" + "_sum"
         )
-
         wsToBeFitted = Minus(
             LHSWorkspace=name + "_raw",
             RHSWorkspace=name + "_empty",
-            OutputWorkspace=name + "_raw_minus_empty",
+            OutputWorkspace=name + "_raw_-empty",
         )
     return wsToBeFitted
 
@@ -382,18 +373,6 @@ def load_instrument_params(ip_file, spectrum_list):
 
     select_rows = np.where((spectra >= first_spec) & (spectra <= last_spec))
     return data[select_rows]
-
-
-def createWS(dataX, dataY, dataE, wsName, parentWorkspace=None):
-    ws = CreateWorkspace(
-        DataX=dataX.flatten(),
-        DataY=dataY.flatten(),
-        DataE=dataE.flatten(),
-        Nspec=len(dataY),
-        OutputWorkspace=wsName,
-        ParentWorkspace=parentWorkspace
-    )
-    return ws
 
 
 def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio):
