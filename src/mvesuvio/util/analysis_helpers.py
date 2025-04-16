@@ -239,7 +239,7 @@ def scattering_type(load_ai, shorthand=False):
     return scatteringType 
 
 
-def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath, 
+def load_raw_and_empty_from_path(userWsRawPath, userWsEmptyPath, 
                                   tofBinning, name, scaleRaw, scaleEmpty, subEmptyFromRaw):
     print("\nLoading local workspaces ...\n")
     Load(Filename=str(userWsRawPath), OutputWorkspace=name + "_raw")
@@ -283,7 +283,7 @@ def loadRawAndEmptyWsFromUserPath(userWsRawPath, userWsEmptyPath,
         wsToBeFitted = Minus(
             LHSWorkspace=name + "_raw",
             RHSWorkspace=name + "_empty",
-            OutputWorkspace=name + "_raw_minus_empty",
+            OutputWorkspace=name + "_raw_-empty",
         )
     return wsToBeFitted
 

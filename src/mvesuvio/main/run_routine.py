@@ -1,7 +1,7 @@
 from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import calculate_resolution, fix_profile_parameters, isolate_lighest_mass_data,  \
-                            loadRawAndEmptyWsFromUserPath, cropAndMaskWorkspace, \
+                            load_raw_and_empty_from_path, cropAndMaskWorkspace, \
                             calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
                             is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios, \
@@ -254,7 +254,7 @@ class Runner:
 
         raw_path, empty_path = self._save_ws_if_not_on_path(ai)
 
-        ws = loadRawAndEmptyWsFromUserPath(
+        ws = load_raw_and_empty_from_path(
             userWsRawPath=raw_path,
             userWsEmptyPath=empty_path,
             tofBinning=ai.time_of_flight_binning,

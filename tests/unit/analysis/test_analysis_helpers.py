@@ -7,15 +7,18 @@ from pathlib import Path
 import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_resolution, numerical_third_derivative,  \
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, SaveNexus, CompareWorkspaces, Rebin, AnalysisDataService
 import tempfile
 from textwrap import dedent
 
 class TestAnalysisHelpers(unittest.TestCase):
     def setUp(self):
         pass
+
+    def tearDown(self):
+        AnalysisDataService.clear()
 
     def test_extract_ws(self):
         data = [1, 2, 3]
@@ -516,6 +519,44 @@ class TestAnalysisHelpers(unittest.TestCase):
         ])
         np.testing.assert_allclose(ip, expected_ip)
         
+
+    def test_load_raw_and_empty_from_path_with_subtraction(self):
+
+        empty_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_empty_backward.nxs"
+        raw_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_raw_backward.nxs"
+
+        ws_result = load_raw_and_empty_from_path(raw_path, empty_path, "110, 5, 400", "test", 1.1, 0.9, True)
+
+        raw_ws = Load(Filename=str(raw_path))
+        raw_ws = Rebin(raw_ws, "110, 5, 400")
+        empty_ws = Load(Filename=str(empty_path))
+        empty_ws = Rebin(empty_ws, "110, 5, 400")
+        expected_ws = 1.1 * raw_ws - 0.9 * empty_ws
+
+        (match, messages) = CompareWorkspaces(ws_result.name(), expected_ws.name())
+        error = ""
+        if not match:
+            error = messages.cell(0,0)
+        self.assertTrue(match, error)
+
+
+    def test_load_raw_and_empty_from_path_without_subtraction(self):
+
+        empty_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_empty_backward.nxs"
+        raw_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_raw_backward.nxs"
+
+        ws_result = load_raw_and_empty_from_path(raw_path, empty_path, "110, 5, 400", "test", 0.5, 0.8, False)
+
+        raw_ws = Load(Filename=str(raw_path))
+        raw_ws = Rebin(raw_ws, "110, 5, 400")
+        expected_ws = 0.5 * raw_ws
+
+        (match, messages) = CompareWorkspaces(ws_result.name(), expected_ws.name())
+        error = ""
+        if not match:
+            error = messages.cell(0,0)
+        self.assertTrue(match, error)
+
 
 if __name__ == "__main__":
     unittest.main()
