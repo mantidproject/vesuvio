@@ -505,19 +505,6 @@ class TestAnalysisHelpers(unittest.TestCase):
     def test_load_instrument_params(self):
 
         ip_file_path = Path(__file__).parent.parent.parent / "data/analysis/unit/ip_example.par"
-        # with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        #     tmp.write(dedent("""
-        #         Det	Plik	theta		t0	L0		L1
-        #         3	3	131.441	-0.2	11.005	0.617619
-        #         4	4	132.836	-0.2	11.005	0.604547
-        #         5	5	133.892	-0.2	11.005	0.587558
-        #         6	6	133.753	-0.2	11.005	0.59536
-        #         7	7	133.246	-0.2	11.005	0.59228
-        #         8	8	131.671	-0.2	11.005	0.619911
-        #         9	9	133.817	-0.2	11.005	0.589136
-        #         10	10	134.897	-0.2	11.005	0.586193
-        #         """).encode())
-
         ip = load_instrument_params(ip_file_path, np.array([5, 6, 7, 8]))
 
         print(str(ip).replace('\n', ',\n'))
