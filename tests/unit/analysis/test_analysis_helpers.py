@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, numerical_third_derivative,  \
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_resolution, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
 
@@ -480,6 +480,29 @@ class TestAnalysisHelpers(unittest.TestCase):
         args, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
 
+
+    def test_load_resolution(self):
+
+        instrument_parameters = np.vstack([np.arange(130, 140), np.zeros(10), np.zeros(10)]).T
+        res_pars = load_resolution(instrument_parameters)
+        print(str(res_pars).replace('\n', ',\n').replace(' ', ', '))
+
+        expected_res_pars = np.array([
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01]])
+
+        np.testing.assert_allclose(res_pars, expected_res_pars)
+
+
+        
 
 if __name__ == "__main__":
     unittest.main()
