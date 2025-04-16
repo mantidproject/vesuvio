@@ -384,18 +384,6 @@ def load_instrument_params(ip_file, spectrum_list):
     return data[select_rows]
 
 
-def createWS(dataX, dataY, dataE, wsName, parentWorkspace=None):
-    ws = CreateWorkspace(
-        DataX=dataX.flatten(),
-        DataY=dataY.flatten(),
-        DataE=dataE.flatten(),
-        Nspec=len(dataY),
-        OutputWorkspace=wsName,
-        ParentWorkspace=parentWorkspace
-    )
-    return ws
-
-
 def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_ratio):
     means_dict = _convert_table_to_dict(incoming_means_table)
     profiles_dict = _convert_table_to_dict(receiving_profiles_table)
