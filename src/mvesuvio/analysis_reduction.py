@@ -83,19 +83,19 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             doc="Whether to run gamma correction."
         )
         self.declareProperty(
-            name="SampleVerticalWidth",
-            defaultValue=-1.0,
+            name="VesuvioThickness",
+            defaultValue=0.1,
             validator=FloatBoundedValidator(lower=0)
         )
         self.declareProperty(
-            name="SampleHorizontalWidth",
-            defaultValue=-1.0,
-            validator=FloatBoundedValidator(lower=0)
-        )
-        self.declareProperty(
-            name="SampleThickness",
-            defaultValue=-1.0,
-            validator=FloatBoundedValidator(lower=0)
+            name="SampleShapeXml",
+            defaultValue=f'''<cuboid id="sample-shape">
+                <left-front-bottom-point x="0.05" y="-0.05" z="0.005" />
+                <left-front-top-point x="0.05" y="0.05" z="0.005"/>
+                <left-back-bottom-point x="0.05" y="-0.05" z="-0.005" />
+                <right-front-bottom-point x="-0.05" y="-0.05" z="0.005" /> 
+                </cuboid>''',
+            doc="XML string that describes the shape of the sample. Used in MS correction."
         )
         self.declareProperty(
             name="ModeRunning",
@@ -166,9 +166,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._transmission_guess = self.getProperty("TransmissionGuess").value 
         self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value 
         self._number_of_events = self.getProperty("NumberOfEvents").value 
-        self._vertical_width = self.getProperty("SampleVerticalWidth").value 
-        self._horizontal_width = self.getProperty("SampleHorizontalWidth").value 
-        self._thickness = self.getProperty("SampleThickness").value 
+        self._vesuvio_thickness = self.getProperty("VesuvioThickness").value
+        self._sample_shape_xml = self.getProperty("SampleShapeXml").value
         self._mode_running = self.getProperty("ModeRunning").value 
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
         self._gamma_correction = self.getProperty("GammaCorrection").value 
@@ -740,7 +739,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
         self.log().notice("\nEvaluating multiple scattering correction ...\n")
 
-        self._create_slab_geometry()  # Sample properties for MS correction
+        CreateSampleShape(self._workspace_for_corrections, self._sample_shape_xml)
 
         # Make local variables
         masses = self._masses
@@ -760,7 +759,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             Masses=masses,
             Amplitudes=mean_intensity_ratios,
             TransmissionGuess=self._transmission_guess,
-            Thickness=0.1,
+            Thickness=self._vesuvio_thickness,
         )
         ws_corrections_name = self._workspace_for_corrections.name()
         atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
@@ -794,28 +793,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         DeleteWorkspaces([data_normalisation, simulation_normalisation, trans, dens])
         # The only remaining workspaces are the _mltp_sctr and _tot_sctr
         return mtd[ws_corrections_name + "_mltp_sctr"]
-
-
-    def _create_slab_geometry(self):
-        half_height, half_width, half_thick = (
-            0.5 * self._vertical_width,
-            0.5 * self._horizontal_width,
-            0.5 * self._thickness,
-        )
-        xml_str = (
-            ' <cuboid id="sample-shape"> '
-            + '<left-front-bottom-point x="%f" y="%f" z="%f" /> '
-            % (half_width, -half_height, half_thick)
-            + '<left-front-top-point x="%f" y="%f" z="%f" /> '
-            % (half_width, half_height, half_thick)
-            + '<left-back-bottom-point x="%f" y="%f" z="%f" /> '
-            % (half_width, -half_height, -half_thick)
-            + '<right-front-bottom-point x="%f" y="%f" z="%f" /> '
-            % (-half_width, -half_height, half_thick)
-            + "</cuboid>"
-        )
-        CreateSampleShape(self._workspace_for_corrections, xml_str)
-        return
 
 
     def create_gamma_workspaces(self):

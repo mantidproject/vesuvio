@@ -1,12 +1,24 @@
 from dataclasses import dataclass
 
-
 @dataclass
 class SampleParameters:
     # Sample slab parameters, expressed in meters
-    vertical_width = 0.1 
-    horizontal_width = 0.1 
-    thickness = 0.001
+    slab_height = 0.1 
+    slab_width = 0.1 
+    slab_thickness = 0.001
+
+    sample_shape_xml = f'''<cuboid id="sample-shape">
+        <left-front-bottom-point x="{slab_width/2}" y="{-slab_height/2}" z="{slab_thickness/2}" />
+        <left-front-top-point x="{slab_width/2}" y="{slab_height/2}" z="{slab_thickness/2}" />
+        <left-back-bottom-point x="{slab_width/2}" y="{-slab_height/2}" z="{-slab_thickness/2}" />
+        <right-front-bottom-point x="{-slab_width/2}" y="{-slab_height/2}" z="{slab_thickness/2}" /> 
+        </cuboid>'''
+
+    # Passed as the Thickness argument when calling VesuvioThickness
+    # For a slab sample, should be the same as slab_thickness
+    # Currently VesuvioThickness does not support other shapes
+    # In that case make an educated guess
+    thickness_for_vesuvio_thickness = 0.001
 
 
 @dataclass
