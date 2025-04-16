@@ -239,47 +239,38 @@ def scattering_type(load_ai, shorthand=False):
     return scatteringType 
 
 
-def load_raw_and_empty_from_path(userWsRawPath, userWsEmptyPath, 
-                                  tofBinning, name, scaleRaw, scaleEmpty, subEmptyFromRaw):
+def load_raw_and_empty_from_path(raw_path, empty_path, 
+                                  tof_binning, name, raw_scale_factor, empty_scale_factor, raw_minus_empty):
     print("\nLoading local workspaces ...\n")
-    Load(Filename=str(userWsRawPath), OutputWorkspace=name + "_raw")
+    Load(Filename=str(raw_path), OutputWorkspace=name + "_raw")
     Rebin(
         InputWorkspace=name + "_raw",
-        Params=tofBinning,
+        Params=tof_binning,
         OutputWorkspace=name + "_raw",
     )
-
-    assert (isinstance(scaleRaw, numbers.Real)), "Scaling factor of raw ws needs to be float or int."
     Scale(
         InputWorkspace=name + "_raw",
         OutputWorkspace=name + "_raw",
-        Factor=str(scaleRaw),
+        Factor=str(raw_scale_factor),
     )
-
     SumSpectra(InputWorkspace=name + "_raw", OutputWorkspace=name + "_raw" + "_sum")
     wsToBeFitted = mtd[name+"_raw"]
 
-    if subEmptyFromRaw:
-        Load(Filename=str(userWsEmptyPath), OutputWorkspace=name + "_empty")
+    if raw_minus_empty:
+        Load(Filename=str(empty_path), OutputWorkspace=name + "_empty")
         Rebin(
             InputWorkspace=name + "_empty",
-            Params=tofBinning,
+            Params=tof_binning,
             OutputWorkspace=name + "_empty",
         )
-
-        assert (isinstance(scaleEmpty, float)) | (
-            isinstance(scaleEmpty, int)
-        ), "Scaling factor of empty ws needs to be float or int"
         Scale(
             InputWorkspace=name + "_empty",
             OutputWorkspace=name + "_empty",
-            Factor=str(scaleEmpty),
+            Factor=str(empty_scale_factor),
         )
-
         SumSpectra(
             InputWorkspace=name + "_empty", OutputWorkspace=name + "_empty" + "_sum"
         )
-
         wsToBeFitted = Minus(
             LHSWorkspace=name + "_raw",
             RHSWorkspace=name + "_empty",
