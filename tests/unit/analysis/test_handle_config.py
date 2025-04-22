@@ -2,6 +2,7 @@ import unittest
 from mock import MagicMock, patch, call
 from mvesuvio.util import handle_config
 import tempfile
+from textwrap import dedent
 import os
 
 class TestHandleConfig(unittest.TestCase):
@@ -23,6 +24,21 @@ class TestHandleConfig(unittest.TestCase):
         config_path, config_file = getattr(handle_config, "__parse_config_env_var")()
         self.assertEqual(str(config_path), os.path.join(os.path.expanduser('~'), '.mvesuvio'))
         self.assertEqual(str(config_file), "vesuvio.user.properties")
+
+    def test_read_config(self):
+        file = tempfile.NamedTemporaryFile()
+        file.write(dedent("""
+            caching.inputs=/inputs.py
+            caching.ipfolder=/ip_files
+            """).encode())
+        file.seek(0)
+        lines = getattr(handle_config, "__read_config")(file.name)
+        self.assertEqual(lines, ['\n', "caching.inputs=/inputs.py\n", "caching.ipfolder=/ip_files\n"])
+
+
+    def test_read_config_throws(self):
+        with self.assertRaises(RuntimeError):
+            lines = getattr(handle_config, "__read_config")("/not.there")
 
 
     def test_setup_default_inputs(self):
