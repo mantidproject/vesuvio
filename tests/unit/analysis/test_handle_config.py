@@ -12,11 +12,13 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_parse_config_env_var_with_env_variable(self):
         with patch("mvesuvio.util.handle_config.os.getenv") as mock_getenv:
-            mock_getenv.return_value = "/some/random/path/to/vesuvio.user.properties"
+            file = tempfile.NamedTemporaryFile()
+            mock_getenv.return_value = file.name
             # getattr because Python mangles name
             config_path, config_file = getattr(handle_config, "__parse_config_env_var")()
-            self.assertEqual(str(config_path), "/some/random/path/to")
-            self.assertEqual(str(config_file), "vesuvio.user.properties")
+            expected_path, expected_file = os.path.split(file.name)
+            self.assertEqual(str(config_path), expected_path)
+            self.assertEqual(str(config_file), expected_file)
 
 
     def test_parse_config_env_var_default(self):
@@ -89,8 +91,8 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_get_script_name(self):
-        with patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config:
-            mock_read_config.return_value = "path/to/inputs.py"
+        with patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename:
+            mock_basename.return_value = "inputs.py" 
             self.assertEqual(handle_config.get_script_name(), "inputs")
 
 
