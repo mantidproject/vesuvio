@@ -91,7 +91,10 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_get_script_name(self):
-        with patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename:
+        with (
+            patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename,
+            patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config_var
+        ):
             mock_basename.return_value = "inputs.py" 
             self.assertEqual(handle_config.get_script_name(), "inputs")
 
