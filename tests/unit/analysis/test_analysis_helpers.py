@@ -7,14 +7,18 @@ from pathlib import Path
 import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
-    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load
-
+    fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, SaveNexus, CompareWorkspaces, Rebin, AnalysisDataService
+import tempfile
+from textwrap import dedent
 
 class TestAnalysisHelpers(unittest.TestCase):
     def setUp(self):
         pass
+
+    def tearDown(self):
+        AnalysisDataService.clear()
 
     def test_extract_ws(self):
         data = [1, 2, 3]
@@ -480,6 +484,91 @@ class TestAnalysisHelpers(unittest.TestCase):
         args, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
 
+
+    def test_load_resolution(self):
+
+        instrument_parameters = np.vstack([np.arange(130, 140), np.zeros(10), np.zeros(10)]).T
+        res_pars = load_resolution(instrument_parameters)
+
+        expected_res_pars = np.array([
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [8.87e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 4.03e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01],
+            [7.30e+01, 3.70e-01, 1.60e-02, 2.10e-02, 2.30e-02, 2.40e+01]])
+
+        np.testing.assert_allclose(res_pars, expected_res_pars)
+
+
+    def test_load_instrument_params(self):
+
+        ip_file_path = Path(__file__).parent.parent.parent / "data/analysis/unit/ip_example.par"
+        ip = load_instrument_params(ip_file_path, np.array([5, 6, 7, 8]))
+
+        print(str(ip).replace('\n', ',\n'))
+        expected_ip = np.array([
+            [ 5., 5., 133.892, -0.2, 11.005, 0.587558],
+            [  6., 6., 133.753, -0.2, 11.005, 0.59536 ],
+            [  7., 7., 133.246, -0.2, 11.005, 0.59228 ],
+            [  8., 8., 131.671, -0.2, 11.005, 0.619911]
+        ])
+        np.testing.assert_allclose(ip, expected_ip)
+        
+
+    def test_load_raw_and_empty_from_path_with_subtraction(self):
+
+        empty_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_empty_backward.nxs"
+        raw_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_raw_backward.nxs"
+
+        ws_result = load_raw_and_empty_from_path(raw_path, empty_path, "110, 5, 400", "test", 1.1, 0.9, True)
+
+        raw_ws = Load(Filename=str(raw_path))
+        raw_ws = Rebin(raw_ws, "110, 5, 400")
+        empty_ws = Load(Filename=str(empty_path))
+        empty_ws = Rebin(empty_ws, "110, 5, 400")
+        expected_ws = 1.1 * raw_ws - 0.9 * empty_ws
+
+        (match, messages) = CompareWorkspaces(ws_result.name(), expected_ws.name())
+        error = ""
+        if not match:
+            error = messages.cell(0,0)
+        self.assertTrue(match, error)
+
+
+    def test_load_raw_and_empty_from_path_without_subtraction(self):
+
+        empty_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_empty_backward.nxs"
+        raw_path = Path(__file__).parent.parent.parent / "data/analysis/unit/system_test_inputs_raw_backward.nxs"
+
+        ws_result = load_raw_and_empty_from_path(raw_path, empty_path, "110, 5, 400", "test", 0.5, 0.8, False)
+
+        raw_ws = Load(Filename=str(raw_path))
+        raw_ws = Rebin(raw_ws, "110, 5, 400")
+        expected_ws = 0.5 * raw_ws
+
+        (match, messages) = CompareWorkspaces(ws_result.name(), expected_ws.name())
+        error = ""
+        if not match:
+            error = messages.cell(0,0)
+        self.assertTrue(match, error)
+
+
+    def test_scattering_type(self):
+        class BackwardAnalysisInputs:
+            pass
+        
+        class ForwardAnalysisInputs:
+            pass
+
+        self.assertEqual(scattering_type(BackwardAnalysisInputs, False), "BACKWARD")
+        self.assertEqual(scattering_type(BackwardAnalysisInputs, True), "bckwd")
+        self.assertEqual(scattering_type(ForwardAnalysisInputs, False), "FORWARD")
+        self.assertEqual(scattering_type(ForwardAnalysisInputs, True), "fwd")
 
 if __name__ == "__main__":
     unittest.main()
