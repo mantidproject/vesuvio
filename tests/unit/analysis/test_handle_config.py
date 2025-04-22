@@ -96,15 +96,22 @@ class TestHandleConfig(unittest.TestCase):
             self.assertEqual(handle_config.get_script_name(), "inputs")
 
 
-    def test_setup_default_inputs(self):
-        tempdir = tempfile.gettempdir()
-        mock_path = os.path.join(tempdir, 'mock_inputs.py')
-        # Make sure file does not exist from previous tests
-        try:
-            os.remove(mock_path)
-        except FileNotFoundError:
-            pass
+    def test_setup_config_dir(self):
+        tempdir = tempfile.TemporaryDirectory()
+        handle_config.setup_config_dir(tempdir.name)
 
+        vesuvio_file = open(os.path.join(tempdir.name, "vesuvio.user.properties"), "r")
+        self.assertEqual(vesuvio_file.read(), "caching.inputs=\ncaching.ipfolder=\n")
+        vesuvio_file.close()
+        mantid_file = open(os.path.join(tempdir.name, "Mantid.user.properties"), "r")
+        self.assertEqual(mantid_file.read(), "default.facility=ISIS\ndefault.instrument=Vesuvio\ndatasearch.searcharchive=On\n")
+        mantid_file.close()
+        tempdir.cleanup()
+
+
+    def test_setup_default_inputs(self):
+        tempdir = tempfile.TemporaryDirectory()
+        mock_path = os.path.join(tempdir.name, 'mock_inputs.py')
         with patch.object(handle_config, "VESUVIO_INPUTS_PATH", mock_path):
 
             handle_config.setup_default_inputs()
@@ -125,4 +132,5 @@ class TestHandleConfig(unittest.TestCase):
             file = open(mock_path, 'r')
             self.assertEqual(original_content, file.read())
             file.close()
-            os.remove(mock_path)
+            tempdir.cleanup()
+
