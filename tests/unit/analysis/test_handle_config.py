@@ -41,9 +41,9 @@ class TestHandleConfig(unittest.TestCase):
             lines = getattr(handle_config, "__read_config")("/not.there")
 
 
-    def test_read_config_vars(self):
-        mock_dir = tempfile.gettempdir()
-        mock_file = 'mock_properties.py'
+    def test_set_config_vars(self):
+        file = tempfile.NamedTemporaryFile() 
+        mock_dir, mock_file = os.path.split(file.name)
         with (
             patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
             patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
@@ -55,8 +55,37 @@ class TestHandleConfig(unittest.TestCase):
 
             file = open(os.path.join(mock_dir, mock_file), "r")
             self.assertEqual(file.read(), "\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
+        file.close()
 
 
+    def test_read_config_vars(self):
+        file = tempfile.NamedTemporaryFile() 
+        file.write("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n".encode())
+        file.seek(0)
+        mock_dir, mock_file = os.path.split(file.name)
+
+        with (
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
+            patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file)
+        ):
+            self.assertEqual(handle_config.read_config_var('caching.inputs'), '/inputs.py')
+            self.assertEqual(handle_config.read_config_var('caching.ipfolder'), '/ipfiles')
+        file.close()
+
+
+    def test_read_config_vars_throws(self):
+        file = tempfile.NamedTemporaryFile() 
+        file.write("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n".encode())
+        file.seek(0)
+        mock_dir, mock_file = os.path.split(file.name)
+
+        with (
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
+            patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file),
+            self.assertRaises(ValueError)
+        ):
+            handle_config.read_config_var('non.existent') 
+        file.close()
 
 
     def test_setup_default_inputs(self):
