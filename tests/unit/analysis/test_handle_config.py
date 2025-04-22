@@ -88,6 +88,12 @@ class TestHandleConfig(unittest.TestCase):
         file.close()
 
 
+    def test_get_script_name(self):
+        with patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config:
+            mock_read_config.return_value = "path/to/inputs.py"
+            self.assertEqual(handle_config.get_script_name(), "inputs")
+
+
     def test_setup_default_inputs(self):
         tempdir = tempfile.gettempdir()
         mock_path = os.path.join(tempdir, 'mock_inputs.py')
