@@ -41,6 +41,24 @@ class TestHandleConfig(unittest.TestCase):
             lines = getattr(handle_config, "__read_config")("/not.there")
 
 
+    def test_read_config_vars(self):
+        mock_dir = tempfile.gettempdir()
+        mock_file = 'mock_properties.py'
+        with (
+            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
+            patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file)
+
+        ):
+            mock_read_config.return_value = ['\n', 'caching.inputs=\n', 'caching.ipfolder=\n']
+            handle_config.set_config_vars({'caching.inputs': '/inputs.py', 'caching.ipfolder': '/ipfiles'})
+
+            file = open(os.path.join(mock_dir, mock_file), "r")
+            self.assertEqual(file.read(), "\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
+
+
+
+
     def test_setup_default_inputs(self):
         tempdir = tempfile.gettempdir()
         mock_path = os.path.join(tempdir, 'mock_inputs.py')
