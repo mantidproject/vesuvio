@@ -317,9 +317,7 @@ def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
     dataX, dataY, dataE = extractWS(ws)
 
     ranges = [r.split("-") for r in maskTOFRange.replace(" ","").split(',')]
-
     for r in ranges:
-
         mask = (dataX >= float(r[0])) & (dataX <= float(r[-1]))
         dataY[mask] = 0
 
@@ -481,3 +479,16 @@ def make_multiple_scattering_input_string(masses, meanWidths, meanIntensityRatio
         str(np.array(atomic_properties_list).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
     )
     return atomic_properties_list 
+
+
+def convert_to_list_of_spectrum_numbers(detectors):
+
+    if isinstance(detectors, str):
+        detector_ranges = [r.split("-") for r in detectors.replace(" ","").split(",")]
+        return [i for r in detector_ranges for i in range(int(r[0]), int(r[-1]) + 1)]
+
+    if isinstance(detectors, list) or isinstance(detectors, np.ndarray):
+        return [int(d) for d in detectors]
+
+    raise ValueError("Type not recognized: Masked detectors should be string, list or array.")
+

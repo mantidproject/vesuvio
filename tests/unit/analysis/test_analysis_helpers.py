@@ -8,7 +8,7 @@ import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, SaveNexus, CompareWorkspaces, Rebin, AnalysisDataService
 import tempfile
 from textwrap import dedent
@@ -600,6 +600,21 @@ class TestAnalysisHelpers(unittest.TestCase):
         self.assertEqual(scattering_type(BackwardAnalysisInputs, True), "bckwd")
         self.assertEqual(scattering_type(ForwardAnalysisInputs, False), "FORWARD")
         self.assertEqual(scattering_type(ForwardAnalysisInputs, True), "fwd")
+
+
+    def test_convert_to_list_of_spectrum_numbers_string(self):
+        res = convert_to_list_of_spectrum_numbers("1, 3-6, 8-8, 10")
+        self.assertEqual(res, [1, 3, 4, 5, 6, 8, 10])
+
+
+    def test_convert_to_list_of_spectrum_numbers_list_mixed(self):
+        res = convert_to_list_of_spectrum_numbers(["1", 3, 5, 6, "7"])
+        self.assertEqual(res, [1, 3, 5, 6, 7])
+
+
+    def test_convert_to_list_of_spectrum_numbers_list_integers(self):
+        res = convert_to_list_of_spectrum_numbers([1, 3, 5, 6, 7])
+        self.assertEqual(res, [1, 3, 5, 6, 7])
 
 if __name__ == "__main__":
     unittest.main()

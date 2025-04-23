@@ -5,7 +5,7 @@ from mvesuvio.util.analysis_helpers import calculate_resolution, fix_profile_par
                             calculate_h_ratio, name_for_starting_ws, \
                             scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
                             is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios, \
-                            print_table_workspace
+                            print_table_workspace, convert_to_list_of_spectrum_numbers
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
@@ -280,7 +280,7 @@ class Runner:
             "InstrumentParametersFile": str(ipFilesPath / ai.instrument_parameters_file),
             "HRatioToLowestMass": ai.intensity_ratio_of_hydrogen_to_lowest_mass if hasattr(ai, 'intensity_ratio_of_hydrogen_to_lowest_mass') else 0,
             "NumberOfIterations": int(ai.number_of_iterations_for_corrections),
-            "InvalidDetectors": [int(det) for det in ai.mask_detectors],
+            "InvalidDetectors": convert_to_list_of_spectrum_numbers(ai.mask_detectors),
             "MultipleScatteringCorrection": ai.do_multiple_scattering_correction,
             "SampleShapeXml": ai.sample_shape_xml, 
             "VesuvioThickness": ai.thickness_for_vesuvio_thickness,
