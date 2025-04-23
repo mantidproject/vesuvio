@@ -315,13 +315,13 @@ def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
         return
 
     dataX, dataY, dataE = extractWS(ws)
-    start, end = [float(s) for s in maskTOFRange.split("-")]
-    assert (
-        start <= end
-    ), "Start value for masking needs to be smaller or equal than end."
-    mask = (dataX >= start) & (dataX <= end)  # TOF region to mask
 
-    dataY[mask] = 0
+    ranges = [r.split("-") for r in maskTOFRange.replace(" ","").split(',')]
+
+    for r in ranges:
+
+        mask = (dataX >= float(r[0])) & (dataX <= float(r[-1]))
+        dataY[mask] = 0
 
     pass_data_into_ws(dataX, dataY, dataE, ws)
     return

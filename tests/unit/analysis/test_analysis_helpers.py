@@ -184,6 +184,37 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(actual_data_y, expected_data_y)
 
 
+    def test_mask_time_of_flight_bins_with_zeros_several_ranges(self):
+        data_x = np.arange(0, 10, 0.5).reshape(1, -1) * np.ones((3, 1))
+        data_y = np.ones_like(data_x)
+        data_e = np.ones_like(data_x)
+        workspace_mock = MagicMock()
+        workspace_mock.extractX.return_value = data_x
+        workspace_mock.extractY.return_value = data_y
+        workspace_mock.extractE.return_value = data_e
+
+        actual_data_x = np.zeros_like(data_x)
+        actual_data_y = np.zeros_like(data_x)
+        actual_data_e = np.zeros_like(data_x)
+
+        workspace_mock.dataY.side_effect = lambda i: actual_data_y[i]
+        workspace_mock.dataX.side_effect = lambda i: actual_data_x[i]
+        workspace_mock.dataE.side_effect = lambda i: actual_data_e[i]
+
+        workspace_mock.getNumberHistograms.return_value = 3
+
+        mask_time_of_flight_bins_with_zeros(workspace_mock, '1.1-3,3.5,  4.5-7.3, 9')
+
+        np.testing.assert_allclose(actual_data_x, data_x)
+        np.testing.assert_allclose(actual_data_e, data_e)
+        expected_data_y = np.ones_like(data_x)
+        expected_data_y[(data_x >= 1.1) & (data_x <= 3)] = 0
+        expected_data_y[(data_x == 3.5)] = 0
+        expected_data_y[(data_x >= 4.5) & (data_x <= 7.3)] = 0
+        expected_data_y[(data_x == 9)] = 0
+        np.testing.assert_allclose(actual_data_y, expected_data_y)
+
+
     def test_isolate_lighest_mass_data_no_fse_subtraction(self):
         np.random.seed(0)
 
