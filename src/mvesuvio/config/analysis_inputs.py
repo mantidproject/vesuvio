@@ -32,9 +32,9 @@ class BackwardAnalysisInputs(SampleParameters):
     mode = "DoubleDifference"
     instrument_parameters_file = "ip2019.par"
     detectors = "3-134"
-    mask_detectors = [18, 34, 42, 43, 59, 60, 62, 118, 119, 133]
+    mask_detectors = [18, 34, 42, 43, 59, 60, 62, 118, 119, 133] # Can also be a string "18, 34, 42-43, 59-60, 62, 118-119, 133"
     time_of_flight_binning = "275.,1.,420"
-    mask_time_of_flight_range = None
+    mask_time_of_flight_range = None   # Can be string eg. "110-120, 200-210"
     subtract_empty_workspace_from_raw = True
     scale_empty_workspace = 1  # None or scaling factor
     scale_raw_workspace = 1
@@ -90,9 +90,9 @@ class ForwardAnalysisInputs(SampleParameters):
     mode = "SingleDifference"
     instrument_parameters_file = "ip2018_3.par"
     detectors = '144-182'
-    mask_detectors = [173, 174, 179]
+    mask_detectors = [173, 174, 179]   # Can also be a string "173-174, 179"
     time_of_flight_binning = "110,1,430"
-    mask_time_of_flight_range = None
+    mask_time_of_flight_range = None   # Can be string Eg. "110-120, 200-210"
     subtract_empty_workspace_from_raw = False
     scale_empty_workspace = 1  # None or scaling factor
     scale_raw_workspace = 1
