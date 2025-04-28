@@ -23,7 +23,7 @@ classifiers = [
 # Only these few, package meant to be installed alongside vesuvio-dev.yml 
 dependencies = [
     "iminuit",
-    "jacobi==0.4.2",
+    "jacobi",
     "dill",
 ]
 
