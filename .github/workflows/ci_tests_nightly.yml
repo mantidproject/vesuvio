@@ -23,6 +23,10 @@ jobs:
           environment-file: vesuvio-dev.yml
           auto-activate-base: false
 
+      - name: Install Mantid
+        run: |
+          mamba install -c mantid/label/nightly mantidworkbench
+
       - name: Install mvesuvio package
         # The editable flag is necessary for coverage to find the src/ files
         run: pip install -e .
