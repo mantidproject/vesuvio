@@ -1,5 +1,2 @@
 python:
   - 3.10
-
-jacobi:
-  - 0.4.2 #pinned until later versions are proven.

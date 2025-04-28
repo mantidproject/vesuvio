@@ -27,7 +27,7 @@ requirements:
     - mantid
     - matplotlib
     - iminuit
-    - jacobi {{ jacobi }}
+    - jacobi
     - dill
 
 test:
