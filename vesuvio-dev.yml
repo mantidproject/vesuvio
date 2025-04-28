@@ -2,7 +2,7 @@ name: vesuvio-dev
 
 channels:
   - conda-forge
-  - mantid
+  - mantid/label/nightly
 
 dependencies:
   - mantidworkbench
