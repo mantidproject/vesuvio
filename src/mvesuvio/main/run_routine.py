@@ -11,6 +11,7 @@ from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 from mantid.api import mtd
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii 
+from mantid.kernel import logger
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
 import numpy as np
@@ -111,7 +112,7 @@ class Runner:
                     if not pattern.match(line):
                         outfile.write(line)
         except OSError:
-            print("Mantid log file not available. Unable to produce a summarized log file for this routine.")
+            logger.error("Mantid log file not available. Unable to produce a summarized log file for this routine.")
         return 
 
         
@@ -133,7 +134,7 @@ class Runner:
             i_cls.save_path = self.experiment_path / "output_files" / "fitting"
             i_cls.save_path.mkdir(exist_ok=True, parents=True)
             # NOTE: Resolution workspace is useful for scientists outside mantid
-            SaveAscii(ws_resolution.name(), str(i_cls.save_path))
+            SaveAscii(ws_resolution.name(), str(i_cls.save_path / ws_resolution.name()))
             self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_lighest_ncp, ws_resolution).run()
         return
 
@@ -211,16 +212,12 @@ class Runner:
         Runs iterative procedure with alternating back and forward scattering.
         """
 
-        # assert (
-        #     bckwdIC.runningSampleWS is False
-        # ), "Preliminary procedure not suitable for Bootstrap."
-        # fwdIC.runningPreliminary = True
-
         userInput = input(
-            "\nHydrogen intensity ratio to lowest mass is not set. Run procedure to estimate it?"
+            "\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure."
         )
-        if not ((userInput == "y") or (userInput == "Y")):
-            raise KeyboardInterrupt("Procedure interrupted.")
+        if not userInput == "":
+            logger.error("Procedure interrupted.")
+            return
 
         table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
 
@@ -247,7 +244,9 @@ class Runner:
 
             table_h_ratios.addRow([current_ratio])
 
-        print("\nProcedute to estimate Hydrogen ratio finished.",
+            SaveAscii(table_h_ratios.name(), str(self.experiment_path / "output_files" / table_h_ratios.name())) 
+
+        logger.notice("\nProcedute to estimate Hydrogen ratio finished.",
               "\nEstimates at each iteration converged:",
               f"\n{table_h_ratios.column(0)}")
         return
