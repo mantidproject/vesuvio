@@ -2,7 +2,7 @@ name: Deploy mvesuvio nightly
 
 on:
   workflow_run:
-    workflows: ["mvesuvio nightly build"]
+    workflows: ["Run tests nightly"]
     branches: [main]
     types:
       - completed

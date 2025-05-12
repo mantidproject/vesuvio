@@ -1,4 +1,4 @@
-name: mvesuvio nightly build
+name: Run tests nightly
 
 on:
   schedule:
