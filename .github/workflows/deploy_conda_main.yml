@@ -1,0 +1,32 @@
+name: Deploy mvesuvio main
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build_conda_and_upload:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout mvesuvio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: vesuvio-dev 
+          environment-file: vesuvio-dev.yml
+          auto-activate-base: false
+
+      - name: Publish conda package
+        uses: ./.github/actions/publish-conda-package
+        with:
+          label: main
+          token: ${{ secrets.ANACONDA_API_TOKEN }}
