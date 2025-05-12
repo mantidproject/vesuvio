@@ -10,7 +10,7 @@ from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import mtd
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import mtd, RenameWorkspace, Minus, SumSpectra
+from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii 
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
 import numpy as np
@@ -127,10 +127,13 @@ class Runner:
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
             ws_lighest_data, ws_lighest_ncp  = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncp_group"], i_cls.subtract_calculated_fse_from_data) 
+            # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
             # NOTE: Set saving path like this for now
             i_cls.save_path = self.experiment_path / "output_files" / "fitting"
             i_cls.save_path.mkdir(exist_ok=True, parents=True)
+            # NOTE: Resolution workspace is useful for scientists outside mantid
+            SaveAscii(ws_resolution.name(), str(i_cls.save_path))
             self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_lighest_ncp, ws_resolution).run()
         return
 
