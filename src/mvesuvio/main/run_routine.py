@@ -87,6 +87,17 @@ class Runner:
             self.make_summarised_log_file()
             return self.analysis_result, self.fitting_result  
 
+        if self.bckwd_ai.run_this_scattering_type:
+
+            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0):
+                self.run_estimate_h_ratio()
+                return
+
+            # TODO: make this automatic
+            assert is_hydrogen_present(self.fwd_ai.masses) != (
+                self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0 
+            ), "No Hydrogen detected, intensity_ratio_of_hydrogen_to_lowest_mass has to be set to 0"
+
         self.runAnalysisRoutine()
         self.runAnalysisFitting()
 
@@ -140,18 +151,6 @@ class Runner:
 
 
     def runAnalysisRoutine(self):
-
-        if self.bckwd_ai.run_this_scattering_type:
-
-            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0):
-                self.run_estimate_h_ratio()
-                return
-
-            # TODO: make this automatic
-            assert is_hydrogen_present(self.fwd_ai.masses) != (
-                self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0 
-            ), "No Hydrogen detected, intensity_ratio_of_hydrogen_to_lowest_mass has to be set to 0"
-
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
             self.run_joint_analysis()
             return 
@@ -212,11 +211,15 @@ class Runner:
         Runs iterative procedure with alternating back and forward scattering.
         """
 
-        userInput = input(
-            "\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure."
-        )
-        if not userInput == "":
-            logger.error("Procedure interrupted.")
+        try:
+            userInput = input(
+                "\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure."
+            )
+            if not userInput == "":
+                raise EOFError
+
+        except EOFError:
+            logger.error("Estimation of Hydrogen intensity ratio interrupted.")
             return
 
         table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
@@ -246,9 +249,8 @@ class Runner:
 
             SaveAscii(table_h_ratios.name(), str(self.experiment_path / "output_files" / table_h_ratios.name())) 
 
-        logger.notice("\nProcedute to estimate Hydrogen ratio finished.",
-              "\nEstimates at each iteration converged:",
-              f"\n{table_h_ratios.column(0)}")
+        logger.notice("\nProcedute to estimate Hydrogen ratio finished.")
+        print_table_workspace(table_h_ratios)
         return
 
 
