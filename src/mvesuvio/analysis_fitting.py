@@ -448,7 +448,8 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     signature = describe(model)[:]  # Build signature of convolved function
     signature[1:1] = ["y0"]  # Add intercept as first fitting parameter after range 'x'
 
-    convolvedModel.func_code = make_func_code(signature)
+    # Initialize limits as None, constrained later
+    convolvedModel._parameters = {key: None for key in signature}
     defaultPars["y0"] = 0  # Add initialization of parameter to dictionary
 
     # Fit only valid values, ignore cut-offs
@@ -1724,7 +1725,7 @@ def calcCostFun(model, i, x, y, yerr, res, sharedPars):
     signature[1:1] = ["y0"]
 
     costSig = [key if key in sharedPars else key + str(i) for key in signature]
-    convolvedModel.func_code = make_func_code(costSig)
+    convolvedModel._parameters = {key: None for key in costSig}
 
     # Select only valid data, i.e. when error is not 0 or nan or inf
     nonZeros = (yerr != 0) & (yerr != np.nan) & (yerr != np.inf) & (y != np.nan)
