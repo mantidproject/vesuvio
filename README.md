@@ -1,88 +1,83 @@
 # Mantid VESUVIO
 
+[![Nightly Build Status](https://github.com/mantidproject/vesuvio/actions/workflows/deploy_conda_nightly.yml/badge.svg)](https://github.com/mantidproject/vesuvio/actions/workflows/deploy_conda_nightly.yml)
 [![Coverage Status](https://coveralls.io/repos/github/mantidproject/vesuvio/badge.svg?branch=main)](https://coveralls.io/github/mantidproject/vesuvio?branch=main)
 
 This repository contains:
 - `mvesuvio` package containing the Optimized NCP analysis procedures, published nightly.
-- Vesuvio calibration script
+- Vesuvio calibration scripts, under the `tools` folder
 
 ## Install mvesuvio package
+The `mvesuvio` package is meant to be used inside the [Mantid software](https://www.mantidproject.org/index.html). If you've never used Mantid before, don't worry, you can follow these steps to install both Mantid and the `mvesuvio` package.
 
-### For stand-alone (non-conda) Mantid installation
-Currently this method is tested up until Mantid 6.8. 
+### Installing mantid and mvesuvio using conda/mamba
 
-The easiest way to install the package is to install it through pip.
-To pip install mvesuvio, follow these [instructions](https://docs.mantidproject.org/nightly/concepts/PipInstall.html) and replace `<insert_package_name>` with `mvesuvio`.
-
-Then open mantid workbench and in the editor run the following script:
-
-```
-import mvesuvio as mv
-mv.set_config()
-```
-
-You will see that the output shows two directories: one for the inputs file and another for the instrument parameters (IP) file.
-
-Both of these directories sit inside a default location of a `.mvesuvio` folder.
-
-The `.` in front of the directory name means this folder might be hidden by your OS, so you might have to turn on the option of showing hidden folders.
-
-You should place of your IP files inside this IP directory, you will notice that I have placed some example files in there already.
-
-The other directory in the output of the config command tells you which inputs file is being used for running the analysis.
-
-You should go to the directory of the inputs file and copy-and-paste this file into any directory inside your desktop where you want to run the analysis for a given sample.
-
-And that's the end of the installation and setup!
-
-## Using mvesuvio
-
-The easiest way to run the analysis scripts is to start with an inputs file and run it from inside mantid workbench.
-
-Open mantid workbench and navigate to the directory of the inputs file you copy-and-pasted in the last section.
-
-**Warning**: Do not run the analysis routine on the default location for the inputs file. This will clutter the default `.mvesuvio` folder and may cause problems later down the line.
-
-Now you can alter the inputs of the file as you see fit. When you are finished, press run. This will run the routine and create a new directory for the output files inside the parent directory of the inputs file.
-
-To run a new sample, simply copy-and-paste one of the inputs file into any directory you see fit, change the inputs and press run.
-
-## Alternative Installation and Usage (Conda and CLI)
-We also provide an alternative conda installation for users wanting to use mantid workbench inside a conda environment.
-
-### Install mamba
-
-To use the `mvesuvio` package you will need to use the `conda` package manager (or preferably  `mamba`, a much faster implementation of `conda`).
+To install `mvesuvio` you need to have `conda` installed (or preferably  `mamba`, a much faster implementation of `conda`).
 
 This is also the recommended best practice way of using the mantid packages.
 
 To download and install mamba:
 - https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html
 
-### Create and activate an environment for mantidworkbench and mvesuvio
+To check you have mamba installed, run:
+- `mamba --version`
 
-Firstly create a conda environment where `mvesuvio` is going to be installed:
+You should see some output with the versions available in your system.
+
+Now create a new conda environment (replace `<environment-name>` with something descriptive, for example `mantid-mvesuvio`):
 - `mamba create -n <environment_name>`
 
-Next activate the environment you created:
+And activate the environment you created:
 - `mamba activate <environment_name>`
 
-Install mantid workbench (the version is pinned to 6.8 for now):
-- `mamba install mantidworkbench=6.8`
+Install the latest version of mantid workbench:
+- `mamba install mantidworkbench`
 
 Finally, install `mvesuvio` through the mantid channel:
 - `mamba install -c mantid/label/nightly mvesuvio`
 
-Start workbench using the command line:
+You need to run the following command so that `mvesuvio` sets up some defaults:
+- `mvesuvio config`
+
+You can now start workbench by typing:
 - `workbench`
 
-### Using mvesuvio via the command line (CLI)
-If using a conda installation, the Command Line Interface (CLI) of the mvesuvio package becomes an attractive feature. 
+### Quickstart (running first analysis)
 
-This allows for setting the inputs file or the IP folder through terminal commands and run the analysis in the terminal (without 
+To run your very first analysis (and check that everything is working), go to your home folder and find the folder `.mvesuvio`.
+(The `.` in front of the directory name means this folder might be hidden by your OS, so you might have to turn on the option of showing hidden folders.
+)
+
+If the folder does not exist, try running `mvesuvio config` from the environment's terminal.
+Alternatively, you can open Mantid workbench, go the editor and run:
+
+```
+import mvesuvio as mv
+mv.set_config()
+```
+
+Once you have located the `.mvesuvio` folder, open Mantid workbench and inside it open the script `analysis_inputs.py` located inside `.mvesuvio`.
+
+This script represents the basics for passing in the inputs of the analysis routine.
+Click the run button on the workbench to start the execution of the script.
+(Check that you have the archive search enabled, otherwise the Vesuvio runs will not be found).
+This scipt is an example of a well-behaved sample and it should run without issues.
+
+If the run was successfull, you will notice that a new folder was created inside `.mvesuvio` containing all of the relevant outputs for this script.
+
+**IMPORTANT**:To run a new sample with different inputs, you should **copy** the example script `analysis_inputs.py` and place it in **any** folder of your choice outside `.mvesuvio`. 
+For providing the instrument parameters files, place them inside `.mvesuvio/ip_files/`.
+(You can change the directory of the instrument files too, consult next section).
+
+
+## Advanced Usage (CLI)
+
+### Using mvesuvio via the command line (CLI)
+If using a conda installation, you can use the Command Line Interface (CLI) to change some configurations and execute your python scripts.
+This allows for setting the inputs file or the instrument parameters folder through terminal commands and run the analysis in the terminal (without 
 the need for opening mantid workbench).
 
-You can use `mvesuvio` via the command line. There are two commands available: `config` and `run`.
+There are two commands available: `mvesuvio config` and `mvesuvio run`.
 
 #### config
 
@@ -90,7 +85,8 @@ The `config` command has two optional arguments:
 - `--set-inputs` - Sets the location of the inputs python file.
 - `--set-ipfolder` - Sets the directory in which `mvesuvio` will look for instrument parameter files.
 
-If any of these arguments are not provided a default location will be selected. These will be output on the running of `mvesuvo config`
+If any of these arguments are not provided a default location will be selected. 
+These will be output on the running of `mvesuvo config`.
 
 Usage examples:
 - `mvesuvio config --set-ipfolder C:\IPFolder` - Set instrument parameters folder.
@@ -98,11 +94,7 @@ Usage examples:
 
 #### run
 
-The `run` command has one optional argument:
-- `--yes` - If provided, this argument automatically inputs `Y` when prompted for user input.
-
 Usage example:
-- `mvesuvio run --yes` - Run the vesuvio analysis, automatically providing `Y` when prompted.
 - `mvesuvio run`- Run the vesuvio analysis, will wait for user input when prompted.
 
 ### Importing mvesuvio in workbench
