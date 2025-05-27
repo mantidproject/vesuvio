@@ -330,6 +330,28 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
+def pseudo_voigt(x, sigma, gamma):
+    """Convolution between Gaussian with std sigma and Lorentzian with HWHM gamma"""
+    fg, fl = 2.0 * sigma * np.sqrt(2.0 * np.log(2.0)), 2.0 * gamma
+    f = 0.5346 * fl + np.sqrt(0.2166 * fl**2 + fg**2)
+    eta = 1.36603 * fl / f - 0.47719 * (fl / f) ** 2 + 0.11116 * (fl / f) ** 3
+    sigma_v, gamma_v = f / (2.0 * np.sqrt(2.0 * np.log(2.0))), f / 2.0
+    pseudo_voigt = eta * lorentzian(x, gamma_v) + (1.0 - eta) * gaussian(x, sigma_v)
+    return pseudo_voigt
+
+
+def gaussian(x, sigma):
+    """Gaussian centered at zero"""
+    gauss = np.exp(-(x**2) / 2 / sigma**2) 
+    gauss /= np.sqrt(2.0 * np.pi) * sigma
+    return gauss
+
+
+def lorentzian(x, gamma):
+    """Lorentzian centered at zero"""
+    return gamma / np.pi / (x**2 + gamma**2)
+
+
 def numerical_third_derivative(x, y):
     k6 = (- y[:, 12:] + y[:, :-12]) * 1
     k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
