@@ -1,6 +1,7 @@
 from fileinput import filename
 import numpy as np 
 import matplotlib.pyplot as plt
+import scipy
 import dill      # Only for converting constraints from string
 from pathlib import Path
 from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
