@@ -8,7 +8,7 @@ import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers, pseudo_voigt
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, SaveNexus, CompareWorkspaces, Rebin, AnalysisDataService
 import tempfile
 from textwrap import dedent
@@ -147,6 +147,14 @@ class TestAnalysisHelpers(unittest.TestCase):
         x_extended = extend_range_of_array(x, 5)
         np.testing.assert_array_equal(x_extended, np.vstack([np.linspace(-7.5, 7.5, 31), np.linspace(-15, 15, 31)]))
 
+
+    def test_pseudo_voigt(self):
+        x= np.linspace(-20, 20, 10)
+        actual_result = pseudo_voigt(x, 5, 4)
+        expected_result = np.array([0.00360493, 0.00695558, 0.01490388, 0.02897969, 0.04368826, 0.04368826
+, 0.02897969, 0.01490388, 0.00695558, 0.00360493])
+        np.testing.assert_allclose(actual_result, expected_result, atol=1e-6)
+        
 
     def test_numerical_third_derivative(self):
         x= np.linspace(-20, 20, 300)    # Workspaces are about 300 points of range

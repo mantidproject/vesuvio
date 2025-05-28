@@ -16,7 +16,7 @@ from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
                                             extend_range_of_array, print_table_workspace, make_gamma_correction_input_string, \
-                                            make_multiple_scattering_input_string
+                                            make_multiple_scattering_input_string, pseudo_voigt
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -575,7 +575,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         lorentzian_width = self._get_lorentzian_resolution(centers)
         total_gaussian_width = np.sqrt(widths**2 + gaussian_width**2)
 
-        JOfY = scipy.special.voigt_profile(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
+        JOfY = pseudo_voigt(self._y_space_arrays[self._row_being_fit] - centers, total_gaussian_width, lorentzian_width)
 
         # Third derivative cuts edges of array by 6 indices
         JOfY_third_derivative = numerical_third_derivative(self._y_space_arrays[self._row_being_fit], JOfY)
