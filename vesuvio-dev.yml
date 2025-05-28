@@ -6,7 +6,7 @@ channels:
 
 dependencies:
   - mantidworkbench
-  - flake8
+  - ruff
   - conda-wrappers
   - pre-commit
   - coveralls

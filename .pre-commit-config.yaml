@@ -14,9 +14,8 @@ repos:
         args: ['--maxkb=4096']
         exclude: 'unpackaged|legacy'
 
-  - repo: https://github.com/PyCQA/flake8.git
-    rev: 6.1.0
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.3
     hooks:
-      - id: flake8
-        args: ['--config', 'config.flake8']
-        exclude: 'unpackaged|legacy'
+      - id: ruff
+        args: ["."]
