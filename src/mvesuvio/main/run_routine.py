@@ -304,31 +304,6 @@ class Runner:
         alg.setProperties(kwargs)
         return alg
 
-    def _make_neutron_profiles(cls, ai):
-        profiles = []
-        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-            ai.masses,
-            ai.initial_fitting_parameters[::3],
-            ai.initial_fitting_parameters[1::3],
-            ai.initial_fitting_parameters[2::3],
-            ai.fitting_bounds[::3],
-            ai.fitting_bounds[1::3],
-            ai.fitting_bounds[2::3],
-        ):
-            profiles.append(
-                NeutronComptonProfile(
-                    label=str(float(mass)),
-                    mass=float(mass),
-                    intensity=float(intensity),
-                    width=float(width),
-                    center=float(center),
-                    intensity_bounds=list(intensity_bound),
-                    width_bounds=list(width_bound),
-                    center_bounds=list(center_bound),
-                )
-            )
-        return profiles
-
     def _save_ws_if_not_on_path(self, load_ai):
         scatteringType = scattering_type(load_ai).lower()
         scriptName = handle_config.get_script_name()

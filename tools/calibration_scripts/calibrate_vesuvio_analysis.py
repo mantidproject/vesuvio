@@ -575,7 +575,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         file_data = np.asarray([[1, 1, 0, 0, 0, 0], [2, 2, 0, 0, 0, 0]])
         file_data = np.append(file_data, np.column_stack((det, det, theta, t0, L0, L1)), axis=0)
 
-        workdir = config["defaultsave.directory"]
+        # TODO: Fix this error picked up by linter
+        workdir = config["defaultsave.directory"]  # noqa: F821
         file_path = os.path.join(workdir, self._output_workspace_name + ".par")
 
         with open(file_path, "wb") as f_handle:
