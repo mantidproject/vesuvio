@@ -1,8 +1,6 @@
 from dataclasses import dataclass
-from typing_extensions import override
 import unittest
 from pathlib import Path
-from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
 from mvesuvio.analysis_fitting import FitInYSpace
 from mantid.simpleapi import Load, LoadAscii, mtd, CompareWorkspaces, AnalysisDataService

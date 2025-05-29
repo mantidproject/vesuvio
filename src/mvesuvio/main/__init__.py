@@ -1,7 +1,7 @@
 """Package defining entry points."""
 
 import argparse
-from os import environ, path
+from os import path
 from mvesuvio.util import handle_config
 
 

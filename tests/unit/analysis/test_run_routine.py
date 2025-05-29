@@ -1,8 +1,6 @@
 
 import unittest
-import numpy as np
-import numpy.testing as nptest
-from mock import MagicMock, patch, call
+from mock import MagicMock
 from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
 from pathlib import Path

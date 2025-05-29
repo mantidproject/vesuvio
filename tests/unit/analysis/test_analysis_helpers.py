@@ -1,6 +1,5 @@
 import unittest
 import numpy as np
-from numpy.testing._private.utils import assert_allclose
 import scipy
 import dill
 from pathlib import Path
@@ -9,9 +8,7 @@ from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers, pseudo_voigt
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, SaveNexus, CompareWorkspaces, Rebin, AnalysisDataService
-import tempfile
-from textwrap import dedent
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, CompareWorkspaces, Rebin, AnalysisDataService
 
 class TestAnalysisHelpers(unittest.TestCase):
     def setUp(self):
@@ -279,7 +276,6 @@ class TestAnalysisHelpers(unittest.TestCase):
 
 
     def test_vesuvio_resolution(self):
-        import matplotlib.pyplot as plt
         ws_data = Load(str(Path(__file__).parent.parent.parent/"data/analysis/unit/analysis_fwd_0.nxs"))
 
         ws_res = calculate_resolution(1, ws_data, '-25, 5, 25')

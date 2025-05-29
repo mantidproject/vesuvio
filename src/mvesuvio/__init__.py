@@ -7,10 +7,11 @@ nuclear kinetic energies and moment distributions.
 """
 
 from mvesuvio._version import __version__
+from mvesuvio.main import main
 
 __project_url__ = "https://github.com/mantidproject/vesuvio"
 
-from mvesuvio.main import main
+__all__ = ["__version__", "__project_url__"]
 
 
 class ArgInputs:

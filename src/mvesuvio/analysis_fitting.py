@@ -8,9 +8,7 @@ from iminuit import Minuit, cost
 from iminuit.util import make_func_code, describe
 import jacobi
 import time
-import re
 from mantid.kernel import logger
-from mantid.simpleapi import AnalysisDataService
 
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws

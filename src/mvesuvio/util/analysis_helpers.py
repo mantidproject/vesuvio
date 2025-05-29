@@ -6,7 +6,6 @@ from mantid.simpleapi import (
     Minus,
     CropWorkspace,
     MaskDetectors,
-    CreateWorkspace,
     CreateEmptyTableWorkspace,
     DeleteWorkspace,
     SaveNexus,
@@ -19,7 +18,6 @@ from mantid.simpleapi import (
 )
 from mantid.kernel import logger
 import numpy as np
-import numbers
 
 from mvesuvio.util import handle_config
 

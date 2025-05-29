@@ -1,5 +1,5 @@
 import unittest
-from mock import MagicMock, patch, call
+from mock import patch
 from mvesuvio.util import handle_config
 import tempfile
 from textwrap import dedent
