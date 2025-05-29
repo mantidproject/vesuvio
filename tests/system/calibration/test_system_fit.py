@@ -169,7 +169,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
 
     @staticmethod
     def _find_all_peak_positions(params_table):
-        filter_errors_func = lambda name: ('LorentzPos' in name or 'PeakCentre' in name) and 'Err' not in name
+        filter_errors_func = lambda name: ('LorentzPos' in name or 'PeakCentre' in name) and 'Err' not in name  # noqa : E731
         column_names = params_table.getColumnNames()
         column_names = filter(filter_errors_func, column_names)
         return column_names

@@ -1224,7 +1224,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
     def test_fit_bragg_peaks_success(self, group_workspaces_mock):
         fit_result_ret_val = {'status': 'success'}
-        fit_results = lambda *args: fit_result_ret_val
+        fit_results = lambda *args: fit_result_ret_val  # noqa : E731
         selected_params = ['selected_params1', 'selected_params2']
         output_workspaces = ['ws1', 'ws2']
 
