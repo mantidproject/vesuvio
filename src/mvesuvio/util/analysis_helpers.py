@@ -134,7 +134,7 @@ def create_profiles_table(name, ai):
 
     def wrapb(bound):
         # Literally to just account for NoneType
-        if bound == None:
+        if bound is None:
             return np.inf
         return bound
 

@@ -541,7 +541,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         if column_name not in table_ws.getColumnNames():
             table_ws.addColumn("double", column_name)
 
-        if spec_list == None:
+        if spec_list is None:
             offset = 0
         else:
             if len(data) < (spec_list[1] + 1 - spec_list[0]):
