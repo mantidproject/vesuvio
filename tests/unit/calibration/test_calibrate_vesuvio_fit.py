@@ -355,7 +355,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                       'OutputWorkspace': ''}
         for prop in properties:
             expected_value = alg.getProperty(prop).value
-            if type(expected_value) == np.ndarray:
+            if type(expected_value) is np.ndarray:
                 expected_value = list(expected_value)
             self.assertEqual(expected_value, properties[prop], f'Property {prop}. Expected: {expected_value},'
                                                                f'Actual: {properties[prop]}')
