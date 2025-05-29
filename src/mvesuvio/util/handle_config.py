@@ -108,7 +108,7 @@ def __mk_dir(type: str, path: str):
     try:
         os.makedirs(path, exist_ok=True)
         return True
-    except:
+    except FileNotFoundError:
         print(f"Unable to make {type} directory at location: {path}")
         return False
 

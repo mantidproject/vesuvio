@@ -87,7 +87,7 @@ exclude = [".git", "build", "buildconfig", "unpackaged", "legacy"]
 line-length = 140
 
 [tool.ruff.lint]
-ignore = ["F405", "F403", "E722", "E721"]
+ignore = ["F405", "F403", "E721"]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = false
