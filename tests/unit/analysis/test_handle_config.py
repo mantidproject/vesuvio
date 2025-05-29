@@ -40,7 +40,7 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_read_config_throws(self):
         with self.assertRaises(RuntimeError):
-            lines = getattr(handle_config, "__read_config")("/not.there")
+            getattr(handle_config, "__read_config")("/not.there")
 
 
     def test_set_config_vars(self):
@@ -93,7 +93,6 @@ class TestHandleConfig(unittest.TestCase):
     def test_get_script_name(self):
         with (
             patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename,
-            patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config_var
         ):
             mock_basename.return_value = "inputs.py"
             self.assertEqual(handle_config.get_script_name(), "inputs")

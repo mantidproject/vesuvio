@@ -1211,7 +1211,6 @@ class EVSCalibrationFit(PythonAlgorithm):
             AppendSpectra(ws_name, peak_ws, ValidateInputs=False, OutputWorkspace=ws_name)
 
             # create sum of peak fits
-            temp_sum_workspace = "__temp_sum_ws"
             SumSpectra(InputWorkspace=peak_ws, OutputWorkspace=peak_ws)
             AppendSpectra(ws_name, peak_ws, ValidateInputs=False, OutputWorkspace=ws_name)
             ax.setLabel(mtd[ws_name].getNumberHistograms() - 1, "Total")

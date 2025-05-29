@@ -187,11 +187,6 @@ class TestAnalysisReduction(unittest.TestCase):
     def test_set_y_space_arrays(self):
         alg = VesuvioAnalysisRoutine()
         alg._masses = np.array([1, 12, 16])
-        dataX = np.array([
-            [110.5, 111.5, 112.5, 113.5, 114.5],
-            [110.5, 111.5, 112.5, 113.5, 114.5],
-            [110.5, 111.5, 112.5, 113.5, 114.5],
-        ])
         alg._deltaQ = np.array([[227.01905, 224.95887, 222.94348, 220.97148, 219.04148],
            [226.21278, 224.18766, 222.20618, 220.26696, 218.36867],
            [226.07138, 224.05877, 222.08939, 220.16185, 218.27485],
