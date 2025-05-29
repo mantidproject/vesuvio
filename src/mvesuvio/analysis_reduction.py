@@ -1,22 +1,51 @@
 from fileinput import filename
-import numpy as np 
+import numpy as np
 import matplotlib.pyplot as plt
 import scipy
-import dill      # Only for converting constraints from string
+import dill  # Only for converting constraints from string
 from pathlib import Path
-from mantid.kernel import StringListValidator, Direction, IntArrayBoundedValidator, IntArrayProperty,\
-     IntBoundedValidator, FloatBoundedValidator
-from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty, WorkspaceGroupProperty 
+from mantid.kernel import (
+    StringListValidator,
+    Direction,
+    IntArrayBoundedValidator,
+    IntArrayProperty,
+    IntBoundedValidator,
+    FloatBoundedValidator,
+)
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, MatrixWorkspaceProperty, WorkspaceGroupProperty
 from mantid.dataobjects import TableWorkspaceProperty
-from mantid.simpleapi import mtd, CreateEmptyTableWorkspace, SumSpectra, \
-                            CloneWorkspace, DeleteWorkspace, VesuvioCalculateGammaBackground, \
-                            VesuvioCalculateMS, Scale, RenameWorkspace, Minus, CreateSampleShape, \
-                            VesuvioThickness, Integration, Divide, Multiply, DeleteWorkspaces, \
-                            CreateWorkspace, GroupWorkspaces, SaveAscii
+from mantid.simpleapi import (
+    mtd,
+    CreateEmptyTableWorkspace,
+    SumSpectra,
+    CloneWorkspace,
+    DeleteWorkspace,
+    VesuvioCalculateGammaBackground,
+    VesuvioCalculateMS,
+    Scale,
+    RenameWorkspace,
+    Minus,
+    CreateSampleShape,
+    VesuvioThickness,
+    Integration,
+    Divide,
+    Multiply,
+    DeleteWorkspaces,
+    CreateWorkspace,
+    GroupWorkspaces,
+    SaveAscii,
+)
 
-from mvesuvio.util.analysis_helpers import numerical_third_derivative, load_resolution, load_instrument_params, \
-                                            extend_range_of_array, print_table_workspace, make_gamma_correction_input_string, \
-                                            make_multiple_scattering_input_string, pseudo_voigt
+from mvesuvio.util.analysis_helpers import (
+    numerical_third_derivative,
+    load_resolution,
+    load_instrument_params,
+    extend_range_of_array,
+    print_table_workspace,
+    make_gamma_correction_input_string,
+    make_multiple_scattering_input_string,
+    pseudo_voigt,
+)
 
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
@@ -28,7 +57,6 @@ H_BAR = 2.0445
 
 
 class VesuvioAnalysisRoutine(PythonAlgorithm):
-
     def summary(self):
         return "Runs the analysis reduction routine for VESUVIO."
 
@@ -36,124 +64,69 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return "VesuvioAnalysis"
 
     def PyInit(self):
-        self.declareProperty(MatrixWorkspaceProperty(
-            name="InputWorkspace",
-            defaultValue="",
-            direction=Direction.Input),
-            doc="Workspace to fit Neutron Compton Profiles."
-        )
-        self.declareProperty(TableWorkspaceProperty(
-            name="InputProfiles",
-            defaultValue="",
-            direction=Direction.Input),
-            doc="Table workspace containing starting parameters for profiles."
-        )
-        self.declareProperty(FileProperty(
-            name='InstrumentParametersFile', 
-            defaultValue='', 
-            action=FileAction.Load, 
-            extensions=["par", "dat"]),
-            doc="Filename of the instrument parameter file."
+        self.declareProperty(
+            MatrixWorkspaceProperty(name="InputWorkspace", defaultValue="", direction=Direction.Input),
+            doc="Workspace to fit Neutron Compton Profiles.",
         )
         self.declareProperty(
-            name="HRatioToLowestMass", 
+            TableWorkspaceProperty(name="InputProfiles", defaultValue="", direction=Direction.Input),
+            doc="Table workspace containing starting parameters for profiles.",
+        )
+        self.declareProperty(
+            FileProperty(name="InstrumentParametersFile", defaultValue="", action=FileAction.Load, extensions=["par", "dat"]),
+            doc="Filename of the instrument parameter file.",
+        )
+        self.declareProperty(
+            name="HRatioToLowestMass",
             defaultValue=0.0,
-            validator=FloatBoundedValidator(lower=0), 
-            doc="Intensity ratio between H peak and lowest mass peak."
+            validator=FloatBoundedValidator(lower=0),
+            doc="Intensity ratio between H peak and lowest mass peak.",
         )
+        self.declareProperty(name="NumberOfIterations", defaultValue=2, validator=IntBoundedValidator(lower=0))
         self.declareProperty(
-            name="NumberOfIterations", 
-            defaultValue=2,
-            validator=IntBoundedValidator(lower=0)
+            IntArrayProperty(name="InvalidDetectors", validator=IntArrayBoundedValidator(lower=3, upper=198), direction=Direction.Input),
+            doc="List of invalid detectors whithin range 3-198.",
         )
-        self.declareProperty(IntArrayProperty(
-            name="InvalidDetectors",
-            validator=IntArrayBoundedValidator(lower=3, upper=198),
-            direction=Direction.Input),
-            doc="List of invalid detectors whithin range 3-198."
-        )
-        self.declareProperty(
-            name="MultipleScatteringCorrection", 
-            defaultValue=False, 
-            doc="Whether to run multiple scattering correction."
-        )
-        self.declareProperty(
-            name="GammaCorrection", 
-            defaultValue=False, 
-            doc="Whether to run gamma correction."
-        )
-        self.declareProperty(
-            name="VesuvioThickness",
-            defaultValue=0.1,
-            validator=FloatBoundedValidator(lower=0)
-        )
+        self.declareProperty(name="MultipleScatteringCorrection", defaultValue=False, doc="Whether to run multiple scattering correction.")
+        self.declareProperty(name="GammaCorrection", defaultValue=False, doc="Whether to run gamma correction.")
+        self.declareProperty(name="VesuvioThickness", defaultValue=0.1, validator=FloatBoundedValidator(lower=0))
         self.declareProperty(
             name="SampleShapeXml",
-            defaultValue=f'''<cuboid id="sample-shape">
+            defaultValue="""<cuboid id="sample-shape">
                 <left-front-bottom-point x="0.05" y="-0.05" z="0.005" />
                 <left-front-top-point x="0.05" y="0.05" z="0.005"/>
                 <left-back-bottom-point x="0.05" y="-0.05" z="-0.005" />
-                <right-front-bottom-point x="-0.05" y="-0.05" z="0.005" /> 
-                </cuboid>''',
-            doc="XML string that describes the shape of the sample. Used in MS correction."
+                <right-front-bottom-point x="-0.05" y="-0.05" z="0.005" />
+                </cuboid>""",
+            doc="XML string that describes the shape of the sample. Used in MS correction.",
         )
         self.declareProperty(
             name="ModeRunning",
             defaultValue="BACKWARD",
             validator=StringListValidator(["BACKWARD", "FORWARD"]),
-            doc="Whether running backward or forward scattering.")
+            doc="Whether running backward or forward scattering.",
+        )
 
-        self.declareProperty(
-            name="OutputDirectory",
-            defaultValue="",
-            doc="Directory where to save analysis results."
-        )
-        self.declareProperty(
-            name="Constraints",
-            defaultValue="",
-            doc="Constraints to use during fitting profiles."
-        )
-        self.declareProperty(
-            name="TransmissionGuess",
-            defaultValue=-1.0,
-            validator=FloatBoundedValidator(lower=0, upper=1)
-        )
-        self.declareProperty(
-            name="MultipleScatteringOrder",
-            defaultValue=-1,
-            validator=IntBoundedValidator(lower=0)
-        )
-        self.declareProperty(
-            name="NumberOfEvents",
-            defaultValue=-1,
-            validator=IntBoundedValidator(lower=0)
-        )
-        self.declareProperty(
-            name="ResultsPath",
-            defaultValue="",
-            doc="Directory to store results, to be deleted later."
-        )
+        self.declareProperty(name="OutputDirectory", defaultValue="", doc="Directory where to save analysis results.")
+        self.declareProperty(name="Constraints", defaultValue="", doc="Constraints to use during fitting profiles.")
+        self.declareProperty(name="TransmissionGuess", defaultValue=-1.0, validator=FloatBoundedValidator(lower=0, upper=1))
+        self.declareProperty(name="MultipleScatteringOrder", defaultValue=-1, validator=IntBoundedValidator(lower=0))
+        self.declareProperty(name="NumberOfEvents", defaultValue=-1, validator=IntBoundedValidator(lower=0))
+        self.declareProperty(name="ResultsPath", defaultValue="", doc="Directory to store results, to be deleted later.")
         # Outputs
-        self.declareProperty(TableWorkspaceProperty(
-            name="OutputMeansTable",
-            defaultValue="",
-            direction=Direction.Output),
-            doc="TableWorkspace containing final means of intensity and widths."
+        self.declareProperty(
+            TableWorkspaceProperty(name="OutputMeansTable", defaultValue="", direction=Direction.Output),
+            doc="TableWorkspace containing final means of intensity and widths.",
         )
-        self.declareProperty(WorkspaceGroupProperty(
-            name="OutputNCPGroup",
-            defaultValue="ncp",
-            direction=Direction.Output),
-            doc="GroupWorkspace containing Neutron Compton Profiles for each mass and sum."
+        self.declareProperty(
+            WorkspaceGroupProperty(name="OutputNCPGroup", defaultValue="ncp", direction=Direction.Output),
+            doc="GroupWorkspace containing Neutron Compton Profiles for each mass and sum.",
         )
-        self.declareProperty(WorkspaceGroupProperty(
-            name="OutputFSEGroup",
-            defaultValue="fse",
-            direction=Direction.Output),
-            doc="GroupWorkspace containing fitted Final State Effects for each mass."
+        self.declareProperty(
+            WorkspaceGroupProperty(name="OutputFSEGroup", defaultValue="fse", direction=Direction.Output),
+            doc="GroupWorkspace containing fitted Final State Effects for each mass.",
         )
 
-                                    
     def PyExec(self):
         self._setup()
         self.run()
@@ -162,17 +135,17 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._name = self.getPropertyValue("InputWorkspace")
         self._ip_file = self.getProperty("InstrumentParametersFile").value
         self._number_of_iterations = self.getProperty("NumberOfIterations").value
-        self._mask_spectra = self.getProperty("InvalidDetectors").value 
-        self._transmission_guess = self.getProperty("TransmissionGuess").value 
-        self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value 
-        self._number_of_events = self.getProperty("NumberOfEvents").value 
+        self._mask_spectra = self.getProperty("InvalidDetectors").value
+        self._transmission_guess = self.getProperty("TransmissionGuess").value
+        self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value
+        self._number_of_events = self.getProperty("NumberOfEvents").value
         self._vesuvio_thickness = self.getProperty("VesuvioThickness").value
         self._sample_shape_xml = self.getProperty("SampleShapeXml").value
-        self._mode_running = self.getProperty("ModeRunning").value 
-        self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value 
-        self._gamma_correction = self.getProperty("GammaCorrection").value 
+        self._mode_running = self.getProperty("ModeRunning").value
+        self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value
+        self._gamma_correction = self.getProperty("GammaCorrection").value
         self._save_results_path = Path(self.getProperty("ResultsPath").value)
-        self._h_ratio = self.getProperty("HRatioToLowestMass").value 
+        self._h_ratio = self.getProperty("HRatioToLowestMass").value
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
         self._profiles_table = self.getProperty("InputProfiles").value
 
@@ -182,14 +155,12 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # Create paths if not there already
         self._save_results_path.mkdir(parents=True, exist_ok=True)
         self._save_figures_path = self._save_results_path / "figures"
-        self._save_figures_path.mkdir(parents=True, exist_ok=True) 
+        self._save_figures_path.mkdir(parents=True, exist_ok=True)
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
         for intensity, width, center in zip(
-            self._profiles_table.column("intensity"),
-            self._profiles_table.column("width"),
-            self._profiles_table.column("center")
+            self._profiles_table.column("intensity"), self._profiles_table.column("width"), self._profiles_table.column("center")
         ):
             self._initial_fit_parameters.extend([intensity, width, center])
 
@@ -201,7 +172,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._profiles_table.column("width_lb"),
             self._profiles_table.column("width_ub"),
             self._profiles_table.column("center_lb"),
-            self._profiles_table.column("center_ub")
+            self._profiles_table.column("center_ub"),
         ):
             self._initial_fit_bounds.extend([[intensity_lb, intensity_ub], [width_lb, width_ub], [center_lb, center_ub]])
 
@@ -209,16 +180,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._masses = np.array(self._profiles_table.column("mass"))
 
         # Variables changing during fit
-        self._workspace_for_corrections = self.getProperty("InputWorkspace").value 
+        self._workspace_for_corrections = self.getProperty("InputWorkspace").value
         self._workspace_being_fit = self.getProperty("InputWorkspace").value
-        self._row_being_fit = 0 
+        self._row_being_fit = 0
         self._zero_columns_boolean_mask = None
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
 
-
     def _update_workspace_data(self):
-
         self._dataX = self._workspace_being_fit.extractX()
         self._dataY = self._workspace_being_fit.extractY()
         self._dataE = self._workspace_being_fit.extractE()
@@ -229,10 +198,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._set_y_space_arrays()
 
         self._fit_parameters = np.zeros((len(self._dataY), 3 * self._profiles_table.rowCount() + 2))
-        self._row_being_fit = 0 
+        self._row_being_fit = 0
         self._table_fit_results = self._initialize_table_fit_parameters()
 
-        # Initialise workspaces for fitted ncp 
+        # Initialise workspaces for fitted ncp
         self._fit_profiles_workspaces = {}
         ws_ncp_group = self._initialize_and_group_workspaces("ncp", self._fit_profiles_workspaces)
         self.setPropertyValue("OutputNCPGroup", ws_ncp_group.name())
@@ -243,28 +212,24 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self.setPropertyValue("OutputFSEGroup", ws_fse_group.name())
 
         # Initialise empty means
-        self._mean_widths = np.zeros(self._masses.size) 
+        self._mean_widths = np.zeros(self._masses.size)
         self._std_widths = np.zeros(self._masses.size)
         self._mean_intensity_ratios = np.zeros(self._masses.size)
         self._std_intensity_ratios = np.zeros(self._masses.size)
 
-
     def _initialize_and_group_workspaces(self, suffix, result_dict):
         # Helper to initialize either ncp of fse workspaces and group them together
-        assert not result_dict   # Check dict is empty
+        assert not result_dict  # Check dict is empty
         for element in self._profiles_table.column("label"):
-            result_dict[element] = self._create_emtpy_ncp_workspace(f'_{element}_{suffix}')
-        result_dict['total'] = self._create_emtpy_ncp_workspace(f'_total_{suffix}')
+            result_dict[element] = self._create_emtpy_ncp_workspace(f"_{element}_{suffix}")
+        result_dict["total"] = self._create_emtpy_ncp_workspace(f"_total_{suffix}")
 
-        empty_sum_ws = [SumSpectra(ws, OutputWorkspace=ws.name()+"_sum") for ws in result_dict.values()]
+        empty_sum_ws = [SumSpectra(ws, OutputWorkspace=ws.name() + "_sum") for ws in result_dict.values()]
         ws_to_group = list(result_dict.values()) + empty_sum_ws
-        return GroupWorkspaces(ws_to_group, OutputWorkspace=self._workspace_being_fit.name()+f"_{suffix}_group")
-
+        return GroupWorkspaces(ws_to_group, OutputWorkspace=self._workspace_being_fit.name() + f"_{suffix}_group")
 
     def _initialize_table_fit_parameters(self):
-        table = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._workspace_being_fit.name()+ "_fit_results"
-        )
+        table = CreateEmptyTableWorkspace(OutputWorkspace=self._workspace_being_fit.name() + "_fit_results")
         table.setTitle("SciPy Fit Parameters")
         table.addColumn(type="float", name="Spec")
         for label in self._profiles_table.column("label"):
@@ -274,32 +239,25 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         table.addColumn(type="float", name="NChi2")
         return table
 
-
     def _create_emtpy_ncp_workspace(self, suffix):
         return CreateWorkspace(
             DataX=self._dataX,
             DataY=np.zeros(self._dataY.size),
             DataE=np.zeros(self._dataE.size),
             Nspec=self._workspace_being_fit.getNumberHistograms(),
-            UnitX="TOF",    # I had hoped for a method like .XUnit() but alas
-            OutputWorkspace=self._workspace_being_fit.name()+suffix,
+            UnitX="TOF",  # I had hoped for a method like .XUnit() but alas
+            OutputWorkspace=self._workspace_being_fit.name() + suffix,
             ParentWorkspace=self._workspace_being_fit,
-            Distribution=True
-    )
-
-
-    def run(self):
-
-        assert self._profiles_table.rowCount() > 0, "Need at least one profile to run the routine!"
-
-        CloneWorkspace(
-            InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._name + '_0' 
+            Distribution=True,
         )
 
-        for iteration in range(self._number_of_iterations + 1):
+    def run(self):
+        assert self._profiles_table.rowCount() > 0, "Need at least one profile to run the routine!"
 
-            self._workspace_being_fit = mtd[self._name + '_' + str(iteration)]
+        CloneWorkspace(InputWorkspace=self._workspace_being_fit.name(), OutputWorkspace=self._name + "_0")
+
+        for iteration in range(self._number_of_iterations + 1):
+            self._workspace_being_fit = mtd[self._name + "_" + str(iteration)]
             self._update_workspace_data()
 
             self._fit_neutron_compton_profiles()
@@ -312,27 +270,20 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             if iteration == self._number_of_iterations:
                 break
 
-            # Do this because MS and Gamma corrections do not accept zero columns 
-            if iteration==0:
+            # Do this because MS and Gamma corrections do not accept zero columns
+            if iteration == 0:
                 self._replace_zeros_with_ncp_for_corrections()
 
-            CloneWorkspace(
-                InputWorkspace=self._workspace_for_corrections.name(), 
-                OutputWorkspace="next_iteration"
-            )
+            CloneWorkspace(InputWorkspace=self._workspace_for_corrections.name(), OutputWorkspace="next_iteration")
             self._correct_for_gamma_and_multiple_scattering("next_iteration")
 
-            # Need to remask columns of output of corrections 
+            # Need to remask columns of output of corrections
             self._remask_columns_with_zeros("next_iteration")
 
-            RenameWorkspace(
-                InputWorkspace="next_iteration", 
-                OutputWorkspace=self._name + '_' + str(iteration + 1)
-            )
+            RenameWorkspace(InputWorkspace="next_iteration", OutputWorkspace=self._name + "_" + str(iteration + 1))
 
         self._save_results()
-        return self 
-
+        return self
 
     def _fit_neutron_compton_profiles(self):
         """
@@ -350,32 +301,28 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         print_table_workspace(self._table_fit_results)
         return
 
-
     def _set_kinematic_arrays(self, dataX):
-
         # Extend range due to third derivative cutting edges
         dataX = extend_range_of_array(dataX, 6)
 
         det, plick, angle, T0, L0, L1 = np.hsplit(self._instrument_params, 6)  # each is of len(dataX)
 
         # T0 is electronic delay due to instruments
-        t_us = dataX - T0  
+        t_us = dataX - T0
         self._v0 = VELOCITY_FINAL * L0 / (VELOCITY_FINAL * t_us - L1)
         # en_to_vel is a factor used to easily change velocity to energy and vice-versa
-        self._E0 = np.square(self._v0 / ENERGY_TO_VELOCITY)  
+        self._E0 = np.square(self._v0 / ENERGY_TO_VELOCITY)
         self._deltaE = self._E0 - ENERGY_FINAL
         delta_Q2 = (
             2.0
-            * NEUTRON_MASS 
+            * NEUTRON_MASS
             / H_BAR**2
             * (self._E0 + ENERGY_FINAL - 2.0 * np.sqrt(self._E0 * ENERGY_FINAL) * np.cos(angle / 180.0 * np.pi))
         )
         self._deltaQ = np.sqrt(delta_Q2)
         return
 
-
     def _set_y_space_arrays(self):
-
         delta_Q = self._deltaQ[np.newaxis, :, :]
         delta_E = self._deltaE[np.newaxis, :, :]
         masses = self._masses.reshape(-1, 1, 1)
@@ -384,12 +331,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         y_spaces = masses / H_BAR**2 / delta_Q * (delta_E - energy_recoil)
 
         # Swap axis so that first axis selects spectra
-        self._y_space_arrays = np.swapaxes(y_spaces, 0, 1) 
+        self._y_space_arrays = np.swapaxes(y_spaces, 0, 1)
         return
 
-
     def _save_plots(self):
-
         if not self._save_figures_path.exists():
             return
 
@@ -397,12 +342,12 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
 
-        ws_data_sum = mtd[self._workspace_being_fit.name()+"_sum"]
+        ws_data_sum = mtd[self._workspace_being_fit.name() + "_sum"]
         ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra")
 
         for key, ws in self._fit_profiles_workspaces.items():
-            ws_sum = mtd[ws.name()+"_sum"] 
-            ax.plot(ws_sum, label=f'Sum of {key} profile', linewidth=lw)
+            ws_sum = mtd[ws.name() + "_sum"]
+            ax.plot(ws_sum, label=f"Sum of {key} profile", linewidth=lw)
 
         ax.set_xlabel("TOF")
         ax.set_ylabel("Counts")
@@ -415,24 +360,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         plt.close(fig)
         return
 
-
     def _calculate_summed_workspaces(self):
-
-        SumSpectra(
-            InputWorkspace=self._workspace_being_fit.name(), 
-            OutputWorkspace=self._workspace_being_fit.name() + "_sum")
+        SumSpectra(InputWorkspace=self._workspace_being_fit.name(), OutputWorkspace=self._workspace_being_fit.name() + "_sum")
 
         for ws in self._fit_profiles_workspaces.values():
-            SumSpectra(
-                InputWorkspace=ws.name(),
-                OutputWorkspace=ws.name() + "_sum"
-            )
+            SumSpectra(InputWorkspace=ws.name(), OutputWorkspace=ws.name() + "_sum")
 
         for ws in self._fit_fse_workspaces.values():
-            SumSpectra(
-                InputWorkspace=ws.name(),
-                OutputWorkspace=ws.name() + "_sum"
-            )
+            SumSpectra(InputWorkspace=ws.name(), OutputWorkspace=ws.name() + "_sum")
 
     def _set_means_and_std(self):
         widths = np.zeros((self._profiles_table.rowCount(), self._table_fit_results.rowCount()))
@@ -446,10 +381,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._create_means_table()
         return
 
-
     def _set_means_and_std_arrays(self, widths, intensities):
         # Remove failed fits and masked spectra
-        non_zero_columns = np.any(widths!=0, axis=0)
+        non_zero_columns = np.any(widths != 0, axis=0)
         widths = widths[:, non_zero_columns]
         intensities = intensities[:, non_zero_columns]
 
@@ -465,17 +399,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # Use sum instead of nansum to propagate nans
         intensities = intensities / intensities.sum(axis=0)
 
-        self._mean_widths = np.nanmean(widths, axis=1) 
-        self._std_widths = np.nanstd(widths, axis=1) 
-        self._mean_intensity_ratios = np.nanmean(intensities, axis=1) 
-        self._std_intensity_ratios = np.nanstd(intensities, axis=1) 
+        self._mean_widths = np.nanmean(widths, axis=1)
+        self._std_widths = np.nanstd(widths, axis=1)
+        self._mean_intensity_ratios = np.nanmean(intensities, axis=1)
+        self._std_intensity_ratios = np.nanstd(intensities, axis=1)
         return
 
-
     def _create_means_table(self):
-        table = CreateEmptyTableWorkspace(
-            OutputWorkspace=self._workspace_being_fit.name() + "_means"
-        )
+        table = CreateEmptyTableWorkspace(OutputWorkspace=self._workspace_being_fit.name() + "_means")
         table.addColumn(type="str", name="label")
         table.addColumn(type="float", name="mass")
         table.addColumn(type="float", name="mean_width")
@@ -498,11 +429,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         print_table_workspace(table, precision=5)
         return table
 
-
     def _fit_neutron_compton_profiles_to_row(self):
-
         if np.all(self._dataY[self._row_being_fit] == 0):
-            self._table_fit_results.addRow(np.zeros(3*self._profiles_table.rowCount()+2))
+            self._table_fit_results.addRow(np.zeros(3 * self._profiles_table.rowCount() + 2))
             spectrum_number = self._instrument_params[self._row_being_fit, 0]
             self.log().notice(f"Skip spectrum {int(spectrum_number):3d}")
             return
@@ -513,7 +442,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             method="SLSQP",
             bounds=self._initial_fit_bounds,
             constraints=self._constraints,
-            tol=1e-6
+            tol=1e-6,
         )
         fitPars = result["x"]
 
@@ -525,7 +454,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._table_fit_results.addRow(tableRow)
 
         # Store results for easier access when calculating means
-        self._fit_parameters[self._row_being_fit] = tableRow 
+        self._fit_parameters[self._row_being_fit] = tableRow
 
         self.log().notice(f"Fit spectrum {int(spectrum_number):3d}: \u2713")
 
@@ -535,10 +464,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._fit_profiles_workspaces[element].dataY(self._row_being_fit)[:] = ncp
             self._fit_fse_workspaces[element].dataY(self._row_being_fit)[:] = fse
 
-        self._fit_profiles_workspaces['total'].dataY(self._row_being_fit)[:] = np.sum(ncp_for_each_mass, axis=0)
-        self._fit_fse_workspaces['total'].dataY(self._row_being_fit)[:] = np.sum(fse_for_each_mass, axis=0)
+        self._fit_profiles_workspaces["total"].dataY(self._row_being_fit)[:] = np.sum(ncp_for_each_mass, axis=0)
+        self._fit_fse_workspaces["total"].dataY(self._row_being_fit)[:] = np.sum(fse_for_each_mass, axis=0)
         return
-
 
     def _error_function(self, pars):
         """Error function to be minimized, in TOF space"""
@@ -560,10 +488,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         return np.sum((ncp_total - data_y) ** 2 / data_e**2)
 
-
     def _neutron_compton_profiles(self, pars):
         """
-        Neutron Compton Profile distribution on TOF space for a single spectrum. 
+        Neutron Compton Profile distribution on TOF space for a single spectrum.
         Calculated from kinematics, J(y) and resolution functions.
         """
         intensities = pars[::3].reshape(-1, 1)
@@ -580,23 +507,21 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # Third derivative cuts edges of array by 6 indices
         JOfY_third_derivative = numerical_third_derivative(self._y_space_arrays[self._row_being_fit], JOfY)
 
-        deltaQ = self._deltaQ[self._row_being_fit, 6: -6]
-        E0 = self._E0[self._row_being_fit, 6: -6]
+        deltaQ = self._deltaQ[self._row_being_fit, 6:-6]
+        E0 = self._E0[self._row_being_fit, 6:-6]
         JOfY = JOfY[:, 6:-6]
 
-        FSE = - JOfY_third_derivative * widths**4 / deltaQ * 0.72
+        FSE = -JOfY_third_derivative * widths**4 / deltaQ * 0.72
 
-        NCP = intensities * (JOfY+FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
+        NCP = intensities * (JOfY + FSE) * E0 * E0 ** (-0.92) * masses / deltaQ
         FSE = intensities * FSE * E0 * E0 ** (-0.92) * masses / deltaQ
         return NCP, FSE
-
 
     def _get_gaussian_resolution(self, centers):
         proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
         gauss_resolution = self._gaussian_resolution[self._row_being_fit]
-        assert proximity_to_y_centers.shape==gauss_resolution.shape
+        assert proximity_to_y_centers.shape == gauss_resolution.shape
         return np.take_along_axis(gauss_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
-
 
     def _set_gaussian_resolution(self):
         masses = self._masses.reshape(-1, 1, 1)
@@ -613,20 +538,11 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         dWdL1 = 2.0 * E0**1.5 / ENERGY_FINAL**0.5 / L0
         dWdL0 = 2.0 * E0 / L0
 
-        dW2 = (
-            dWdE1**2 * dE1**2
-            + dWdTOF**2 * dTOF**2
-            + dWdL1**2 * dL1**2
-            + dWdL0**2 * dL0**2
-        ) * np.ones((masses.size, 1, 1))
+        dW2 = (dWdE1**2 * dE1**2 + dWdTOF**2 * dTOF**2 + dWdL1**2 * dL1**2 + dWdL0**2 * dL0**2) * np.ones((masses.size, 1, 1))
         # conversion from meV^2 to A^-2, dydW = (M/q)^2
         dW2 *= (masses / H_BAR**2 / delta_Q) ** 2
 
-        dQdE1 = (
-            1.0
-            - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0
-            - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 - L1 / L0 * E0 / ENERGY_FINAL)
-        )
+        dQdE1 = 1.0 - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0 - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 - L1 / L0 * E0 / ENERGY_FINAL)
         dQdTOF = 2.0 * E0 * v0 / L0
         dQdL1 = 2.0 * E0**1.5 / L0 / ENERGY_FINAL**0.5
         dQdL0 = 2.0 * E0 / L0
@@ -634,8 +550,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         dQ2 = (
             dQdE1**2 * dE1**2
-            + (dQdTOF**2 * dTOF**2 + dQdL1**2 * dL1**2 + dQdL0**2 * dL0**2)
-            * np.abs(ENERGY_FINAL / E0 * np.cos(angle) - 1)
+            + (dQdTOF**2 * dTOF**2 + dQdL1**2 * dL1**2 + dQdL0**2 * dL0**2) * np.abs(ENERGY_FINAL / E0 * np.cos(angle) - 1)
             + dQdTheta**2 * dTheta**2
         )
         dQ2 *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
@@ -645,13 +560,11 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._gaussian_resolution = np.swapaxes(gaussianResWidth, 0, 1)
         return
 
-
     def _get_lorentzian_resolution(self, centers):
         proximity_to_y_centers = np.abs(self._y_space_arrays[self._row_being_fit] - centers)
         lorentzian_resolution = self._lorentzian_resolution[self._row_being_fit]
-        assert proximity_to_y_centers.shape==lorentzian_resolution.shape
+        assert proximity_to_y_centers.shape == lorentzian_resolution.shape
         return np.take_along_axis(lorentzian_resolution, proximity_to_y_centers.argmin(axis=1, keepdims=True), axis=1)
-
 
     def _set_lorentzian_resolution(self):
         masses = self._masses.reshape(-1, 1, 1)
@@ -664,12 +577,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         dWdE1_lor = (1.0 + (E0 / ENERGY_FINAL) ** 1.5 * (L1 / L0)) ** 2 * np.ones((masses.size, 1, 1))
         # conversion from meV^2 to A^-2
-        dWdE1_lor *= (masses / H_BAR**2 / delta_Q) ** 2 
+        dWdE1_lor *= (masses / H_BAR**2 / delta_Q) ** 2
 
         dQdE1_lor = (
-            1.0
-            - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0
-            - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 + L1 / L0 * E0 / ENERGY_FINAL)
+            1.0 - (E0 / ENERGY_FINAL) ** 1.5 * L1 / L0 - np.cos(angle) * ((E0 / ENERGY_FINAL) ** 0.5 + L1 / L0 * E0 / ENERGY_FINAL)
         ) ** 2
         dQdE1_lor *= (NEUTRON_MASS / H_BAR**2 / delta_Q) ** 2
 
@@ -677,30 +588,25 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._lorentzian_resolution = np.swapaxes(lorentzianResWidth, 0, 1)
         return
 
-
     def _replace_zeros_with_ncp_for_corrections(self):
         """
-        If the initial input contains columns with zeros 
-        (to mask resonance peaks) then these sections must be approximated 
-        by the total fitted function because multiple scattering and 
+        If the initial input contains columns with zeros
+        (to mask resonance peaks) then these sections must be approximated
+        by the total fitted function because multiple scattering and
         gamma correction algorithms do not accept columns with zeros.
-        If no masked columns are present then the input workspace 
+        If no masked columns are present then the input workspace
         for corrections is left unchanged.
         """
         dataY = self._workspace_for_corrections.extractY()
-        ncp = self._fit_profiles_workspaces['total'].extractY()
+        ncp = self._fit_profiles_workspaces["total"].extractY()
 
         self._zero_columns_boolean_mask = np.all(dataY == 0, axis=0)  # Masked Cols
 
         for row in range(self._workspace_for_corrections.getNumberHistograms()):
             self._workspace_for_corrections.dataY(row)[self._zero_columns_boolean_mask] = ncp[row, self._zero_columns_boolean_mask]
 
-        SumSpectra(
-            InputWorkspace=self._workspace_for_corrections.name(), 
-            OutputWorkspace=self._workspace_for_corrections.name() + "_sum"
-        )
+        SumSpectra(InputWorkspace=self._workspace_for_corrections.name(), OutputWorkspace=self._workspace_for_corrections.name() + "_sum")
         return
-
 
     def _remask_columns_with_zeros(self, ws_to_remask_name):
         """
@@ -714,26 +620,15 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             ws_to_remask.dataE(row)[self._zero_columns_boolean_mask] = 0
         return
 
-
     def _correct_for_gamma_and_multiple_scattering(self, ws_name):
-
         if self._gamma_correction:
             gamma_correction_ws = self.create_gamma_workspaces()
-            Minus(
-                LHSWorkspace=ws_name,
-                RHSWorkspace=gamma_correction_ws.name(),
-                OutputWorkspace=ws_name
-            )
+            Minus(LHSWorkspace=ws_name, RHSWorkspace=gamma_correction_ws.name(), OutputWorkspace=ws_name)
 
         if self._multiple_scattering_correction:
             multiple_scattering_ws = self.create_multiple_scattering_workspaces()
-            Minus(
-                LHSWorkspace=ws_name,
-                RHSWorkspace=multiple_scattering_ws.name(), 
-                OutputWorkspace=ws_name
-            )
+            Minus(LHSWorkspace=ws_name, RHSWorkspace=multiple_scattering_ws.name(), OutputWorkspace=ws_name)
         return
-
 
     def create_multiple_scattering_workspaces(self):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
@@ -772,7 +667,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             NumScatters=self._multiple_scattering_order,
             NumEventsPerRun=int(self._number_of_events),
             TotalScatteringWS=ws_corrections_name + "_tot_sctr",
-            MultipleScatteringWS=ws_corrections_name + "_mltp_sctr"
+            MultipleScatteringWS=ws_corrections_name + "_mltp_sctr",
         )
         data_normalisation = Integration(ws_corrections_name)
         simulation_normalisation = Integration(ws_corrections_name + "_tot_sctr")
@@ -794,7 +689,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # The only remaining workspaces are the _mltp_sctr and _tot_sctr
         return mtd[ws_corrections_name + "_mltp_sctr"]
 
-
     def create_gamma_workspaces(self):
         """Creates _gamma_background correction workspace to be subtracted from the main workspace"""
 
@@ -803,7 +697,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         background, corrected = VesuvioCalculateGammaBackground(InputWorkspace=ws_corrections_name, ComptonFunction=profiles_string)
         DeleteWorkspace(corrected)
-        RenameWorkspace(InputWorkspace= background, OutputWorkspace = ws_corrections_name + "_gamma_backgr")
+        RenameWorkspace(InputWorkspace=background, OutputWorkspace=ws_corrections_name + "_gamma_backgr")
         Scale(
             InputWorkspace=ws_corrections_name + "_gamma_backgr",
             OutputWorkspace=ws_corrections_name + "_gamma_backgr",
@@ -812,8 +706,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         )
         return mtd[ws_corrections_name + "_gamma_backgr"]
 
-
     def _save_results(self):
         for ws_name in mtd.getObjectNames():
-            if ws_name.endswith(('ncp', 'fse', 'fit_results', 'means', 'initial_parameters') + tuple([str(i) for i in range(10)])):
+            if ws_name.endswith(("ncp", "fse", "fit_results", "means", "initial_parameters") + tuple([str(i) for i in range(10)])):
                 SaveAscii(ws_name, str(self._save_results_path / ws_name))

@@ -1,5 +1,5 @@
-"""Package defining entry points.
-"""
+"""Package defining entry points."""
+
 import argparse
 from os import environ, path
 from mvesuvio.util import handle_config
@@ -23,14 +23,10 @@ def __setup_and_parse_args():
 
 
 def __set_up_parser():
-    parser = argparse.ArgumentParser(
-        description="Package to analyse Vesuvio instrument data"
-    )
+    parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
     subparsers = parser.add_subparsers(dest="command", required=True)
     config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
-    config_parser.add_argument(
-        "--set-inputs", "-i", help="set the inputs python file", default="", type=str
-    )
+    config_parser.add_argument("--set-inputs", "-i", help="set the inputs python file", default="", type=str)
     config_parser.add_argument(
         "--set-ipfolder",
         "-p",
@@ -44,7 +40,6 @@ def __set_up_parser():
 
 
 def __setup_config(args):
-
     __set_logging_properties()
 
     config_dir = handle_config.VESUVIO_CONFIG_PATH
@@ -53,23 +48,11 @@ def __setup_config(args):
     inputs = handle_config.VESUVIO_INPUTS_PATH
 
     if handle_config.config_set():
-        inputs = (
-            handle_config.read_config_var("caching.inputs")
-            if not args or not args.set_inputs
-            else args.set_inputs
-        )
-        ipfolder_dir = (
-            handle_config.read_config_var("caching.ipfolder")
-            if not args or not args.set_ipfolder
-            else args.set_ipfolder
-        )
+        inputs = handle_config.read_config_var("caching.inputs") if not args or not args.set_inputs else args.set_inputs
+        ipfolder_dir = handle_config.read_config_var("caching.ipfolder") if not args or not args.set_ipfolder else args.set_ipfolder
     else:
-        inputs = (
-            inputs if not args or not args.set_inputs else args.set_inputs
-        )
-        ipfolder_dir = (
-            ipfolder_dir if not args or not args.set_ipfolder else args.set_ipfolder
-        )
+        inputs = inputs if not args or not args.set_inputs else args.set_inputs
+        ipfolder_dir = ipfolder_dir if not args or not args.set_ipfolder else args.set_ipfolder
 
         handle_config.setup_default_ipfile_dir()
         handle_config.setup_default_inputs()
@@ -85,6 +68,7 @@ def __setup_config(args):
 
 def __set_logging_properties():
     from mantid.kernel import ConfigService
+
     ConfigService.setString("logging.loggers.root.channel.class", "SplitterChannel")
     ConfigService.setString("logging.loggers.root.channel.channel1", "consoleChannel")
     ConfigService.setString("logging.loggers.root.channel.channel2", "fileChannel")
@@ -98,10 +82,11 @@ def __set_logging_properties():
     mantid_properties_file = path.join(ConfigService.getPropertiesDir(), "Mantid.properties")
     ConfigService.saveConfig(mantid_properties_file)
     return
-            
+
 
 def __run_analysis():
-    from mvesuvio.main.run_routine import Runner 
+    from mvesuvio.main.run_routine import Runner
+
     Runner().run()
 
 

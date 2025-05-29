@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing_extensions import override
 import unittest
 from pathlib import Path
-from mvesuvio.main.run_routine import Runner 
+from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
 from mvesuvio.analysis_fitting import FitInYSpace
 from mantid.simpleapi import Load, LoadAscii, mtd, CompareWorkspaces, AnalysisDataService
@@ -55,16 +55,16 @@ class TestFitting(unittest.TestCase):
             run_minos = True
             do_global_fit = True   # Performs global fit with Minuit by default
             number_of_global_fit_groups = 4
-            mask_zeros_with = "nan"   
+            mask_zeros_with = "nan"
 
             save_path = self.target_dir
             masses = [1.0079, 12, 16, 27]
-            instrument_parameters_file = self.ipfile_path 
+            instrument_parameters_file = self.ipfile_path
             detectors = '144-182'
 
         self.fi = FitInputs()
         return
-        
+
     def tearDown(self) -> None:
         AnalysisDataService.clear()
         return
@@ -72,7 +72,7 @@ class TestFitting(unittest.TestCase):
     def test_gauss_with_symmetrisation_and_fse(self):
         fi = self.fi
         fi.fitting_model = "gauss"
-        fi.do_symmetrisation = True 
+        fi.do_symmetrisation = True
         fi.subtract_calculated_fse_from_data = True
         alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
         alg.run()

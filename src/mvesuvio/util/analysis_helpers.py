@@ -1,8 +1,22 @@
-
-from mantid.simpleapi import Load, Rebin, Scale, SumSpectra, Minus, CropWorkspace, \
-                            MaskDetectors, CreateWorkspace, CreateEmptyTableWorkspace, \
-                            DeleteWorkspace, SaveNexus, LoadVesuvio, mtd, VesuvioResolution, \
-                            AppendSpectra, RenameWorkspace, CloneWorkspace
+from mantid.simpleapi import (
+    Load,
+    Rebin,
+    Scale,
+    SumSpectra,
+    Minus,
+    CropWorkspace,
+    MaskDetectors,
+    CreateWorkspace,
+    CreateEmptyTableWorkspace,
+    DeleteWorkspace,
+    SaveNexus,
+    LoadVesuvio,
+    mtd,
+    VesuvioResolution,
+    AppendSpectra,
+    RenameWorkspace,
+    CloneWorkspace,
+)
 from mantid.kernel import logger
 import numpy as np
 import numbers
@@ -11,12 +25,13 @@ from mvesuvio.util import handle_config
 
 import ntpath
 
+
 def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
     # NOTE: Minus() is not used so it doesn't change dataE
 
     ws_ncp_names = [n for n in ws_group_ncp.getNames() if n.endswith("ncp")]
-    masses = [float(n.split('_')[-2]) for n in ws_ncp_names if 'total' not in n]
-    ws_total_ncp_name = [n for n in ws_ncp_names if n.endswith('_total_ncp')][0]
+    masses = [float(n.split("_")[-2]) for n in ws_ncp_names if "total" not in n]
+    ws_total_ncp_name = [n for n in ws_ncp_names if n.endswith("_total_ncp")][0]
     ws_lighest_ncp_name = ws_ncp_names[masses.index(min(masses))]
     ws_lighest_ncp = mtd[ws_lighest_ncp_name]
     ws_total_ncp = mtd[ws_total_ncp_name]
@@ -27,7 +42,7 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
 
     if subtract_fse:
         suffix += "_-fse"
-        ws_lighest_fse = mtd[ws_lighest_ncp_name.replace('ncp', 'fse')]
+        ws_lighest_fse = mtd[ws_lighest_ncp_name.replace("ncp", "fse")]
 
         isolated_data_y -= ws_lighest_fse.extractY()
 
@@ -35,13 +50,13 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
         # TODO: Find a better solution later
         ws_lighest_ncp_y = ws_lighest_ncp.extractY()
         ws_lighest_ncp_y -= ws_lighest_fse.extractY()
-        ws_lighest_ncp = CloneWorkspace(ws_lighest_ncp, OutputWorkspace=ws_lighest_ncp.name()+"_-fse")
+        ws_lighest_ncp = CloneWorkspace(ws_lighest_ncp, OutputWorkspace=ws_lighest_ncp.name() + "_-fse")
         write_data_y_into_ws(ws_lighest_ncp_y, ws_lighest_ncp)
         SumSpectra(ws_lighest_ncp.name(), OutputWorkspace=ws_lighest_ncp.name() + "_sum")
 
     # TODO: Find a better way to propagate masked values
     isolated_data_y[initial_ws.extractY() == 0] = 0
-    ws_lighest_data = CloneWorkspace(initial_ws, OutputWorkspace=initial_ws.name()+suffix)
+    ws_lighest_data = CloneWorkspace(initial_ws, OutputWorkspace=initial_ws.name() + suffix)
     write_data_y_into_ws(isolated_data_y, ws_lighest_data)
     SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
 
@@ -50,17 +65,14 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
 
 def write_data_y_into_ws(data_y, ws):
     for i in range(ws.getNumberHistograms()):
-        ws.dataY(i)[:] = data_y[i, :] 
+        ws.dataY(i)[:] = data_y[i, :]
     return
 
 
 def calculate_resolution(mass, ws, rebin_range):
-
-    resName = ws.name() + f"_resolution"
+    resName = ws.name() + "_resolution"
     for index in range(ws.getNumberHistograms()):
-        VesuvioResolution(
-            Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp"
-        )
+        VesuvioResolution(Workspace=ws, WorkspaceIndex=index, Mass=mass, OutputWorkspaceYSpace="tmp")
         Rebin(
             InputWorkspace="tmp",
             Params=rebin_range,
@@ -89,22 +101,24 @@ def pass_data_into_ws(dataX, dataY, dataE, ws):
 
 def print_table_workspace(table, precision=3):
     table_dict = table.toDict()
-    # Convert floats into strings 
+    # Convert floats into strings
     for key, values in table_dict.items():
         new_column = [int(item) if (isinstance(item, float) and item.is_integer()) else item for item in values]
         table_dict[key] = [f"{item:.{precision}f}" if isinstance(item, float) else str(item) for item in new_column]
 
     max_spacing = [max([len(item) for item in values] + [len(key)]) for key, values in table_dict.items()]
-    header = "|" + "|".join(f"{item}{' '*(spacing-len(item))}" for item, spacing in zip(table_dict.keys(), max_spacing)) + "|"
+    header = "|" + "|".join(f"{item}{' ' * (spacing - len(item))}" for item, spacing in zip(table_dict.keys(), max_spacing)) + "|"
     logger.notice(f"Table {table.name()}:")
-    logger.notice(' '+'-'*(len(header)-2)+' ')
+    logger.notice(" " + "-" * (len(header) - 2) + " ")
     logger.notice(header)
     for i in range(table.rowCount()):
-        table_row = "|".join(f"{values[i]}{' '*(spacing-len(str(values[i])))}" for values, spacing in zip(table_dict.values(), max_spacing))
+        table_row = "|".join(
+            f"{values[i]}{' ' * (spacing - len(str(values[i])))}" for values, spacing in zip(table_dict.values(), max_spacing)
+        )
         logger.notice("|" + table_row + "|")
-    logger.notice(' '+'-'*(len(header)-2)+' ')
+    logger.notice(" " + "-" * (len(header) - 2) + " ")
     return
-    
+
 
 def create_profiles_table(name, ai):
     table = CreateEmptyTableWorkspace(OutputWorkspace=name)
@@ -127,20 +141,34 @@ def create_profiles_table(name, ai):
         return bound
 
     for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-        ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
-        ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
+        ai.masses,
+        ai.initial_fitting_parameters[::3],
+        ai.initial_fitting_parameters[1::3],
+        ai.initial_fitting_parameters[2::3],
+        ai.fitting_bounds[::3],
+        ai.fitting_bounds[1::3],
+        ai.fitting_bounds[2::3],
     ):
         table.addRow(
-            [str(float(mass)), float(mass), float(intensity), float(wrapb(intensity_bound[0])), float(wrapb(intensity_bound[1])),
-             float(width), float(wrapb(width_bound[0])), float(wrapb(width_bound[1])), float(center), float(wrapb(center_bound[0])), float(wrapb(center_bound[1]))]
+            [
+                str(float(mass)),
+                float(mass),
+                float(intensity),
+                float(wrapb(intensity_bound[0])),
+                float(wrapb(intensity_bound[1])),
+                float(width),
+                float(wrapb(width_bound[0])),
+                float(wrapb(width_bound[1])),
+                float(center),
+                float(wrapb(center_bound[0])),
+                float(wrapb(center_bound[1])),
+            ]
         )
     return table
 
 
 def create_table_for_hydrogen_to_mass_ratios():
-    table = CreateEmptyTableWorkspace(
-        OutputWorkspace="hydrogen_intensity_ratios_estimates"
-    )
+    table = CreateEmptyTableWorkspace(OutputWorkspace="hydrogen_intensity_ratios_estimates")
     table.addColumn(type="float", name="Hydrogen intensity ratio to lowest mass at each iteration")
     return table
 
@@ -152,16 +180,13 @@ def is_hydrogen_present(masses) -> bool:
         return False
 
     print("\nH mass detected.\n")
-    assert (
-        len(Hmask) > 1
-    ), "When H is only mass present, run independent forward procedure, not joint."
+    assert len(Hmask) > 1, "When H is only mass present, run independent forward procedure, not joint."
     assert Hmask[0], "H mass needs to be the first mass in masses and initPars."
     assert sum(Hmask) == 1, "More than one mass very close to H were detected."
     return True
 
 
 def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
-
     if not (ws_path.is_file()):
         logger.notice(f"Cached workspace not found at {ws_path}")
         return False
@@ -172,9 +197,7 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
     saved_runs = metadata.getPropertyValue("Filename")
     if saved_runs != runs:
-        logger.notice(
-            f"Filename in saved workspace did not match: {saved_runs} and {runs}"
-        )
+        logger.notice(f"Filename in saved workspace did not match: {saved_runs} and {runs}")
         return False
 
     saved_mode = metadata.getPropertyValue("Mode")
@@ -184,9 +207,7 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
     saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
     if saved_ipfile_name != ipfile:
-        logger.notice(
-            f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile}"
-        )
+        logger.notice(f"IP files in saved workspace did not match: {saved_ipfile_name} and {ipfile}")
         return False
 
     logger.notice("\nLocally saved workspace metadata matched with analysis inputs.\n")
@@ -195,7 +216,6 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
 
 def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
-
     if "backward" in ws_path.name:
         spectra = "3-134"
     elif "forward" in ws_path.name:
@@ -218,7 +238,7 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
 
 
 def name_for_starting_ws(load_ai):
-    name_suffix = scattering_type(load_ai, shorthand=True) 
+    name_suffix = scattering_type(load_ai, shorthand=True)
     name = handle_config.get_script_name() + "_" + name_suffix
     return name
 
@@ -233,14 +253,11 @@ def scattering_type(load_ai, shorthand=False):
         if shorthand:
             scatteringType = "fwd"
     else:
-        raise ValueError(
-            f"Input class for workspace not valid: {load_ai.__name__}"
-        )
-    return scatteringType 
+        raise ValueError(f"Input class for workspace not valid: {load_ai.__name__}")
+    return scatteringType
 
 
-def load_raw_and_empty_from_path(raw_path, empty_path, 
-                                  tof_binning, name, raw_scale_factor, empty_scale_factor, raw_minus_empty):
+def load_raw_and_empty_from_path(raw_path, empty_path, tof_binning, name, raw_scale_factor, empty_scale_factor, raw_minus_empty):
     print("\nLoading local workspaces ...\n")
     Load(Filename=str(raw_path), OutputWorkspace=name + "_raw")
     Rebin(
@@ -254,7 +271,7 @@ def load_raw_and_empty_from_path(raw_path, empty_path,
         Factor=str(raw_scale_factor),
     )
     SumSpectra(InputWorkspace=name + "_raw", OutputWorkspace=name + "_raw" + "_sum")
-    wsToBeFitted = mtd[name+"_raw"]
+    wsToBeFitted = mtd[name + "_raw"]
 
     if raw_minus_empty:
         Load(Filename=str(empty_path), OutputWorkspace=name + "_empty")
@@ -268,9 +285,7 @@ def load_raw_and_empty_from_path(raw_path, empty_path,
             OutputWorkspace=name + "_empty",
             Factor=str(empty_scale_factor),
         )
-        SumSpectra(
-            InputWorkspace=name + "_empty", OutputWorkspace=name + "_empty" + "_sum"
-        )
+        SumSpectra(InputWorkspace=name + "_empty", OutputWorkspace=name + "_empty" + "_sum")
         wsToBeFitted = Minus(
             LHSWorkspace=name + "_raw",
             RHSWorkspace=name + "_empty",
@@ -283,9 +298,7 @@ def cropAndMaskWorkspace(ws, firstSpec, lastSpec, maskedDetectors, maskTOFRange)
     """Returns cloned and cropped workspace with modified name"""
     # Read initial Spectrum number
     wsFirstSpec = ws.getSpectrumNumbers()[0]
-    assert (
-        firstSpec >= wsFirstSpec
-    ), "Can't crop workspace, firstSpec < first spectrum in workspace."
+    assert firstSpec >= wsFirstSpec, "Can't crop workspace, firstSpec < first spectrum in workspace."
 
     initialIdx = firstSpec - wsFirstSpec
     lastIdx = lastSpec - wsFirstSpec
@@ -316,7 +329,7 @@ def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
 
     dataX, dataY, dataE = extractWS(ws)
 
-    ranges = [r.split("-") for r in maskTOFRange.replace(" ","").split(',')]
+    ranges = [r.split("-") for r in maskTOFRange.replace(" ", "").split(",")]
     for r in ranges:
         mask = (dataX >= float(r[0])) & (dataX <= float(r[-1]))
         dataY[mask] = 0
@@ -342,7 +355,7 @@ def pseudo_voigt(x, sigma, gamma):
 
 def gaussian(x, sigma):
     """Gaussian centered at zero"""
-    gauss = np.exp(-(x**2) / 2 / sigma**2) 
+    gauss = np.exp(-(x**2) / 2 / sigma**2)
     gauss /= np.sqrt(2.0 * np.pi) * sigma
     return gauss
 
@@ -353,12 +366,12 @@ def lorentzian(x, gamma):
 
 
 def numerical_third_derivative(x, y):
-    k6 = (- y[:, 12:] + y[:, :-12]) * 1
-    k5 = (+ y[:, 11:-1] - y[:, 1:-11]) * 24
-    k4 = (- y[:, 10:-2] + y[:, 2:-10]) * 192
-    k3 = (+ y[:, 9:-3] - y[:, 3:-9]) * 488
-    k2 = (+ y[:, 8:-4] - y[:, 4:-8]) * 387
-    k1 = (- y[:, 7:-5] + y[:, 5:-7]) * 1584
+    k6 = (-y[:, 12:] + y[:, :-12]) * 1
+    k5 = (+y[:, 11:-1] - y[:, 1:-11]) * 24
+    k4 = (-y[:, 10:-2] + y[:, 2:-10]) * 192
+    k3 = (+y[:, 9:-3] - y[:, 3:-9]) * 488
+    k2 = (+y[:, 8:-4] - y[:, 4:-8]) * 387
+    k1 = (-y[:, 7:-5] + y[:, 5:-7]) * 1584
 
     dev = k1 + k2 + k3 + k4 + k5 + k6
     dev /= np.power(x[:, 7:-5] - x[:, 6:-6], 3)
@@ -385,7 +398,6 @@ def load_resolution(instrument_params):
 
 
 def load_instrument_params(ip_file, spectrum_list):
-
     first_spec = min(spectrum_list)
     last_spec = max(spectrum_list)
     data = np.loadtxt(ip_file, dtype=str)[1:].astype(float)
@@ -401,20 +413,20 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
 
     # Set intensities
     for p in profiles_dict.values():
-        if np.isclose(p['mass'], 1, atol=0.1):    # Hydrogen present
-            p['intensity'] = h_ratio * _get_lightest_profile(means_dict)['mean_intensity']
+        if np.isclose(p["mass"], 1, atol=0.1):  # Hydrogen present
+            p["intensity"] = h_ratio * _get_lightest_profile(means_dict)["mean_intensity"]
             continue
-        p['intensity'] = means_dict[p['label']]['mean_intensity']
+        p["intensity"] = means_dict[p["label"]]["mean_intensity"]
 
     # Normalise intensities
-    sum_intensities = sum([p['intensity'] for p in profiles_dict.values()])
+    sum_intensities = sum([p["intensity"] for p in profiles_dict.values()])
     for p in profiles_dict.values():
-        p['intensity'] /= sum_intensities
-        
+        p["intensity"] /= sum_intensities
+
     # Set widths
     for p in profiles_dict.values():
         try:
-            p['width'] = means_dict[p['label']]['mean_width']
+            p["width"] = means_dict[p["label"]]["mean_width"]
         except KeyError:
             continue
 
@@ -422,8 +434,8 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
     for p in profiles_dict.values():
         if p == _get_lightest_profile(profiles_dict):
             continue
-        p['width_lb'] = p['width']
-        p['width_ub'] = p['width']
+        p["width_lb"] = p["width"]
+        p["width_ub"] = p["width"]
 
     result_profiles_table = _convert_dict_to_table(profiles_dict)
     return result_profiles_table
@@ -432,8 +444,8 @@ def fix_profile_parameters(incoming_means_table, receiving_profiles_table, h_rat
 def _convert_table_to_dict(table):
     result_dict = {}
     for i in range(table.rowCount()):
-        row_dict = table.row(i) 
-        result_dict[row_dict['label']] = row_dict
+        row_dict = table.row(i)
+        result_dict[row_dict["label"]] = row_dict
     return result_dict
 
 
@@ -442,7 +454,7 @@ def _convert_dict_to_table(m_dict):
     for p in m_dict.values():
         if table.columnCount() == 0:
             for key, value in p.items():
-                value_type = 'str' if isinstance(value, str) else 'float'
+                value_type = "str" if isinstance(value, str) else "float"
                 table.addColumn(value_type, key)
 
         table.addRow(p)
@@ -451,66 +463,55 @@ def _convert_dict_to_table(m_dict):
 
 def _get_lightest_profile(p_dict):
     profiles = [p for p in p_dict.values()]
-    masses = [p['mass'] for p in p_dict.values()]
+    masses = [p["mass"] for p in p_dict.values()]
     return profiles[np.argmin(masses)]
 
 
 def calculate_h_ratio(means_table):
-
     masses = means_table.column("mass")
     intensities = np.array(means_table.column("mean_intensity"))
 
-    if not np.isclose(min(masses), 1, atol=0.1):    # Hydrogen not present
+    if not np.isclose(min(masses), 1, atol=0.1):  # Hydrogen not present
         return None
-    
-    # Hydrogen present 
+
+    # Hydrogen present
     sorted_intensities = intensities[np.argsort(masses)]
 
-    return sorted_intensities[0] / sorted_intensities[1] 
+    return sorted_intensities[0] / sorted_intensities[1]
 
 
 def extend_range_of_array(arr, n_columns):
     arr = arr.copy()
     left_extend = arr[:, :n_columns] + (arr[:, 0] - arr[:, n_columns]).reshape(-1, 1)
-    right_extend = arr[:, -n_columns:] + (arr[:, -1] - arr[:, -n_columns-1]).reshape(-1, 1)
+    right_extend = arr[:, -n_columns:] + (arr[:, -1] - arr[:, -n_columns - 1]).reshape(-1, 1)
     return np.concatenate([left_extend, arr, right_extend], axis=-1)
 
 
 def make_gamma_correction_input_string(masses, mean_widths, mean_intensity_ratios):
     profiles = ""
     for mass, width, intensity in zip(masses, mean_widths, mean_intensity_ratios):
-        profiles += (
-            "name=GaussianComptonProfile,Mass="
-            + str(mass)
-            + ",Width="
-            + str(width)
-            + ",Intensity="
-            + str(intensity)
-            + ";"
-        )
-    logger.notice("\nThe sample properties for Gamma Correction are:\n\n" + \
-            str(profiles).replace(';', '\n\n').replace(',', '\n'))
+        profiles += "name=GaussianComptonProfile,Mass=" + str(mass) + ",Width=" + str(width) + ",Intensity=" + str(intensity) + ";"
+    logger.notice("\nThe sample properties for Gamma Correction are:\n\n" + str(profiles).replace(";", "\n\n").replace(",", "\n"))
     return profiles
 
 
 def make_multiple_scattering_input_string(masses, meanWidths, meanIntensityRatios):
     atomic_properties_list = np.vstack([masses, meanIntensityRatios, meanWidths]).transpose().flatten().tolist()
     logger.notice(
-        "\nSample properties for multiple scattering correction:\n\n" + \
-        "mass   intensity   width\n" + \
-        str(np.array(atomic_properties_list).reshape(-1, 3)).replace('[', '').replace(']', '') + "\n"
+        "\nSample properties for multiple scattering correction:\n\n"
+        + "mass   intensity   width\n"
+        + str(np.array(atomic_properties_list).reshape(-1, 3)).replace("[", "").replace("]", "")
+        + "\n"
     )
-    return atomic_properties_list 
+    return atomic_properties_list
 
 
 def convert_to_list_of_spectrum_numbers(detectors):
-
     if isinstance(detectors, str):
-        detector_ranges = [r.split("-") for r in detectors.replace(" ","").split(",")]
+        detector_ranges = [r.split("-") for r in detectors.replace(" ", "").split(",")]
         return [i for r in detector_ranges for i in range(int(r[0]), int(r[-1]) + 1)]
 
     if isinstance(detectors, list) or isinstance(detectors, np.ndarray):
         return [int(d) for d in detectors]
 
     raise ValueError("Type not recognized: Masked detectors should be string, list or array.")
-

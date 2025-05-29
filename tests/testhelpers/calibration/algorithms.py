@@ -7,6 +7,7 @@
 
 import mantid  # noqa
 
+
 def create_algorithm(name, **kwargs):
     """Create a named algorithm, set the properties given by the keywords and return the
     algorithm handle WITHOUT executing the algorithm
@@ -41,4 +42,3 @@ def create_algorithm(name, **kwargs):
         del kwargs["rethrow"]
     alg.setProperties(kwargs)
     return alg
-

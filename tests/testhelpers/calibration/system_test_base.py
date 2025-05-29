@@ -21,8 +21,8 @@ class TestConstants:
 
 class EVSCalibrationTest(unittest.TestCase):
     def load_ip_file(self):
-        param_names = ['spectrum', 'theta', 't0', 'L0', 'L1']
-        file_data = np.loadtxt(self._parameter_file, skiprows=3, usecols=[0,2,3,4,5], unpack=True)
+        param_names = ["spectrum", "theta", "t0", "L0", "L1"]
+        file_data = np.loadtxt(self._parameter_file, skiprows=3, usecols=[0, 2, 3, 4, 5], unpack=True)
 
         params = {}
         for name, column in zip(param_names, file_data):
@@ -61,7 +61,7 @@ class EVSCalibrationTest(unittest.TestCase):
         self._energy_estimates = np.array(EVSGlobals.ENERGY_ESTIMATE)
 
     def _setup_uranium_test(self):
-        self._function = 'Gaussian'
+        self._function = "Gaussian"
         self._mass = EVSGlobals.U_MASS
         self._d_spacings = []
         self._energy_estimates = np.array(EVSGlobals.U_PEAK_ENERGIES)
@@ -105,7 +105,7 @@ class EVSCalibrationTest(unittest.TestCase):
             self._load_file_vesuvio(sample_no, output_name)
         except RuntimeError:
             self._load_file_raw(sample_no, output_name)
-        print('Load Successful')
+        print("Load Successful")
 
     def _total_runs(self):
         """
@@ -129,7 +129,7 @@ class EVSCalibrationTest(unittest.TestCase):
         return run_no
 
     def _background_run_range(self):
-        background = '' if self._E1_fit_active else self._background
+        background = "" if self._E1_fit_active else self._background
         return background
 
     def _get_d_spacings(self):
@@ -140,32 +140,50 @@ class EVSCalibrationTest(unittest.TestCase):
         print("Attempting LoadVesuvio")
         test_directory = path.dirname(path.dirname(path.dirname(__file__)))
         try:
-            prefix = 'EVS'
-            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
-            LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
-                        SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
-                        EnableLogging=False)
+            prefix = "EVS"
+            filename = str(path.join(test_directory, "data", "calibration", f"{prefix}{sample_no}.raw"))
+            LoadVesuvio(
+                Filename=filename,
+                Mode=self._selected_mode,
+                OutputWorkspace=output_name,
+                SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
+                EnableLogging=False,
+            )
         except RuntimeError:
-            prefix = 'VESUVIO000'
-            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
-            LoadVesuvio(Filename=filename, Mode=self._selected_mode, OutputWorkspace=output_name,
-                        SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
-                        EnableLogging=False)
+            prefix = "VESUVIO000"
+            filename = str(path.join(test_directory, "data", "calibration", f"{prefix}{sample_no}.raw"))
+            LoadVesuvio(
+                Filename=filename,
+                Mode=self._selected_mode,
+                OutputWorkspace=output_name,
+                SpectrumList="%d-%d" % (self._selected_spec_range[0], self._selected_spec_range[1]),
+                EnableLogging=False,
+            )
 
     def _load_file_raw(self, sample_no, output_name):
         print("Attempting LoadRaw")
         test_directory = path.dirname(path.dirname(path.dirname(__file__)))
         try:
-            prefix = 'EVS'
-            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
-            LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=self._selected_spec_range[0],
-                    SpectrumMax=self._selected_spec_range[-1], EnableLogging=False)
+            prefix = "EVS"
+            filename = str(path.join(test_directory, "data", "calibration", f"{prefix}{sample_no}.raw"))
+            LoadRaw(
+                filename,
+                OutputWorkspace=output_name,
+                SpectrumMin=self._selected_spec_range[0],
+                SpectrumMax=self._selected_spec_range[-1],
+                EnableLogging=False,
+            )
         except RuntimeError as err:
             print(err)
-            prefix = 'VESUVIO000'
-            filename = str(path.join(test_directory, 'data', 'calibration', f'{prefix}{sample_no}.raw'))
-            LoadRaw(filename, OutputWorkspace=output_name, SpectrumMin=self._selected_spec_range[0],
-                    SpectrumMax=self._selected_spec_range[-1], EnableLogging=False)
+            prefix = "VESUVIO000"
+            filename = str(path.join(test_directory, "data", "calibration", f"{prefix}{sample_no}.raw"))
+            LoadRaw(
+                filename,
+                OutputWorkspace=output_name,
+                SpectrumMin=self._selected_spec_range[0],
+                SpectrumMax=self._selected_spec_range[-1],
+                EnableLogging=False,
+            )
         ConvertToDistribution(output_name, EnableLogging=False)
 
     def tearDown(self):

@@ -13,7 +13,9 @@ def assert_allclose_excluding_bad_detectors(expected_position, position, rtol, d
         try:
             np.testing.assert_allclose(elem_m, elem_n, detector_specific_rtol, atol=0)
         except AssertionError:
-            test_failures.append(f"Element {i}: Expected {elem_m}, found {elem_n}. atol "
-                                 f"{abs(elem_n-elem_m)}, rtol {abs(elem_n-elem_m)/elem_n},"
-                                 f"max tol: {detector_specific_rtol}")
+            test_failures.append(
+                f"Element {i}: Expected {elem_m}, found {elem_n}. atol "
+                f"{abs(elem_n - elem_m)}, rtol {abs(elem_n - elem_m) / elem_n},"
+                f"max tol: {detector_specific_rtol}"
+            )
     return test_failures

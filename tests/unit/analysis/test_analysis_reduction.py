@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from mock import MagicMock, Mock, patch, call
-from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine 
+from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 from mvesuvio.util.analysis_helpers import load_resolution
 from mvesuvio.util import handle_config
 from mantid.simpleapi import CreateWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
@@ -28,7 +28,7 @@ class TestAnalysisReduction(unittest.TestCase):
             "NumberOfIterations": 4,
             "InvalidDetectors": [3],
             "MultipleScatteringCorrection": False,
-            "SampleShapeXml": "", 
+            "SampleShapeXml": "",
             "VesuvioThickness": 0.1,
             "GammaCorrection": True,
             "ModeRunning": "BACKWARD",
@@ -47,7 +47,7 @@ class TestAnalysisReduction(unittest.TestCase):
             # Only check is that it should not raise any errors
             alg.getPropertyValue(prop)
 
-    
+
     @patch('mvesuvio.analysis_reduction.VesuvioAnalysisRoutine.getPropertyValue')
     @patch('mvesuvio.analysis_reduction.load_instrument_params')
     @patch('mvesuvio.analysis_reduction.load_resolution')
@@ -87,7 +87,7 @@ class TestAnalysisReduction(unittest.TestCase):
                 else:
                     return MagicMock(value=None)
 
-            mock_get_prop.side_effect = mock_properties 
+            mock_get_prop.side_effect = mock_properties
 
             alg = VesuvioAnalysisRoutine()
             alg._save_results_path = MagicMock()
@@ -126,7 +126,7 @@ class TestAnalysisReduction(unittest.TestCase):
         alg.setPropertyValue = MagicMock()
 
         alg._update_workspace_data()
-            
+
         self.assertEqual(alg._fit_parameters.sum(), 0)
         self.assertEqual(alg._row_being_fit, 0)
         self.assertEqual(alg._table_fit_results.rowCount(), 0)
@@ -224,7 +224,7 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._table_fit_results = MagicMock(return_value=None)
         alg._fit_neutron_compton_profiles()
         self.assertEqual(alg._fit_neutron_compton_profiles_to_row.call_count, 3)
-        
+
 
     def test_neutron_compton_profile_fit_function(self):
         alg = VesuvioAnalysisRoutine()
@@ -277,17 +277,17 @@ class TestAnalysisReduction(unittest.TestCase):
 
         alg._dataE = np.zeros_like(alg._dataX)
         chi2_without_errors = alg._error_function(example_fit_parameters)
-        self.assertEqual(chi2_without_errors, 
+        self.assertEqual(chi2_without_errors,
                          np.sum((alg._dataY - np.sum(NCP, axis=0))**2))
 
         alg._dataE = np.full_like(alg._dataX, 0.0015, dtype=np.double)
         chi2_with_errors = alg._error_function(example_fit_parameters)
-        self.assertEqual(chi2_with_errors, 
+        self.assertEqual(chi2_with_errors,
                          np.sum((alg._dataY - np.sum(NCP, axis=0))**2 / alg._dataE**2))
 
         alg._dataY[0, :20] = 0
         chi2_with_errors_with_tof_masked = alg._error_function(example_fit_parameters)
-        self.assertEqual(chi2_with_errors_with_tof_masked, 
+        self.assertEqual(chi2_with_errors_with_tof_masked,
                          np.sum((alg._dataY[0, 20:] - np.sum(NCP, axis=0)[20:])**2 / alg._dataE[0, 20:]**2))
 
         self.assertAlmostEqual(chi2_without_errors, chi2_with_errors * 0.0015**2, places=15)
@@ -304,9 +304,9 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._masses = np.array([1, 12, 16, 27])
 
         alg._dataX = np.array([
-            [113., 119., 125., 131., 137., 143., 149., 155., 161., 167., 173., 179., 185., 191., 197., 203., 209., 215., 221., 227., 233., 239., 245., 251., 257., 263., 269., 275., 281., 287., 293., 299., 305., 311., 317., 323., 329., 335., 341., 347., 353., 359., 365., 371., 377., 383., 389., 395., 401., 407., 413., 419., 425., 429.], 
-            [113., 119., 125., 131., 137., 143., 149., 155., 161., 167., 173., 179., 185., 191., 197., 203., 209., 215., 221., 227., 233., 239., 245., 251., 257., 263., 269., 275., 281., 287., 293., 299., 305., 311., 317., 323., 329., 335., 341., 347., 353., 359., 365., 371., 377., 383., 389., 395., 401., 407., 413., 419., 425., 429.], 
-            [113., 119., 125., 131., 137., 143., 149., 155., 161., 167., 173., 179., 185., 191., 197., 203., 209., 215., 221., 227., 233., 239., 245., 251., 257., 263., 269., 275., 281., 287., 293., 299., 305., 311., 317., 323., 329., 335., 341., 347., 353., 359., 365., 371., 377., 383., 389., 395., 401., 407., 413., 419., 425., 429.], 
+            [113., 119., 125., 131., 137., 143., 149., 155., 161., 167., 173., 179., 185., 191., 197., 203., 209., 215., 221., 227., 233., 239., 245., 251., 257., 263., 269., 275., 281., 287., 293., 299., 305., 311., 317., 323., 329., 335., 341., 347., 353., 359., 365., 371., 377., 383., 389., 395., 401., 407., 413., 419., 425., 429.],
+            [113., 119., 125., 131., 137., 143., 149., 155., 161., 167., 173., 179., 185., 191., 197., 203., 209., 215., 221., 227., 233., 239., 245., 251., 257., 263., 269., 275., 281., 287., 293., 299., 305., 311., 317., 323., 329., 335., 341., 347., 353., 359., 365., 371., 377., 383., 389., 395., 401., 407., 413., 419., 425., 429.],
+            [113., 119., 125., 131., 137., 143., 149., 155., 161., 167., 173., 179., 185., 191., 197., 203., 209., 215., 221., 227., 233., 239., 245., 251., 257., 263., 269., 275., 281., 287., 293., 299., 305., 311., 317., 323., 329., 335., 341., 347., 353., 359., 365., 371., 377., 383., 389., 395., 401., 407., 413., 419., 425., 429.],
         ])
         alg._set_kinematic_arrays(alg._dataX)
         alg._set_gaussian_resolution()
@@ -339,7 +339,7 @@ class TestAnalysisReduction(unittest.TestCase):
         ])
         alg._constraints = ()
 
-        # Create arrays for storing results 
+        # Create arrays for storing results
         ncp_total_array = np.zeros_like(alg._dataY)
         fse_total_array = np.zeros_like(alg._dataY)
         alg._fit_profiles_workspaces = {
@@ -405,7 +405,7 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._dataY = alg._dataY[:, cut_off_idx:].reshape(1, -1)
         alg._dataX = alg._dataX[:, cut_off_idx:].reshape(1, -1)
         alg._dataE = alg._dataE[:, cut_off_idx:].reshape(1, -1)
-        
+
         # Run methods that depend on dataX
         alg._set_kinematic_arrays(alg._dataX)
         alg._set_gaussian_resolution()
@@ -473,13 +473,13 @@ class TestAnalysisReduction(unittest.TestCase):
 
     def test_get_gaussian_resolution(self):
         alg = VesuvioAnalysisRoutine()
-        alg._gaussian_resolution = np.arange(18).reshape(2, 3, 3) 
+        alg._gaussian_resolution = np.arange(18).reshape(2, 3, 3)
         alg._y_space_arrays = np.arange(18).reshape(2, 3, 3)
-        
+
         alg._row_being_fit = 0
         centers = np.array([0.5, 3.6, 7.6]).reshape(-1, 1)
         np.testing.assert_allclose(alg._get_gaussian_resolution(centers), np.array([0, 4, 8]).reshape(-1, 1))
-        
+
         alg._row_being_fit = 1
         centers = np.array([11.3, 9.6, 14.7]).reshape(-1, 1)
         np.testing.assert_allclose(alg._get_gaussian_resolution(centers), np.array([11, 12, 15]).reshape(-1, 1))
@@ -487,13 +487,13 @@ class TestAnalysisReduction(unittest.TestCase):
 
     def test_get_lorentzian_resolution(self):
         alg = VesuvioAnalysisRoutine()
-        alg._lorentzian_resolution = np.arange(18).reshape(2, 3, 3) 
+        alg._lorentzian_resolution = np.arange(18).reshape(2, 3, 3)
         alg._y_space_arrays = np.arange(18).reshape(2, 3, 3)
-        
+
         alg._row_being_fit = 0
         centers = np.array([0.5, 3.6, 7.6]).reshape(-1, 1)
         np.testing.assert_allclose(alg._get_lorentzian_resolution(centers), np.array([0, 4, 8]).reshape(-1, 1))
-        
+
         alg._row_being_fit = 1
         centers = np.array([11.3, 9.6, 14.7]).reshape(-1, 1)
         np.testing.assert_allclose(alg._get_lorentzian_resolution(centers), np.array([11, 12, 15]).reshape(-1, 1))
@@ -503,7 +503,7 @@ class TestAnalysisReduction(unittest.TestCase):
         alg = VesuvioAnalysisRoutine()
         alg._create_means_table = MagicMock()
         alg._profiles_table = MagicMock(rowCount=MagicMock(return_value=2), column=MagicMock(return_value=['1.0', '12.0']))
-        
+
         def pick_column(arg):
             table = {
                 '1.0 w': [5.6, 5.1, 0, 2, 5.4],
@@ -536,11 +536,11 @@ class TestAnalysisReduction(unittest.TestCase):
 
         alg = VesuvioAnalysisRoutine()
         alg._workspace_for_corrections = ws_input
-        alg._sample_shape_xml = f'''<cuboid id="sample-shape">
+        alg._sample_shape_xml = '''<cuboid id="sample-shape">
             <left-front-bottom-point x="0.05" y="-0.05" z="0.0005" />
             <left-front-top-point x="0.05" y="0.05" z="0.0005"/>
             <left-back-bottom-point x="0.05" y="-0.05" z="-0.0005" />
-            <right-front-bottom-point x="-0.05" y="-0.05" z="0.0005" /> 
+            <right-front-bottom-point x="-0.05" y="-0.05" z="0.0005" />
             </cuboid>'''
         alg._vesuvio_thickness = 0.1
 
@@ -611,7 +611,7 @@ class TestAnalysisReduction(unittest.TestCase):
 
         ws_mock = Mock()
         ws_mock.name.side_effect=lambda:"_ws"
-        alg._workspace_being_fit = ws_mock 
+        alg._workspace_being_fit = ws_mock
 
         mock_ncp1 = Mock()
         mock_ncp1.name.side_effect=lambda:"_ncp1"
@@ -624,12 +624,12 @@ class TestAnalysisReduction(unittest.TestCase):
 
         alg._fit_profiles_workspaces = {
             "1": mock_ncp1,
-            "2": mock_ncp2 
-        } 
+            "2": mock_ncp2
+        }
         alg._fit_fse_workspaces = {
             "1": mock_fse1,
-            "2": mock_fse2 
-        } 
+            "2": mock_fse2
+        }
         with patch('mvesuvio.analysis_reduction.SumSpectra') as mock_sum_spectra:
 
             alg._calculate_summed_workspaces()

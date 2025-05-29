@@ -29,9 +29,7 @@ def __read_config(config_file_path, throw_on_not_found=True):
             lines = file.readlines()
     except IOError:
         if throw_on_not_found:
-            raise RuntimeError(
-                f"Could not read from vesuvio config file: {config_file_path}"
-            )
+            raise RuntimeError(f"Could not read from vesuvio config file: {config_file_path}")
     return lines
 
 
@@ -92,9 +90,9 @@ def setup_config_dir(config_dir):
 
 def setup_default_inputs():
     copyfile(
-            os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE),
-            os.path.join(VESUVIO_INPUTS_PATH),
-        )
+        os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_INPUTS_FILE),
+        os.path.join(VESUVIO_INPUTS_PATH),
+    )
 
 
 def setup_default_ipfile_dir():
@@ -106,13 +104,13 @@ def setup_default_ipfile_dir():
         )
 
 
-def __mk_dir(type:str, path: str):
+def __mk_dir(type: str, path: str):
     try:
         os.makedirs(path, exist_ok=True)
         return True
     except:
         print(f"Unable to make {type} directory at location: {path}")
-        return False 
+        return False
 
 
 def config_set():
