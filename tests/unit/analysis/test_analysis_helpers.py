@@ -451,7 +451,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             self.assertFalse(match)
 
     @patch('mvesuvio.util.analysis_helpers.Load')
-    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
+    def test_ws_history_matches_inputs_bad_ipfile(self, mock_load):
         path = Mock()
         path.is_file.return_value = True
         props = {

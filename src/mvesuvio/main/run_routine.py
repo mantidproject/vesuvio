@@ -19,7 +19,6 @@ from mvesuvio.util.analysis_helpers import (
 )
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
-from mantid.api import mtd
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii
 from mantid.kernel import logger
