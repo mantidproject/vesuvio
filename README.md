@@ -60,7 +60,7 @@ Once you have located the `.mvesuvio` folder, open Mantid workbench and inside i
 
 This script represents the basics for passing in the inputs of the analysis routine.
 Click the run button on the workbench to start the execution of the script.
-(Check that you have the archive search enabled, otherwise the Vesuvio runs will not be found).
+(Check that you have the archive search enabled, the facility is set to ISIS and the instrument set to VESUVIO, otherwise the Vesuvio runs might not be found).
 This scipt is an example of a well-behaved sample and it should run without issues.
 
 If the run was successfull, you will notice that a new folder was created inside `.mvesuvio` containing all of the relevant outputs for this script.
