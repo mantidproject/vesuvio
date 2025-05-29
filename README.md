@@ -85,7 +85,7 @@ The `config` command has two optional arguments:
 - `--set-inputs` - Sets the location of the inputs python file.
 - `--set-ipfolder` - Sets the directory in which `mvesuvio` will look for instrument parameter files.
 
-If any of these arguments are not provided a default location will be selected. 
+If any of these arguments are not provided, a default location will be selected. 
 These will be output on the running of `mvesuvo config`.
 
 Usage examples:
