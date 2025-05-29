@@ -1213,8 +1213,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         return alg
 
     def _test_calls_individually(self, call_list, calls):
-        for j, call in enumerate(call_list):
-            for i, arg in enumerate(call.args):
+        for j, _call in enumerate(call_list):
+            for i, arg in enumerate(_call.args):
                 expected_arg = calls[j][i]
                 try:
                     self.assertEqual(arg, expected_arg)
