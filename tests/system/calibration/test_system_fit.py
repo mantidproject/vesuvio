@@ -124,7 +124,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
     def _assert_fitted_positions_match_expected(self, expected_positions, params_table, rel_tolerance=None,
                                                 default_rel_tol=TestConstants.DEFAULT_RELATIVE_TOLERANCE):
         """
-        Check that each of the fitted peak positions match the expected 
+        Check that each of the fitted peak positions match the expected
         positions in time of flight calculated from the parameter file
         within a small tolerance.
         """
@@ -137,9 +137,9 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         column_names = self._find_all_peak_positions(params_table)
 
         error_dict = {}
-        for name, expected_position in zip(column_names, expected_positions):        
+        for name, expected_position in zip(column_names, expected_positions):
             position = np.array(params_table.column(name))
-            
+
             self.assertFalse(np.isnan(position).any())
             self.assertFalse(np.isinf(position).any())
             error_list = assert_allclose_excluding_bad_detectors(expected_position, position, rel_tolerance, default_rel_tol)
@@ -169,13 +169,13 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
 
     @staticmethod
     def _find_all_peak_positions(params_table):
-        filter_errors_func = lambda name: ('LorentzPos' in name or 'PeakCentre' in name) and 'Err' not in name
+        filter_errors_func = lambda name: ('LorentzPos' in name or 'PeakCentre' in name) and 'Err' not in name  # noqa : E731
         column_names = params_table.getColumnNames()
         column_names = filter(filter_errors_func, column_names)
         return column_names
 
     def _calculate_energy_peak_positions(self):
-        """ 
+        """
         Using the calibrated values to calculate the expected
         position of the L0/L1/E1 peak in time of flight.
         """
@@ -200,7 +200,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         return tof
 
     def _calculate_theta_peak_positions(self):
-        """ 
+        """
         Using the calibrated values of theta calculate the expected
         peak position in time of flight.
         """

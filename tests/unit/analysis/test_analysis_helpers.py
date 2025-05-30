@@ -1,6 +1,5 @@
 import unittest
 import numpy as np
-from numpy.testing._private.utils import assert_allclose
 import scipy
 import dill
 from pathlib import Path
@@ -9,9 +8,7 @@ from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
     mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers, pseudo_voigt
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, SaveNexus, CompareWorkspaces, Rebin, AnalysisDataService
-import tempfile
-from textwrap import dedent
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, CompareWorkspaces, Rebin, AnalysisDataService
 
 class TestAnalysisHelpers(unittest.TestCase):
     def setUp(self):
@@ -41,7 +38,7 @@ class TestAnalysisHelpers(unittest.TestCase):
 
     def test_fix_profile_parameters_with_H(self):
         means_table_mock = MagicMock()
-        means_table_mock.rowCount.return_value = 3 
+        means_table_mock.rowCount.return_value = 3
         means_table_mock.row.side_effect = [
             {'label': '16.0', 'mass': 16.0, 'mean_width': 8.974, 'std_width': 1.401, 'mean_intensity': 0.176, 'std_intensity': 0.08722},
             {'label': '27.0', 'mass': 27.0, 'mean_width': 15.397, 'std_width': 1.131, 'mean_intensity': 0.305, 'std_intensity': 0.04895},
@@ -76,7 +73,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             result_table.row(3),
             {'label': '27.0', 'mass': 27.0, 'intensity': 0.0354737788438797, 'intensity_lb': 0.0 , 'intensity_ub': np.inf, 'width': 15.397000312805176, 'width_lb': 15.397000312805176, 'width_ub': 15.397000312805176, 'center': 0.0, 'center_lb': -3.0 , 'center_ub': 1.0}
         )
-        
+
 
     def test_fix_profile_parameters_without_H(self):
         # TODO: Use a more physical example containing Deuterium
@@ -84,7 +81,7 @@ class TestAnalysisHelpers(unittest.TestCase):
         # the first mass will be made free to vary and the intensities don't change
 
         means_table_mock = MagicMock()
-        means_table_mock.rowCount.return_value = 3 
+        means_table_mock.rowCount.return_value = 3
         means_table_mock.row.side_effect = [
             {'label': '16.0', 'mass': 16.0, 'mean_width': 8.974, 'std_width': 1.401, 'mean_intensity': 0.176, 'std_intensity': 0.08722},
             {'label': '27.0', 'mass': 27.0, 'mean_width': 15.397, 'std_width': 1.131, 'mean_intensity': 0.305, 'std_intensity': 0.04895},
@@ -154,7 +151,7 @@ class TestAnalysisHelpers(unittest.TestCase):
         expected_result = np.array([0.00360493, 0.00695558, 0.01490388, 0.02897969, 0.04368826, 0.04368826
 , 0.02897969, 0.01490388, 0.00695558, 0.00360493])
         np.testing.assert_allclose(actual_result, expected_result, atol=1e-6)
-        
+
 
     def test_numerical_third_derivative(self):
         x= np.linspace(-20, 20, 300)    # Workspaces are about 300 points of range
@@ -187,7 +184,7 @@ class TestAnalysisHelpers(unittest.TestCase):
 
         np.testing.assert_allclose(actual_data_x, data_x)
         np.testing.assert_allclose(actual_data_e, data_e)
-        expected_data_y = np.ones((3, 10)) 
+        expected_data_y = np.ones((3, 10))
         expected_data_y[(data_x >= 4.5) & (data_x <= 7.3)] = 0
         np.testing.assert_allclose(actual_data_y, expected_data_y)
 
@@ -277,9 +274,8 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(ws_res_ncp.extractE(), ws_ncp1.extractE())
         np.testing.assert_allclose(ws_res_ncp.extractX(), ws_ncp1.extractX())
 
-    
+
     def test_vesuvio_resolution(self):
-        import matplotlib.pyplot as plt
         ws_data = Load(str(Path(__file__).parent.parent.parent/"data/analysis/unit/analysis_fwd_0.nxs"))
 
         ws_res = calculate_resolution(1, ws_data, '-25, 5, 25')
@@ -455,7 +451,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             self.assertFalse(match)
 
     @patch('mvesuvio.util.analysis_helpers.Load')
-    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
+    def test_ws_history_matches_inputs_bad_ipfile(self, mock_load):
         path = Mock()
         path.is_file.return_value = True
         props = {
@@ -557,7 +553,7 @@ class TestAnalysisHelpers(unittest.TestCase):
             [  8., 8., 131.671, -0.2, 11.005, 0.619911]
         ])
         np.testing.assert_allclose(ip, expected_ip)
-        
+
 
     def test_load_raw_and_empty_from_path_with_subtraction(self):
 
@@ -600,7 +596,7 @@ class TestAnalysisHelpers(unittest.TestCase):
     def test_scattering_type(self):
         class BackwardAnalysisInputs:
             pass
-        
+
         class ForwardAnalysisInputs:
             pass
 

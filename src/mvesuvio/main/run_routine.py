@@ -1,16 +1,26 @@
 from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.util import handle_config
-from mvesuvio.util.analysis_helpers import calculate_resolution, fix_profile_parameters, isolate_lighest_mass_data,  \
-                            load_raw_and_empty_from_path, cropAndMaskWorkspace, \
-                            calculate_h_ratio, name_for_starting_ws, \
-                            scattering_type, ws_history_matches_inputs, save_ws_from_load_vesuvio, \
-                            is_hydrogen_present, create_profiles_table, create_table_for_hydrogen_to_mass_ratios, \
-                            print_table_workspace, convert_to_list_of_spectrum_numbers
+from mvesuvio.util.analysis_helpers import (
+    calculate_resolution,
+    fix_profile_parameters,
+    isolate_lighest_mass_data,
+    load_raw_and_empty_from_path,
+    cropAndMaskWorkspace,
+    calculate_h_ratio,
+    name_for_starting_ws,
+    scattering_type,
+    ws_history_matches_inputs,
+    save_ws_from_load_vesuvio,
+    is_hydrogen_present,
+    create_profiles_table,
+    create_table_for_hydrogen_to_mass_ratios,
+    print_table_workspace,
+    convert_to_list_of_spectrum_numbers,
+)
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
-from mantid.api import mtd
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii 
+from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii
 from mantid.kernel import logger
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
@@ -18,7 +28,7 @@ import numpy as np
 from pathlib import Path
 import importlib
 import sys
-import dill         # To convert constraints to string
+import dill  # To convert constraints to string
 import re
 import os
 
@@ -29,9 +39,7 @@ class Runner:
         self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
         self.setup()
 
-
     def setup(self):
-        
         ai = self.import_from_inputs()
 
         self.bckwd_ai = ai.BackwardAnalysisInputs
@@ -42,7 +50,7 @@ class Runner:
         self.classes_to_fit_y_space = []
         for ai_cls in [self.bckwd_ai, self.fwd_ai]:
             if ai_cls.fit_in_y_space:
-                self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + '_' + str(ai_cls.number_of_iterations_for_corrections))
+                self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + "_" + str(ai_cls.number_of_iterations_for_corrections))
                 self.classes_to_fit_y_space.append(ai_cls)
 
         self.analysis_result = None
@@ -52,10 +60,10 @@ class Runner:
         inputs_script_path = Path(handle_config.read_config_var("caching.inputs"))
         script_name = handle_config.get_script_name()
         self.experiment_path = inputs_script_path.parent / script_name
-        self.input_ws_path =  self.experiment_path / "input_workspaces"
+        self.input_ws_path = self.experiment_path / "input_workspaces"
         self.input_ws_path.mkdir(parents=True, exist_ok=True)
 
-        # TODO: remove this by fixing circular import 
+        # TODO: remove this by fixing circular import
         self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
         self.bckwd_ai.name = name_for_starting_ws(self.bckwd_ai)
 
@@ -69,42 +77,39 @@ class Runner:
         spec.loader.exec_module(module)
         return module
 
-
     def run(self):
         if not self.bckwd_ai.run_this_scattering_type and not self.fwd_ai.run_this_scattering_type:
             return
 
         # Erase previous log
         # Not working on Windows due to shared file locks
-        if os.name == 'posix': 
-            with open(self.mantid_log_file, 'w') as file:
-                file.write('')
+        if os.name == "posix":
+            with open(self.mantid_log_file, "w") as file:
+                file.write("")
 
         # If any ws for y fit already loaded
         wsInMtd = [ws in mtd for ws in self.ws_to_fit_y_space]  # Bool list
         if (len(wsInMtd) > 0) and all(wsInMtd):
             self.runAnalysisFitting()
             self.make_summarised_log_file()
-            return self.analysis_result, self.fitting_result  
+            return self.analysis_result, self.fitting_result
 
         if self.bckwd_ai.run_this_scattering_type:
-
-            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0):
+            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass == 0):
                 self.run_estimate_h_ratio()
                 return
 
             # TODO: make this automatic
-            assert is_hydrogen_present(self.fwd_ai.masses) != (
-                self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass==0 
-            ), "No Hydrogen detected, intensity_ratio_of_hydrogen_to_lowest_mass has to be set to 0"
+            assert is_hydrogen_present(self.fwd_ai.masses) != (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass == 0), (
+                "No Hydrogen detected, intensity_ratio_of_hydrogen_to_lowest_mass has to be set to 0"
+            )
 
         self.runAnalysisRoutine()
         self.runAnalysisFitting()
 
         # Return results used only in tests
         self.make_summarised_log_file()
-        return self.analysis_result, self.fitting_result  
-
+        return self.analysis_result, self.fitting_result
 
     def make_summarised_log_file(self):
         pattern = re.compile(r"^\d{4}-\d{2}-\d{2}")
@@ -115,7 +120,7 @@ class Runner:
             with open(self.mantid_log_file, "r") as infile, open(log_file_save_path, "w") as outfile:
                 for line in infile:
                     if "VesuvioAnalysisRoutine" in line:
-                        outfile.write(line)       
+                        outfile.write(line)
 
                     if "Notice Python" in line:  # For Fitting notices
                         outfile.write(line)
@@ -124,21 +129,21 @@ class Runner:
                         outfile.write(line)
         except OSError:
             logger.error("Mantid log file not available. Unable to produce a summarized log file for this routine.")
-        return 
+        return
 
-        
     def make_log_file_name(self):
-        filename = ''
+        filename = ""
         if self.bckwd_ai.run_this_scattering_type:
-            filename += 'bckwd_' + self.bckwd_ai.fitting_model
+            filename += "bckwd_" + self.bckwd_ai.fitting_model
         if self.fwd_ai.run_this_scattering_type:
-            filename += 'fwd_' + self.fwd_ai.fitting_model
-        return self.experiment_path / (filename+ ".log")
-
+            filename += "fwd_" + self.fwd_ai.fitting_model
+        return self.experiment_path / (filename + ".log")
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            ws_lighest_data, ws_lighest_ncp  = isolate_lighest_mass_data(mtd[wsName], mtd[wsName+"_ncp_group"], i_cls.subtract_calculated_fse_from_data) 
+            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(
+                mtd[wsName], mtd[wsName + "_ncp_group"], i_cls.subtract_calculated_fse_from_data
+            )
             # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
             # NOTE: Set saving path like this for now
@@ -149,19 +154,17 @@ class Runner:
             self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_lighest_ncp, ws_resolution).run()
         return
 
-
     def runAnalysisRoutine(self):
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
             self.run_joint_analysis()
-            return 
+            return
         if self.bckwd_ai.run_this_scattering_type:
             self.run_single_analysis(self.bckwd_ai)
-            return 
+            return
         if self.fwd_ai.run_this_scattering_type:
             self.run_single_analysis(self.fwd_ai)
             return
-        return 
-
+        return
 
     def run_single_analysis(self, ai):
         AnalysisDataService.clear()
@@ -170,7 +173,6 @@ class Runner:
         self.analysis_result = alg
         return
 
-
     def run_joint_analysis(self):
         AnalysisDataService.clear()
         back_alg = self._create_analysis_algorithm(self.bckwd_ai)
@@ -178,10 +180,8 @@ class Runner:
         self.run_joint_algs(back_alg, front_alg)
         return
 
-
     @classmethod
     def run_joint_algs(cls, back_alg, front_alg):
-
         back_alg.execute()
 
         incoming_means_table = mtd[back_alg.getPropertyValue("OutputMeansTable")]
@@ -203,7 +203,6 @@ class Runner:
         front_alg.execute()
         return
 
-
     def run_estimate_h_ratio(self):
         """
         Used when H is present and H to first mass ratio is not known.
@@ -212,9 +211,7 @@ class Runner:
         """
 
         try:
-            userInput = input(
-                "\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure."
-            )
+            userInput = input("\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure.")
             if not userInput == "":
                 raise EOFError
 
@@ -230,32 +227,29 @@ class Runner:
         front_alg.execute()
 
         means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
-        current_ratio = calculate_h_ratio(means_table) 
+        current_ratio = calculate_h_ratio(means_table)
 
         table_h_ratios.addRow([current_ratio])
-        previous_ratio = np.nan 
+        previous_ratio = np.nan
 
         while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
-
             back_alg.setProperty("HRatioToLowestMass", current_ratio)
             self.run_joint_algs(back_alg, front_alg)
 
             previous_ratio = current_ratio
 
             means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
-            current_ratio = calculate_h_ratio(means_table) 
+            current_ratio = calculate_h_ratio(means_table)
 
             table_h_ratios.addRow([current_ratio])
 
-            SaveAscii(table_h_ratios.name(), str(self.experiment_path / "output_files" / table_h_ratios.name())) 
+            SaveAscii(table_h_ratios.name(), str(self.experiment_path / "output_files" / table_h_ratios.name()))
 
         logger.notice("\nProcedute to estimate Hydrogen ratio finished.")
         print_table_workspace(table_h_ratios)
         return
 
-
     def _create_analysis_algorithm(self, ai):
-
         raw_path, empty_path = self._save_ws_if_not_on_path(ai)
 
         ws = load_raw_and_empty_from_path(
@@ -265,28 +259,30 @@ class Runner:
             name=name_for_starting_ws(ai),
             raw_scale_factor=ai.scale_raw_workspace,
             empty_scale_factor=ai.scale_empty_workspace,
-            raw_minus_empty=ai.subtract_empty_workspace_from_raw
+            raw_minus_empty=ai.subtract_empty_workspace_from_raw,
         )
-        first_detector, last_detector = [int(s) for s in ai.detectors.split('-')]
+        first_detector, last_detector = [int(s) for s in ai.detectors.split("-")]
         cropedWs = cropAndMaskWorkspace(
-            ws, 
+            ws,
             firstSpec=first_detector,
             lastSpec=last_detector,
             maskedDetectors=ai.mask_detectors,
-            maskTOFRange=ai.mask_time_of_flight_range
+            maskTOFRange=ai.mask_time_of_flight_range,
         )
-        profiles_table = create_profiles_table(cropedWs.name()+"_initial_parameters", ai)
+        profiles_table = create_profiles_table(cropedWs.name() + "_initial_parameters", ai)
         print_table_workspace(profiles_table)
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
         kwargs = {
             "InputWorkspace": cropedWs.name(),
             "InputProfiles": profiles_table.name(),
             "InstrumentParametersFile": str(ipFilesPath / ai.instrument_parameters_file),
-            "HRatioToLowestMass": ai.intensity_ratio_of_hydrogen_to_lowest_mass if hasattr(ai, 'intensity_ratio_of_hydrogen_to_lowest_mass') else 0,
+            "HRatioToLowestMass": ai.intensity_ratio_of_hydrogen_to_lowest_mass
+            if hasattr(ai, "intensity_ratio_of_hydrogen_to_lowest_mass")
+            else 0,
             "NumberOfIterations": int(ai.number_of_iterations_for_corrections),
             "InvalidDetectors": convert_to_list_of_spectrum_numbers(ai.mask_detectors),
             "MultipleScatteringCorrection": ai.do_multiple_scattering_correction,
-            "SampleShapeXml": ai.sample_shape_xml, 
+            "SampleShapeXml": ai.sample_shape_xml,
             "VesuvioThickness": ai.thickness_for_vesuvio_thickness,
             "GammaCorrection": ai.do_gamma_correction,
             "ModeRunning": scattering_type(ai),
@@ -295,7 +291,7 @@ class Runner:
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
             "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
-            "OutputMeansTable":" Final_Means"
+            "OutputMeansTable": " Final_Means",
         }
 
         if self.running_tests:
@@ -306,24 +302,9 @@ class Runner:
 
         alg.initialize()
         alg.setProperties(kwargs)
-        return alg 
-
-
-    def _make_neutron_profiles(cls, ai):
-        profiles = []
-        for mass, intensity, width, center, intensity_bound, width_bound, center_bound in zip(
-            ai.masses, ai.initial_fitting_parameters[::3], ai.initial_fitting_parameters[1::3], ai.initial_fitting_parameters[2::3],
-            ai.fitting_bounds[::3], ai.fitting_bounds[1::3], ai.fitting_bounds[2::3]
-        ):
-            profiles.append(NeutronComptonProfile(
-                label=str(float(mass)), mass=float(mass), intensity=float(intensity), width=float(width), center=float(center),
-                intensity_bounds=list(intensity_bound), width_bounds=list(width_bound), center_bounds=list(center_bound)
-            ))
-        return profiles
-
+        return alg
 
     def _save_ws_if_not_on_path(self, load_ai):
-
         scatteringType = scattering_type(load_ai).lower()
         scriptName = handle_config.get_script_name()
 
@@ -336,10 +317,10 @@ class Runner:
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 
         if not ws_history_matches_inputs(load_ai.runs, load_ai.mode, load_ai.instrument_parameters_file, rawPath):
-            save_ws_from_load_vesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath/load_ai.instrument_parameters_file), rawPath)
+            save_ws_from_load_vesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath / load_ai.instrument_parameters_file), rawPath)
 
         if not ws_history_matches_inputs(load_ai.empty_runs, load_ai.mode, load_ai.instrument_parameters_file, emptyPath):
-            save_ws_from_load_vesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath/load_ai.instrument_parameters_file), emptyPath)
+            save_ws_from_load_vesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath / load_ai.instrument_parameters_file), emptyPath)
         return rawPath, emptyPath
 
 

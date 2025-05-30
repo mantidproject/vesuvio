@@ -355,7 +355,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                       'OutputWorkspace': ''}
         for prop in properties:
             expected_value = alg.getProperty(prop).value
-            if type(expected_value) == np.ndarray:
+            if type(expected_value) is np.ndarray:
                 expected_value = list(expected_value)
             self.assertEqual(expected_value, properties[prop], f'Property {prop}. Expected: {expected_value},'
                                                                f'Actual: {properties[prop]}')
@@ -1213,8 +1213,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         return alg
 
     def _test_calls_individually(self, call_list, calls):
-        for j, call in enumerate(call_list):
-            for i, arg in enumerate(call.args):
+        for j, _call in enumerate(call_list):
+            for i, arg in enumerate(_call.args):
                 expected_arg = calls[j][i]
                 try:
                     self.assertEqual(arg, expected_arg)
@@ -1224,7 +1224,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
     def test_fit_bragg_peaks_success(self, group_workspaces_mock):
         fit_result_ret_val = {'status': 'success'}
-        fit_results = lambda *args: fit_result_ret_val
+        fit_results = lambda *args: fit_result_ret_val  # noqa : E731
         selected_params = ['selected_params1', 'selected_params2']
         output_workspaces = ['ws1', 'ws2']
 

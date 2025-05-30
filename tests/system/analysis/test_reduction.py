@@ -1,6 +1,6 @@
 import unittest
 from pathlib import Path
-from mvesuvio.main.run_routine import Runner 
+from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
 import mvesuvio
 from mantid.simpleapi import LoadAscii, mtd, CompareWorkspaces, AnalysisDataService
@@ -14,7 +14,7 @@ class TestReduction(unittest.TestCase):
 
     def setUp(self):
         pass
-        
+
     def test_reduction(self):
         benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
         results_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs" / "output_files" / "reduction"
@@ -46,7 +46,7 @@ class TestReduction(unittest.TestCase):
             if ws_name.startswith('bench'):
                 if ws_name.endswith('fit_results'):
                     # Fit results spectra by spectra very too much for comparison
-                    # TODO: Find out why and fix it 
+                    # TODO: Find out why and fix it
                     continue
                 else:
                     tol = 1e-3

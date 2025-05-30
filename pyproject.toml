@@ -81,3 +81,15 @@ distance-dirty = "{version}.dev{distance}+uncommitted"
 
 [tool.versioningit.write]
 file = "src/mvesuvio/_version.py"
+
+[tool.ruff]
+exclude = [".git", "build", "buildconfig", "unpackaged", "legacy"]
+line-length = 140
+
+[tool.ruff.lint]
+ignore = ["F405", "F403"]
+
+[tool.ruff.format]
+skip-magic-trailing-comma = false
+line-ending = "auto"
+exclude = ["tests/unit/**", "tests/system/**"]

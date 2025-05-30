@@ -1,5 +1,5 @@
 import unittest
-from mock import MagicMock, patch, call
+from mock import patch
 from mvesuvio.util import handle_config
 import tempfile
 from textwrap import dedent
@@ -40,11 +40,11 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_read_config_throws(self):
         with self.assertRaises(RuntimeError):
-            lines = getattr(handle_config, "__read_config")("/not.there")
+            getattr(handle_config, "__read_config")("/not.there")
 
 
     def test_set_config_vars(self):
-        file = tempfile.NamedTemporaryFile() 
+        file = tempfile.NamedTemporaryFile()
         mock_dir, mock_file = os.path.split(file.name)
         with (
             patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
@@ -61,7 +61,7 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_read_config_vars(self):
-        file = tempfile.NamedTemporaryFile() 
+        file = tempfile.NamedTemporaryFile()
         file.write("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n".encode())
         file.seek(0)
         mock_dir, mock_file = os.path.split(file.name)
@@ -76,7 +76,7 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_read_config_vars_throws(self):
-        file = tempfile.NamedTemporaryFile() 
+        file = tempfile.NamedTemporaryFile()
         file.write("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n".encode())
         file.seek(0)
         mock_dir, mock_file = os.path.split(file.name)
@@ -86,16 +86,16 @@ class TestHandleConfig(unittest.TestCase):
             patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file),
             self.assertRaises(ValueError)
         ):
-            handle_config.read_config_var('non.existent') 
+            handle_config.read_config_var('non.existent')
         file.close()
 
 
     def test_get_script_name(self):
         with (
             patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename,
-            patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config_var
+            patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config_var # noqa : F841
         ):
-            mock_basename.return_value = "inputs.py" 
+            mock_basename.return_value = "inputs.py"
             self.assertEqual(handle_config.get_script_name(), "inputs")
 
 
