@@ -116,7 +116,7 @@ class TestAnalysisHelpers(unittest.TestCase):
     def test_calculate_h_ratio(self):
         means_table_mock = MagicMock()
         means_table_mock.column.side_effect = lambda x: [16, 1, 12] if x=="mass" else [0.1, 0.85, 0.05]
-        h_ratio = calculate_h_ratio(means_table_mock)
+        h_ratio = calculate_h_ratio(means_table_mock, 12)
         self.assertEqual(h_ratio, 0.85 / 0.05)
 
 
