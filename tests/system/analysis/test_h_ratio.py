@@ -28,7 +28,7 @@ class TestReduction(unittest.TestCase):
             os.remove(str(results_path))
 
         runner = Runner(True)
-        runner.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass = 0
+        runner.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass = 0
         runner.run()
 
         AnalysisDataService.clear()
