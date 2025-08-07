@@ -638,8 +638,8 @@ def selectModelAndPars(modelFlag):
             jp = np.exp(-(y**2) / (2 * sigTH**2)) * (1 + R**2 + 2 * R * np.exp(-alpha) * np.cos(beta)) / denom
             jp *= np.sin(theta)
 
-            JBest = np.trapz(jp, x=theta, axis=0)
-            JBest /= np.abs(np.trapz(JBest, x=y))
+            JBest = np.trapezoid(jp, x=theta, axis=0)
+            JBest /= np.abs(np.trapezoid(JBest, x=y))
             JBest *= A
             return JBest
 
@@ -663,8 +663,8 @@ def selectModelAndPars(modelFlag):
             jp = np.exp(-(y**2) / (2 * sigTH**2)) / (2.506628 * sigTH)
             jp *= np.sin(theta)
 
-            JBest = np.trapz(jp, x=theta, axis=0)
-            JBest /= np.abs(np.trapz(JBest, x=y))
+            JBest = np.trapezoid(jp, x=theta, axis=0)
+            JBest /= np.abs(np.trapezoid(JBest, x=y))
             JBest *= A
             return JBest
 
@@ -687,8 +687,8 @@ def selectModelAndPars(modelFlag):
 
             J = np.sin(theta) / S2_inv * np.exp(-(y**2) / 2 * S2_inv)
 
-            J = np.trapz(J, x=phi, axis=2)[:, :, np.newaxis]  # Keep shape
-            J = np.trapz(J, x=theta, axis=1)
+            J = np.trapezoid(J, x=phi, axis=2)[:, :, np.newaxis]  # Keep shape
+            J = np.trapezoid(J, x=theta, axis=1)
 
             J *= A * 2 / np.pi * 1 / np.sqrt(2 * np.pi) * 1 / (sig_x * sig_y * sig_z)  # Normalisation
             J = J.squeeze()
