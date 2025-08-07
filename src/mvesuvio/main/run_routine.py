@@ -141,9 +141,18 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(
-                mtd[wsName], mtd[wsName + "_ncp_group"], i_cls.subtract_calculated_fse_from_data
-            )
+            try:
+                ws_to_fit = mtd[wsName]
+            except KeyError:
+                logger.warning(f"Workspace {wsName} not found. Skipping fitting in Y-Space.")
+                return
+            try:
+                ws_to_fit_ncps = mtd[wsName + "_ncp_group"]
+            except KeyError:
+                logger.warning(f"Workspace {wsName}_ncp_group not found. Skipping fitting in Y-Space.")
+                return
+
+            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(ws_to_fit, ws_to_fit_ncps, i_cls.subtract_calculated_fse_from_data)
             # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
             # NOTE: Set saving path like this for now

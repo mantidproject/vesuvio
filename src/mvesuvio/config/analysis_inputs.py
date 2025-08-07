@@ -53,7 +53,7 @@ class BackwardAnalysisInputs(SampleParameters):
     do_multiple_scattering_correction = True
     chosen_mass_index = 0  # index in 'masses' list (index from 0 to n-1), ignored if H not present
     intensity_ratio_of_hydrogen_to_chosen_mass = (
-        0  # 19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
+        19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
     )
     transmission_guess = 0.8537  # Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
