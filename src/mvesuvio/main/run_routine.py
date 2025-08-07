@@ -210,14 +210,15 @@ class Runner:
         Runs iterative procedure with alternating back and forward scattering.
         """
 
-        try:
-            userInput = input("\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure.")
-            if not userInput == "":
-                raise EOFError
+        if not self.running_tests:
+            try:
+                userInput = input("\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure.")
+                if not userInput == "":
+                    raise EOFError
 
-        except EOFError:
-            logger.error("Estimation of Hydrogen intensity ratio interrupted.")
-            return
+            except EOFError:
+                logger.error("Estimation of Hydrogen intensity ratio interrupted.")
+                return
 
         table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
 
