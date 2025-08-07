@@ -283,7 +283,6 @@ class Runner:
             "InvalidDetectors": convert_to_list_of_spectrum_numbers(ai.mask_detectors),
             "MultipleScatteringCorrection": ai.do_multiple_scattering_correction,
             "SampleShapeXml": ai.sample_shape_xml,
-            "VesuvioThickness": ai.thickness_for_vesuvio_thickness,
             "GammaCorrection": ai.do_gamma_correction,
             "ModeRunning": scattering_type(ai),
             "TransmissionGuess": ai.transmission_guess,

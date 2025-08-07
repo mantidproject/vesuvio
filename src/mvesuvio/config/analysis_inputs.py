@@ -15,12 +15,6 @@ class SampleParameters:
         <right-front-bottom-point x="{-slab_width / 2}" y="{-slab_height / 2}" z="{slab_thickness / 2}" />
         </cuboid>'''
 
-    # Passed as the Thickness argument when calling VesuvioThickness
-    # For a slab sample, should be the same as slab_thickness
-    # Currently VesuvioThickness does not support other shapes
-    # In that case make an educated guess
-    thickness_for_vesuvio_thickness = 0.001
-
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):

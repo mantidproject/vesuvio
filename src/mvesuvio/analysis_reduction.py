@@ -88,7 +88,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         )
         self.declareProperty(name="MultipleScatteringCorrection", defaultValue=False, doc="Whether to run multiple scattering correction.")
         self.declareProperty(name="GammaCorrection", defaultValue=False, doc="Whether to run gamma correction.")
-        self.declareProperty(name="VesuvioThickness", defaultValue=0.1, validator=FloatBoundedValidator(lower=0))
         self.declareProperty(
             name="SampleShapeXml",
             defaultValue="""<cuboid id="sample-shape">
@@ -138,7 +137,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._transmission_guess = self.getProperty("TransmissionGuess").value
         self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value
         self._number_of_events = self.getProperty("NumberOfEvents").value
-        self._vesuvio_thickness = self.getProperty("VesuvioThickness").value
         self._sample_shape_xml = self.getProperty("SampleShapeXml").value
         self._mode_running = self.getProperty("ModeRunning").value
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value
@@ -653,7 +651,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             Masses=masses,
             Amplitudes=mean_intensity_ratios,
             TransmissionGuess=self._transmission_guess,
-            Thickness=self._vesuvio_thickness,
+            Thickness=0.1,
         )
         ws_corrections_name = self._workspace_for_corrections.name()
         atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
