@@ -652,8 +652,8 @@ def selectModelAndPars(modelFlag):
         }  # TODO: Starting parameters and bounds?
         sharedPars = ["d", "R", "sig1", "sig2"]  # Only varying parameter is amplitude A
 
-    elif modelFlag == "ansiogauss":
-        # Ansiotropic case
+    elif modelFlag == "gauss2d":
+        # Anisotropic case
         def model(x, A, sig1, sig2):
             # h = 2.04
             theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
@@ -701,7 +701,7 @@ def selectModelAndPars(modelFlag):
         raise ValueError(
             """
         Fitting Model not recognized, available options:
-        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'gauss2d' gauss3d'"
         """
         )
 
@@ -1124,19 +1124,20 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             """
         elif (
             (yFitIC.fitting_model == "doublewell")
-            | (yFitIC.fitting_model == "ansiogauss")
+            | (yFitIC.fitting_model == "gauss2d")
             | (yFitIC.fitting_model == "gauss3d")
             | (yFitIC.fitting_model == "gauss_cntr")
             | (yFitIC.fitting_model == "gcc4c6_cntr")
             | (yFitIC.fitting_model == "gcc4_cntr")
             | (yFitIC.fitting_model == "gcc6_cntr")
         ):
+            logger.warning("Fitting model recognized but not currently implemented in Mantid Fit. Skipping Mantid Fit ...")
             return
         else:
             raise ValueError(
                 """
             Fitting Model not recognized, available options:
-            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'gauss2d' gauss3d'"
             """
             )
 

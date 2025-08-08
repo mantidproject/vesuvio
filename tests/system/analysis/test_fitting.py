@@ -85,11 +85,11 @@ class TestFitting(unittest.TestCase):
         alg.run()
         self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gcc4_fit", self.target_dir / "gcc4_fit"))
 
-    def test_ansiogauss_with_symmetrisation_no_fse(self):
+    def test_gauss2d_with_symmetrisation_no_fse(self):
         fi = self.fi
-        fi.fitting_model = "ansiogauss"
+        fi.fitting_model = "gauss2d"
         fi.do_symmetrisation = True
         fi.subtract_calculated_fse_from_data = False
         alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
         alg.run()
-        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "ansiogauss_fit", self.target_dir / "ansiogauss_fit"))
+        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gauss2d_fit", self.target_dir / "gauss2d_fit"))
