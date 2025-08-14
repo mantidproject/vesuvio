@@ -95,13 +95,13 @@ class Runner:
             return self.analysis_result, self.fitting_result
 
         if self.bckwd_ai.run_this_scattering_type:
-            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass == 0):
+            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0):
                 self.run_estimate_h_ratio()
                 return
 
             # TODO: make this automatic
-            assert is_hydrogen_present(self.fwd_ai.masses) != (self.bckwd_ai.intensity_ratio_of_hydrogen_to_lowest_mass == 0), (
-                "No Hydrogen detected, intensity_ratio_of_hydrogen_to_lowest_mass has to be set to 0"
+            assert is_hydrogen_present(self.fwd_ai.masses) != (self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0), (
+                "No Hydrogen detected, intensity_ratio_of_hydrogen_to_chosen_mass should be set to 0"
             )
 
         self.runAnalysisRoutine()
@@ -141,9 +141,18 @@ class Runner:
 
     def runAnalysisFitting(self):
         for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(
-                mtd[wsName], mtd[wsName + "_ncp_group"], i_cls.subtract_calculated_fse_from_data
-            )
+            try:
+                ws_to_fit = mtd[wsName]
+            except KeyError:
+                logger.warning(f"Workspace {wsName} not found. Skipping fitting in Y-Space.")
+                return
+            try:
+                ws_to_fit_ncps = mtd[wsName + "_ncp_group"]
+            except KeyError:
+                logger.warning(f"Workspace {wsName}_ncp_group not found. Skipping fitting in Y-Space.")
+                return
+
+            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(ws_to_fit, ws_to_fit_ncps, i_cls.subtract_calculated_fse_from_data)
             # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
             # NOTE: Set saving path like this for now
@@ -185,7 +194,7 @@ class Runner:
         back_alg.execute()
 
         incoming_means_table = mtd[back_alg.getPropertyValue("OutputMeansTable")]
-        h_ratio = back_alg.getProperty("HRatioToLowestMass").value
+        h_ratio = back_alg.getProperty("HRatioToChosenMass").value
 
         assert incoming_means_table is not None, "Means table from backward routine not correctly accessed."
         assert h_ratio is not None, "H ratio from backward routine not correctly accesssed."
@@ -210,14 +219,17 @@ class Runner:
         Runs iterative procedure with alternating back and forward scattering.
         """
 
-        try:
-            userInput = input("\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure.")
-            if not userInput == "":
-                raise EOFError
+        if not self.running_tests:
+            try:
+                userInput = input("\nHydrogen intensity ratio to lowest mass is not set. Press Enter to start estimate procedure.")
+                if not userInput == "":
+                    raise EOFError
 
-        except EOFError:
-            logger.error("Estimation of Hydrogen intensity ratio interrupted.")
-            return
+            except EOFError:
+                logger.error("Estimation of Hydrogen intensity ratio interrupted.")
+                return
+
+        chosen_mass = self.bckwd_ai.masses[self.bckwd_ai.chosen_mass_index]
 
         table_h_ratios = create_table_for_hydrogen_to_mass_ratios()
 
@@ -227,19 +239,19 @@ class Runner:
         front_alg.execute()
 
         means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
-        current_ratio = calculate_h_ratio(means_table)
+        current_ratio = calculate_h_ratio(means_table, chosen_mass)
 
         table_h_ratios.addRow([current_ratio])
         previous_ratio = np.nan
 
         while not np.isclose(current_ratio, previous_ratio, rtol=0.01):
-            back_alg.setProperty("HRatioToLowestMass", current_ratio)
+            back_alg.setProperty("HRatioToChosenMass", current_ratio)
             self.run_joint_algs(back_alg, front_alg)
 
             previous_ratio = current_ratio
 
             means_table = mtd[front_alg.getPropertyValue("OutputMeansTable")]
-            current_ratio = calculate_h_ratio(means_table)
+            current_ratio = calculate_h_ratio(means_table, chosen_mass)
 
             table_h_ratios.addRow([current_ratio])
 
@@ -276,14 +288,14 @@ class Runner:
             "InputWorkspace": cropedWs.name(),
             "InputProfiles": profiles_table.name(),
             "InstrumentParametersFile": str(ipFilesPath / ai.instrument_parameters_file),
-            "HRatioToLowestMass": ai.intensity_ratio_of_hydrogen_to_lowest_mass
-            if hasattr(ai, "intensity_ratio_of_hydrogen_to_lowest_mass")
+            "ChosenMassIndex": ai.chosen_mass_index if hasattr(ai, "chosen_mass_index") else 0,
+            "HRatioToChosenMass": ai.intensity_ratio_of_hydrogen_to_chosen_mass
+            if hasattr(ai, "intensity_ratio_of_hydrogen_to_chosen_mass")
             else 0,
             "NumberOfIterations": int(ai.number_of_iterations_for_corrections),
             "InvalidDetectors": convert_to_list_of_spectrum_numbers(ai.mask_detectors),
             "MultipleScatteringCorrection": ai.do_multiple_scattering_correction,
             "SampleShapeXml": ai.sample_shape_xml,
-            "VesuvioThickness": ai.thickness_for_vesuvio_thickness,
             "GammaCorrection": ai.do_gamma_correction,
             "ModeRunning": scattering_type(ai),
             "TransmissionGuess": ai.transmission_guess,

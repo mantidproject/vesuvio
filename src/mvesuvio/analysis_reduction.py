@@ -76,10 +76,16 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             doc="Filename of the instrument parameter file.",
         )
         self.declareProperty(
-            name="HRatioToLowestMass",
+            name="ChosenMassIndex",
+            defaultValue=0,
+            validator=IntBoundedValidator(lower=0),
+            doc="Index of mass that anchors hydrogen ratio provided by the user.",
+        )
+        self.declareProperty(
+            name="HRatioToChosenMass",
             defaultValue=0.0,
             validator=FloatBoundedValidator(lower=0),
-            doc="Intensity ratio between H peak and lowest mass peak.",
+            doc="Intensity ratio between H peak and chosen mass peak. Traditionally estimated using stoichiometry values.",
         )
         self.declareProperty(name="NumberOfIterations", defaultValue=2, validator=IntBoundedValidator(lower=0))
         self.declareProperty(
@@ -88,7 +94,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         )
         self.declareProperty(name="MultipleScatteringCorrection", defaultValue=False, doc="Whether to run multiple scattering correction.")
         self.declareProperty(name="GammaCorrection", defaultValue=False, doc="Whether to run gamma correction.")
-        self.declareProperty(name="VesuvioThickness", defaultValue=0.1, validator=FloatBoundedValidator(lower=0))
         self.declareProperty(
             name="SampleShapeXml",
             defaultValue="""<cuboid id="sample-shape">
@@ -138,13 +143,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._transmission_guess = self.getProperty("TransmissionGuess").value
         self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value
         self._number_of_events = self.getProperty("NumberOfEvents").value
-        self._vesuvio_thickness = self.getProperty("VesuvioThickness").value
         self._sample_shape_xml = self.getProperty("SampleShapeXml").value
         self._mode_running = self.getProperty("ModeRunning").value
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value
         self._gamma_correction = self.getProperty("GammaCorrection").value
         self._save_results_path = Path(self.getProperty("ResultsPath").value)
-        self._h_ratio = self.getProperty("HRatioToLowestMass").value
+        self._chosen_index_for_h_ratio = self.getProperty("ChosenMassIndex").value
+        self._h_ratio = self.getProperty("HRatioToChosenMass").value
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
         self._profiles_table = self.getProperty("InputProfiles").value
 
@@ -185,6 +190,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._zero_columns_boolean_mask = None
         self._table_fit_results = None
         self._fit_profiles_workspaces = {}
+
+        assert self._chosen_index_for_h_ratio < self._masses.size, "Index of chosen mass out of range."
 
     def _update_workspace_data(self):
         self._dataX = self._workspace_being_fit.extractX()
@@ -643,7 +650,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         # If Backscattering mode and H is present in the sample, add H to MS properties
         if self._mode_running == "BACKWARD":
             if self._h_ratio > 0:  # If H is present, ratio is a number
-                HIntensity = self._h_ratio * mean_intensity_ratios[np.argmin(masses)]
+                HIntensity = self._h_ratio * mean_intensity_ratios[self._chosen_index_for_h_ratio]
                 mean_intensity_ratios = np.append(mean_intensity_ratios, HIntensity)
                 mean_intensity_ratios /= np.sum(mean_intensity_ratios)
                 masses = np.append(masses, 1.0079)
@@ -653,7 +660,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             Masses=masses,
             Amplitudes=mean_intensity_ratios,
             TransmissionGuess=self._transmission_guess,
-            Thickness=self._vesuvio_thickness,
+            Thickness=0.1,
         )
         ws_corrections_name = self._workspace_for_corrections.name()
         atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)

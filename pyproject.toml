@@ -83,7 +83,7 @@ distance-dirty = "{version}.dev{distance}+uncommitted"
 file = "src/mvesuvio/_version.py"
 
 [tool.ruff]
-exclude = [".git", "build", "buildconfig", "unpackaged", "legacy"]
+exclude = [".git", "build", "buildconfig", "unpackaged", "legacy", "src/mvesuvio/config/analysis_inputs.py"]
 line-length = 140
 
 [tool.ruff.lint]

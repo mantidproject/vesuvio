@@ -15,12 +15,6 @@ class SampleParameters:
         <right-front-bottom-point x="{-slab_width / 2}" y="{-slab_height / 2}" z="{slab_thickness / 2}" />
         </cuboid>'''
 
-    # Passed as the Thickness argument when calling VesuvioThickness
-    # For a slab sample, should be the same as slab_thickness
-    # Currently VesuvioThickness does not support other shapes
-    # In that case make an educated guess
-    thickness_for_vesuvio_thickness = 0.1
-
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
@@ -57,7 +51,8 @@ class BackwardAnalysisInputs(SampleParameters):
 
     number_of_iterations_for_corrections = 0  # 4
     do_multiple_scattering_correction = True
-    intensity_ratio_of_hydrogen_to_lowest_mass = 19.0620008206  # Set to zero to disable
+    chosen_mass_index = 0
+    intensity_ratio_of_hydrogen_to_chosen_mass = 19.0620008206  # Set to zero to disable
     transmission_guess = 0.8537  # Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
     multiple_scattering_number_of_events = 1.0e5

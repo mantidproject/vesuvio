@@ -24,12 +24,12 @@ class TestAnalysisReduction(unittest.TestCase):
             "InputWorkspace": CreateSampleWorkspace(OutputWorkspace="input-ws").name(),
             "InputProfiles": CreateEmptyTableWorkspace(OutputWorkspace="profiles-table").name(),
             "InstrumentParametersFile": str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files", "ip2018_3.par")),
-            "HRatioToLowestMass": 0,
+            "ChosenMassIndex": 0,
+            "HRatioToChosenMass": 0,
             "NumberOfIterations": 4,
             "InvalidDetectors": [3],
             "MultipleScatteringCorrection": False,
             "SampleShapeXml": "",
-            "VesuvioThickness": 0.1,
             "GammaCorrection": True,
             "ModeRunning": "BACKWARD",
             "TransmissionGuess": 0,
@@ -84,6 +84,8 @@ class TestAnalysisReduction(unittest.TestCase):
                     return MagicMock(value="")
                 if key == "Constraints":
                     return MagicMock(value=str(dill.dumps(({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }))))
+                if key == "ChosenMassIndex":
+                    return MagicMock(value=0)
                 else:
                     return MagicMock(value=None)
 
@@ -537,12 +539,11 @@ class TestAnalysisReduction(unittest.TestCase):
             <left-back-bottom-point x="0.05" y="-0.05" z="-0.0005" />
             <right-front-bottom-point x="-0.05" y="-0.05" z="0.0005" />
             </cuboid>'''
-        alg._vesuvio_thickness = 0.1
-
         alg._masses = np.array([12.0, 16.0, 27.0])
         alg._mean_widths = np.array([15.35080, 8.72859, 13.89955])
         alg._mean_intensity_ratios = np.array([0.53110, 0.17667, 0.29223])
         alg._mode_running = "BACKWARD"
+        alg._chosen_index_for_h_ratio = 0
         alg._h_ratio = 19.0620008206
         alg._transmission_guess = 0.8537
         alg._number_of_events = 1.0e5

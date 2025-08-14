@@ -638,8 +638,8 @@ def selectModelAndPars(modelFlag):
             jp = np.exp(-(y**2) / (2 * sigTH**2)) * (1 + R**2 + 2 * R * np.exp(-alpha) * np.cos(beta)) / denom
             jp *= np.sin(theta)
 
-            JBest = np.trapz(jp, x=theta, axis=0)
-            JBest /= np.abs(np.trapz(JBest, x=y))
+            JBest = np.trapezoid(jp, x=theta, axis=0)
+            JBest /= np.abs(np.trapezoid(JBest, x=y))
             JBest *= A
             return JBest
 
@@ -652,8 +652,8 @@ def selectModelAndPars(modelFlag):
         }  # TODO: Starting parameters and bounds?
         sharedPars = ["d", "R", "sig1", "sig2"]  # Only varying parameter is amplitude A
 
-    elif modelFlag == "ansiogauss":
-        # Ansiotropic case
+    elif modelFlag == "gauss2d":
+        # Anisotropic case
         def model(x, A, sig1, sig2):
             # h = 2.04
             theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
@@ -663,8 +663,8 @@ def selectModelAndPars(modelFlag):
             jp = np.exp(-(y**2) / (2 * sigTH**2)) / (2.506628 * sigTH)
             jp *= np.sin(theta)
 
-            JBest = np.trapz(jp, x=theta, axis=0)
-            JBest /= np.abs(np.trapz(JBest, x=y))
+            JBest = np.trapezoid(jp, x=theta, axis=0)
+            JBest /= np.abs(np.trapezoid(JBest, x=y))
             JBest *= A
             return JBest
 
@@ -687,8 +687,8 @@ def selectModelAndPars(modelFlag):
 
             J = np.sin(theta) / S2_inv * np.exp(-(y**2) / 2 * S2_inv)
 
-            J = np.trapz(J, x=phi, axis=2)[:, :, np.newaxis]  # Keep shape
-            J = np.trapz(J, x=theta, axis=1)
+            J = np.trapezoid(J, x=phi, axis=2)[:, :, np.newaxis]  # Keep shape
+            J = np.trapezoid(J, x=theta, axis=1)
 
             J *= A * 2 / np.pi * 1 / np.sqrt(2 * np.pi) * 1 / (sig_x * sig_y * sig_z)  # Normalisation
             J = J.squeeze()
@@ -701,7 +701,7 @@ def selectModelAndPars(modelFlag):
         raise ValueError(
             """
         Fitting Model not recognized, available options:
-        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+        'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'gauss2d' gauss3d'"
         """
         )
 
@@ -1124,19 +1124,20 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             """
         elif (
             (yFitIC.fitting_model == "doublewell")
-            | (yFitIC.fitting_model == "ansiogauss")
+            | (yFitIC.fitting_model == "gauss2d")
             | (yFitIC.fitting_model == "gauss3d")
             | (yFitIC.fitting_model == "gauss_cntr")
             | (yFitIC.fitting_model == "gcc4c6_cntr")
             | (yFitIC.fitting_model == "gcc4_cntr")
             | (yFitIC.fitting_model == "gcc6_cntr")
         ):
+            logger.warning("Fitting model recognized but not currently implemented in Mantid Fit. Skipping Mantid Fit ...")
             return
         else:
             raise ValueError(
                 """
             Fitting Model not recognized, available options:
-            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'ansiogauss' gauss3d'"
+            'gauss', 'gauss_cntr', 'gcc4c6', 'gcc4c6_cntr', 'gcc4', 'gcc4_cntr, 'gcc6', 'gcc6_cntr', 'doublewell', 'gauss2d' gauss3d'"
             """
             )
 

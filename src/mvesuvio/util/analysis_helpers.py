@@ -167,7 +167,7 @@ def create_profiles_table(name, ai):
 
 def create_table_for_hydrogen_to_mass_ratios():
     table = CreateEmptyTableWorkspace(OutputWorkspace="hydrogen_intensity_ratios_estimates")
-    table.addColumn(type="float", name="Hydrogen intensity ratio to lowest mass at each iteration")
+    table.addColumn(type="float", name="Hydrogen intensity ratio to chosen mass at each iteration")
     return table
 
 
@@ -465,17 +465,15 @@ def _get_lightest_profile(p_dict):
     return profiles[np.argmin(masses)]
 
 
-def calculate_h_ratio(means_table):
+def calculate_h_ratio(means_table, chosen_mass):
     masses = means_table.column("mass")
     intensities = np.array(means_table.column("mean_intensity"))
 
     if not np.isclose(min(masses), 1, atol=0.1):  # Hydrogen not present
         return None
 
-    # Hydrogen present
-    sorted_intensities = intensities[np.argsort(masses)]
-
-    return sorted_intensities[0] / sorted_intensities[1]
+    # Hydrogen present, assumes its lowest mass
+    return intensities[np.argmin(masses)] / intensities[np.argmax(np.isclose(masses, chosen_mass, atol=0.01))]
 
 
 def extend_range_of_array(arr, n_columns):
