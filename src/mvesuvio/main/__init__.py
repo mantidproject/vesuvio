@@ -50,6 +50,7 @@ def __set_up_parser():
         default="",
         type=str,
     )
+    run_parser.add_argument("--minimal-output", action="store_true", help="Flag to set output files to minimum.")
     return parser
 
 
@@ -104,7 +105,9 @@ def __run_analysis(args):
     if not args:
         Runner().run()
         return
-    Runner(override_back_workspace=args.back_workspace, override_front_workspace=args.front_workspace).run()
+    Runner(
+        override_back_workspace=args.back_workspace, override_front_workspace=args.front_workspace, minimal_output=args.minimal_output
+    ).run()
 
 
 if __name__ == "__main__":
