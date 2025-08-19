@@ -169,6 +169,15 @@ class Runner:
         return
 
     def runAnalysisRoutine(self):
+        if self.bckwd_ai.override_input_workspace:
+            if not self.bckwd_ai.override_input_workspace.endswith(".nxs"):
+                logger.error("Currently only nexus files are supported for overriding input workspaces. Try again with a .nxs file.")
+                return
+        if self.fwd_ai.override_input_workspace:
+            if not self.fwd_ai.override_input_workspace.endswith(".nxs"):
+                logger.error("Currently only nexus files are supported for overriding input workspaces. Try again with a .nxs file.")
+                return
+
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
             # Either both overrides are empty or they're both set to a workspace path
             if (not self.bckwd_ai.override_input_workspace) != (not self.fwd_ai.override_input_workspace):
@@ -178,14 +187,17 @@ class Runner:
                 return
             self.run_joint_analysis()
             return
+
         if self.bckwd_ai.run_this_scattering_type:
             if not self.bckwd_ai.override_input_workspace and self.fwd_ai.override_input_workspace:
                 logger.error(
                     "Forward input workspace was explicitly set but analysis is running backward routine. Please provide input workspace for backward analysis."
                 )
                 return
+
             self.run_single_analysis(self.bckwd_ai)
             return
+
         if self.fwd_ai.run_this_scattering_type:
             if not self.fwd_ai.override_input_workspace and self.bckwd_ai.override_input_workspace:
                 logger.error(
@@ -283,9 +295,8 @@ class Runner:
         return
 
     def _create_analysis_algorithm(self, ai):
-        raw_path, empty_path = self._save_ws_if_not_on_path(ai)
-
         if not ai.override_input_workspace:
+            raw_path, empty_path = self._save_ws_if_not_on_path(ai)
             ws = load_raw_and_empty_from_path(
                 raw_path=raw_path,
                 empty_path=empty_path,
