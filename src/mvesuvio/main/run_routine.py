@@ -34,11 +34,12 @@ import os
 
 
 class Runner:
-    def __init__(self, override_back_workspace="", override_front_workspace="", running_tests=False) -> None:
+    def __init__(self, override_back_workspace="", override_front_workspace="", minimal_output=False, running_tests=False) -> None:
         self.running_tests = running_tests
         self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
         self.override_back_workspace = override_back_workspace
         self.override_front_workspace = override_front_workspace
+        self.minimal_output = minimal_output
         self.setup()
 
     def setup(self):
@@ -73,6 +74,8 @@ class Runner:
 
         self.fwd_ai.override_input_workspace = self.override_front_workspace
         self.bckwd_ai.override_input_workspace = self.override_back_workspace
+        self.fwd_ai.minimal_output = self.minimal_output
+        self.bckwd_ai.minimal_output = self.minimal_output
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -340,6 +343,7 @@ class Runner:
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
             "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
+            "MinimalOutputFiles": ai.minimal_output,
             "OutputMeansTable": " Final_Means",
         }
 
