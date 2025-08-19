@@ -20,7 +20,7 @@ from mvesuvio.util.analysis_helpers import (
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii
+from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii, Load
 from mantid.kernel import logger
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
@@ -34,9 +34,11 @@ import os
 
 
 class Runner:
-    def __init__(self, running_tests=False) -> None:
+    def __init__(self, override_back_workspace="", override_front_workspace="", running_tests=False) -> None:
         self.running_tests = running_tests
         self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
+        self.override_back_workspace = override_back_workspace
+        self.override_front_workspace = override_front_workspace
         self.setup()
 
     def setup(self):
@@ -68,6 +70,9 @@ class Runner:
         self.bckwd_ai.name = name_for_starting_ws(self.bckwd_ai)
 
         self.mantid_log_file = "mantid.log"
+
+        self.fwd_ai.override_input_workspace = self.override_front_workspace
+        self.bckwd_ai.override_input_workspace = self.override_back_workspace
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -165,12 +170,28 @@ class Runner:
 
     def runAnalysisRoutine(self):
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
+            # Either both overrides are empty or they're both set to a workspace path
+            if (not self.bckwd_ai.override_input_workspace) != (not self.fwd_ai.override_input_workspace):
+                logger.error(
+                    "Running joint analysis requires that both backward and forward workspaces are explicitly passed as inputs to override default input workspaces."
+                )
+                return
             self.run_joint_analysis()
             return
         if self.bckwd_ai.run_this_scattering_type:
+            if not self.bckwd_ai.override_input_workspace and self.fwd_ai.override_input_workspace:
+                logger.error(
+                    "Forward input workspace was explicitly set but analysis is running backward routine. Please provide input workspace for backward analysis."
+                )
+                return
             self.run_single_analysis(self.bckwd_ai)
             return
         if self.fwd_ai.run_this_scattering_type:
+            if not self.fwd_ai.override_input_workspace and self.bckwd_ai.override_input_workspace:
+                logger.error(
+                    "Backward input workspace was explicitly set but analysis is running forward routine. Please provide input workspace for forward analysis."
+                )
+                return
             self.run_single_analysis(self.fwd_ai)
             return
         return
@@ -264,28 +285,33 @@ class Runner:
     def _create_analysis_algorithm(self, ai):
         raw_path, empty_path = self._save_ws_if_not_on_path(ai)
 
-        ws = load_raw_and_empty_from_path(
-            raw_path=raw_path,
-            empty_path=empty_path,
-            tof_binning=ai.time_of_flight_binning,
-            name=name_for_starting_ws(ai),
-            raw_scale_factor=ai.scale_raw_workspace,
-            empty_scale_factor=ai.scale_empty_workspace,
-            raw_minus_empty=ai.subtract_empty_workspace_from_raw,
-        )
-        first_detector, last_detector = [int(s) for s in ai.detectors.split("-")]
-        cropedWs = cropAndMaskWorkspace(
-            ws,
-            firstSpec=first_detector,
-            lastSpec=last_detector,
-            maskedDetectors=ai.mask_detectors,
-            maskTOFRange=ai.mask_time_of_flight_range,
-        )
-        profiles_table = create_profiles_table(cropedWs.name() + "_initial_parameters", ai)
+        if not ai.override_input_workspace:
+            ws = load_raw_and_empty_from_path(
+                raw_path=raw_path,
+                empty_path=empty_path,
+                tof_binning=ai.time_of_flight_binning,
+                name=name_for_starting_ws(ai),
+                raw_scale_factor=ai.scale_raw_workspace,
+                empty_scale_factor=ai.scale_empty_workspace,
+                raw_minus_empty=ai.subtract_empty_workspace_from_raw,
+            )
+            first_detector, last_detector = [int(s) for s in ai.detectors.split("-")]
+            input_ws = cropAndMaskWorkspace(
+                ws,
+                firstSpec=first_detector,
+                lastSpec=last_detector,
+                maskedDetectors=ai.mask_detectors,
+                maskTOFRange=ai.mask_time_of_flight_range,
+            )
+        else:
+            ws_path = Path(ai.override_input_workspace)
+            input_ws = Load(Filename=str(ws_path), OutputWorkspace=ws_path.stem)
+
+        profiles_table = create_profiles_table(input_ws.name() + "_initial_parameters", ai)
         print_table_workspace(profiles_table)
         ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
         kwargs = {
-            "InputWorkspace": cropedWs.name(),
+            "InputWorkspace": input_ws.name(),
             "InputProfiles": profiles_table.name(),
             "InstrumentParametersFile": str(ipFilesPath / ai.instrument_parameters_file),
             "ChosenMassIndex": ai.chosen_mass_index if hasattr(ai, "chosen_mass_index") else 0,

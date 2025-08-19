@@ -13,7 +13,7 @@ def main(manual_args=None):
     if args.command == "run":
         if not handle_config.config_set():
             __setup_config(None)
-        __run_analysis()
+        __run_analysis(args)
 
 
 def __setup_and_parse_args():
@@ -35,7 +35,21 @@ def __set_up_parser():
         type=str,
     )
 
-    subparsers.add_parser("run", help="run mvesuvio analysis")
+    run_parser = subparsers.add_parser("run", help="run mvesuvio analysis")
+    run_parser.add_argument(
+        "--back-workspace",
+        "-b",
+        help="input workspace for vesuvio backward analysis, bypasses loading (and subtracting) raw and empty.",
+        default="",
+        type=str,
+    )
+    run_parser.add_argument(
+        "--front-workspace",
+        "-f",
+        help="input workspace for vesuvio forward analysis, bypasses loading (and subtracting) raw and empty.",
+        default="",
+        type=str,
+    )
     return parser
 
 
@@ -84,10 +98,13 @@ def __set_logging_properties():
     return
 
 
-def __run_analysis():
+def __run_analysis(args):
     from mvesuvio.main.run_routine import Runner
 
-    Runner().run()
+    if not args:
+        Runner().run()
+        return
+    Runner(override_back_workspace=args.back_workspace, override_front_workspace=args.front_workspace).run()
 
 
 if __name__ == "__main__":
