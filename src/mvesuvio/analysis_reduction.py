@@ -33,6 +33,7 @@ from mantid.simpleapi import (
     CreateWorkspace,
     GroupWorkspaces,
     SaveAscii,
+    SaveNexus,
     AppendSpectra,
 )
 
@@ -729,3 +730,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         for ws_name in mtd.getObjectNames():
             if ws_name.endswith(("ncp", "fse", "fit_results", "means", "initial_parameters") + tuple([str(i) for i in range(10)])):
                 SaveAscii(ws_name, str(self._save_results_path / ws_name))
+        input_workspaces = [ws for ws in mtd.getObjectNames() if ws.endswith(tuple([str(i) for i in range(10)]))]
+        max_ending = max([int(name[-1]) for name in input_workspaces])
+        for ws_name in input_workspaces:
+            if ws_name.endswith(str(max_ending)):
+                SaveNexus(ws_name, str(self._save_results_path.absolute() / ws_name) + ".nxs")
