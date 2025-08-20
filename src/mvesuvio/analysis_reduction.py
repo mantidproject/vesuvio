@@ -731,11 +731,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
     def _save_results(self):
         all_workspaces = mtd.getObjectNames()
         if self._minimal_output:
-            input_workspaces = [ws for ws in all_workspaces if ws.endswith(tuple([str(i) for i in range(10)]))]
-            last_iteration = max([int(name[-1]) for name in input_workspaces])
+            last_iteration = max([ws.replace("_total_ncp", "")[-1] for ws in all_workspaces if ws.endswith("_total_ncp")])
             for ws_name in all_workspaces:
                 if ws_name.endswith((f"{last_iteration}_total_ncp", f"{last_iteration}_total_fse")):
-                    SaveNexus(ws_name, str(self._save_results_path.absolute() / ws_name) + ".nxs")
+                    SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
                 if ws_name.endswith((f"{last_iteration}_fit_results", f"{last_iteration}_means")):
                     SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
             return

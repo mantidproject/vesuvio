@@ -34,12 +34,39 @@ import os
 
 
 class Runner:
-    def __init__(self, override_back_workspace="", override_front_workspace="", minimal_output=False, running_tests=False) -> None:
+    def __init__(
+        self,
+        override_back_workspace="",
+        override_front_workspace="",
+        bootstrap_inputs_directory="",
+        minimal_output=False,
+        output_directory="",
+        running_tests=False,
+    ) -> None:
         self.running_tests = running_tests
         self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
         self.override_back_workspace = override_back_workspace
         self.override_front_workspace = override_front_workspace
+        self.bootstrap_inputs_directory = bootstrap_inputs_directory
         self.minimal_output = minimal_output
+        self.mantid_log_file = "mantid.log"
+
+        # I/O paths
+        inputs_script_path = Path(handle_config.read_config_var("caching.inputs"))
+        script_name = handle_config.get_script_name()
+        self.experiment_path = inputs_script_path.parent / script_name
+        self.input_ws_path = self.experiment_path / "input_workspaces"
+        self.input_ws_path.mkdir(parents=True, exist_ok=True)
+        if not output_directory:
+            self.output_directory = Path(self.experiment_path) / "output_files"
+        else:
+            self.output_directory = Path(output_directory)
+        self.reduction_directory = self.output_directory / "reduction"
+        self.fitting_directory = self.output_directory / "fitting"
+
+        self.analysis_result = None
+        self.fitting_result = None
+
         self.setup()
 
     def setup(self):
@@ -56,21 +83,9 @@ class Runner:
                 self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + "_" + str(ai_cls.number_of_iterations_for_corrections))
                 self.classes_to_fit_y_space.append(ai_cls)
 
-        self.analysis_result = None
-        self.fitting_result = None
-
-        # I/O paths
-        inputs_script_path = Path(handle_config.read_config_var("caching.inputs"))
-        script_name = handle_config.get_script_name()
-        self.experiment_path = inputs_script_path.parent / script_name
-        self.input_ws_path = self.experiment_path / "input_workspaces"
-        self.input_ws_path.mkdir(parents=True, exist_ok=True)
-
         # TODO: remove this by fixing circular import
         self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
         self.bckwd_ai.name = name_for_starting_ws(self.bckwd_ai)
-
-        self.mantid_log_file = "mantid.log"
 
         self.fwd_ai.override_input_workspace = self.override_front_workspace
         self.bckwd_ai.override_input_workspace = self.override_back_workspace
@@ -84,6 +99,67 @@ class Runner:
         sys.modules[name] = module
         spec.loader.exec_module(module)
         return module
+
+    def run_bootstrap(self):
+        inputs_dir_path = Path(self.bootstrap_inputs_directory)
+        if not inputs_dir_path.is_dir():
+            logger.error("The inputs directory path provided for bootstrap is not a directory.")
+
+        boot_outputs_dir_path = inputs_dir_path.parent / (inputs_dir_path.name + "_outputs")
+        boot_outputs_dir_path.mkdir(exist_ok=True)
+
+        inputs_backward_path = inputs_dir_path / "backward"
+        if not inputs_backward_path.exists():
+            inputs_backward_path.mkdir(exist_ok=True)
+            logger.error(f"Created backward directory. Please place your backward samples here: {str(inputs_backward_path)}")
+
+        inputs_forward_path = inputs_dir_path / "forward"
+        if not inputs_forward_path.exists():
+            inputs_forward_path.mkdir(exist_ok=True)
+            logger.error(f"Created forward directory. Please place your forward samples here: {str(inputs_forward_path)}")
+
+        # Check procedure for estimating h ratio will not run
+        if self.bckwd_ai.run_this_scattering_type:
+            if is_hydrogen_present(self.fwd_ai.masses):
+                if self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0:
+                    logger.error("Hydrogen ratio not set, run analysis on sample first before attempting bootstrap.")
+                    return
+            else:
+                logger.warning("Ignoring Hydrogen ratio because not detected in masses.")
+                self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass = 0
+
+        def longest_common_prefix(s1, s2):
+            return s1[: next((i for i, (a, b) in enumerate(zip(s1, s2)) if a != b or a == "_" or b == "_"), min(len(s1), len(s2)))]
+
+        def sorting_order(p):
+            return int(p.stem[-1])
+
+        if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
+            for back_ws_path, front_ws_path in zip(
+                sorted(inputs_backward_path.iterdir(), key=sorting_order), sorted(inputs_forward_path.iterdir(), key=sorting_order)
+            ):
+                back_ws_name = back_ws_path.stem
+                front_ws_name = front_ws_path.stem
+                if back_ws_name[-1] != front_ws_name[-1]:
+                    logger.error(f"Bootstrap Error: inputs {back_ws_name} and {front_ws_name} do not have the same last character.")
+                    continue
+
+                common_prefix = longest_common_prefix(back_ws_name, front_ws_name)
+                if not common_prefix:
+                    logger.error(f"Bootstrap Error: inputs {back_ws_name} and {front_ws_name} do not have a common prefix.")
+
+                sample_output_directory = boot_outputs_dir_path / (common_prefix + "_joint_" + back_ws_name[-1])
+                sample_output_directory.mkdir(exist_ok=True)
+                self.update_output_directory(sample_output_directory)
+
+                self.bckwd_ai.override_input_workspace = str(back_ws_path.absolute())
+                self.fwd_ai.override_input_workspace = str(front_ws_path.absolute())
+                self.runAnalysisRoutine()
+
+    def update_output_directory(self, path):
+        self.output_directory = path
+        self.reduction_directory = self.output_directory / "reduction"
+        self.fitting_directory = self.output_directory / "fitting"
 
     def run(self):
         if not self.bckwd_ai.run_this_scattering_type and not self.fwd_ai.run_this_scattering_type:
@@ -164,7 +240,7 @@ class Runner:
             # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
             ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
             # NOTE: Set saving path like this for now
-            i_cls.save_path = self.experiment_path / "output_files" / "fitting"
+            i_cls.save_path = self.fitting_directory
             i_cls.save_path.mkdir(exist_ok=True, parents=True)
             # NOTE: Resolution workspace is useful for scientists outside mantid
             SaveAscii(ws_resolution.name(), str(i_cls.save_path / ws_resolution.name()))
@@ -291,7 +367,7 @@ class Runner:
 
             table_h_ratios.addRow([current_ratio])
 
-            SaveAscii(table_h_ratios.name(), str(self.experiment_path / "output_files" / table_h_ratios.name()))
+            SaveAscii(table_h_ratios.name(), str(self.output_directory / table_h_ratios.name()))
 
         logger.notice("\nProcedute to estimate Hydrogen ratio finished.")
         print_table_workspace(table_h_ratios)
@@ -319,7 +395,7 @@ class Runner:
             )
         else:
             ws_path = Path(ai.override_input_workspace)
-            input_ws = Load(Filename=str(ws_path), OutputWorkspace=ws_path.stem)
+            input_ws = Load(Filename=str(ws_path.absolute()), OutputWorkspace=ws_path.stem)
 
         profiles_table = create_profiles_table(input_ws.name() + "_initial_parameters", ai)
         print_table_workspace(profiles_table)
@@ -342,7 +418,7 @@ class Runner:
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
             "Constraints": str(dill.dumps(ai.constraints)),
-            "ResultsPath": str(self.experiment_path / "output_files" / "reduction"),
+            "ResultsPath": str(self.reduction_directory.absolute()),
             "MinimalOutputFiles": ai.minimal_output,
             "OutputMeansTable": " Final_Means",
         }
