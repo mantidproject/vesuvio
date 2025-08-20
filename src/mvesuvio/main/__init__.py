@@ -2,6 +2,7 @@
 
 import argparse
 from os import path
+from pathlib import Path
 from mvesuvio.util import handle_config
 
 
@@ -14,6 +15,11 @@ def main(manual_args=None):
         if not handle_config.config_set():
             __setup_config(None)
         __run_analysis(args)
+
+    if args.command == "bootstrap":
+        if not handle_config.config_set():
+            __setup_config(None)
+        __run_bootstrap(args)
 
 
 def __setup_and_parse_args():
@@ -51,6 +57,15 @@ def __set_up_parser():
         type=str,
     )
     run_parser.add_argument("--minimal-output", action="store_true", help="Flag to set output files to minimum.")
+    run_parser.add_argument("--outputs-dir", "-o", help="Directory for populating with output files.")
+    boot_parser = subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
+    boot_parser.add_argument(
+        "--inputs-dir",
+        "-d",
+        help="Directory containing input bootstrap replicas. Replicas should be inside sparate backaward and forward subdirectories.",
+        default="",
+        type=str,
+    )
     return parser
 
 
@@ -58,19 +73,21 @@ def __setup_config(args):
     __set_logging_properties()
 
     config_dir = handle_config.VESUVIO_CONFIG_PATH
-    handle_config.setup_config_dir(config_dir)
-    ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
     inputs = handle_config.VESUVIO_INPUTS_PATH
+    ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
+    handle_config.setup_default_inputs()
+    handle_config.setup_default_ipfile_dir()
 
     if handle_config.config_set():
-        inputs = handle_config.read_config_var("caching.inputs") if not args or not args.set_inputs else args.set_inputs
-        ipfolder_dir = handle_config.read_config_var("caching.ipfolder") if not args or not args.set_ipfolder else args.set_ipfolder
+        inputs = handle_config.read_config_var("caching.inputs")
+        ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
     else:
-        inputs = inputs if not args or not args.set_inputs else args.set_inputs
-        ipfolder_dir = ipfolder_dir if not args or not args.set_ipfolder else args.set_ipfolder
+        handle_config.setup_config_dir(config_dir)
 
-        handle_config.setup_default_ipfile_dir()
-        handle_config.setup_default_inputs()
+    if args and args.set_inputs:
+        inputs = str(Path(args.set_inputs).absolute())
+    if args and args.set_ipfolder:
+        ipfolder_dir = str(Path(args.set_ipfolder).absolute())
 
     handle_config.set_config_vars(
         {
@@ -106,8 +123,19 @@ def __run_analysis(args):
         Runner().run()
         return
     Runner(
-        override_back_workspace=args.back_workspace, override_front_workspace=args.front_workspace, minimal_output=args.minimal_output
+        override_back_workspace=args.back_workspace,
+        override_front_workspace=args.front_workspace,
+        minimal_output=args.minimal_output,
+        output_directory=args.outputs_dir,
     ).run()
+
+
+def __run_bootstrap(args):
+    from mvesuvio.main.run_routine import Runner
+
+    if not args:
+        return
+    Runner(bootstrap_inputs_directory=args.inputs_dir, minimal_output=True).run_bootstrap()
 
 
 if __name__ == "__main__":
