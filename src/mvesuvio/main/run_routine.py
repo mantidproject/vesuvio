@@ -7,8 +7,6 @@ from mvesuvio.util.analysis_helpers import (
     load_raw_and_empty_from_path,
     cropAndMaskWorkspace,
     calculate_h_ratio,
-    name_for_starting_ws,
-    scattering_type,
     ws_history_matches_inputs,
     save_ws_from_load_vesuvio,
     is_hydrogen_present,
@@ -18,12 +16,14 @@ from mvesuvio.util.analysis_helpers import (
     convert_to_list_of_spectrum_numbers,
 )
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
+from mvesuvio import globals
 
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import mtd, RenameWorkspace, SaveAscii, Load
 from mantid.kernel import logger
 from mantid.api import AlgorithmFactory, AlgorithmManager
 
+import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 import importlib
@@ -75,22 +75,16 @@ class Runner:
         self.bckwd_ai = ai.BackwardAnalysisInputs
         self.fwd_ai = ai.ForwardAnalysisInputs
 
-        # Names of workspaces to check if they exist to skip analysis
-        self.ws_to_fit_y_space = []
-        self.classes_to_fit_y_space = []
-        for ai_cls in [self.bckwd_ai, self.fwd_ai]:
-            if ai_cls.fit_in_y_space:
-                self.ws_to_fit_y_space.append(name_for_starting_ws(ai_cls) + "_" + str(ai_cls.number_of_iterations_for_corrections))
-                self.classes_to_fit_y_space.append(ai_cls)
+        self.fwd_ai.minimal_output = self.minimal_output
+        self.bckwd_ai.minimal_output = self.minimal_output
 
-        # TODO: remove this by fixing circular import
-        self.fwd_ai.name = name_for_starting_ws(self.fwd_ai)
-        self.bckwd_ai.name = name_for_starting_ws(self.bckwd_ai)
+        self.fwd_ai.name = handle_config.get_script_name() + "_" + globals.FORWARD_TAG
+        self.bckwd_ai.name = handle_config.get_script_name() + "_" + globals.BACKWARD_TAG
 
         self.fwd_ai.override_input_workspace = self.override_front_workspace
         self.bckwd_ai.override_input_workspace = self.override_back_workspace
-        self.fwd_ai.minimal_output = self.minimal_output
-        self.bckwd_ai.minimal_output = self.minimal_output
+
+        self.update_ws_names_from_override_input_workspaces()
 
     def import_from_inputs(self):
         name = "analysis_inputs"
@@ -101,65 +95,94 @@ class Runner:
         return module
 
     def run_bootstrap(self):
-        inputs_dir_path = Path(self.bootstrap_inputs_directory)
-        if not inputs_dir_path.is_dir():
-            logger.error("The inputs directory path provided for bootstrap is not a directory.")
+        if self.h_ratio_is_zero_when_h_present():
+            logger.error("Hydrogen ratio not set, run analysis on sample first before attempting bootstrap.")
+            return
 
-        boot_outputs_dir_path = inputs_dir_path.parent / (inputs_dir_path.name + "_outputs")
-        boot_outputs_dir_path.mkdir(exist_ok=True)
+        input_dirs = self.get_bootstrap_input_directories()
+        if not input_dirs:
+            return
+        inputs_parent_path, inputs_backward_path, inputs_forward_path = input_dirs
 
-        inputs_backward_path = inputs_dir_path / "backward"
-        if not inputs_backward_path.exists():
-            inputs_backward_path.mkdir(exist_ok=True)
-            logger.error(f"Created backward directory. Please place your backward samples here: {str(inputs_backward_path)}")
-
-        inputs_forward_path = inputs_dir_path / "forward"
-        if not inputs_forward_path.exists():
-            inputs_forward_path.mkdir(exist_ok=True)
-            logger.error(f"Created forward directory. Please place your forward samples here: {str(inputs_forward_path)}")
-
-        # Check procedure for estimating h ratio will not run
-        if self.bckwd_ai.run_this_scattering_type:
-            if is_hydrogen_present(self.fwd_ai.masses):
-                if self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0:
-                    logger.error("Hydrogen ratio not set, run analysis on sample first before attempting bootstrap.")
-                    return
-            else:
-                logger.warning("Ignoring Hydrogen ratio because not detected in masses.")
-                self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass = 0
-
-        def longest_common_prefix(s1, s2):
-            return s1[: next((i for i, (a, b) in enumerate(zip(s1, s2)) if a != b or a == "_" or b == "_"), min(len(s1), len(s2)))]
-
+        # Sort files based on last character, assumed to be integer
         def sorting_order(p):
             return int(p.stem[-1])
+
+        boot_outputs_dir_path = inputs_parent_path.parent / (inputs_parent_path.name + "_outputs")
+        boot_outputs_dir_path.mkdir(exist_ok=True)
 
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
             for back_ws_path, front_ws_path in zip(
                 sorted(inputs_backward_path.iterdir(), key=sorting_order), sorted(inputs_forward_path.iterdir(), key=sorting_order)
             ):
-                back_ws_name = back_ws_path.stem
-                front_ws_name = front_ws_path.stem
-                if back_ws_name[-1] != front_ws_name[-1]:
-                    logger.error(f"Bootstrap Error: inputs {back_ws_name} and {front_ws_name} do not have the same last character.")
-                    continue
-
-                common_prefix = longest_common_prefix(back_ws_name, front_ws_name)
+                common_prefix = self.get_common_prefix_of_bootstrap_sample_names(back_ws_path.stem, front_ws_path.stem)
                 if not common_prefix:
-                    logger.error(f"Bootstrap Error: inputs {back_ws_name} and {front_ws_name} do not have a common prefix.")
+                    return
 
-                sample_output_directory = boot_outputs_dir_path / (common_prefix + "_joint_" + back_ws_name[-1])
+                sample_output_directory = boot_outputs_dir_path / (common_prefix + "_joint_" + back_ws_path.stem[-1])
                 sample_output_directory.mkdir(exist_ok=True)
                 self.update_output_directory(sample_output_directory)
 
                 self.bckwd_ai.override_input_workspace = str(back_ws_path.absolute())
                 self.fwd_ai.override_input_workspace = str(front_ws_path.absolute())
-                self.runAnalysisRoutine()
+                self.update_ws_names_from_override_input_workspaces()
+
+                self.bckwd_ai.show_plots = False
+                self.fwd_ai.show_plots = False
+
+                AnalysisDataService.clear()
+                self.run()
+
+                # Close any plots that might still be open
+                plt.close("all")
+
+    def get_common_prefix_of_bootstrap_sample_names(self, back_ws_name, front_ws_name):
+        if back_ws_name == front_ws_name:
+            logger.error(f"Bootstrap Error: backward and forward inputs should not have the same name: {front_ws_name}.")
+            return ""
+        if back_ws_name[-1] != front_ws_name[-1]:
+            logger.error(f"Bootstrap Error: inputs {back_ws_name} and {front_ws_name} do not have the same last character.")
+            return ""
+
+        def longest_common_prefix(s1, s2):
+            return s1[: next((i for i, (a, b) in enumerate(zip(s1, s2)) if a != b or a == "_" or b == "_"), min(len(s1), len(s2)))]
+
+        common_prefix = longest_common_prefix(back_ws_name, front_ws_name)
+        if not common_prefix:
+            logger.error(f"Bootstrap Error: inputs {back_ws_name} and {front_ws_name} do not have a common prefix.")
+            return ""
+        return common_prefix
+
+    def get_bootstrap_input_directories(self):
+        inputs_dir_path = Path(self.bootstrap_inputs_directory)
+        if not inputs_dir_path.is_dir():
+            logger.error("The inputs directory path provided for bootstrap is not a directory.")
+            return ()
+
+        inputs_backward_path = inputs_dir_path / "backward"
+        if not inputs_backward_path.exists():
+            inputs_backward_path.mkdir(exist_ok=True)
+            logger.error(f"Created backward directory. Please place your backward samples here: {str(inputs_backward_path)}")
+            return ()
+
+        inputs_forward_path = inputs_dir_path / "forward"
+        if not inputs_forward_path.exists():
+            inputs_forward_path.mkdir(exist_ok=True)
+            logger.error(f"Created forward directory. Please place your forward samples here: {str(inputs_forward_path)}")
+            return ()
+        return (inputs_dir_path, inputs_backward_path, inputs_forward_path)
 
     def update_output_directory(self, path):
         self.output_directory = path
         self.reduction_directory = self.output_directory / "reduction"
         self.fitting_directory = self.output_directory / "fitting"
+
+    def update_ws_names_from_override_input_workspaces(self):
+        if self.fwd_ai.override_input_workspace:
+            self.fwd_ai.name = Path(self.fwd_ai.override_input_workspace).stem
+
+        if self.bckwd_ai.override_input_workspace:
+            self.bckwd_ai.name = Path(self.bckwd_ai.override_input_workspace).stem
 
     def run(self):
         if not self.bckwd_ai.run_this_scattering_type and not self.fwd_ai.run_this_scattering_type:
@@ -171,29 +194,31 @@ class Runner:
             with open(self.mantid_log_file, "w") as file:
                 file.write("")
 
-        # If any ws for y fit already loaded
-        wsInMtd = [ws in mtd for ws in self.ws_to_fit_y_space]  # Bool list
-        if (len(wsInMtd) > 0) and all(wsInMtd):
-            self.runAnalysisFitting()
+        if self.runAnalysisFitting():
             self.make_summarised_log_file()
             return self.analysis_result, self.fitting_result
 
-        if self.bckwd_ai.run_this_scattering_type:
-            if is_hydrogen_present(self.fwd_ai.masses) & (self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0):
-                self.run_estimate_h_ratio()
-                return
-
-            # TODO: make this automatic
-            assert is_hydrogen_present(self.fwd_ai.masses) != (self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0), (
-                "No Hydrogen detected, intensity_ratio_of_hydrogen_to_chosen_mass should be set to 0"
-            )
+        if self.h_ratio_is_zero_when_h_present():
+            self.run_estimate_h_ratio()
+            self.make_summarised_log_file()
+            return
 
         self.runAnalysisRoutine()
         self.runAnalysisFitting()
 
-        # Return results used only in tests
         self.make_summarised_log_file()
+        # Return results used only in tests
         return self.analysis_result, self.fitting_result
+
+    def h_ratio_is_zero_when_h_present(self):
+        if self.bckwd_ai.run_this_scattering_type:
+            if is_hydrogen_present(self.fwd_ai.masses):
+                if self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass == 0:
+                    return True
+            else:
+                logger.warning("Ignoring Hydrogen ratio because not detected in masses.")
+                self.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass = 0
+        return False
 
     def make_summarised_log_file(self):
         pattern = re.compile(r"^\d{4}-\d{2}-\d{2}")
@@ -224,28 +249,31 @@ class Runner:
         return self.experiment_path / (filename + ".log")
 
     def runAnalysisFitting(self):
-        for wsName, i_cls in zip(self.ws_to_fit_y_space, self.classes_to_fit_y_space):
-            try:
-                ws_to_fit = mtd[wsName]
-            except KeyError:
-                logger.warning(f"Workspace {wsName} not found. Skipping fitting in Y-Space.")
-                return
-            try:
-                ws_to_fit_ncps = mtd[wsName + "_ncp_group"]
-            except KeyError:
-                logger.warning(f"Workspace {wsName}_ncp_group not found. Skipping fitting in Y-Space.")
-                return
+        success = False
+        if self.bckwd_ai.fit_in_y_space:
+            success |= self.run_y_space_reduction_and_fit(self.bckwd_ai)
+        if self.fwd_ai.fit_in_y_space:
+            success |= self.run_y_space_reduction_and_fit(self.fwd_ai)
+        return success
 
-            ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(ws_to_fit, ws_to_fit_ncps, i_cls.subtract_calculated_fse_from_data)
-            # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
-            ws_resolution = calculate_resolution(min(i_cls.masses), mtd[wsName], i_cls.range_for_rebinning_in_y_space)
-            # NOTE: Set saving path like this for now
-            i_cls.save_path = self.fitting_directory
-            i_cls.save_path.mkdir(exist_ok=True, parents=True)
-            # NOTE: Resolution workspace is useful for scientists outside mantid
-            SaveAscii(ws_resolution.name(), str(i_cls.save_path / ws_resolution.name()))
-            self.fitting_result = FitInYSpace(i_cls, ws_lighest_data, ws_lighest_ncp, ws_resolution).run()
-        return
+    def run_y_space_reduction_and_fit(self, ai):
+        ws_to_fit_name = ai.name + "_" + str(ai.number_of_iterations_for_corrections)
+        try:
+            ws_to_fit = mtd[ws_to_fit_name]
+            ws_to_fit_ncps = mtd[ws_to_fit_name + "_ncp_group"]
+        except KeyError:
+            logger.warning(f"Either {ws_to_fit_name} or {ws_to_fit_name}_ncp_group not found. Skipping fitting in Y-Space.")
+            return False
+
+        # TODO: Move resolution calculation to end of analysis, instead of beggining of fitting
+        ws_resolution = calculate_resolution(min(ai.masses), ws_to_fit, ai.range_for_rebinning_in_y_space)
+        # NOTE: Resolution workspace is useful for scientists outside mantid
+        self.fitting_directory.mkdir(exist_ok=True)
+        SaveAscii(ws_resolution.name(), str(self.fitting_directory / ws_resolution.name()))
+
+        ws_lighest_data, ws_lighest_ncp = isolate_lighest_mass_data(ws_to_fit, ws_to_fit_ncps, ai.subtract_calculated_fse_from_data)
+        self.fitting_result = FitInYSpace(ai, ws_lighest_data, ws_lighest_ncp, ws_resolution, outputs_dir=self.fitting_directory).run()
+        return True
 
     def runAnalysisRoutine(self):
         if self.bckwd_ai.override_input_workspace:
@@ -380,7 +408,7 @@ class Runner:
                 raw_path=raw_path,
                 empty_path=empty_path,
                 tof_binning=ai.time_of_flight_binning,
-                name=name_for_starting_ws(ai),
+                name=ai.name,
                 raw_scale_factor=ai.scale_raw_workspace,
                 empty_scale_factor=ai.scale_empty_workspace,
                 raw_minus_empty=ai.subtract_empty_workspace_from_raw,
@@ -394,8 +422,7 @@ class Runner:
                 maskTOFRange=ai.mask_time_of_flight_range,
             )
         else:
-            ws_path = Path(ai.override_input_workspace)
-            input_ws = Load(Filename=str(ws_path.absolute()), OutputWorkspace=ws_path.stem)
+            input_ws = Load(Filename=str(Path(ai.override_input_workspace).absolute()), OutputWorkspace=ai.name)
 
         profiles_table = create_profiles_table(input_ws.name() + "_initial_parameters", ai)
         print_table_workspace(profiles_table)
@@ -413,7 +440,7 @@ class Runner:
             "MultipleScatteringCorrection": ai.do_multiple_scattering_correction,
             "SampleShapeXml": ai.sample_shape_xml,
             "GammaCorrection": ai.do_gamma_correction,
-            "ModeRunning": scattering_type(ai),
+            "ModeRunning": "BACKWARD" if self.get_scattering_type(ai) == globals.BACKWARD_TAG else "FORWARD",
             "TransmissionGuess": ai.transmission_guess,
             "MultipleScatteringOrder": int(ai.multiple_scattering_order),
             "NumberOfEvents": int(ai.multiple_scattering_number_of_events),
@@ -433,24 +460,29 @@ class Runner:
         alg.setProperties(kwargs)
         return alg
 
-    def _save_ws_if_not_on_path(self, load_ai):
-        scatteringType = scattering_type(load_ai).lower()
-        scriptName = handle_config.get_script_name()
+    def _save_ws_if_not_on_path(self, ai):
+        raw_name = handle_config.get_script_name() + "_" + "raw" + "_" + self.get_scattering_type(ai) + ".nxs"
+        empty_name = handle_config.get_script_name() + "_" + "empty" + "_" + self.get_scattering_type(ai) + ".nxs"
 
-        rawWSName = scriptName + "_" + "raw" + "_" + scatteringType + ".nxs"
-        emptyWSName = scriptName + "_" + "empty" + "_" + scatteringType + ".nxs"
+        raw_path = self.input_ws_path / raw_name
+        empty_path = self.input_ws_path / empty_name
 
-        rawPath = self.input_ws_path / rawWSName
-        emptyPath = self.input_ws_path / emptyWSName
+        ip_files_path = Path(handle_config.read_config_var("caching.ipfolder"))
 
-        ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+        if not ws_history_matches_inputs(ai.runs, ai.mode, ai.instrument_parameters_file, raw_path):
+            save_ws_from_load_vesuvio(ai.runs, ai.mode, str(ip_files_path / ai.instrument_parameters_file), raw_path)
 
-        if not ws_history_matches_inputs(load_ai.runs, load_ai.mode, load_ai.instrument_parameters_file, rawPath):
-            save_ws_from_load_vesuvio(load_ai.runs, load_ai.mode, str(ipFilesPath / load_ai.instrument_parameters_file), rawPath)
+        if not ws_history_matches_inputs(ai.empty_runs, ai.mode, ai.instrument_parameters_file, empty_path):
+            save_ws_from_load_vesuvio(ai.empty_runs, ai.mode, str(ip_files_path / ai.instrument_parameters_file), empty_path)
+        return raw_path, empty_path
 
-        if not ws_history_matches_inputs(load_ai.empty_runs, load_ai.mode, load_ai.instrument_parameters_file, emptyPath):
-            save_ws_from_load_vesuvio(load_ai.empty_runs, load_ai.mode, str(ipFilesPath / load_ai.instrument_parameters_file), emptyPath)
-        return rawPath, emptyPath
+    def get_scattering_type(self, ai):
+        if ai.__name__ in ["BackwardAnalysisInputs"]:
+            return globals.BACKWARD_TAG
+        elif ai.__name__ in ["ForwardAnalysisInputs"]:
+            return globals.FORWARD_TAG
+        else:
+            raise ValueError(f"Input class for workspace not valid: {ai.__name__}")
 
 
 if __name__ == "__main__":
