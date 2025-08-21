@@ -84,8 +84,6 @@ class Runner:
 
         self.fwd_ai.override_input_workspace = self.override_front_workspace
         self.bckwd_ai.override_input_workspace = self.override_back_workspace
-        self.fwd_ai.minimal_output = self.minimal_output
-        self.bckwd_ai.minimal_output = self.minimal_output
 
         self.update_ws_names_from_override_input_workspaces()
 
