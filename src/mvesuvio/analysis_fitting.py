@@ -15,15 +15,18 @@ from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into
 
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
+PLOTS_PROJECTION = "mantid"
+
 
 class FitInYSpace:
-    def __init__(self, fi, ws_to_fit, ws_to_fit_ncp, ws_res):
+    def __init__(self, fi, ws_to_fit, ws_to_fit_ncp, ws_res, outputs_dir):
         self.fitting_inputs = fi
         self.ws_to_fit = ws_to_fit
         self.ws_to_fit_ncp = ws_to_fit_ncp
         self.ws_resolution = ws_res
 
-        fi.figSavePath = fi.save_path / "figures"
+        fi.outputs_dir = outputs_dir
+        fi.figSavePath = fi.outputs_dir / "figures"
         fi.figSavePath.mkdir(exist_ok=True, parents=True)
 
     def run(self):
@@ -772,7 +775,7 @@ def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
     for p, v, e in zip(mObj.parameters, mObj.values, mObj.errors):
         leg += f"${p}={v:.2f} \\pm {e:.2f}$\n"
 
-    fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
+    fig, ax = plt.subplots(subplot_kw={"projection": PLOTS_PROJECTION})
     ax.errorbar(wsMinuitFit, "k.", wkspIndex=0, label="Weighted Avg")
     ax.errorbar(wsMinuitFit, "r-", wkspIndex=1, label=leg)
     ax.plot(wsMinuitFit, "b.", wkspIndex=2, label="Residuals")
@@ -845,6 +848,9 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
 
         if yFitIC.show_plots:
             fig.show()
+        else:
+            plt.close(fig)
+            del fig
 
     return parameters, values, errors, minosAutoErr, minosManErr
 
@@ -868,8 +874,8 @@ def runAndPlotManualMinos(minuitObj, constrFunc, bestFitVals, bestFitErrs, showP
         width,
         tight_layout=True,
         figsize=figsize,
-        subplot_kw={"projection": "mantid"},
-    )  # subplot_kw={'projection':'mantid'}
+        subplot_kw={"projection": PLOTS_PROJECTION},
+    )
     fig.canvas.manager.set_window_title(wsName + "_minos")
 
     merrors = {}
@@ -996,7 +1002,7 @@ def plotAutoMinos(minuitObj, wsName, yFitIC):
         width,
         tight_layout=True,
         figsize=figsize,
-        subplot_kw={"projection": "mantid"},
+        subplot_kw={"projection": PLOTS_PROJECTION},
     )
     fig.canvas.manager.set_window_title(wsName + "_autominos")
 
@@ -1020,7 +1026,11 @@ def plotAutoMinos(minuitObj, wsName, yFitIC):
     fig.legend(handle, label, loc="lower right")
     savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title()
     plt.savefig(savePath, bbox_inches="tight")
-    fig.show()
+    if yFitIC.show_plots:
+        fig.show()
+    else:
+        plt.close(fig)
+        del fig, axs
 
 
 def plotProfile(ax, var, varSpace, fValsMigrad, lerr, uerr, fValsMin, varVal, varErr):
@@ -1318,7 +1328,7 @@ def groupDetectors(ipData, yFitIC):
     idxList = formIdxList(clusters)
 
     if yFitIC.show_plots:
-        fig, ax = plt.subplots(tight_layout=True, subplot_kw={"projection": "mantid"})
+        fig, ax = plt.subplots(tight_layout=True, subplot_kw={"projection": PLOTS_PROJECTION})
         fig.canvas.manager.set_window_title("Grouping of detectors")
         plotFinalGroups(ax, ipData, idxList)
         fig.show()
@@ -1424,7 +1434,7 @@ def formIdxList(clusters):
 
 def plotDetsAndInitialCenters(L1, theta, centers):
     """Used in debugging."""
-    fig, ax = plt.subplots(tight_layout=True, subplot_kw={"projection": "mantid"})
+    fig, ax = plt.subplots(tight_layout=True, subplot_kw={"projection": PLOTS_PROJECTION})
     fig.canvas.manager.set_window_title("Starting centroids for groupings")
     ax.scatter(L1, theta, alpha=0.3, color="r", label="Detectors")
     ax.scatter(centers[:, 0], centers[:, 1], color="k", label="Starting centroids")
@@ -1613,7 +1623,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
         int(np.ceil(len(dataY) / rows)),
         figsize=(15, 8),
         tight_layout=True,
-        subplot_kw={"projection": "mantid"},
+        subplot_kw={"projection": PLOTS_PROJECTION},
     )
     fig.canvas.manager.set_window_title(wsName + "_fitglobal")
 
