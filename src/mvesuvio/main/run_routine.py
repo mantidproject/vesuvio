@@ -113,29 +113,59 @@ class Runner:
         boot_outputs_dir_path.mkdir(exist_ok=True)
 
         if self.bckwd_ai.run_this_scattering_type and self.fwd_ai.run_this_scattering_type:
+            procedure_output_dir_path = boot_outputs_dir_path / "joint"
+            procedure_output_dir_path.mkdir(exist_ok=True)
+
             for back_ws_path, front_ws_path in zip(
                 sorted(inputs_backward_path.iterdir(), key=sorting_order), sorted(inputs_forward_path.iterdir(), key=sorting_order)
             ):
                 common_prefix = self.get_common_prefix_of_bootstrap_sample_names(back_ws_path.stem, front_ws_path.stem)
                 if not common_prefix:
                     return
+                sample_output_directory = procedure_output_dir_path / (common_prefix + "_joint_" + back_ws_path.stem[-1])
 
-                sample_output_directory = boot_outputs_dir_path / (common_prefix + "_joint_" + back_ws_path.stem[-1])
-                sample_output_directory.mkdir(exist_ok=True)
-                self.update_output_directory(sample_output_directory)
-
-                self.bckwd_ai.override_input_workspace = str(back_ws_path.absolute())
-                self.fwd_ai.override_input_workspace = str(front_ws_path.absolute())
-                self.update_ws_names_from_override_input_workspaces()
-
-                self.bckwd_ai.show_plots = False
-                self.fwd_ai.show_plots = False
-
+                self.update_sample_inputs_outputs(back_ws_path, front_ws_path, sample_output_directory)
                 AnalysisDataService.clear()
                 self.run()
+                plt.close("all")  # Close any plots that might still be open
+            return
 
-                # Close any plots that might still be open
-                plt.close("all")
+        if self.bckwd_ai.run_this_scattering_type:
+            procedure_output_dir_path = boot_outputs_dir_path / "backward"
+            procedure_output_dir_path.mkdir(exist_ok=True)
+            for back_ws_path in sorted(inputs_backward_path.iterdir(), key=sorting_order):
+                sample_output_directory = procedure_output_dir_path / (back_ws_path.stem.split("_")[0] + "_bckwd_" + back_ws_path.stem[-1])
+
+                self.update_sample_inputs_outputs(back_ws_path, None, sample_output_directory)
+                AnalysisDataService.clear()
+                self.run()
+                plt.close("all")  # Close any plots that might still be open
+            return
+
+        if self.fwd_ai.run_this_scattering_type:
+            procedure_output_dir_path = boot_outputs_dir_path / "forward"
+            procedure_output_dir_path.mkdir(exist_ok=True)
+            for front_ws_path in sorted(inputs_forward_path.iterdir(), key=sorting_order):
+                sample_output_directory = procedure_output_dir_path / (front_ws_path.stem.split("_")[0] + "_fwd_" + front_ws_path.stem[-1])
+
+                self.update_sample_inputs_outputs(None, front_ws_path, sample_output_directory)
+                AnalysisDataService.clear()
+                self.run()
+                plt.close("all")  # Close any plots that might still be open
+            return
+        return
+
+    def update_sample_inputs_outputs(self, back_ws_path, front_ws_path, output_path):
+        output_path.mkdir(exist_ok=True)
+        self.update_output_directory(output_path)
+
+        self.bckwd_ai.override_input_workspace = str(back_ws_path.absolute()) if back_ws_path is not None else ""
+        self.fwd_ai.override_input_workspace = str(front_ws_path.absolute()) if front_ws_path is not None else ""
+        self.update_ws_names_from_override_input_workspaces()
+
+        self.bckwd_ai.show_plots = False
+        self.fwd_ai.show_plots = False
+        return
 
     def get_common_prefix_of_bootstrap_sample_names(self, back_ws_name, front_ws_name):
         if back_ws_name == front_ws_name:

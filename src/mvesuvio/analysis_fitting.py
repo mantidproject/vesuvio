@@ -1667,4 +1667,4 @@ def save_workspaces(yFitIC):
         if ws_name.endswith("Parameters") or ws_name.endswith("Workspace") or ws_name.endswith("CovarianceMatrix"):
             save_path = yFitIC.outputs_dir / f"{yFitIC.fitting_model}_fit" / ws_name
             save_path.parent.mkdir(exist_ok=True, parents=True)
-            SaveAscii(ws_name, str(save_path))
+            SaveAscii(ws_name, str(save_path.absolute()))
