@@ -31,6 +31,7 @@ import sys
 import dill  # To convert constraints to string
 import re
 import os
+import traceback
 
 
 class Runner:
@@ -251,9 +252,17 @@ class Runner:
     def runAnalysisFitting(self):
         success = False
         if self.bckwd_ai.fit_in_y_space:
-            success |= self.run_y_space_reduction_and_fit(self.bckwd_ai)
+            try:
+                success |= self.run_y_space_reduction_and_fit(self.bckwd_ai)
+            except Exception:
+                success |= True
+                logger.error(traceback.format_exc())
         if self.fwd_ai.fit_in_y_space:
-            success |= self.run_y_space_reduction_and_fit(self.fwd_ai)
+            try:
+                success |= self.run_y_space_reduction_and_fit(self.fwd_ai)
+            except Exception:
+                success |= True
+                logger.error(traceback.format_exc())
         return success
 
     def run_y_space_reduction_and_fit(self, ai):

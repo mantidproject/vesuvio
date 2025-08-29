@@ -20,7 +20,6 @@ PLOTS_PROJECTION = "mantid"
 
 class FitInYSpace:
     def __init__(self, fi, ws_to_fit, ws_to_fit_ncp, ws_res, outputs_dir):
-        self.fitting_inputs = fi
         self.ws_to_fit = ws_to_fit
         self.ws_to_fit_ncp = ws_to_fit_ncp
         self.ws_resolution = ws_res
@@ -28,6 +27,14 @@ class FitInYSpace:
         fi.outputs_dir = outputs_dir
         fi.figSavePath = fi.outputs_dir / "figures"
         fi.figSavePath.mkdir(exist_ok=True, parents=True)
+
+        # TODO: Look into fixing this
+        # If errors are zero, don't run minos or global fit
+        if np.max(ws_to_fit.extractE()) == 0:
+            fi.run_minos = False
+            fi.do_global_fit = False
+
+        self.fitting_inputs = fi
 
     def run(self):
         wsResSum = SumSpectra(InputWorkspace=self.ws_resolution, OutputWorkspace=self.ws_resolution.name() + "_Sum")
