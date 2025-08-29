@@ -71,18 +71,16 @@ def __set_up_parser():
 
 def __setup_config(args):
     __set_logging_properties()
-
-    config_dir = handle_config.VESUVIO_CONFIG_PATH
-    inputs = handle_config.VESUVIO_INPUTS_PATH
-    ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
+    handle_config.setup_config_dir()
     handle_config.setup_default_inputs()
     handle_config.setup_default_ipfile_dir()
+
+    inputs = handle_config.VESUVIO_INPUTS_PATH
+    ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
 
     if handle_config.config_set():
         inputs = handle_config.read_config_var("caching.inputs")
         ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
-    else:
-        handle_config.setup_config_dir(config_dir)
 
     if args and args.set_inputs:
         inputs = str(Path(args.set_inputs).absolute())

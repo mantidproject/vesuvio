@@ -76,16 +76,16 @@ def get_script_name():
     return scriptName
 
 
-def setup_config_dir(config_dir):
-    success = __mk_dir("config", config_dir)
-    if success:
+def setup_config_dir():
+    if not os.path.isdir(VESUVIO_CONFIG_PATH):
+        os.makedirs(VESUVIO_CONFIG_PATH)
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_CONFIG_FILE),
-            os.path.join(config_dir, VESUVIO_CONFIG_FILE),
+            os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE),
         )
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", MANTID_CONFIG_FILE),
-            os.path.join(config_dir, MANTID_CONFIG_FILE),
+            os.path.join(VESUVIO_CONFIG_PATH, MANTID_CONFIG_FILE),
         )
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", SCRIPT_TO_CREATE_FIGURES),
