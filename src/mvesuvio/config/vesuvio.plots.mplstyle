@@ -1,0 +1,8 @@
+axes.titlesize : 18
+axes.labelsize : 18
+lines.linewidth : 2
+lines.markersize : 5
+xtick.labelsize : 16
+ytick.labelsize : 16
+legend.frameon : False
+errorbar.capsize : 0
