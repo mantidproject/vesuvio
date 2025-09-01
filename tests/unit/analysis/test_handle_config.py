@@ -4,6 +4,7 @@ from mvesuvio.util import handle_config
 import tempfile
 from textwrap import dedent
 import os
+import shutil
 
 class TestHandleConfig(unittest.TestCase):
     @classmethod
@@ -100,16 +101,23 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_setup_config_dir(self):
-        tempdir = tempfile.TemporaryDirectory()
-        handle_config.setup_config_dir(tempdir.name)
+        tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
+        # Clean up any mess from previous tests
+        shutil.rmtree(tempdir, ignore_errors=True)
 
-        vesuvio_file = open(os.path.join(tempdir.name, "vesuvio.user.properties"), "r")
+        handle_config.setup_config_dir(tempdir)
+
+        vesuvio_file = open(os.path.join(tempdir, "vesuvio.user.properties"), "r")
         self.assertEqual(vesuvio_file.read(), "caching.inputs=\ncaching.ipfolder=\n")
         vesuvio_file.close()
-        mantid_file = open(os.path.join(tempdir.name, "Mantid.user.properties"), "r")
+        mantid_file = open(os.path.join(tempdir, "Mantid.user.properties"), "r")
         self.assertEqual(mantid_file.read(), "default.facility=ISIS\ndefault.instrument=Vesuvio\ndatasearch.searcharchive=On\n")
         mantid_file.close()
-        tempdir.cleanup()
+        plots_file = open(os.path.join(tempdir, "vesuvio.plots.mplstyle"), "r")
+        self.assertEqual(plots_file.readline().split(":")[0], "axes.titlesize ")
+        plots_file.close()
+
+        shutil.rmtree(tempdir)
 
 
     def test_setup_default_inputs(self):
