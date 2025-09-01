@@ -7,7 +7,8 @@ import numpy.testing as nptest
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.util.analysis_helpers import calculate_resolution, create_profiles_table, extractWS, _convert_dict_to_table,  \
     fix_profile_parameters, calculate_h_ratio, extend_range_of_array, is_hydrogen_present, isolate_lighest_mass_data, load_instrument_params, load_raw_and_empty_from_path, load_resolution, numerical_third_derivative,  \
-    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, scattering_type, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers, pseudo_voigt
+    mask_time_of_flight_bins_with_zeros, make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, save_ws_from_load_vesuvio, ws_history_matches_inputs, convert_to_list_of_spectrum_numbers, pseudo_voigt
+from mvesuvio import globals
 from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, RenameWorkspace, Load, CompareWorkspaces, Rebin, AnalysisDataService
 
 class TestAnalysisHelpers(unittest.TestCase):
@@ -499,10 +500,10 @@ class TestAnalysisHelpers(unittest.TestCase):
     @patch('mvesuvio.util.analysis_helpers.SaveNexus')
     @patch('mvesuvio.util.analysis_helpers.LoadVesuvio')
     def test_save_ws_from_load_vesuvio_backward(self, mock_load_vesuvio, mock_save_nexus):
-        path = Path('notthere/raw_backward.nxs')
+        path = Path(f'notthere/raw_{globals.BACKWARD_TAG}.nxs')
         save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
         mock_load_vesuvio.assert_has_calls([
-            call(Filename='1234', SpectrumList='3-134', Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_backward.nxs', LoadLogFiles=False)
+            call(Filename='1234', SpectrumList='3-134', Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{globals.BACKWARD_TAG}.nxs', LoadLogFiles=False)
         ])
         args, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
@@ -511,10 +512,10 @@ class TestAnalysisHelpers(unittest.TestCase):
     @patch('mvesuvio.util.analysis_helpers.SaveNexus')
     @patch('mvesuvio.util.analysis_helpers.LoadVesuvio')
     def test_save_ws_from_load_vesuvio_forward(self, mock_load_vesuvio, mock_save_nexus):
-        path = Path('notthere/raw_forward.nxs')
+        path = Path(f'notthere/raw_{globals.FORWARD_TAG}.nxs')
         save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
         mock_load_vesuvio.assert_has_calls([
-            call(Filename='1234', SpectrumList="135-198", Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace='raw_forward.nxs', LoadLogFiles=False)
+            call(Filename='1234', SpectrumList="135-198", Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{globals.FORWARD_TAG}.nxs', LoadLogFiles=False)
         ])
         args, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
@@ -591,19 +592,6 @@ class TestAnalysisHelpers(unittest.TestCase):
         if not match:
             error = messages.cell(0,0)
         self.assertTrue(match, error)
-
-
-    def test_scattering_type(self):
-        class BackwardAnalysisInputs:
-            pass
-
-        class ForwardAnalysisInputs:
-            pass
-
-        self.assertEqual(scattering_type(BackwardAnalysisInputs, False), "BACKWARD")
-        self.assertEqual(scattering_type(BackwardAnalysisInputs, True), "bckwd")
-        self.assertEqual(scattering_type(ForwardAnalysisInputs, False), "FORWARD")
-        self.assertEqual(scattering_type(ForwardAnalysisInputs, True), "fwd")
 
 
     def test_convert_to_list_of_spectrum_numbers_string(self):

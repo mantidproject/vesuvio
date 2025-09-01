@@ -72,7 +72,7 @@ class TestFitting(unittest.TestCase):
         fi.fitting_model = "gauss"
         fi.do_symmetrisation = True
         fi.subtract_calculated_fse_from_data = True
-        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
+        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution, self.target_dir)
         alg.run()
         self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gauss_fit", self.target_dir / "gauss_fit"))
 
@@ -81,7 +81,7 @@ class TestFitting(unittest.TestCase):
         fi.fitting_model = "gcc4"
         fi.do_symmetrisation = False
         fi.subtract_calculated_fse_from_data = True
-        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
+        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution, self.target_dir)
         alg.run()
         self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gcc4_fit", self.target_dir / "gcc4_fit"))
 
@@ -90,6 +90,6 @@ class TestFitting(unittest.TestCase):
         fi.fitting_model = "gauss2d"
         fi.do_symmetrisation = True
         fi.subtract_calculated_fse_from_data = False
-        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution)
+        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution, self.target_dir)
         alg.run()
         self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gauss2d_fit", self.target_dir / "gauss2d_fit"))
