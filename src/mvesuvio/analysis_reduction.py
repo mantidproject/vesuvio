@@ -35,6 +35,7 @@ from mantid.simpleapi import (
     SaveAscii,
 )
 
+from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import (
     numerical_third_derivative,
     load_resolution,
@@ -46,6 +47,7 @@ from mvesuvio.util.analysis_helpers import (
     pseudo_voigt,
 )
 
+plt.style.use(["ggplot", handle_config.get_plots_config_file()])
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 NEUTRON_MASS = 1.008  # a.m.u.
@@ -344,16 +346,14 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         if not self._save_figures_path.exists():
             return
 
-        lw = 2
-
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
 
         ws_data_sum = mtd[self._workspace_being_fit.name() + "_sum"]
-        ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra")
+        ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra", elinewidth=1.5)
 
         for key, ws in self._fit_profiles_workspaces.items():
             ws_sum = mtd[ws.name() + "_sum"]
-            ax.plot(ws_sum, label=f"Sum of {key} profile", linewidth=lw)
+            ax.plot(ws_sum, label=f"Sum of {key} profile")
 
         ax.set_xlabel("TOF")
         ax.set_ylabel("Counts")

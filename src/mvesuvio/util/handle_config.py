@@ -18,6 +18,7 @@ VESUVIO_INPUTS_FILE = "analysis_inputs.py"
 VESUVIO_INPUTS_PATH = os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_INPUTS_FILE)
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANTID_CONFIG_FILE = "Mantid.user.properties"
+PLOTS_CONFIG_FILE = "vesuvio.plots.mplstyle"
 VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
 ######################
 
@@ -75,6 +76,10 @@ def get_script_name():
     return scriptName
 
 
+def get_plots_config_file() -> str:
+    return os.path.abspath(os.path.join(VESUVIO_CONFIG_PATH, PLOTS_CONFIG_FILE))
+
+
 def setup_config_dir(config_dir):
     success = __mk_dir("config", config_dir)
     if success:
@@ -85,6 +90,10 @@ def setup_config_dir(config_dir):
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", MANTID_CONFIG_FILE),
             os.path.join(config_dir, MANTID_CONFIG_FILE),
+        )
+        copyfile(
+            os.path.join(VESUVIO_PACKAGE_PATH, "config", PLOTS_CONFIG_FILE),
+            os.path.join(config_dir, PLOTS_CONFIG_FILE),
         )
 
 
@@ -106,9 +115,9 @@ def setup_default_ipfile_dir():
 
 def __mk_dir(type: str, path: str):
     try:
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=False)
         return True
-    except FileNotFoundError:
+    except (FileNotFoundError, FileExistsError):
         print(f"Unable to make {type} directory at location: {path}")
         return False
 
