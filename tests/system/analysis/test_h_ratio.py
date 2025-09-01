@@ -27,7 +27,7 @@ class TestReduction(unittest.TestCase):
         if results_path.is_file():
             os.remove(str(results_path))
 
-        runner = Runner(True)
+        runner = Runner(running_tests=True)
         runner.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass = 0
         runner.run()
 

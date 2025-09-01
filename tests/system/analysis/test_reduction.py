@@ -3,7 +3,7 @@ from pathlib import Path
 from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
 import mvesuvio
-from mantid.simpleapi import LoadAscii, mtd, CompareWorkspaces, AnalysisDataService
+from mantid.simpleapi import Load, LoadAscii, mtd, CompareWorkspaces, AnalysisDataService
 import shutil
 
 
@@ -28,19 +28,26 @@ class TestReduction(unittest.TestCase):
         if results_path.exists():
             shutil.rmtree(str(results_path))
 
-        Runner(True).run()
+        Runner().run()
 
         AnalysisDataService.clear()
 
         for p in benchmark_path.iterdir():
             if p.is_dir():
                 continue
+            if p.name.endswith("nxs"):
+                Load(str(p), OutputWorkspace="bench_"+p.stem)
+                continue
+            # TODO: Rename ascii files to include a .txt extension
             LoadAscii(str(p), Separator="CSV", OutputWorkspace="bench_"+p.name)
 
         for p in results_path.iterdir():
             if p.is_dir():
                 continue
-            LoadAscii(str(p), Separator="CSV", OutputWorkspace=p.name)
+            if p.name.endswith("nxs"):
+                Load(str(p), OutputWorkspace=p.stem)
+                continue
+            LoadAscii(str(p), Separator="CSV", OutputWorkspace=p.stem)
 
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
