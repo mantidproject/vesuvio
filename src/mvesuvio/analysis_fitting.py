@@ -13,7 +13,10 @@ from mantid.kernel import logger
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
 
-plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+try:
+    plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+except OSError:
+    pass
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 PLOTS_PROJECTION = "mantid"

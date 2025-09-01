@@ -49,7 +49,10 @@ from mvesuvio.util.analysis_helpers import (
     pseudo_voigt,
 )
 
-plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+try:
+    plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+except OSError:
+    pass
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 NEUTRON_MASS = 1.008  # a.m.u.
