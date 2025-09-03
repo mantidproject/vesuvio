@@ -1647,7 +1647,16 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        if ws_name.endswith("Parameters") or ws_name.endswith("Workspace") or ws_name.endswith("CovarianceMatrix"):
-            save_path = yFitIC.save_path / f"{yFitIC.fitting_model}_fit" / ws_name
+        save_path = yFitIC.save_path / f"{yFitIC.fitting_model}_fit" / ws_name
+        if ws_name.endswith("Parameters") or ws_name.endswith("CovarianceMatrix"):
             save_path.parent.mkdir(exist_ok=True, parents=True)
             SaveAscii(ws_name, str(save_path))
+        if ws_name.endswith("Workspace"):
+            save_path.parent.mkdir(exist_ok=True, parents=True)
+            ws_pars = mtd[ws_name.replace("Workspace", "Parameters")]
+            lab = ""
+            for p, v, e in zip(ws_pars.column("Name"), ws_pars.column("Value"), ws_pars.column("Error")):
+                if p.startswith("Cost"):
+                    break
+                lab += f"{p.split('.')[-1]}={v:.2f} $\\pm$ {e:.2f}\n"
+            SaveAscii(ws_name, str(save_path), LogList=["Weighted Avg", lab, "Residuals"])

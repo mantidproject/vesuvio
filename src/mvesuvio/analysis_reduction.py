@@ -33,6 +33,7 @@ from mantid.simpleapi import (
     CreateWorkspace,
     GroupWorkspaces,
     SaveAscii,
+    AppendSpectra,
 )
 
 from mvesuvio.util.analysis_helpers import (
@@ -147,7 +148,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._mode_running = self.getProperty("ModeRunning").value
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value
         self._gamma_correction = self.getProperty("GammaCorrection").value
-        self._save_results_path = Path(self.getProperty("ResultsPath").value)
+        self._save_results_path = Path(self.getProperty("ResultsPath").value).absolute()
         self._chosen_index_for_h_ratio = self.getProperty("ChosenMassIndex").value
         self._h_ratio = self.getProperty("HRatioToChosenMass").value
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
@@ -349,11 +350,19 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
 
         ws_data_sum = mtd[self._workspace_being_fit.name() + "_sum"]
-        ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra")
+        lab = "Sum of spectra"
+        ax.errorbar(ws_data_sum, fmt="k.", label=lab)
+
+        label_list = [lab]
+        ws_fig_name = self._workspace_being_fit.name() + "_ncp_fits_sum"
+        CloneWorkspace(ws_data_sum, OutputWorkspace=ws_fig_name)
 
         for key, ws in self._fit_profiles_workspaces.items():
             ws_sum = mtd[ws.name() + "_sum"]
-            ax.plot(ws_sum, label=f"Sum of {key} profile", linewidth=lw)
+            lab = f"Sum of {key} profile"
+            ax.plot(ws_sum, label=lab, linewidth=lw)
+            label_list.append(lab)
+            AppendSpectra(ws_fig_name, ws_sum, OutputWorkspace=ws_fig_name)
 
         ax.set_xlabel("TOF")
         ax.set_ylabel("Counts")
@@ -364,6 +373,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         savePath = self._save_figures_path / fileName
         plt.savefig(savePath, bbox_inches="tight")
         plt.close(fig)
+
+        # TODO: Sort this out into something cleaner
+        file_name = self._workspace_being_fit.name() + "_profiles_sum.txt"
+        SaveAscii(ws_fig_name, str(self._save_results_path / file_name), LogList=label_list)
         return
 
     def _calculate_summed_workspaces(self):

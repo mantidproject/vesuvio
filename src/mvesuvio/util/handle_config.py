@@ -19,6 +19,7 @@ VESUVIO_INPUTS_PATH = os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_INPUTS_FILE)
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANTID_CONFIG_FILE = "Mantid.user.properties"
 VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
+SCRIPT_TO_CREATE_FIGURES = "script_to_create_figures.py"
 ######################
 
 
@@ -85,6 +86,10 @@ def setup_config_dir(config_dir):
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", MANTID_CONFIG_FILE),
             os.path.join(config_dir, MANTID_CONFIG_FILE),
+        )
+        copyfile(
+            os.path.join(VESUVIO_PACKAGE_PATH, "config", SCRIPT_TO_CREATE_FIGURES),
+            os.path.join(config_dir, SCRIPT_TO_CREATE_FIGURES),
         )
 
 
