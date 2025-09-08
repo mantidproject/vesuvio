@@ -34,7 +34,7 @@ class TestFitting(unittest.TestCase):
         cls.ws_to_fit_ncp_path = cls.inputs_path / "system_test_inputs_fwd_1_1.0079_ncp_-fse.nxs"
         cls.ws_resolution_path = cls.inputs_path / "system_test_inputs_fwd_1_resolution.nxs"
 
-        cls.ipfile_path = Path(handle_config.VESUVIO_IPFOLDER_PATH) / "ip2018_3.par"
+        cls.ipfile_path = Path(handle_config.VESUVIO_CONFIG_PATH) / handle_config.IP_FOLDER / "ip2018_3.par"
 
         return
 
