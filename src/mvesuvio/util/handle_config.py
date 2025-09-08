@@ -79,6 +79,8 @@ def get_script_name():
 
 def get_plots_config_file() -> str:
     return os.path.abspath(os.path.join(VESUVIO_CONFIG_PATH, PLOTS_CONFIG_FILE))
+
+
 def setup_config_dir():
     if not os.path.isdir(VESUVIO_CONFIG_PATH):
         os.makedirs(VESUVIO_CONFIG_PATH)
@@ -96,7 +98,7 @@ def setup_config_dir():
         )
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", PLOTS_CONFIG_FILE),
-            os.path.join(config_dir, PLOTS_CONFIG_FILE),
+            os.path.join(VESUVIO_CONFIG_PATH, PLOTS_CONFIG_FILE),
         )
 
 
