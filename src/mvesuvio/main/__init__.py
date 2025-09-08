@@ -81,6 +81,8 @@ def __setup_config(args):
     if handle_config.config_set():
         inputs = handle_config.read_config_var("caching.inputs")
         ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
+    else:
+        handle_config.set_default_config_vars()
 
     if args and args.set_inputs:
         inputs = str(Path(args.set_inputs).absolute())

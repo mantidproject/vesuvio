@@ -2,18 +2,9 @@ import os
 from shutil import copyfile, copytree, ignore_patterns
 
 
-def __parse_config_env_var():
-    env_var = os.getenv("VESUVIOPROPERTIES")
-    if env_var:
-        config_path, config_file = os.path.split(env_var)
-    else:
-        config_path = os.path.join(os.path.expanduser("~"), ".mvesuvio")
-        config_file = "vesuvio.user.properties"
-    return config_path, config_file
-
-
 ### PATH CONSTANTS ###
-VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE = __parse_config_env_var()
+VESUVIO_CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".mvesuvio")
+VESUVIO_CONFIG_FILE = "vesuvio.user.properties"
 VESUVIO_INPUTS_FILE = "analysis_inputs.py"
 VESUVIO_INPUTS_PATH = os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_INPUTS_FILE)
 VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,6 +13,15 @@ PLOTS_CONFIG_FILE = "vesuvio.plots.mplstyle"
 VESUVIO_IPFOLDER_PATH = os.path.join(VESUVIO_CONFIG_PATH, "ip_files")
 SCRIPT_TO_CREATE_FIGURES = "script_to_create_figures.py"
 ######################
+
+
+def set_default_config_vars():
+    set_config_vars(
+        {
+            "caching.inputs": os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_INPUTS_FILE),
+            "caching.ipfolder": VESUVIO_IPFOLDER_PATH,
+        }
+    )
 
 
 def __read_config(config_file_path, throw_on_not_found=True):
@@ -36,7 +36,7 @@ def __read_config(config_file_path, throw_on_not_found=True):
 
 
 def set_config_vars(var_dict):
-    file_path = os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE)
+    file_path = os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_CONFIG_FILE)
     lines = __read_config(file_path)
 
     updated_lines = []
@@ -58,7 +58,7 @@ def set_config_vars(var_dict):
 
 
 def read_config_var(var, throw_on_not_found=True):
-    file_path = f"{VESUVIO_CONFIG_PATH}{os.path.sep}{VESUVIO_CONFIG_FILE}"
+    file_path = os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_CONFIG_FILE)
     lines = __read_config(file_path, throw_on_not_found)
 
     result = ""
@@ -84,14 +84,6 @@ def get_plots_config_file() -> str:
 def setup_config_dir():
     if not os.path.isdir(VESUVIO_CONFIG_PATH):
         os.makedirs(VESUVIO_CONFIG_PATH)
-        copyfile(
-            os.path.join(VESUVIO_PACKAGE_PATH, "config", VESUVIO_CONFIG_FILE),
-            os.path.join(VESUVIO_CONFIG_PATH, VESUVIO_CONFIG_FILE),
-        )
-        copyfile(
-            os.path.join(VESUVIO_PACKAGE_PATH, "config", MANTID_CONFIG_FILE),
-            os.path.join(VESUVIO_CONFIG_PATH, MANTID_CONFIG_FILE),
-        )
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", SCRIPT_TO_CREATE_FIGURES),
             os.path.join(VESUVIO_CONFIG_PATH, SCRIPT_TO_CREATE_FIGURES),
