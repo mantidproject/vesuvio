@@ -89,7 +89,7 @@ def setup_config_dir():
         )
         copyfile(
             os.path.join(VESUVIO_PACKAGE_PATH, "config", SCRIPT_TO_CREATE_FIGURES),
-            os.path.join(config_dir, SCRIPT_TO_CREATE_FIGURES),
+            os.path.join(VESUVIO_CONFIG_PATH, SCRIPT_TO_CREATE_FIGURES),
         )
 
 

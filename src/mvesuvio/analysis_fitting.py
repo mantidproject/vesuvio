@@ -1664,7 +1664,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        save_path = yFitIC.save_path / f"{yFitIC.fitting_model}_fit" / ws_name
+        save_path = yFitIC.outputs_dir / f"{yFitIC.fitting_model}_fit" / ws_name
         if ws_name.endswith("Parameters") or ws_name.endswith("CovarianceMatrix"):
             save_path.parent.mkdir(exist_ok=True, parents=True)
             SaveAscii(ws_name, str(save_path))

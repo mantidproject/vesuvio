@@ -111,8 +111,11 @@ class TestHandleConfig(unittest.TestCase):
         mantid_file = open(os.path.join(tempdir, "Mantid.user.properties"), "r")
         self.assertEqual(mantid_file.read(), "default.facility=ISIS\ndefault.instrument=Vesuvio\ndatasearch.searcharchive=On\n")
         mantid_file.close()
+        script_figures = open(os.path.join(tempdir, "script_to_create_figures.py"))
+        script_figures.close()
         os.remove(vesuvio_file.name)
         os.remove(mantid_file.name)
+        os.remove(script_figures.name)
         os.rmdir(tempdir)
 
 
