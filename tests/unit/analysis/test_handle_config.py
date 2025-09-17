@@ -104,6 +104,7 @@ class TestHandleConfig(unittest.TestCase):
         tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
         # Clean up any mess from previous tests
         shutil.rmtree(tempdir, ignore_errors=True)
+
         with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
             handle_config.setup_config_dir()
 
@@ -120,6 +121,7 @@ class TestHandleConfig(unittest.TestCase):
         plots_file.close()
 
         shutil.rmtree(tempdir)
+
 
     def test_setup_config_dir_dir_already_exists(self):
         tempdir = tempfile.TemporaryDirectory()
