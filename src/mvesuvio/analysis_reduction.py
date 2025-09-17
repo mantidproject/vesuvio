@@ -33,6 +33,7 @@ from mantid.simpleapi import (
     CreateWorkspace,
     GroupWorkspaces,
     SaveAscii,
+    SaveNexus,
     AppendSpectra,
 )
 
@@ -118,6 +119,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self.declareProperty(name="MultipleScatteringOrder", defaultValue=-1, validator=IntBoundedValidator(lower=0))
         self.declareProperty(name="NumberOfEvents", defaultValue=-1, validator=IntBoundedValidator(lower=0))
         self.declareProperty(name="ResultsPath", defaultValue="", doc="Directory to store results, to be deleted later.")
+        self.declareProperty(name="MinimalOutputFiles", defaultValue=False, doc="Flag to set number of output files to minimum.")
         # Outputs
         self.declareProperty(
             TableWorkspaceProperty(name="OutputMeansTable", defaultValue="", direction=Direction.Output),
@@ -153,6 +155,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._h_ratio = self.getProperty("HRatioToChosenMass").value
         self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
         self._profiles_table = self.getProperty("InputProfiles").value
+        self._minimal_output = self.getProperty("MinimalOutputFiles").value
 
         self._instrument_params = load_instrument_params(self._ip_file, self.getProperty("InputWorkspace").value.getSpectrumNumbers())
         self._resolution_params = load_resolution(self._instrument_params)
@@ -342,7 +345,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return
 
     def _save_plots(self):
-        if not self._save_figures_path.exists():
+        if self._minimal_output or not self._save_figures_path.exists():
             return
 
         lw = 2
@@ -726,6 +729,18 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         return mtd[ws_corrections_name + "_gamma_backgr"]
 
     def _save_results(self):
-        for ws_name in mtd.getObjectNames():
-            if ws_name.endswith(("ncp", "fse", "fit_results", "means", "initial_parameters") + tuple([str(i) for i in range(10)])):
-                SaveAscii(ws_name, str(self._save_results_path / ws_name))
+        all_workspaces = mtd.getObjectNames()
+        if self._minimal_output:
+            last_iteration = max([ws.replace("_total_ncp", "")[-1] for ws in all_workspaces if ws.endswith("_total_ncp")])
+            for ws_name in all_workspaces:
+                if ws_name.endswith((f"{last_iteration}_total_ncp", f"{last_iteration}_total_fse")):
+                    SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
+                if ws_name.endswith((f"{last_iteration}_fit_results", f"{last_iteration}_means")):
+                    SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
+            return
+
+        for ws_name in all_workspaces:
+            if ws_name.endswith(("ncp", "fse", "initial_parameters", "means", "fit_results")):
+                SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
+            if ws_name.endswith(tuple([str(i) for i in range(10)])):
+                SaveNexus(ws_name, str(self._save_results_path.absolute() / ws_name) + ".nxs")

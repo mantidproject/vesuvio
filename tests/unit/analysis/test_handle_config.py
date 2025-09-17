@@ -100,16 +100,35 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_setup_config_dir(self):
-        tempdir = tempfile.TemporaryDirectory()
-        handle_config.setup_config_dir(tempdir.name)
+        # Can't use TemporaryDirectory here because that creates directory
+        tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
+        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
+            handle_config.setup_config_dir()
 
-        vesuvio_file = open(os.path.join(tempdir.name, "vesuvio.user.properties"), "r")
+        vesuvio_file = open(os.path.join(tempdir, "vesuvio.user.properties"), "r")
         self.assertEqual(vesuvio_file.read(), "caching.inputs=\ncaching.ipfolder=\n")
         vesuvio_file.close()
-        mantid_file = open(os.path.join(tempdir.name, "Mantid.user.properties"), "r")
+        mantid_file = open(os.path.join(tempdir, "Mantid.user.properties"), "r")
         self.assertEqual(mantid_file.read(), "default.facility=ISIS\ndefault.instrument=Vesuvio\ndatasearch.searcharchive=On\n")
         mantid_file.close()
-        tempdir.cleanup()
+        script_figures = open(os.path.join(tempdir, "script_to_create_figures.py"))
+        script_figures.close()
+        os.remove(vesuvio_file.name)
+        os.remove(mantid_file.name)
+        os.remove(script_figures.name)
+        os.rmdir(tempdir)
+
+
+    def test_setup_config_dir_dir_already_exists(self):
+        tempdir = tempfile.TemporaryDirectory()
+        with (
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
+            patch("mvesuvio.util.handle_config.os.makedirs") as mock_mkdirs,
+            patch("mvesuvio.util.handle_config.copyfile") as mock_copyfile
+        ):
+            handle_config.setup_config_dir()
+            mock_mkdirs.assert_not_called()
+            mock_copyfile.assert_not_called()
 
 
     def test_setup_default_inputs(self):

@@ -19,7 +19,7 @@ from mantid.simpleapi import (
 from mantid.kernel import logger
 import numpy as np
 
-from mvesuvio.util import handle_config
+from mvesuvio import globals
 
 import ntpath
 
@@ -214,9 +214,9 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
 
 def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
-    if "backward" in ws_path.name:
+    if globals.BACKWARD_TAG in ws_path.stem:
         spectra = "3-134"
-    elif "forward" in ws_path.name:
+    elif globals.FORWARD_TAG in ws_path.stem:
         spectra = "135-198"
     else:
         raise ValueError(f"Invalid name to save workspace: {ws_path.name}")
@@ -233,26 +233,6 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
     SaveNexus(vesuvio_ws, Filename=str(ws_path.absolute()))
     print(f"Workspace saved locally at: {ws_path.absolute()}")
     return
-
-
-def name_for_starting_ws(load_ai):
-    name_suffix = scattering_type(load_ai, shorthand=True)
-    name = handle_config.get_script_name() + "_" + name_suffix
-    return name
-
-
-def scattering_type(load_ai, shorthand=False):
-    if load_ai.__name__ in ["BackwardAnalysisInputs"]:
-        scatteringType = "BACKWARD"
-        if shorthand:
-            scatteringType = "bckwd"
-    elif load_ai.__name__ in ["ForwardAnalysisInputs"]:
-        scatteringType = "FORWARD"
-        if shorthand:
-            scatteringType = "fwd"
-    else:
-        raise ValueError(f"Input class for workspace not valid: {load_ai.__name__}")
-    return scatteringType
 
 
 def load_raw_and_empty_from_path(raw_path, empty_path, tof_binning, name, raw_scale_factor, empty_scale_factor, raw_minus_empty):
