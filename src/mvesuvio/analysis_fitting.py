@@ -13,6 +13,10 @@ from mantid.kernel import logger
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
 
+try:
+    plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+except OSError:
+    pass
 repoPath = Path(__file__).absolute().parent  # Path to the repository
 
 PLOTS_PROJECTION = "mantid"
@@ -783,13 +787,12 @@ def saveMinuitPlot(yFitIC, wsMinuitFit, mObj):
         leg += f"${p}={v:.2f} \\pm {e:.2f}$\n"
 
     fig, ax = plt.subplots(subplot_kw={"projection": PLOTS_PROJECTION})
-    ax.errorbar(wsMinuitFit, "k.", wkspIndex=0, label="Weighted Avg")
-    ax.errorbar(wsMinuitFit, "r-", wkspIndex=1, label=leg)
+    ax.errorbar(wsMinuitFit, "r-", wkspIndex=1, label=leg, elinewidth=1.5)
+    ax.errorbar(wsMinuitFit, "k.", wkspIndex=0, label="Weighted Avg", elinewidth=1.5)
     ax.plot(wsMinuitFit, "b.", wkspIndex=2, label="Residuals")
     ax.set_xlabel("YSpace")
     ax.set_ylabel("Counts")
     ax.set_title("Minuit Fit")
-    ax.grid()
     ax.legend()
 
     fileName = wsMinuitFit.name() + ".pdf"
@@ -1636,7 +1639,7 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
     # Data used in Global Fit
     for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
-        ax.errorbar(x, y, yerr, fmt="k.", label=f"Data Group {i}")
+        ax.errorbar(x, y, yerr, fmt="k.", label=f"Data Group {i}", elinewidth=1.5)
 
     # Global Fit
     for x, costFun, ax in zip(dataX, totCost, axs.flat):
@@ -1654,7 +1657,6 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
 
         ax.plot(x, yfit, "r-", label="\n".join(leg))
         ax.plot(x, y - yfit, "b.", label="Residuals")
-        ax.grid()
         ax.legend()
     savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title()
     plt.savefig(savePath, bbox_inches="tight")

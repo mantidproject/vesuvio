@@ -37,6 +37,7 @@ from mantid.simpleapi import (
     AppendSpectra,
 )
 
+from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import (
     numerical_third_derivative,
     load_resolution,
@@ -48,6 +49,10 @@ from mvesuvio.util.analysis_helpers import (
     pseudo_voigt,
 )
 
+try:
+    plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+except OSError:
+    pass
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 NEUTRON_MASS = 1.008  # a.m.u.
@@ -348,13 +353,11 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         if self._minimal_output or not self._save_figures_path.exists():
             return
 
-        lw = 2
-
         fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
 
         ws_data_sum = mtd[self._workspace_being_fit.name() + "_sum"]
         lab = "Sum of spectra"
-        ax.errorbar(ws_data_sum, fmt="k.", label=lab)
+        ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra", elinewidth=1.5)
 
         label_list = [lab]
         ws_fig_name = self._workspace_being_fit.name() + "_ncp_fits_sum"
@@ -363,7 +366,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         for key, ws in self._fit_profiles_workspaces.items():
             ws_sum = mtd[ws.name() + "_sum"]
             lab = f"Sum of {key} profile"
-            ax.plot(ws_sum, label=lab, linewidth=lw)
+            ax.plot(ws_sum, label=lab)
             label_list.append(lab)
             AppendSpectra(ws_fig_name, ws_sum, OutputWorkspace=ws_fig_name)
 
@@ -734,13 +737,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             last_iteration = max([ws.replace("_total_ncp", "")[-1] for ws in all_workspaces if ws.endswith("_total_ncp")])
             for ws_name in all_workspaces:
                 if ws_name.endswith((f"{last_iteration}_total_ncp", f"{last_iteration}_total_fse")):
-                    SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
+                    SaveAscii(ws_name, str(self._save_results_path / ws_name) + ".txt")
                 if ws_name.endswith((f"{last_iteration}_fit_results", f"{last_iteration}_means")):
-                    SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
+                    SaveAscii(ws_name, str(self._save_results_path / ws_name) + ".txt")
             return
 
         for ws_name in all_workspaces:
             if ws_name.endswith(("ncp", "fse", "initial_parameters", "means", "fit_results")):
-                SaveAscii(ws_name, str(self._save_results_path.absolute() / ws_name) + ".txt")
+                SaveAscii(ws_name, str(self._save_results_path / ws_name) + ".txt")
             if ws_name.endswith(tuple([str(i) for i in range(10)])):
-                SaveNexus(ws_name, str(self._save_results_path.absolute() / ws_name) + ".nxs")
+                SaveNexus(ws_name, str(self._save_results_path / ws_name) + ".nxs")

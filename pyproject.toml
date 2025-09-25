@@ -40,7 +40,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "mvesuvio.config.ip_files" = ["*.par"]
-"mvesuvio.config" = ["*.properties"]
+"mvesuvio.config" = ["*.properties", "*.mplstyle"]
 
 [tool.pytest.ini_options]
 pythonpath = [

@@ -4,6 +4,7 @@ from mvesuvio.util import handle_config
 import tempfile
 from textwrap import dedent
 import os
+import shutil
 
 class TestHandleConfig(unittest.TestCase):
     @classmethod
@@ -100,8 +101,10 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_setup_config_dir(self):
-        # Can't use TemporaryDirectory here because that creates directory
         tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
+        # Clean up any mess from previous tests
+        shutil.rmtree(tempdir, ignore_errors=True)
+
         with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
             handle_config.setup_config_dir()
 
@@ -113,10 +116,11 @@ class TestHandleConfig(unittest.TestCase):
         mantid_file.close()
         script_figures = open(os.path.join(tempdir, "script_to_create_figures.py"))
         script_figures.close()
-        os.remove(vesuvio_file.name)
-        os.remove(mantid_file.name)
-        os.remove(script_figures.name)
-        os.rmdir(tempdir)
+        plots_file = open(os.path.join(tempdir, "vesuvio.plots.mplstyle"), "r")
+        self.assertEqual(plots_file.readline().split(":")[0], "axes.titlesize ")
+        plots_file.close()
+
+        shutil.rmtree(tempdir)
 
 
     def test_setup_config_dir_dir_already_exists(self):
