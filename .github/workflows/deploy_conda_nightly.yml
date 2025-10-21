@@ -40,3 +40,9 @@ jobs:
         with:
           label: nightly
           token: ${{ secrets.ANACONDA_API_TOKEN }}
+
+      - name: Build mvesuvio nightly pypi package
+        if: ${{ env.recentCommits == 'true'}}
+        uses: ./.github/actions/publish-pypi-package
+        with:
+          token: ${{ secrets.PYPI_API_TOKEN }}
