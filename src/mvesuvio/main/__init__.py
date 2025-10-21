@@ -75,12 +75,11 @@ def __setup_config(args):
     handle_config.setup_default_inputs()
     handle_config.setup_default_ipfile_dir()
 
-    inputs = handle_config.VESUVIO_INPUTS_PATH
-    ipfolder_dir = handle_config.VESUVIO_IPFOLDER_PATH
+    if not handle_config.config_set():
+        handle_config.set_default_config_vars()
 
-    if handle_config.config_set():
-        inputs = handle_config.read_config_var("caching.inputs")
-        ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
+    inputs = handle_config.read_config_var("caching.inputs")
+    ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
 
     if args and args.set_inputs:
         inputs = str(Path(args.set_inputs).absolute())

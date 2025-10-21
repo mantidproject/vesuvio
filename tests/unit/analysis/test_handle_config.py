@@ -4,6 +4,7 @@ from mvesuvio.util import handle_config
 import tempfile
 from textwrap import dedent
 import os
+from pathlib import Path
 import shutil
 
 class TestHandleConfig(unittest.TestCase):
@@ -11,22 +12,6 @@ class TestHandleConfig(unittest.TestCase):
     def setUpClass(cls):
         pass
 
-    def test_parse_config_env_var_with_env_variable(self):
-        with patch("mvesuvio.util.handle_config.os.getenv") as mock_getenv:
-            file = tempfile.NamedTemporaryFile()
-            mock_getenv.return_value = file.name
-            # getattr because Python mangles name
-            config_path, config_file = getattr(handle_config, "__parse_config_env_var")()
-            expected_path, expected_file = os.path.split(file.name)
-            self.assertEqual(str(config_path), expected_path)
-            self.assertEqual(str(config_file), expected_file)
-
-
-    def test_parse_config_env_var_default(self):
-        # getattr because Python mangles name
-        config_path, config_file = getattr(handle_config, "__parse_config_env_var")()
-        self.assertEqual(str(config_path), os.path.join(os.path.expanduser('~'), '.mvesuvio'))
-        self.assertEqual(str(config_file), "vesuvio.user.properties")
 
     def test_read_config(self):
         file = tempfile.NamedTemporaryFile()
@@ -45,50 +30,55 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_set_config_vars(self):
-        file = tempfile.NamedTemporaryFile()
-        mock_dir, mock_file = os.path.split(file.name)
+        mock_dir = tempfile.TemporaryDirectory()
+        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
+        mock_file = Path(mock_file)
+        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file.write_text("")
+
         with (
             patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
-            patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file)
+            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
+            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name)
 
         ):
             mock_read_config.return_value = ['\n', 'caching.inputs=\n', 'caching.ipfolder=\n']
             handle_config.set_config_vars({'caching.inputs': '/inputs.py', 'caching.ipfolder': '/ipfiles'})
 
-            file = open(os.path.join(mock_dir, mock_file), "r")
+            file = open(mock_file, "r")
             self.assertEqual(file.read(), "\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
         file.close()
 
 
     def test_read_config_vars(self):
-        file = tempfile.NamedTemporaryFile()
-        file.write("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n".encode())
-        file.seek(0)
-        mock_dir, mock_file = os.path.split(file.name)
+        mock_dir = tempfile.TemporaryDirectory()
+        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
+        mock_file = Path(mock_file)
+        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file.write_text("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
 
         with (
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
-            patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file)
+            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
+            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name)
         ):
             self.assertEqual(handle_config.read_config_var('caching.inputs'), '/inputs.py')
             self.assertEqual(handle_config.read_config_var('caching.ipfolder'), '/ipfiles')
-        file.close()
 
 
     def test_read_config_vars_throws(self):
-        file = tempfile.NamedTemporaryFile()
-        file.write("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n".encode())
-        file.seek(0)
-        mock_dir, mock_file = os.path.split(file.name)
+
+        mock_dir = tempfile.TemporaryDirectory()
+        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
+        mock_file = Path(mock_file)
+        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file.write_text("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
 
         with (
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", mock_dir),
-            patch.object(handle_config, "VESUVIO_CONFIG_FILE", mock_file),
+            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
+            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name),
             self.assertRaises(ValueError)
         ):
             handle_config.read_config_var('non.existent')
-        file.close()
 
 
     def test_get_script_name(self):
@@ -108,12 +98,6 @@ class TestHandleConfig(unittest.TestCase):
         with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
             handle_config.setup_config_dir()
 
-        vesuvio_file = open(os.path.join(tempdir, "vesuvio.user.properties"), "r")
-        self.assertEqual(vesuvio_file.read(), "caching.inputs=\ncaching.ipfolder=\n")
-        vesuvio_file.close()
-        mantid_file = open(os.path.join(tempdir, "Mantid.user.properties"), "r")
-        self.assertEqual(mantid_file.read(), "default.facility=ISIS\ndefault.instrument=Vesuvio\ndatasearch.searcharchive=On\n")
-        mantid_file.close()
         script_figures = open(os.path.join(tempdir, "script_to_create_figures.py"))
         script_figures.close()
         plots_file = open(os.path.join(tempdir, "vesuvio.plots.mplstyle"), "r")
@@ -137,8 +121,11 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_setup_default_inputs(self):
         tempdir = tempfile.TemporaryDirectory()
-        mock_path = os.path.join(tempdir.name, 'mock_inputs.py')
-        with patch.object(handle_config, "VESUVIO_INPUTS_PATH", mock_path):
+        mock_path = os.path.join(tempdir.name, 'analysis_inputs.py')
+        with (
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
+            patch.object(handle_config, "ANALYSIS_INPUTS_FILE", "analysis_inputs.py"),
+        ):
 
             handle_config.setup_default_inputs()
 
