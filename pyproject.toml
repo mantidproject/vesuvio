@@ -76,8 +76,8 @@ method = "minor"
 
 [tool.versioningit.format]
 distance = "{version}.dev{distance}"
-dirty = "{version}+uncommitted"
-distance-dirty = "{version}.dev{distance}+uncommitted"
+dirty = "{version}"
+distance-dirty = "{version}.dev{distance}"
 
 [tool.versioningit.write]
 file = "src/mvesuvio/_version.py"
