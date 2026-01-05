@@ -1,3 +1,4 @@
+from contextlib import suppress
 from mantid.kernel import (
     StringArrayProperty,
     Direction,
@@ -451,7 +452,9 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         output_workspace = fit_peaks_output_name + "_Workspace"
         if unconstrained_fit_performed:
-            DeleteWorkspace(find_peaks_output_name_u)
+            # Error in FindPeaks was causing this workspace to be removed from ads already
+            with suppress(Exception):
+                DeleteWorkspace(find_peaks_output_name_u)
 
             if unconstrained_peaks_found:
                 DeleteWorkspace(fit_peaks_output_name_u + "_NormalisedCovarianceMatrix")
