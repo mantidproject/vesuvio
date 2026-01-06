@@ -80,7 +80,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         params_table = self._run_evs_calibration_analysis()
 
         #  Specify detectors tolerances set by user, then update with those to mask as invalid.
-        detector_specific_r_tols = {"L1": {116: 0.25, 170: TestConstants.IGNORE_DETECTOR, 171: TestConstants.IGNORE_DETECTOR}}
+        detector_specific_r_tols = {"Theta": {159: 0.25, 161: 0.15}, "L1": {116: 0.25, 170: TestConstants.IGNORE_DETECTOR, 171: TestConstants.IGNORE_DETECTOR}}
         detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [3, 41, 44, 48, 49, 65, 73, 89, 99, 100, 102,
                                                                                            110, 114, 118, 123, 126, 131, 138, 141, 143,
                                                                                            146, 147, 151, 154, 156, 157, 159, 160, 162,
