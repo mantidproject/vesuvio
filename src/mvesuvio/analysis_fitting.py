@@ -1,6 +1,21 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from mantid.simpleapi import *
+from mantid.simpleapi import (
+    SumSpectra,
+    Divide,
+    ConvertToYSpace,
+    Rebin,
+    Integration,
+    CloneWorkspace,
+    DeleteWorkspace,
+    CreateWorkspace,
+    CreateEmptyTableWorkspace,
+    SaveAscii,
+    Plus,
+    GroupWorkspaces,
+    mtd,
+    Fit,
+)
 from scipy import optimize
 from scipy import signal
 from pathlib import Path
@@ -1265,6 +1280,8 @@ def runGlobalFit(wsYSpace, wsRes, IC):
 
     create_table_for_global_fit_parameters(wsYSpace.name(), IC.fitting_model, m, chi2)
 
+    save_result_of_global_fit(dataX, dataY, dataE, m, totCost, wsYSpace.name())
+
     if IC.show_plots:
         plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
 
@@ -1662,6 +1679,36 @@ def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
     plt.savefig(savePath, bbox_inches="tight")
     fig.show()
     return
+
+
+def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name):
+    global_sum_name = ws_name + "_global_fit_sum"
+    individual_names = []
+
+    for i, (x, y, yerr, cost_fun) in enumerate(zip(data_x, data_y, data_e, total_cost_fun)):
+        values = m.values[describe(cost_fun)]
+        yfit = cost_fun.model(x, *values)
+        res = y - yfit
+
+        CreateWorkspace(
+            DataX=np.concatenate([x, x, x]),
+            DataY=np.concatenate([y, yfit, res]),
+            DataE=np.concatenate([yerr, np.zeros_like(yerr), np.zeros_like(yerr)]),
+            Nspec=3,
+            UnitX="TOF",  # I had hoped for a method like .XUnit() but alas
+            OutputWorkspace=ws_name + f"_global_fit_{i}",
+            ParentWorkspace=ws_name,
+            Distribution=True,
+        )
+        individual_names.append(ws_name + f"_global_fit_{i}")
+
+        if i == 1:
+            Plus(ws_name + "_global_fit_0", ws_name + "_global_fit_1", OutputWorkspace=global_sum_name)
+        elif i > 1:
+            Plus(global_sum_name, ws_name + f"_global_fit_{i}", OutputWorkspace=global_sum_name)
+
+    individual_names.append(global_sum_name)
+    return GroupWorkspaces(individual_names, OutputWorkspace=ws_name + "_global_fit_group")
 
 
 def save_workspaces(yFitIC):
