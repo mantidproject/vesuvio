@@ -499,6 +499,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
 
     # Create workspace with final fitting parameters and their errors
     createFitParametersTableWorkspace(wsYSpaceSym, *fitCols, chi2)
+
+    # TODO: This is bad
+    output_name = wsYSpaceSym.name()
+    DeleteWorkspace(output_name)
+    GroupWorkspaces([ws_name for ws_name in mtd.getObjectNames() if "_minuit_" in ws_name], OutputWorkspace=output_name)
     return
 
 
@@ -1177,16 +1182,22 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             )
 
         suffix = "lm" if minimizer == "Levenberg-Marquardt" else minimizer.lower()
-        outputName = wsYSpaceSym.name() + "_" + suffix + "_" + yFitIC.fitting_model
+        outputName = wsYSpaceSym.name() + f"_{suffix}_" + yFitIC.fitting_model
         CloneWorkspace(InputWorkspace=wsYSpaceSym, OutputWorkspace=outputName)
 
+        # Fit produces output workspaces with results
         Fit(
             Function=function,
             InputWorkspace=outputName,
             Output=outputName,
             Minimizer=minimizer,
         )
-        # Fit produces output workspaces with results
+
+        # Delete workspace prior to replacing it, just to be sure
+        DeleteWorkspace(outputName)
+        # Group output workspaces
+        ws_to_group = [ws_name for ws_name in mtd.getObjectNames() if f"_{suffix}_" in ws_name]
+        GroupWorkspaces(ws_to_group, OutputWorkspace=outputName)
     return
 
 
@@ -1278,12 +1289,10 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     # Number of non zero points (considered in the fit) minus no of parameters
     chi2 = m.fval / (np.sum(dataE != 0) - m.nfit)
 
-    create_table_for_global_fit_parameters(wsYSpace.name(), IC.fitting_model, m, chi2)
-
-    save_result_of_global_fit(dataX, dataY, dataE, m, totCost, wsYSpace.name())
+    fit_ws_group = save_result_of_global_fit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC.fitting_model, chi2)
 
     if IC.show_plots:
-        plotGlobalFit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC)
+        plotGlobalFit(fit_ws_group, IC)
 
     # Pass into array to store values in variable
     return np.array(m.values), np.array(m.errors)
@@ -1639,54 +1648,79 @@ def create_table_for_global_fit_parameters(wsName, model, m, chi2):
     print_table_workspace(t)
 
 
-def plotGlobalFit(dataX, dataY, dataE, mObj, totCost, wsName, yFitIC):
-    if len(dataY) > 10:
-        logger.notice("\nToo many axes to show in figure, skipping the plot ...\n")
-        return
-
-    rows = 2
+def plotGlobalFit(ws_group, yFitIC):
+    individual_names = ws_group.getNames()
     fig, axs = plt.subplots(
-        rows,
-        int(np.ceil(len(dataY) / rows)),
-        figsize=(15, 8),
-        tight_layout=True,
+        1,
+        2,
+        figsize=(10, int(len(individual_names) / 3)),
+        tight_layout=False,
+        constrained_layout=False,
         subplot_kw={"projection": PLOTS_PROJECTION},
     )
-    fig.canvas.manager.set_window_title(wsName + "_fitglobal")
+    fig.canvas.manager.set_window_title(ws_group.name() + "_results")
 
-    # Data used in Global Fit
-    for i, (x, y, yerr, ax) in enumerate(zip(dataX, dataY, dataE, axs.flat)):
-        ax.errorbar(x, y, yerr, fmt="k.", label=f"Data Group {i}", elinewidth=1.5)
+    offset = 0
+    vertical_spacing = 0.02
+    for ws_name in individual_names:
+        if ws_name.endswith("Parameters") or ws_name.endswith("chi2"):
+            continue
 
-    # Global Fit
-    for x, costFun, ax in zip(dataX, totCost, axs.flat):
-        signature = describe(costFun)
+        fit_ws = mtd[ws_name]
 
-        values = mObj.values[signature]
-        errors = mObj.errors[signature]
+        if ws_name.endswith("sum"):
+            axs[1].errorbar(fit_ws, wkspIndex=0, fmt="k.", markersize=5)
+            axs[1].plot(fit_ws, "b.", wkspIndex=2, markersize=5)
+            axs[1].plot(fit_ws, "r-", wkspIndex=1, linewidth=2)
+            axs[1].set_title("Sum of groups and fits")
+            continue
 
-        yfit = costFun.model(x, *values)
+        y_data = fit_ws.extractY()[0, :]
+        y_range = y_data.max() - y_data.min()
 
-        # Build a decent legend
-        leg = []
-        for p, v, e in zip(signature, values, errors):
-            leg.append(f"${p} = {v:.3f} \\pm {e:.3f}$")
+        temp_ws = fit_ws.clone(StoreInADS=False)
+        temp_ws += offset
 
-        ax.plot(x, yfit, "r-", label="\n".join(leg))
-        ax.plot(x, y - yfit, "b.", label="Residuals")
-        ax.legend()
+        axs[0].errorbar(temp_ws, wkspIndex=0, fmt="k.", markersize=3, elinewidth=1)
+        axs[0].plot(temp_ws, "r-", wkspIndex=1, linewidth=2)
+
+        x_data = fit_ws.extractX()[0, :]
+        x_range = x_data.max() - x_data.min()
+        axs[0].text(x_data.max() + x_range * 0.01, offset + y_range / 3, "Group " + ws_name.split("_")[-1], fontsize=9)
+
+        offset += y_data.max() + vertical_spacing
+
     savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title()
     plt.savefig(savePath, bbox_inches="tight")
     fig.show()
     return
 
 
-def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name):
+def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name, fit_model, chi2):
     global_sum_name = ws_name + "_global_fit_sum"
     individual_names = []
 
+    # Create table with only chi2
+    chi2_table_name = ws_name + "_global_fit_" + fit_model + "_chi2"
+    chi2_table = CreateEmptyTableWorkspace(OutputWorkspace=chi2_table_name)
+    chi2_table.setTitle("Global Fit Chi2")
+    chi2_table.addColumn(type="float", name="Chi2")
+    chi2_table.addRow([chi2])
+
+    # Create table of parameters
+    pars_table_name = ws_name + "_global_fit_" + fit_model + "_Parameters"
+    pars_table = CreateEmptyTableWorkspace(OutputWorkspace=pars_table_name)
+    pars_table.setTitle("Global Fit Parameters")
+    pars_table.addColumn(type="int", name="Group")
+    signature = describe(total_cost_fun[0])
+    for parameter in signature:
+        parameter = parameter[:-1] if parameter.endswith("0") else parameter
+        pars_table.addColumn(type="str", name=parameter)
+
     for i, (x, y, yerr, cost_fun) in enumerate(zip(data_x, data_y, data_e, total_cost_fun)):
-        values = m.values[describe(cost_fun)]
+        signature = describe(cost_fun)
+        values = m.values[signature]
+
         yfit = cost_fun.model(x, *values)
         res = y - yfit
 
@@ -1695,9 +1729,7 @@ def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name
             DataY=np.concatenate([y, yfit, res]),
             DataE=np.concatenate([yerr, np.zeros_like(yerr), np.zeros_like(yerr)]),
             Nspec=3,
-            UnitX="TOF",  # I had hoped for a method like .XUnit() but alas
             OutputWorkspace=ws_name + f"_global_fit_{i}",
-            ParentWorkspace=ws_name,
             Distribution=True,
         )
         individual_names.append(ws_name + f"_global_fit_{i}")
@@ -1707,7 +1739,14 @@ def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name
         elif i > 1:
             Plus(global_sum_name, ws_name + f"_global_fit_{i}", OutputWorkspace=global_sum_name)
 
+        # Build strings for par values
+        errors = m.errors[signature]
+        pars_table.addRow([i] + [f" {v:.3f} +/- {e:.3f} " for v, e in zip(values, errors)])
+
     individual_names.append(global_sum_name)
+    individual_names.append(pars_table_name)
+    individual_names.append(chi2_table_name)
+
     return GroupWorkspaces(individual_names, OutputWorkspace=ws_name + "_global_fit_group")
 
 
