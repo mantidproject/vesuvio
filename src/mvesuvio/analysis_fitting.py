@@ -1292,7 +1292,7 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     fit_ws_group = save_result_of_global_fit(dataX, dataY, dataE, m, totCost, wsYSpace.name(), IC.fitting_model, chi2)
 
     if IC.show_plots:
-        plotGlobalFit(fit_ws_group, IC)
+        plot_global_fit(fit_ws_group, IC)
 
     # Pass into array to store values in variable
     return np.array(m.values), np.array(m.errors)
@@ -1648,7 +1648,7 @@ def create_table_for_global_fit_parameters(wsName, model, m, chi2):
     print_table_workspace(t)
 
 
-def plotGlobalFit(ws_group, yFitIC):
+def plot_global_fit(ws_group, yFitIC):
     individual_names = ws_group.getNames()
     fig, axs = plt.subplots(
         1,
@@ -1693,7 +1693,7 @@ def plotGlobalFit(ws_group, yFitIC):
     savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title()
     plt.savefig(savePath, bbox_inches="tight")
     fig.show()
-    return
+    return fig  # Return figure for testing purposes
 
 
 def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name, fit_model, chi2):
