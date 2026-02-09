@@ -1658,7 +1658,8 @@ def plot_global_fit(ws_group, yFitIC):
         constrained_layout=False,
         subplot_kw={"projection": PLOTS_PROJECTION},
     )
-    fig.canvas.manager.set_window_title(ws_group.name() + "_results")
+    fig_title = ws_group.name() + "_results"
+    fig.canvas.manager.set_window_title(fig_title)
 
     offset = 0
     vertical_spacing = 0.02
@@ -1690,7 +1691,7 @@ def plot_global_fit(ws_group, yFitIC):
 
         offset += y_data.max() + vertical_spacing
 
-    savePath = yFitIC.figSavePath / fig.canvas.manager.get_window_title()
+    savePath = yFitIC.figSavePath / fig_title
     plt.savefig(savePath, bbox_inches="tight")
     fig.show()
     return fig  # Return figure for testing purposes

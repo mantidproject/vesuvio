@@ -4,9 +4,10 @@ from mock import MagicMock
 from mvesuvio.analysis_fitting import plot_global_fit
 from mantid.simpleapi import CreateWorkspace, AnalysisDataService
 import matplotlib.pyplot as plt
-import tempfile
 from pathlib import Path
 import pytest
+import tempfile
+
 
 np.set_printoptions(suppress=True, precision=6, linewidth=200)
 
@@ -68,12 +69,12 @@ class TestAnalysisFitting(unittest.TestCase):
             self.assertEqual(len(fig.axes[0].lines), 2*N)
             self.assertEqual(len(fig.axes[1].lines), 3)
 
-            AnalysisDataService.clear()
-            plt.close(fig)
-            plt.close('all')
+            self.assertTrue((yfit_class.figSavePath / (mock_ws_group_name + "_results.png")).exists())
 
-            # Check that plot was saved
-            self.assertTrue((yfit_class.figSavePath / (mock_ws_group_name+"_results.png")).exists())
+        AnalysisDataService.clear()
+        plt.close(fig)
+        plt.close('all')
+
 
     @pytest.fixture(autouse=True)
     def cleanup_plots():
