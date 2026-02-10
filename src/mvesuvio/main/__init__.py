@@ -22,6 +22,10 @@ def main(manual_args=None):
         __run_bootstrap(args)
 
 
+def set_up_parser():
+    return __set_up_parser()
+
+
 def __setup_and_parse_args():
     parser = __set_up_parser()
     args = parser.parse_args()
@@ -32,9 +36,9 @@ def __set_up_parser():
     parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
     subparsers = parser.add_subparsers(dest="command", required=True)
     config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
-    config_parser.add_argument("--set-inputs", "-i", help="set the inputs python file", default="", type=str)
+    config_parser.add_argument("--analysis-inputs", "-i", help="set the inputs python file", default="", type=str)
     config_parser.add_argument(
-        "--set-ipfolder",
+        "--ip-folder",
         "-p",
         help="set the intrument parameters directory",
         default="",
@@ -56,8 +60,19 @@ def __set_up_parser():
         default="",
         type=str,
     )
-    run_parser.add_argument("--minimal-output", action="store_true", help="Flag to set output files to minimum.")
-    run_parser.add_argument("--outputs-dir", "-o", help="Directory for populating with output files.")
+    run_parser.add_argument(
+        "--minimal-output",
+        action="store_true",
+        help="Flag to set output files to minimum.",
+        default=False,
+    )
+    run_parser.add_argument(
+        "--outputs-dir",
+        "-o",
+        help="Directory for populating with output files.",
+        default="",
+        type=str,
+    )
     boot_parser = subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
     boot_parser.add_argument(
         "--inputs-dir",
@@ -67,6 +82,10 @@ def __set_up_parser():
         type=str,
     )
     return parser
+
+
+def setup_config(args):
+    return __setup_config(args)
 
 
 def __setup_config(args):

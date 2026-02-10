@@ -24,17 +24,17 @@ class ArgInputs:
 
 
 class ConfigArgInputs(ArgInputs):
-    def __init__(self, set_inputs, set_ipfolder):
+    def __init__(self, analysis_inputs, ip_folder):
         super().__init__("config")
-        self.__set_inputs = set_inputs
-        self.__set_ipfolder = set_ipfolder
+        self.__set_inputs = analysis_inputs
+        self.__set_ipfolder = ip_folder
 
     @property
-    def set_inputs(self):
+    def analysis_inputs(self):
         return self.__set_inputs
 
     @property
-    def set_ipfolder(self):
+    def ip_folder(self):
         return self.__set_ipfolder
 
 
@@ -63,8 +63,8 @@ class RunArgInputs(ArgInputs):
         return self.__outputs_dir
 
 
-def set_config(inputs_file="", ip_folder=""):
-    config_args = ConfigArgInputs(inputs_file, ip_folder)
+def set_config(analysis_inputs="", ip_folder=""):
+    config_args = ConfigArgInputs(analysis_inputs, ip_folder)
     main(config_args)
 
 
