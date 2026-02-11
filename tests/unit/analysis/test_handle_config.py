@@ -22,6 +22,7 @@ class TestHandleConfig(unittest.TestCase):
         file.seek(0)
         lines = getattr(handle_config, "__read_config")(file.name)
         self.assertEqual(lines, ['\n', "caching.inputs=/inputs.py\n", "caching.ipfolder=/ip_files\n"])
+        file.close()
 
 
     def test_read_config_throws(self):
@@ -47,7 +48,9 @@ class TestHandleConfig(unittest.TestCase):
 
             file = open(mock_file, "r")
             self.assertEqual(file.read(), "\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
-        file.close()
+
+            file.close()
+            mock_dir.cleanup()
 
 
     def test_read_config_vars(self):
@@ -63,6 +66,7 @@ class TestHandleConfig(unittest.TestCase):
         ):
             self.assertEqual(handle_config.read_config_var('caching.inputs'), '/inputs.py')
             self.assertEqual(handle_config.read_config_var('caching.ipfolder'), '/ipfiles')
+            mock_dir.cleanup()
 
 
     def test_read_config_vars_throws(self):
@@ -79,6 +83,7 @@ class TestHandleConfig(unittest.TestCase):
             self.assertRaises(ValueError)
         ):
             handle_config.read_config_var('non.existent')
+            mock_dir.cleanup()
 
 
     def test_get_script_name(self):
@@ -91,6 +96,7 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_setup_config_dir(self):
+        # Use string because want to test when directory does not exist
         tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
         # Clean up any mess from previous tests
         shutil.rmtree(tempdir, ignore_errors=True)
@@ -98,8 +104,8 @@ class TestHandleConfig(unittest.TestCase):
         with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
             handle_config.setup_config_dir()
 
-        script_figures = open(os.path.join(tempdir, "script_to_create_figures.py"))
-        script_figures.close()
+        self.assertTrue(Path(tempdir, "script_to_create_figures.py").exists())
+        self.assertTrue(Path(tempdir, "vesuvio.plots.mplstyle").exists())
         plots_file = open(os.path.join(tempdir, "vesuvio.plots.mplstyle"), "r")
         self.assertEqual(plots_file.readline().split(":")[0], "axes.titlesize ")
         plots_file.close()
@@ -117,6 +123,43 @@ class TestHandleConfig(unittest.TestCase):
             handle_config.setup_config_dir()
             mock_mkdirs.assert_not_called()
             mock_copyfile.assert_not_called()
+            tempdir.cleanup()
+
+
+    def test_setup_default_ipfile_dir(self):
+        tempdir = tempfile.TemporaryDirectory()
+
+        mock_path = os.path.join(tempdir.name, 'ip_folder')
+        with (
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
+            patch.object(handle_config, "IP_FOLDER", "ip_folder"),
+        ):
+            handle_config.setup_default_ipfile_dir()
+
+            # Check all par files inside config/ip_files were copied to destination
+            for ip_file in Path(handle_config.VESUVIO_PACKAGE_PATH, "config", "ip_files").iterdir():
+                if not ip_file.name.endswith("par"):
+                    continue
+
+                self.assertTrue(Path(mock_path, ip_file.name).exists())
+
+            tempdir.cleanup()
+
+
+    def test_setup_default_ipfile_dir_dir_already_exists(self):
+        tempdir = tempfile.TemporaryDirectory()
+        # Create ip folder
+        Path(tempdir.name, "ip_folder").mkdir()
+        self.assertTrue(Path(tempdir.name, "ip_folder").exists())
+
+        with (
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
+            patch.object(handle_config, "IP_FOLDER", "ip_folder"),
+            patch("mvesuvio.util.handle_config.copytree") as mock_mkdirs,
+        ):
+            handle_config.setup_default_ipfile_dir()
+            mock_mkdirs.assert_not_called()
+            tempdir.cleanup()
 
 
     def test_setup_default_inputs(self):
@@ -146,4 +189,3 @@ class TestHandleConfig(unittest.TestCase):
             self.assertEqual(original_content, file.read())
             file.close()
             tempdir.cleanup()
-
