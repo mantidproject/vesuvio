@@ -82,9 +82,8 @@ def _set_up_parser():
 
 def _setup_config(args):
     __set_logging_properties()
-    handle_config.setup_config_dir()
-    handle_config.setup_default_inputs()
-    handle_config.setup_default_ipfile_dir()
+
+    handle_config.refresh_config_dir_and_contents()
 
     if not handle_config.config_set():
         handle_config.set_default_config_vars()
