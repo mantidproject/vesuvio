@@ -85,8 +85,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_handle_config.read_config_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         mock_args = MagicMock()
-        mock_args.set_inputs = None
-        mock_args.set_ipfolder = None
+        mock_args.analysis_inputs = None
+        mock_args.ip_folder = None
 
         _setup_config(mock_args)
 
@@ -107,8 +107,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_path.return_value = mock_path_obj
 
         mock_args = MagicMock()
-        mock_args.set_inputs = "/custom/inputs.py"
-        mock_args.set_ipfolder = None
+        mock_args.analysis_inputs = "/custom/inputs.py"
+        mock_args.ip_folder = None
 
         _setup_config(mock_args)
 
@@ -133,8 +133,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_path.return_value = mock_path_obj
 
         mock_args = MagicMock()
-        mock_args.set_inputs = None
-        mock_args.set_ipfolder = "/custom/ip_folder"
+        mock_args.analysis_inputs = None
+        mock_args.ip_folder = "/custom/ip_folder"
 
         _setup_config(mock_args)
 
@@ -205,6 +205,76 @@ class TestMainFunction(unittest.TestCase):
         # Config setup should be called before run analysis
         mock_setup_config.assert_called_once_with(None)
         mock_run_analysis.assert_called_once()
+
+
+class TestRunAnalysis(unittest.TestCase):
+    """Test cases for _run_analysis function."""
+
+    @patch("mvesuvio.main.run_routine.Runner")
+    def test_run_analysis_with_no_args(self, mock_runner_class):
+        from mvesuvio.main import _run_analysis
+
+        mock_runner_instance = MagicMock()
+        mock_runner_class.return_value = mock_runner_instance
+
+        _run_analysis(None)
+
+        mock_runner_class.assert_called_once_with()
+        mock_runner_instance.run.assert_called_once()
+
+    @patch("mvesuvio.main.run_routine.Runner")
+    def test_run_analysis_with_all_args(self, mock_runner_class):
+        from mvesuvio.main import _run_analysis
+
+        mock_runner_instance = MagicMock()
+        mock_runner_class.return_value = mock_runner_instance
+
+        mock_args = MagicMock()
+        mock_args.back_workspace = "back_workspace_path"
+        mock_args.front_workspace = "front_workspace_path"
+        mock_args.minimal_output = True
+        mock_args.outputs_dir = "/output/dir"
+
+        _run_analysis(mock_args)
+
+        mock_runner_class.assert_called_once_with(
+            override_back_workspace="back_workspace_path",
+            override_front_workspace="front_workspace_path",
+            minimal_output=True,
+            output_directory="/output/dir",
+        )
+        mock_runner_instance.run.assert_called_once()
+
+
+class TestRunBootstrap(unittest.TestCase):
+    """Test cases for _run_bootstrap function."""
+
+    @patch("mvesuvio.main.run_routine.Runner")
+    def test_run_bootstrap_with_no_args(self, mock_runner_class):
+        from mvesuvio.main import _run_bootstrap
+
+        _run_bootstrap(None)
+
+        # Runner should not be instantiated, function should return early
+        mock_runner_class.assert_not_called()
+
+    @patch("mvesuvio.main.run_routine.Runner")
+    def test_run_bootstrap_with_inputs_dir(self, mock_runner_class):
+        from mvesuvio.main import _run_bootstrap
+
+        mock_runner_instance = MagicMock()
+        mock_runner_class.return_value = mock_runner_instance
+
+        mock_args = MagicMock()
+        mock_args.inputs_dir = "/path/to/inputs"
+
+        _run_bootstrap(mock_args)
+
+        mock_runner_class.assert_called_once_with(
+            bootstrap_inputs_directory="/path/to/inputs",
+            minimal_output=True,
+        )
+        mock_runner_instance.run_bootstrap.assert_called_once()
 
 
 if __name__ == "__main__":
