@@ -7,32 +7,28 @@ from mvesuvio.util import handle_config
 
 
 def main(manual_args=None):
-    args = __setup_and_parse_args() if not manual_args else manual_args
+    args = _setup_and_parse_args() if not manual_args else manual_args
     if args.command == "config":
-        __setup_config(args)
+        _setup_config(args)
 
     if args.command == "run":
         if not handle_config.config_set():
-            __setup_config(None)
-        __run_analysis(args)
+            _setup_config(None)
+        _run_analysis(args)
 
     if args.command == "bootstrap":
         if not handle_config.config_set():
-            __setup_config(None)
-        __run_bootstrap(args)
+            _setup_config(None)
+        _run_bootstrap(args)
 
 
-def set_up_parser():
-    return __set_up_parser()
-
-
-def __setup_and_parse_args():
-    parser = __set_up_parser()
+def _setup_and_parse_args():
+    parser = _set_up_parser()
     args = parser.parse_args()
     return args
 
 
-def __set_up_parser():
+def _set_up_parser():
     parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
     subparsers = parser.add_subparsers(dest="command", required=True)
     config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
@@ -84,11 +80,7 @@ def __set_up_parser():
     return parser
 
 
-def setup_config(args):
-    return __setup_config(args)
-
-
-def __setup_config(args):
+def _setup_config(args):
     __set_logging_properties()
     handle_config.setup_config_dir()
     handle_config.setup_default_inputs()
@@ -132,7 +124,7 @@ def __set_logging_properties():
     return
 
 
-def __run_analysis(args):
+def _run_analysis(args):
     from mvesuvio.main.run_routine import Runner
 
     if not args:
@@ -146,7 +138,7 @@ def __run_analysis(args):
     ).run()
 
 
-def __run_bootstrap(args):
+def _run_bootstrap(args):
     from mvesuvio.main.run_routine import Runner
 
     if not args:
