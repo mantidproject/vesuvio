@@ -59,7 +59,10 @@ include = [
 omit = [
     "*tests*",
     "*unpackaged*",
-    "*legacy*"
+    "*legacy*",
+    "*/src/mvesuvio/config/*",
+    "*/src/mvesuvio/globals.py*",
+    "*/src/mvesuvio/_version.py*"
 ]
 
 [tool.coverage.report]
