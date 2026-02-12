@@ -19,9 +19,9 @@ class TestReduction(unittest.TestCase):
         benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
         results_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs" / "output_files" / "reduction"
 
-        mvesuvio.set_config(
+        mvesuvio.config(
             ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-            inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
+            analysis_inputs=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
         )
 
         # Delete outputs from previous runs

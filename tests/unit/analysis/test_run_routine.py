@@ -13,9 +13,9 @@ class TestRunRoutine(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # TODO: Avoid doing this in the future, can probably replace it with mock
-        mvesuvio.set_config(
+        mvesuvio.config(
             ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-            inputs_file=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
+            analysis_inputs=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
         )
         pass
 

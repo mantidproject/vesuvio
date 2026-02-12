@@ -174,5 +174,5 @@ if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.executi
     import mvesuvio
     from pathlib import Path
 
-    mvesuvio.set_config(inputs_file=Path(__file__))
+    mvesuvio.config(analysis_inputs=str(Path(__file__)))
     mvesuvio.run()

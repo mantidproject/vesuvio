@@ -7,34 +7,32 @@ from mvesuvio.util import handle_config
 
 
 def main(manual_args=None):
-    args = __setup_and_parse_args() if not manual_args else manual_args
+    args = _setup_and_parse_args() if not manual_args else manual_args
     if args.command == "config":
-        __setup_config(args)
+        _setup_config(args)
 
     if args.command == "run":
-        if not handle_config.config_set():
-            __setup_config(None)
-        __run_analysis(args)
+        _setup_config(None)
+        _run_analysis(args)
 
     if args.command == "bootstrap":
-        if not handle_config.config_set():
-            __setup_config(None)
-        __run_bootstrap(args)
+        _setup_config(None)
+        _run_bootstrap(args)
 
 
-def __setup_and_parse_args():
-    parser = __set_up_parser()
+def _setup_and_parse_args():
+    parser = _set_up_parser()
     args = parser.parse_args()
     return args
 
 
-def __set_up_parser():
+def _set_up_parser():
     parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
     subparsers = parser.add_subparsers(dest="command", required=True)
     config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
-    config_parser.add_argument("--set-inputs", "-i", help="set the inputs python file", default="", type=str)
+    config_parser.add_argument("--analysis-inputs", "-i", help="set the inputs python file", default="", type=str)
     config_parser.add_argument(
-        "--set-ipfolder",
+        "--ip-folder",
         "-p",
         help="set the intrument parameters directory",
         default="",
@@ -56,8 +54,19 @@ def __set_up_parser():
         default="",
         type=str,
     )
-    run_parser.add_argument("--minimal-output", action="store_true", help="Flag to set output files to minimum.")
-    run_parser.add_argument("--outputs-dir", "-o", help="Directory for populating with output files.")
+    run_parser.add_argument(
+        "--minimal-output",
+        action="store_true",
+        help="Flag to set output files to minimum.",
+        default=False,
+    )
+    run_parser.add_argument(
+        "--outputs-dir",
+        "-o",
+        help="Directory for populating with output files.",
+        default="",
+        type=str,
+    )
     boot_parser = subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
     boot_parser.add_argument(
         "--inputs-dir",
@@ -69,22 +78,21 @@ def __set_up_parser():
     return parser
 
 
-def __setup_config(args):
+def _setup_config(args):
     __set_logging_properties()
-    handle_config.setup_config_dir()
-    handle_config.setup_default_inputs()
-    handle_config.setup_default_ipfile_dir()
 
-    if not handle_config.config_set():
+    handle_config.refresh_config_dir_and_contents()
+
+    if not handle_config.is_cache_set():
         handle_config.set_default_config_vars()
 
-    inputs = handle_config.read_config_var("caching.inputs")
-    ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
+    inputs = handle_config.read_cached_var("caching.inputs")
+    ipfolder_dir = handle_config.read_cached_var("caching.ipfolder")
 
-    if args and args.set_inputs:
-        inputs = str(Path(args.set_inputs).absolute())
-    if args and args.set_ipfolder:
-        ipfolder_dir = str(Path(args.set_ipfolder).absolute())
+    if args and args.analysis_inputs:
+        inputs = str(Path(args.analysis_inputs).absolute())
+    if args and args.ip_folder:
+        ipfolder_dir = str(Path(args.ip_folder).absolute())
 
     handle_config.set_config_vars(
         {
@@ -113,7 +121,7 @@ def __set_logging_properties():
     return
 
 
-def __run_analysis(args):
+def _run_analysis(args):
     from mvesuvio.main.run_routine import Runner
 
     if not args:
@@ -127,7 +135,7 @@ def __run_analysis(args):
     ).run()
 
 
-def __run_bootstrap(args):
+def _run_bootstrap(args):
     from mvesuvio.main.run_routine import Runner
 
     if not args:
