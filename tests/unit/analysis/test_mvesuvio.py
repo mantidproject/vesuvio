@@ -11,7 +11,7 @@ class TestPackageAPI(unittest.TestCase):
     @patch("mvesuvio.main")
     def test_set_config(self, mock_main):
 
-        mvesuvio.set_config(analysis_inputs="mock_file", ip_folder="mock_ipfolder")
+        mvesuvio.config(analysis_inputs="mock_file", ip_folder="mock_ipfolder")
 
         args, _kwargs = mock_main.call_args
         self.assertEqual(args[0].analysis_inputs, "mock_file")

@@ -19,7 +19,7 @@ class TestReduction(unittest.TestCase):
         benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "h_ratio" / "hydrogen_intensity_ratios_estimates"
         results_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs" / "output_files" / "hydrogen_intensity_ratios_estimates"
 
-        mvesuvio.set_config(
+        mvesuvio.config(
             ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
             analysis_inputs=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
         )

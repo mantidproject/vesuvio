@@ -53,7 +53,7 @@ Alternatively, you can open Mantid workbench, go the editor and run:
 
 ```
 import mvesuvio as mv
-mv.set_config()
+mv.config()
 ```
 
 Once you have located the `.mvesuvio` folder, open Mantid workbench and inside it open the script `analysis_inputs.py` located inside `.mvesuvio`.
@@ -108,7 +108,7 @@ In the workbench script editor you must first import mvesuvio:
 
 After this you can set the config if desired, as above in the command line example. All arguments are optional.
 
-- `mv.set_config(inputs_file='C:\Vesuvio\experiment\inputs.py', ip_folder='C:\IPFolder')`
+- `mv.config(analysis_inputs='C:\Vesuvio\experiment\inputs.py', ip_folder='C:\IPFolder')`
 
 Following the setting of the config, you can use workbench to open and edit the analysis input file created in the relevant experiment directory.
 Once the inputs have been ammended and the file saved, run the analysis:

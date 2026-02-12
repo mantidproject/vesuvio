@@ -63,7 +63,7 @@ class RunArgInputs(ArgInputs):
         return self.__outputs_dir
 
 
-def set_config(analysis_inputs="", ip_folder=""):
+def config(analysis_inputs="", ip_folder=""):
     config_args = ConfigArgInputs(analysis_inputs, ip_folder)
     main(config_args)
 
