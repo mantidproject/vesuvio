@@ -12,13 +12,11 @@ def main(manual_args=None):
         _setup_config(args)
 
     if args.command == "run":
-        if not handle_config.config_set():
-            _setup_config(None)
+        _setup_config(None)
         _run_analysis(args)
 
     if args.command == "bootstrap":
-        if not handle_config.config_set():
-            _setup_config(None)
+        _setup_config(None)
         _run_bootstrap(args)
 
 
@@ -85,11 +83,11 @@ def _setup_config(args):
 
     handle_config.refresh_config_dir_and_contents()
 
-    if not handle_config.config_set():
+    if not handle_config.is_cache_set():
         handle_config.set_default_config_vars()
 
-    inputs = handle_config.read_config_var("caching.inputs")
-    ipfolder_dir = handle_config.read_config_var("caching.ipfolder")
+    inputs = handle_config.read_cached_var("caching.inputs")
+    ipfolder_dir = handle_config.read_cached_var("caching.ipfolder")
 
     if args and args.analysis_inputs:
         inputs = str(Path(args.analysis_inputs).absolute())

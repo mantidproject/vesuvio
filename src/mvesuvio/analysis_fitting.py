@@ -1309,7 +1309,7 @@ def extractData(ws, wsRes, ic):
 
 
 def loadInstrParsFileIntoArray(ic):
-    ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+    ipFilesPath = Path(handle_config.read_cached_var("caching.ipfolder"))
     data = np.loadtxt(str(ipFilesPath / ic.instrument_parameters_file), dtype=str)[1:].astype(float)
     spectra = data[:, 0]
     firstSpec, lastSpec = [int(d) for d in ic.detectors.split("-")]

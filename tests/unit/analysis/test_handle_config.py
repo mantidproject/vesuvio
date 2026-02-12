@@ -90,8 +90,8 @@ class TestHandleConfig(unittest.TestCase):
             patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
             patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name)
         ):
-            self.assertEqual(handle_config.read_config_var('caching.inputs'), '/inputs.py')
-            self.assertEqual(handle_config.read_config_var('caching.ipfolder'), '/ipfiles')
+            self.assertEqual(handle_config.read_cached_var('caching.inputs'), '/inputs.py')
+            self.assertEqual(handle_config.read_cached_var('caching.ipfolder'), '/ipfiles')
             mock_dir.cleanup()
 
 
@@ -108,14 +108,14 @@ class TestHandleConfig(unittest.TestCase):
             patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name),
             self.assertRaises(ValueError)
         ):
-            handle_config.read_config_var('non.existent')
+            handle_config.read_cached_var('non.existent')
             mock_dir.cleanup()
 
 
     def test_get_script_name(self):
         with (
             patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename,
-            patch("mvesuvio.util.handle_config.read_config_var") as mock_read_config_var # noqa : F841
+            patch("mvesuvio.util.handle_config.read_cached_var") as mock_read_cached_var # noqa : F841
         ):
             mock_basename.return_value = "inputs.py"
             self.assertEqual(handle_config.get_script_name(), "inputs")

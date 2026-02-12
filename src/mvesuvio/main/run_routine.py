@@ -45,7 +45,7 @@ class Runner:
         running_tests=False,
     ) -> None:
         self.running_tests = running_tests
-        self.inputs_path = Path(handle_config.read_config_var("caching.inputs"))
+        self.inputs_path = Path(handle_config.read_cached_var("caching.inputs"))
         self.override_back_workspace = override_back_workspace
         self.override_front_workspace = override_front_workspace
         self.bootstrap_inputs_directory = bootstrap_inputs_directory
@@ -53,7 +53,7 @@ class Runner:
         self.mantid_log_file = "mantid.log"
 
         # I/O paths
-        inputs_script_path = Path(handle_config.read_config_var("caching.inputs"))
+        inputs_script_path = Path(handle_config.read_cached_var("caching.inputs"))
         script_name = handle_config.get_script_name()
         self.experiment_path = inputs_script_path.parent / script_name
         self.input_ws_path = self.experiment_path / "input_workspaces"
@@ -465,7 +465,7 @@ class Runner:
 
         profiles_table = create_profiles_table(input_ws.name() + "_initial_parameters", ai)
         print_table_workspace(profiles_table)
-        ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
+        ipFilesPath = Path(handle_config.read_cached_var("caching.ipfolder"))
         kwargs = {
             "InputWorkspace": input_ws.name(),
             "InputProfiles": profiles_table.name(),
@@ -506,7 +506,7 @@ class Runner:
         raw_path = self.input_ws_path / raw_name
         empty_path = self.input_ws_path / empty_name
 
-        ip_files_path = Path(handle_config.read_config_var("caching.ipfolder"))
+        ip_files_path = Path(handle_config.read_cached_var("caching.ipfolder"))
 
         if not ws_history_matches_inputs(ai.runs, ai.mode, ai.instrument_parameters_file, raw_path):
             save_ws_from_load_vesuvio(ai.runs, ai.mode, str(ip_files_path / ai.instrument_parameters_file), raw_path)

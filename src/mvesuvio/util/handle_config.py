@@ -57,7 +57,7 @@ def set_config_vars(var_dict):
         file.writelines(updated_lines)
 
 
-def read_config_var(var, throw_on_not_found=True):
+def read_cached_var(var, throw_on_not_found=True):
     file_path = Path(VESUVIO_PACKAGE_PATH, "config", VESUVIO_PROPERTIES_FILE)
     lines = __read_config(file_path, throw_on_not_found)
 
@@ -72,7 +72,7 @@ def read_config_var(var, throw_on_not_found=True):
 
 
 def get_script_name():
-    filename = os.path.basename(read_config_var("caching.inputs"))
+    filename = os.path.basename(read_cached_var("caching.inputs"))
     scriptName = filename.removesuffix(".py")
     return scriptName
 
@@ -126,8 +126,8 @@ def setup_default_ipfile_dir():
         )
 
 
-def config_set():
-    if read_config_var("caching.inputs", False):
+def is_cache_set():
+    if read_cached_var("caching.inputs", False):
         return True
     else:
         return False

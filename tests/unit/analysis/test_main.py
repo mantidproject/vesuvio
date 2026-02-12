@@ -81,8 +81,8 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
     def test_setup_config_with_args_but_no_custom_paths(self, mock_config_service, mock_handle_config):
-        mock_handle_config.config_set.return_value = True
-        mock_handle_config.read_config_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         mock_args = MagicMock()
         mock_args.analysis_inputs = None
@@ -99,8 +99,8 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
     def test_setup_config_with_custom_inputs_path(self, mock_config_service, mock_handle_config, mock_path):
-        mock_handle_config.config_set.return_value = True
-        mock_handle_config.read_config_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         mock_path_obj = MagicMock()
         mock_path_obj.absolute.return_value = "/absolute/custom/inputs.py"
@@ -125,8 +125,8 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mantid.kernel.ConfigService")
 
     def test_setup_config_with_custom_ip_folder(self, mock_config_service, mock_handle_config, mock_path):
-        mock_handle_config.config_set.return_value = True
-        mock_handle_config.read_config_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         mock_path_obj = MagicMock()
         mock_path_obj.absolute.return_value = "/absolute/custom/ip_folder"
@@ -149,8 +149,8 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
     def test_setup_config_calls_mantid_logging_setup(self, mock_config_service, mock_handle_config):
-        mock_handle_config.config_set.return_value = True
-        mock_handle_config.read_config_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         _setup_config(None)
 
@@ -183,7 +183,7 @@ class TestMainFunction(unittest.TestCase):
 
         mock_args = MagicMock()
         mock_args.command = "run"
-        mock_config.config_set.return_value = True
+        mock_config.is_cache_set.return_value = True
 
         main(manual_args=mock_args)
 
@@ -198,7 +198,7 @@ class TestMainFunction(unittest.TestCase):
 
         mock_args = MagicMock()
         mock_args.command = "run"
-        mock_config.config_set.return_value = False  # Config is not set
+        mock_config.is_cache_set.return_value = False  # Config is not set
 
         main(manual_args=mock_args)
 
