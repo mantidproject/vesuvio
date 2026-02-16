@@ -1,4 +1,4 @@
-  {% set version_tag = environ.get('GIT_DESCRIBE_TAG', '0.0.0') %}
+  {% set version_tag = environ.get('GIT_DESCRIBE_TAG', '0.0') %}
   {% set version_number = environ.get('GIT_DESCRIBE_NUMBER', '0') | string %}
   {% set version_number = '.dev' + version_number if version_number != '0' else '' %}
 
@@ -13,7 +13,7 @@ source:
 
 build:
   noarch: python
-  script: python -m pip install --ignore-installed .
+  script: versioningit && python -m pip install --ignore-installed .
   entry_points:
     - mvesuvio = mvesuvio.main:main
 
@@ -21,6 +21,7 @@ requirements:
   build:
     - python {{ python }}
     - setuptools
+    - versioningit
 
   run:
     - python {{ python }}
@@ -38,12 +39,15 @@ test:
     - mock 
   source_files:
     - tests/unit/
-    - tests/data/analysis/inputs/system_test_inputs.py   # Not a test, used by log file unit test
-    - tests/data/analysis/unit/                          # Data used by several unit tests
+    - tests/data/analysis/inputs/system_test_inputs.py      # Not a test, used by log file unit test
+    - tests/data/analysis/unit/                             # Data used by several unit tests
+    - src/mvesuvio/config/analysis_inputs.py                # Used to run basic mvesuvio run
+    - src/mvesuvio/config/analysis_inputs/input_workspaces  # Inputs needed to run mvesuvio
     - tools/
   commands:
     - pytest
-    - mvesuvio config    
+    - mvesuvio version
+    - python src/mvesuvio/config/analysis_inputs.py
 
 about:
   home: https://github.com/mantidproject/vesuvio
