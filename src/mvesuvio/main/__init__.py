@@ -8,6 +8,9 @@ from mvesuvio.util import handle_config
 
 def main(manual_args=None):
     args = _setup_and_parse_args() if not manual_args else manual_args
+    if args.command == "version":
+        _print_version()
+
     if args.command == "config":
         _setup_config(args)
 
@@ -29,6 +32,7 @@ def _setup_and_parse_args():
 def _set_up_parser():
     parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser("version", help="display the version of mvesuvio")
     config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
     config_parser.add_argument("--analysis-inputs", "-i", help="set the inputs python file", default="", type=str)
     config_parser.add_argument(
@@ -141,6 +145,12 @@ def _run_bootstrap(args):
     if not args:
         return
     Runner(bootstrap_inputs_directory=args.inputs_dir, minimal_output=True).run_bootstrap()
+
+
+def _print_version():
+    from mvesuvio import version
+
+    print(version())
 
 
 if __name__ == "__main__":
