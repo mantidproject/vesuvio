@@ -1,6 +1,7 @@
 name: Run tests nightly
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 2 * * *'
 
@@ -32,7 +33,7 @@ jobs:
         run: pip install -e .
 
       # Runs Unit tests
-      - name: Run mvesuvio analysis unit tests
+      - name: Run mvesuvio unit tests
         run: |
           coverage run -m unittest discover -s ./tests/unit
           coverage report
@@ -45,6 +46,6 @@ jobs:
           coveralls --service=github-actions
 
       # Runs System tests
-      - name: Run mvesuvio analysis system tests
+      - name: Run mvesuvio system tests
         run: |
           python -m unittest discover -s ./tests/system

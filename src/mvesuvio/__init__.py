@@ -71,3 +71,8 @@ def config(analysis_inputs="", ip_folder=""):
 def run(back_workspace="", front_workspace="", minimal_output=False, outputs_dir=""):
     run_args = RunArgInputs(back_workspace, front_workspace, minimal_output, outputs_dir)
     main(run_args)
+
+
+def version():
+    """Returns the version of the mvesuvio package."""
+    return __version__

@@ -5,3 +5,4 @@ __pycache__/
 **/output_files/
 **.log
 figures/
+*.egg-info

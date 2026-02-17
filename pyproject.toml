@@ -47,7 +47,7 @@ pythonpath = [
     ".",
     "./src"
 ]
-testpaths = ["tests"]
+testpaths = ["./tests"]
 filterwarnings = ["error"]
 
 [tool.coverage.run]

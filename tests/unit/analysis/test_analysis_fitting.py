@@ -5,7 +5,6 @@ from mvesuvio.analysis_fitting import plot_global_fit
 from mantid.simpleapi import CreateWorkspace, AnalysisDataService
 import matplotlib.pyplot as plt
 from pathlib import Path
-import pytest
 import tempfile
 
 
@@ -74,12 +73,6 @@ class TestAnalysisFitting(unittest.TestCase):
         AnalysisDataService.clear()
         plt.close(fig)
         plt.close('all')
-
-
-    @pytest.fixture(autouse=True)
-    def cleanup_plots():
-        yield
-        plt.close('all')  # Close all figures after each test
 
 if __name__ == "__main__":
     unittest.main()
