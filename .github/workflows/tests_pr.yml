@@ -1,4 +1,4 @@
-name: mvesuvio pull request workflow
+name: Run tests on PR
 
 on:
   push:
