@@ -14,15 +14,18 @@ class TestHandleConfig(unittest.TestCase):
 
 
     def test_read_config(self):
-        file = tempfile.NamedTemporaryFile()
+        file = tempfile.NamedTemporaryFile(delete=False)
         file.write(dedent("""
             caching.inputs=/inputs.py
             caching.ipfolder=/ip_files
             """).encode())
         file.seek(0)
+        file.flush()
+        file.close()
         lines = getattr(handle_config, "__read_config")(file.name)
         self.assertEqual(lines, ['\n', "caching.inputs=/inputs.py\n", "caching.ipfolder=/ip_files\n"])
         file.close()
+        os.unlink(file.name)
 
 
     def test_read_config_throws(self):
@@ -64,7 +67,7 @@ class TestHandleConfig(unittest.TestCase):
             patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
             patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
             patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name),
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", "/path/to/.mvesuvio"),
+            patch.object(handle_config, "VESUVIO_CONFIG_PATH", str(Path("path", "to", ".mvesuvio"))),
             patch.object(handle_config, "ANALYSIS_INPUTS_FILE", "analysis_inputs.py"),
             patch.object(handle_config, "IP_FOLDER", "ip_files"),
 
@@ -73,7 +76,7 @@ class TestHandleConfig(unittest.TestCase):
             handle_config.set_default_config_vars()
 
             file = open(mock_file, "r")
-            self.assertEqual(file.read(), "\ncaching.inputs=/path/to/.mvesuvio/analysis_inputs.py\ncaching.ipfolder=/path/to/.mvesuvio/ip_files\n")
+            self.assertEqual(file.read(), f"\ncaching.inputs={str(Path('path', 'to', '.mvesuvio', 'analysis_inputs.py'))}\ncaching.ipfolder={str(Path('path', 'to', '.mvesuvio', 'ip_files'))}\n")
 
             file.close()
             mock_dir.cleanup()

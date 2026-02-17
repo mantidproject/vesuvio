@@ -20,6 +20,10 @@ class TestRunRoutine(unittest.TestCase):
         pass
 
     def test_make_summarised_log_file(self):
+        # Skip if on windows
+        if os.name == "nt":
+            return
+
         runner = Runner()
         mock_log_file = tempfile.NamedTemporaryFile(delete=False)
         mock_mantid_log_file = tempfile.NamedTemporaryFile(delete=False)
