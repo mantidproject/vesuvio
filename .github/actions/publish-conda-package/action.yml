@@ -21,7 +21,9 @@ runs:
   - name: Make build-env
     shell: bash -l {0}
     run: |
+      conda clean --all --yes --quiet
       conda config --set always_yes yes --set changeps1 no
+      conda config --set channel_priority strict
       conda create -n build-env
       conda activate build-env
       mamba install -c conda-forge mamba conda-build anaconda-client conda-verify boa
@@ -32,6 +34,19 @@ runs:
     shell: bash -l {0}
     run: |
       conda activate build-env
+      conda clean --tempfiles --yes --quiet
       conda config --set anaconda_upload yes
-      conda mambabuild --user ${{ inputs.repository }} --token ${{ inputs.token }} --label ${{ inputs.label }} $GITHUB_WORKSPACE/conda |& tee upload.log
-      grep "Upload complete" upload.log
+      for attempt in {1..3}; do
+        echo "Build attempt $attempt of 3..."
+        if conda mambabuild --user ${{ inputs.repository }} --token ${{ inputs.token }} --label ${{ inputs.label }} $GITHUB_WORKSPACE/conda |& tee upload.log; then
+          grep "Upload complete" upload.log
+          exit 0
+        fi
+        if [ $attempt -lt 3 ]; then
+          echo "Build failed, cleaning cache and retrying..."
+          conda clean --all --yes --quiet
+          sleep 10
+        fi
+      done
+      echo "Build failed after 3 attempts"
+      exit 1
