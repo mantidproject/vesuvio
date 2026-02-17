@@ -1,0 +1,16 @@
+name: Run tests nightly (Linux)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest 
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - uses: ./.github/actions/run-all-tests

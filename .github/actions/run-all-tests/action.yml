@@ -1,0 +1,48 @@
+name: 'Run mvesuvio tests'
+description: 'Runs unit and system tests for mvesuvio with coverage reporting'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout mvesuvio
+      uses: actions/checkout@v3
+
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: vesuvio-dev 
+        environment-file: vesuvio-dev.yml
+        auto-activate-base: false
+
+    - name: Install Mantid
+      run: |
+        mamba install -c mantid/label/nightly mantidworkbench
+      shell: bash
+
+    - name: Install mvesuvio package
+      # The editable flag is necessary for coverage to find the src/ files
+      run: pip install -e .
+      shell: bash
+
+    - name: Run default analysis inputs 
+      run: python src/mvesuvio/config/analysis_inputs.py
+      shell: bash
+
+    - name: Run mvesuvio unit tests
+      run: |
+        coverage run -m unittest discover -s ./tests/unit
+        coverage report
+      shell: bash
+
+    - name: Send coverage report to Coveralls
+      env:
+        COVERALLS_REPO_TOKEN : ${{ secrets.COVERALLS_REPO_TOKEN }}
+      run: |
+        coveralls --service=github-actions
+      shell: bash
+
+    - name: Run mvesuvio system tests
+      run: |
+        python -m unittest discover -s ./tests/system
+      shell: bash
