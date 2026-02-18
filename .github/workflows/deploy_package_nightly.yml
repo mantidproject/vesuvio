@@ -19,7 +19,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          ref: main
 
       - name: Check for changes since last build
         run: |
@@ -30,8 +29,6 @@ jobs:
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
-          activate-environment: vesuvio-dev 
-          environment-file: vesuvio-dev.yml
           auto-activate-base: false
 
       - name: Build mvesuvio nightly conda package

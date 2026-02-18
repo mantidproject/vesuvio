@@ -23,12 +23,14 @@ runs:
     run: |
       conda clean --all --yes --quiet
       conda config --set always_yes yes --set changeps1 no
-      conda config --set channel_priority strict
       conda create -n build-env
       conda activate build-env
       mamba install -c conda-forge mamba conda-build anaconda-client conda-verify boa
+      conda config --set solver libmamba
+      conda config --add channels conda-forge
       conda config --add channels mantid
       conda config --add channels mantid/label/nightly
+      mamba install -c conda-forge 'poco >=1.14.2,<1.14.3'
 
   - name: Build package
     shell: bash -l {0}
@@ -45,6 +47,7 @@ runs:
         if [ $attempt -lt 3 ]; then
           echo "Build failed, cleaning cache and retrying..."
           conda clean --all --yes --quiet
+          conda clean --tempfiles --yes --quiet
           sleep 10
         fi
       done
