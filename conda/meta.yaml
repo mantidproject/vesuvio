@@ -22,7 +22,6 @@ requirements:
     - python {{ python }}
     - setuptools
     - versioningit
-    - poco >=1.14.2,<1.14.3
 
   run:
     - python {{ python }}

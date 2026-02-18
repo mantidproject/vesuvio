@@ -30,7 +30,7 @@ runs:
       conda config --add channels conda-forge
       conda config --add channels mantid
       conda config --add channels mantid/label/nightly
-      mamba install -c conda-forge 'poco >=1.14.2,<1.14.3'
+      mamba install -c conda-forge 'poco >=1.14.2,<1.14.3'   # Needed for fix, attempt to remove at a later date
 
   - name: Build package
     shell: bash -l {0}
@@ -38,18 +38,4 @@ runs:
       conda activate build-env
       conda clean --tempfiles --yes --quiet
       conda config --set anaconda_upload yes
-      for attempt in {1..3}; do
-        echo "Build attempt $attempt of 3..."
-        if conda mambabuild --user ${{ inputs.repository }} --token ${{ inputs.token }} --label ${{ inputs.label }} $GITHUB_WORKSPACE/conda |& tee upload.log; then
-          grep "Upload complete" upload.log
-          exit 0
-        fi
-        if [ $attempt -lt 3 ]; then
-          echo "Build failed, cleaning cache and retrying..."
-          conda clean --all --yes --quiet
-          conda clean --tempfiles --yes --quiet
-          sleep 10
-        fi
-      done
-      echo "Build failed after 3 attempts"
-      exit 1
+      conda mambabuild --user ${{ inputs.repository }} --token ${{ inputs.token }} --label ${{ inputs.label }} $GITHUB_WORKSPACE/conda
