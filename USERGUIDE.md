@@ -42,6 +42,8 @@ class SampleParameters:
         </cuboid>'''
 ```
 
+The reason for exposing the sample parameters is that in the future we want to make the code flexible to other shapes. For more information on how to define shapes other than a slab, consult the Mantid documentation on [How To Define Geometric Shape](https://docs.mantidproject.org/nightly/concepts/HowToDefineGeometricShape.html)
+
 ## BackwardAnalysisInputs
 
 Here we provide a step-by-step guide on how to fill in the Backward analysis input parameters. The class is divided in several sections:
