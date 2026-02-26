@@ -2,6 +2,9 @@
 
 [![Nightly Build Status](https://github.com/mantidproject/vesuvio/actions/workflows/deploy_package_nightly.yml/badge.svg)](https://github.com/mantidproject/vesuvio/actions/workflows/deploy_package_nightly.yml)
 [![Coverage Status](https://coveralls.io/repos/github/mantidproject/vesuvio/badge.svg?branch=main)](https://coveralls.io/github/mantidproject/vesuvio?branch=main)
+[![Anaconda-Server Badge](https://anaconda.org/mantid/mvesuvio/badges/latest_release_relative_date.svg)](https://anaconda.org/mantid/mvesuvio)
+[![Anaconda-Server Badge](https://anaconda.org/mantid/mvesuvio/badges/version.svg)](https://anaconda.org/mantid/mvesuvio)
+[![Anaconda-Server Badge](https://anaconda.org/mantid/mvesuvio/badges/downloads.svg)](https://anaconda.org/mantid/mvesuvio)
 
 This repository contains:
 - `mvesuvio` package containing Neutron Compron Profile (NCP) analysis procedures for Vesuvio, published nightly.
@@ -16,7 +19,7 @@ Once you have a working version of Mantid, go to the `IPython` tab on the bottom
 
 **If you're on Linux:**
 
-`mamba install mvesuvio`
+`mamba install mantid/label/nightly::mvesuvio`
 
 **If you're on Windows:**
 
@@ -38,17 +41,21 @@ To install `mamba`, follow the steps at:
 https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html
 
 To check you have mamba installed, run:
+
 `mamba --version`
 
 You should see some output with the versions available in your system.
 
 Now create a new conda environment, for example I'll call it `mantid-mvesuvio`:
-`mamba create -n mantid-mvesuvio mantidworkbench mvesuvio`
+
+`mamba create -n mantid-mvesuvio mantidworkbench mantid/label/nightly::mvesuvio`
 
 And activate the environment you created:
+
 `mamba activate mantid-mvesuvio`
 
 You can now start Mantid with mvesuvio already installed by typing:
+
 `workbench`
 
 ## Updating versions
@@ -57,9 +64,11 @@ The easiest way to update the mvesuvio package is to uninstall the current packa
 You'll need to use `pip`, `conda` or `mamba` depending on which one you used to install the package.
 
 So for example if you did `mamba install mvesuvio` then the uninstall command is:
+
 `mamba uninstall mvesuvio`
 
 Otherwise if you used pip:
+
 `pip uninstall mvesuvio`
 
 If you do not remember which command you used during the installation, then just run both `pip` and `mamba` uninstall commands, one of them will fail but the other one will succeed.
@@ -91,18 +100,22 @@ For providing the instrument parameters files, place them inside `.mvesuvio/ip_f
 ## Tips and useful commands
 
 A very useful command is:
+
 `mvesuvio version`
 
 Which returns the version of mvesuvio that you have currently installed.
 If you're running a Python script or have access to a Python interpreter (like the IPython tab in Mantid), you can do:
+
 ```
 import mvesuvio
 mvesuvio.version()
 ```
 In a Python interpreter like the IPython tab in Mantid, you can also run terminal commands by starting the command with `!`:
+
 `!mvesuvio version`
 
 Or to see the current configuration:
+
 `!mvesuvio config`
 
 
@@ -139,6 +152,7 @@ Usage example:
 
 The commands available in the CLI can be triggered from Python by calling the method with the same name.
 So for example to set the configuration from a Python script (or from IPython tab):
+
 ```
 import mvesuvio
 mv.config(analysis_inputs='C:\Vesuvio\experiment\inputs.py', ip_folder='C:\IPFolder')
