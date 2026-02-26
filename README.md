@@ -16,7 +16,7 @@ Once you have a working version of Mantid, go to the `IPython` tab on the bottom
 
 **If you're on Linux:**
 
-`conda install mvesuvio`
+`mamba install mvesuvio`
 
 **If you're on Windows:**
 
@@ -56,13 +56,13 @@ You can now start Mantid with mvesuvio already installed by typing:
 The easiest way to update the mvesuvio package is to uninstall the current package in your environment and install it again.
 You'll need to use `pip`, `conda` or `mamba` depending on which one you used to install the package.
 
-So for example if you did `conda install mvesuvio` then the uninstall command is:
-`conda uninstall mvesuvio`
+So for example if you did `mamba install mvesuvio` then the uninstall command is:
+`mamba uninstall mvesuvio`
 
 Otherwise if you used pip:
 `pip uninstall mvesuvio`
 
-If you do not remember which command you used during the installation, then just run both `pip` and `conda` uninstall commands, one of them will fail but the other one will succeed.
+If you do not remember which command you used during the installation, then just run both `pip` and `mamba` uninstall commands, one of them will fail but the other one will succeed.
 
 ### Quickstart (Running your first analysis)
 
