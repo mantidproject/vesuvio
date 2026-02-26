@@ -168,7 +168,7 @@ $$\frac{I_H}{I_M} = \frac{n_H \cdot \sigma_H}{n_M \cdot \sigma_M}$$
 
 If the sample does not contain Hydrogen, these two lines will be ignored.
 
-> **WARNING**: For the **transmission\_guess** in the backward scattering, the value must account for twice the absorption. This means $\text{transmission\_guess} = 1 - 2(1 - T)$, where $T$ is the experimental transmission value obtained from `VesuvioTransmission`.
+> **WARNING**: For the **transmission\_guess** in the backward scattering, the value must account for twice the absorption. This means transmission\_guess $= 1 - 2(1 - T)$, where $T$ is the experimental transmission value obtained from `VesuvioTransmission`.
 
 The multiple scattering **order** and **number\_of\_events** can be tuned, even though the ones shown in the example above are suitable/enough for most cases.
 
