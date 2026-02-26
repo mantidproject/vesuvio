@@ -32,29 +32,29 @@ def _setup_and_parse_args():
 def _set_up_parser():
     parser = argparse.ArgumentParser(description="Package to analyse Vesuvio instrument data")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("version", help="display the version of mvesuvio")
-    config_parser = subparsers.add_parser("config", help="set mvesuvio configuration")
-    config_parser.add_argument("--analysis-inputs", "-i", help="set the inputs python file", default="", type=str)
+    subparsers.add_parser("version", help="Display the version of mvesuvio")
+    config_parser = subparsers.add_parser("config", help="Set mvesuvio configuration")
+    config_parser.add_argument("--analysis-inputs", "-i", help="Set the inputs python file", default="", type=str)
     config_parser.add_argument(
         "--ip-folder",
         "-p",
-        help="set the intrument parameters directory",
+        help="Set the intrument parameters directory",
         default="",
         type=str,
     )
 
-    run_parser = subparsers.add_parser("run", help="run mvesuvio analysis")
+    run_parser = subparsers.add_parser("run", help="Run mvesuvio analysis")
     run_parser.add_argument(
         "--back-workspace",
         "-b",
-        help="input workspace for vesuvio backward analysis, bypasses loading (and subtracting) raw and empty.",
+        help="Input workspace for vesuvio backward analysis, bypasses loading (and subtracting) raw and empty.",
         default="",
         type=str,
     )
     run_parser.add_argument(
         "--front-workspace",
         "-f",
-        help="input workspace for vesuvio forward analysis, bypasses loading (and subtracting) raw and empty.",
+        help="Input workspace for vesuvio forward analysis, bypasses loading (and subtracting) raw and empty.",
         default="",
         type=str,
     )
