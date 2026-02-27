@@ -78,9 +78,9 @@ default-tag = "0.0"
 method = "minor"
 
 [tool.versioningit.format]
-distance = "{version}.dev{distance}"
+distance = "{version}.{distance}"
 dirty = "{version}"
-distance-dirty = "{version}.dev{distance}"
+distance-dirty = "{version}.{distance}"
 
 [tool.versioningit.write]
 file = "src/mvesuvio/_version.py"
