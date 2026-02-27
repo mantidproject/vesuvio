@@ -25,11 +25,11 @@ Once you have a working version of Mantid, go to the `IPython` tab on the bottom
 
 `pip install mvesuvio`
 
-To check if the package was successfully installed, type:
+To check if the package was successfully installed and to do all the necessary setup, type:
 
-`!mvesuvio version`
+`!mvesuvio config`
 
-If you see output for the version then the package is successfully installed!
+If you see some output then the package is successfully installed and setup!
 
 **WARNING: This way of installing the package is not officially supported by Mantid, it just so happens to work. If this stops working or you encounter issues please contact me, as I would like to know. You can still install mvesuvio by following the instructions in the next section.**
 
@@ -60,6 +60,10 @@ You can now start Mantid with mvesuvio already installed by typing:
 
 ## Updating versions
 
+If you want to check the current version of the package, go to the IPython editor in Mantid and type:
+
+`!mvesuvio version`
+
 The easiest way to update the mvesuvio package is to uninstall the current package in your environment and install it again.
 You'll need to use `pip`, `conda` or `mamba` depending on which one you used to install the package.
 
@@ -72,6 +76,13 @@ Otherwise if you used pip:
 `pip uninstall mvesuvio`
 
 If you do not remember which command you used during the installation, then just run both `pip` and `mamba` uninstall commands, one of them will fail but the other one will succeed.
+
+Once you have uninstalled the package, you can install it again to get the latest version.
+If you're looking for a specific version, you can do:
+
+`mamba install mvesuvio=1.0`
+
+Which will install version 1.0 of the package.
 
 ### Quickstart (Running your first analysis)
 
