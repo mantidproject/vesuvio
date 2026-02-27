@@ -1,4 +1,4 @@
-The following user guide is adapted from the Vesuvio Compton Scattering Analysis Script, written by Damien CÉVAËR in April 2025.
+The following user guide is adapted from the Vesuvio Compton Scattering Analysis Script, written by Damien Cévaër in April 2025.
 Please refer to it for details on the data treatment and routines to do before the Vesuvio analysis using the `mvesuvio` package.
 Here I present the transcription of the section relevant to the `mvesuvio` package.
 
