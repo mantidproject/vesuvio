@@ -108,6 +108,8 @@ If the run was successfull, you will notice that a new folder was created inside
 For providing the instrument parameters files, place them inside `.mvesuvio/ip_files/`.**
 (You can change the directory of the instrument files too, consult next section).
 
+For a more detailed explanation on what the inputs in the `analysis_inputs.py` mean, read [USERGUIDE.md](./USERGUIDE.md)
+
 ## Tips and useful commands
 
 A very useful command is:
