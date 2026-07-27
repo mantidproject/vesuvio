@@ -1,0 +1,55 @@
+[workspace]
+name = "vesuvio"
+channels = ["conda-forge", "mantid"]
+platforms = ["linux-64", "osx-64", "win-64"]
+description = "Analyse Vesuvio instrument data"
+
+[dependencies]
+# Core dependencies from pyproject.toml
+python = ">=3.10"
+iminuit = "*"
+jacobi = "*"
+dill = "*"
+
+# Build dependencies
+pip = ">=24.0"
+setuptools = ">=71.0.0"
+wheel = "*"
+versioningit = "*"
+
+# Conda package build tools
+mamba = "*"
+conda-build = "*"
+boa = "*"
+anaconda-client = "*"
+conda-verify = "*"
+
+# Development and testing tools from vesuvio-dev.yml
+mantidworkbench = "*"
+ruff = "*"
+pre-commit = "*"
+pytest = "*"
+coverage = "*"
+mock = "*"
+coveralls = "*"
+
+# PyPI publishing tools
+python-build = "*"
+twine = "*"
+
+[tasks]
+# Run tests
+test = "pytest"
+
+# Format and lint with ruff
+lint = "ruff check src tests"
+format = "ruff format src tests"
+
+# Install the package in development mode
+dev = "pip install -e ."
+
+# Build conda package
+build-conda = "cd conda && conda mambabuild --croot /tmp/conda-bld ."
+
+# Build PyPI package
+build-pypi = "python -m build"
