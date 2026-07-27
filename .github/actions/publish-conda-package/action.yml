@@ -26,6 +26,9 @@ runs:
       ANACONDA_LABEL: ${{ inputs.label }}
     run: |
       pixi run bash -c \
-        "conda config --set anaconda_upload yes && \
+        "conda config --add channels conda-forge && \
+         conda config --add channels mantid && \
+         conda config --add channels mantid/label/nightly && \
+         conda config --set anaconda_upload yes && \
          cd $GITHUB_WORKSPACE/conda && \
          conda mambabuild --croot /tmp/conda-bld --user \$ANACONDA_REPO --token \$ANACONDA_TOKEN --label \$ANACONDA_LABEL ."

@@ -24,12 +24,9 @@ jobs:
         run: |
           echo "recentCommits=$(test -z $(git log --since="yesterday" -1 --format=%h) && echo false || echo true)" >> $GITHUB_ENV
 
-      - name: Setup Miniconda
+      - name: Setup pixi
         if: ${{ env.recentCommits == 'true'}}
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          auto-activate-base: false
+        uses: prefix-dev/setup-pixi@v0.8.0
 
       - name: Build mvesuvio nightly conda package
         if: ${{ env.recentCommits == 'true'}}

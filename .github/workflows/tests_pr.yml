@@ -7,33 +7,21 @@ on:
 jobs:
   test:
     runs-on: ubuntu-22.04
-    defaults:
-      run:
-        shell: bash -l {0}
 
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
-      # Set up conda environnment
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      # Set up pixi environment
+      - name: Setup Pixi
+        uses: prefix-dev/setup-pixi@v0
         with:
-          miniforge-version: latest
-          activate-environment: vesuvio-dev 
-          environment-file: vesuvio-dev.yml
-          auto-activate-base: false
-
-      - name: Install Mantid
-        run: |
-          mamba install -c mantid/label/nightly mantidworkbench
-
-      - name: Install Git 
-        run: mamba install -y git
+          pixi-version: latest
+          environments: default
 
       - name: Install mvesuvio package
-        run: pip install .
+        run: pixi run dev
 
       - name: Check for analysis files changed 
         run: |
@@ -55,19 +43,19 @@ jobs:
       - name: Run mvesuvio Analysis Unit Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/unit/analysis
+          pixi run python -m unittest discover -s ./tests/unit/analysis
 
       - name: Run mvesuvio Analysis System Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/system/analysis
+          pixi run python -m unittest discover -s ./tests/system/analysis
 
       - name: Run mvesuvio Calibration Unit Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/unit/calibration
+          pixi run python -m unittest discover -s ./tests/unit/calibration
 
       - name: Run Vesuvio Calibration System Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          python -m unittest discover -s ./tests/system/calibration
+          pixi run python -m unittest discover -s ./tests/system/calibration
