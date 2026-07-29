@@ -11,10 +11,10 @@ runs:
 
   steps:
   - name: Build package
-    shell: bash -l {0}
+    shell: bash
     run: pixi run build-pypi
   - name: Upload to PyPI
-    shell: bash -l {0}
+    shell: bash
     env:
       TWINE_PASSWORD: ${{ inputs.token }}
     run: pixi run twine upload -u __token__ -p $TWINE_PASSWORD dist/*
