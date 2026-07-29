@@ -19,7 +19,7 @@ runs:
 
   steps:
   - name: Build and upload conda package
-    shell: bash -l
+    shell: bash
     env:
       ANACONDA_TOKEN: ${{ inputs.token }}
       ANACONDA_REPO: ${{ inputs.repository }}
