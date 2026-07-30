@@ -6,3 +6,6 @@ __pycache__/
 **.log
 figures/
 *.egg-info
+
+# Pixi environments (but commit pixi.lock for reproducible builds)
+.pixi/

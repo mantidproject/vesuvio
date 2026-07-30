@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        shell: bash -l {0}
+        shell: bash
 
     steps:
       - name: Checkout mvesuvio
@@ -18,13 +18,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          activate-environment: vesuvio-dev 
-          environment-file: vesuvio-dev.yml
-          auto-activate-base: false
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.8.0
 
       - name: Publish conda package
         uses: ./.github/actions/publish-conda-package
