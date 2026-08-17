@@ -26,7 +26,7 @@ jobs:
 
       - name: Setup pixi
         if: ${{ env.recentCommits == 'true'}}
-        uses: prefix-dev/setup-pixi@v0.8.0
+        uses: prefix-dev/setup-pixi@v0
 
       - name: Build mvesuvio nightly conda package
         if: ${{ env.recentCommits == 'true'}}
