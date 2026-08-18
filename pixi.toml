@@ -1,7 +1,7 @@
 [workspace]
 name = "vesuvio"
 channels = ["conda-forge", "mantid/label/nightly"]
-platforms = ["linux-64"]
+platforms = ["linux-64", "win-64", "osx-arm64"]
 description = "Analyse Vesuvio instrument data"
 
 # [feature.vesuvio-dev.dependencies]

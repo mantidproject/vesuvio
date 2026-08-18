@@ -9,10 +9,9 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Set up pixi environment
     - name: Setup Pixi
-      uses: prefix-dev/setup-pixi@v0.8.0
-      with:
-        pixi-version: latest
+      uses: prefix-dev/setup-pixi@v0
 
     - name: Install mvesuvio package
       # The editable flag is necessary for coverage to find the src/ files
