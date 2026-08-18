@@ -7,7 +7,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/mantid/mvesuvio/badges/downloads.svg)](https://anaconda.org/mantid/mvesuvio)
 
 This repository contains:
-- `mvesuvio` package containing Neutron Compron Profile (NCP) analysis procedures for Vesuvio, published nightly.
+- `mvesuvio` package containing Neutron Compton Profile (NCP) analysis procedures for Vesuvio, published nightly.
 - Vesuvio calibration scripts, under the `tools` folder
 
 Currently only the NCP analysis is usable, the calibration scripts are not yet ready. 
@@ -15,11 +15,22 @@ Currently only the NCP analysis is usable, the calibration scripts are not yet r
 ## Installing mvesuvio package (Try this option first)
 The `mvesuvio` package is meant to be used inside the [Mantid software](https://www.mantidproject.org/index.html), so you'll need to install Mantid first if you haven't.
 
-Once you have a working version of Mantid, go to the `IPython` tab on the bottom center of the window and inside the tab type the following command:
+Once you have a working version of Mantid, go to the `IPython` tab on the bottom center of the window and inside the tab type the following command(s):
 
-**If you're on Linux:**
+**If you're on ADA or Linux:**
 
 `mamba install mantid/label/nightly::mvesuvio`
+
+![alt text](images/ipython_install.png)
+
+Run the following to verify that `mvesuvio` is available in the kernel.
+
+`!mvesuvio version`
+
+> The `mamba install mantid/label/nightly::mvesuvio` command alone may not create the **.mvesuvio** folder in the home directory. 
+> This needs to be forced by running the command `!mvesuvio config` in the IPython editor. The command will output the locations 
+> of *analysis_inputs.py* and *ip_files*.
+> ![alt text](<images/config_output.png>)
 
 **If you're on Windows:**
 
