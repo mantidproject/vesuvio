@@ -48,31 +48,38 @@ If you see some output then the package is successfully installed and setup!
 > you can try to copy it from another computer on which installation was successful. Try to run **analysis_inputs.py**
 > from the newly copied **.mvesuvio** folder and check the inputs and outputs created.
 
-
 ### Installing mantid and mvesuvio using conda/mamba (If the first option failed)
 
-If the previous installation attempt was unsuccessful, then you'll have to use Mantid inside a conda/mamba environment. This is the official recommended way of using the mantid with the mvesuvio package.
+If the previous installation attempt was unsuccessful, then you'll have to use Mantid inside a *conda/mamba* environment. This is the official recommended way of using the mantid with the mvesuvio package.
 
 To install `mamba`, follow the steps at:
 https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html
 
-To check you have mamba installed, run:
+Open a terminal (Applications → System → Terminal) on ADA:
+
+![ada menu](images/ada_menu.png)
+
+Verify mamba is installed by running:
 
 `mamba --version`
 
 You should see some output with the versions available in your system.
 
-Now create a new conda environment, for example I'll call it `mantid-mvesuvio`:
+Now create a new *conda* environment in the terminal, for example I'll call it `mantid-mvesuvio`:
 
 `mamba create -n mantid-mvesuvio mantidworkbench mantid/label/nightly::mvesuvio`
 
-And activate the environment you created:
+![ada mamba environment creation](<images/ada_mamba_create.png>)
+
+And activate the environment you created, by typing the following in the terminal:
 
 `mamba activate mantid-mvesuvio`
 
-You can now start Mantid with mvesuvio already installed by typing:
+You can now start Mantid with `mvesuvio` already installed by typing the following in the terminal:
 
 `workbench`
+
+![ada mamba environment activation](<images/ada_mamba_activate.png>)
 
 ## Updating versions
 
