@@ -23,10 +23,8 @@ Run `mamba install mantid/label/nightly::mvesuvio` followed by `!mvesuvio versio
 
 ![linux ipython install](images/linux_ipython_install.png)
 
-> WARNING: This command alone may not create the **.mvesuvio** folder in the home directory. This needs 
-> to be forced by running the command `!mvesuvio config` in the `IPython` editor. The command will 
-> output the locations of *analysis_inputs.py* and *ip_files*.
-> ![config output](<images/config_output.png>)
+**WARNING: This command alone may not create the .mvesuvio folder in the home directory. This needs to be forced by running the command `!mvesuvio config` in the `IPython` editor. The command will output the locations of *analysis_inputs.py* and *ip_files*.**
+![config output](<images/config_output.png>)
 
 **If you're on Windows:**
 
@@ -40,13 +38,7 @@ To do all the necessary setup, type:
 
 If you see some output then the package is successfully installed and setup!
 
-> WARNING: This way of installing the package is not officially supported by Mantid, it just so happens to
-> work. As you can see above, a folder *C:\<User Path>\Lib\site-packages* is created after the installation. 
-> However, this folder does not contain the **analysis_inputs.py** script. This script is contained in
-> the **.mvesuvio** folder that is usually created by the installation under *C:\Users\<fedid>\.mvesuvio*.
-> If after the pip installation the folder **.mvesuvio** has not been created under *C:\Users\<fedid>\.mvesuvio*
-> you can try to copy it from another computer on which installation was successful. Try to run **analysis_inputs.py**
-> from the newly copied **.mvesuvio** folder and check the inputs and outputs created.
+**WARNING: This way of installing the package is not officially supported by Mantid, it just so happens to work. As you can see above, a folder *C:\<User Path>\Lib\site-packages* is created after the installation. However, this folder does not contain the analysis_inputs.py script. This script is contained in the .mvesuvio folder that is usually created by the installation under *C:\Users\<fedid>\.mvesuvio*. If after the pip installation the folder .mvesuvio has not been created under *C:\Users\<fedid>\.mvesuvio* you can try to copy it from another computer on which installation was successful. Try to run analysis_inputs.py from the newly copied .mvesuvio folder and check the inputs and outputs created.**
 
 ### Installing mantid and mvesuvio using conda/mamba (If the first option failed)
 
@@ -131,10 +123,8 @@ This script is an example of a well-behaved sample and it should run without iss
 
 If the run was successful, you will notice that a new folder was created inside `.mvesuvio` containing all sorts of outputs for this script.
 
-> IMPORTANT: To run a new sample with different inputs, you should *copy* the example script `analysis_inputs.py` and place 
-> it in *any* folder of your choice outside `.mvesuvio`. 
-> For providing the instrument parameters files, place them inside `.mvesuvio/ip_files/`.
-> (You can change the directory of the instrument files too, consult next section).
+**IMPORTANT: To run a new sample with different inputs, you should *copy* the example script `analysis_inputs.py` and place it in *any* folder of your choice outside `.mvesuvio`. For providing the instrument parameters files, place them inside `.mvesuvio/ip_files/`.**
+(You can change the directory of the instrument files too, consult next section).
 
 For a more detailed explanation on what the inputs in the `analysis_inputs.py` mean, read [USERGUIDE.md](./USERGUIDE.md)
 
