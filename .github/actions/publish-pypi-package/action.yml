@@ -17,4 +17,4 @@ runs:
     shell: bash
     env:
       TWINE_PASSWORD: ${{ inputs.token }}
-    run: pixi run twine upload -u __token__ -p $TWINE_PASSWORD dist/*
+    run: pixi run -e pypi-builder twine upload -u __token__ -p $TWINE_PASSWORD dist/*

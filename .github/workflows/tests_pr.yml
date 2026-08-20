@@ -40,19 +40,19 @@ jobs:
       - name: Run mvesuvio Analysis Unit Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/unit/analysis
+          pixi run test-analysis-unit
 
       - name: Run mvesuvio Analysis System Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/system/analysis
+          pixi run test-analysis-system
 
       - name: Run mvesuvio Calibration Unit Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/unit/calibration
+          pixi run test-calibration-unit
 
       - name: Run Vesuvio Calibration System Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/system/calibration
+          pixi run test-calibration-system

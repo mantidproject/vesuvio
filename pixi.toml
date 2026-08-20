@@ -1,73 +1,73 @@
 [workspace]
-name = "vesuvio"
+name = "mvesuvio"
 channels = ["conda-forge", "mantid/label/nightly"]
 platforms = ["linux-64", "win-64", "osx-arm64"]
 description = "Analyse Vesuvio instrument data"
 
-# [feature.vesuvio-dev.dependencies]
 [dependencies]
-# Core dependencies from pyproject.toml
-python = ">=3.11"
-iminuit = "*"
-jacobi = "*"
-dill = "*"
-
-# Build dependencies
-pip = ">=24.0"
-setuptools = ">=71.0.0"
-wheel = "*"
-versioningit = "*"
-
-# Development and testing tools
-mantidworkbench = "*"
-ruff = "*"
-pre-commit = "*"
-pytest = "*"
-coverage = "*"
-mock = "*"
-coveralls = "*"
-
-# PyPI publishing tools
-python-build = "*"
-twine = "*"
-
-# [feature.vesuvio-dev.tasks]
-[tasks]
-# Run tests (default environment only)
-test = "pytest"
-
-# Format and lint with ruff (default environment only)
-lint = "ruff check src tests"
-format = "ruff format src tests"
-
-# Install the package in development mode (default environment only)
-dev = "pip install -e ."
-
-# Build PyPI package (default environment only)
-build-pypi = "python -m build"
-
-[environments]
-# Default environment for development and testing is the first one
-# vesuvio-dev = { features = ["vesuvio-dev"], no-default-feature = true }
-conda-builder = { features = ["conda-builder"], no-default-feature = true }
-
-[feature.conda-builder.dependencies]
-# Build environment: conda build tools with Python compatible with conda ecosystem
 python = ">=3.10"
 pip = ">=24.0"
 setuptools = ">=71.0.0"
 wheel = "*"
-versioningit = "*"
+
+[feature.mvesuvio.dependencies]
+iminuit = "*"
+jacobi = "*"
+dill = "*"
+mantidworkbench = "*"
+
+[feature.conda-builder.dependencies]
 mamba = "*"
 conda-build = "*"
 boa = "*"
 anaconda-client = "*"
 conda-verify = "*"
+
+[feature.pypi-builder.dependencies]
 python-build = "*"
 twine = "*"
 
+[feature.developer.dependencies]
+ruff = "*"
+pre-commit = "*"
+coverage = "*"
+mock = "*"
+coveralls = "*"
+versioningit = "*"
+
+[feature.developer.tasks]
+test = "PYTHONPATH=src python -m unittest discover -s tests -t ."
+test-unit = "PYTHONPATH=src python -m unittest discover -s tests/unit -t ."
+test-system = "PYTHONPATH=src python -m unittest discover -s tests/system -t ."
+test-analysis-unit = "PYTHONPATH=src python -m unittest discover -s tests/unit/analysis -t ."
+test-analysis-system = "PYTHONPATH=src python -m unittest discover -s tests/system/analysis -t ."
+test-calibration-unit = "PYTHONPATH=src python -m unittest discover -s tests/unit/calibration -t ."
+test-calibration-system = "PYTHONPATH=src python -m unittest discover -s tests/system/calibration -t ."
+test-unit-coverage = "PYTHONPATH=src coverage run -m unittest discover -s tests/unit -t . && coverage report"
+default-analysis-inputs = "python src/mvesuvio/config/analysis_inputs.py"
+lint = "ruff check src tests"
+format = "ruff format src tests"
+dev = "pip install -e ."
+
+[feature.pypi-builder.tasks]
+build-pypi = "python -m build"
+
 [feature.conda-builder.tasks]
-# Build conda package (build environment only)
 build-conda = "cd conda && conda mambabuild --croot /tmp/conda-bld ."
+
+# Only used for building in CI on linux
+[feature.conda-builder]
+platforms = ["linux-64"]
+
+# Only used for building in CI on linux
+[feature.pypi-builder]
+platforms = ["linux-64"]
+
+[environments]
+vesuvio-development = ["mvesuvio", "developer"]
+conda-builder = ["conda-builder"]
+pypi-builder = ["pypi-builder"]
+
+
 
 
