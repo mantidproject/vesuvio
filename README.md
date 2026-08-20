@@ -34,7 +34,7 @@ Run `pip install mvesuvio` followed by `pip show mvesuvio` in the `IPython` tab:
 
 ![windows ipython install](images/windows_ipython_install.png)
 
-To check if the package was successfully installed and to do all the necessary setup, type:
+To do all the necessary setup, type:
 
 `!mvesuvio config`
 
@@ -51,10 +51,14 @@ If you see some output then the package is successfully installed and setup!
 ### Installing mantid and mvesuvio using conda/mamba (If the first option failed)
 
 If the previous installation attempt was unsuccessful, then you'll have to use Mantid inside a *conda/mamba* environment. This is the official recommended way of using the mantid with the `mvesuvio` package.
+**If you're on your personal machine (i.e. not on ADA):**
 
 To install `mamba`, follow the steps at:
 https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html
 
+**If you're on ADA:**
+
+`mamba` is already installed on ADA.
 Open a terminal (Applications → System → Terminal) on **ADA**:
 
 ![ada menu](images/ada_menu.png)
