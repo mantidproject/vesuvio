@@ -13,17 +13,13 @@ runs:
     - name: Setup Pixi
       uses: prefix-dev/setup-pixi@v0
 
-    - name: Install mvesuvio package
-      run: pixi run dev
-      shell: bash
-
     - name: Run default analysis inputs
-      run: pixi run default-analysis-inputs
+      run: pixi run -e vesuvio-developer default-analysis-inputs
       shell: bash
 
     - name: Run mvesuvio unit tests
       run: |
-        pixi run test-unit-coverage
+        pixi run -e vesuvio-developer test-unit-coverage
       shell: bash
 
     - name: Send coverage report to Coveralls
@@ -31,10 +27,10 @@ runs:
       env:
         COVERALLS_REPO_TOKEN : ${{ inputs.token }}
       run: |
-        pixi run -e vesuvio-development coveralls --service=github-actions
+        pixi run -e vesuvio-developer coveralls --service=github-actions
       shell: bash
 
     - name: Run mvesuvio system tests
       run: |
-        pixi run test-system
+        pixi run -e vesuvio-developer test-system
       shell: bash

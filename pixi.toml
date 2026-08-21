@@ -44,7 +44,7 @@ test-analysis-system = "PYTHONPATH=src python -m unittest discover -s tests/syst
 test-calibration-unit = "PYTHONPATH=src python -m unittest discover -s tests/unit/calibration -t ."
 test-calibration-system = "PYTHONPATH=src python -m unittest discover -s tests/system/calibration -t ."
 test-unit-coverage = "PYTHONPATH=src coverage run -m unittest discover -s tests/unit -t . && coverage report"
-default-analysis-inputs = "python src/mvesuvio/config/analysis_inputs.py"
+default-analysis-inputs = "PYTHONPATH=src python src/mvesuvio/config/analysis_inputs.py"
 lint = "ruff check src tests"
 format = "ruff format src tests"
 dev = "pip install -e ."
@@ -64,7 +64,7 @@ platforms = ["linux-64"]
 platforms = ["linux-64"]
 
 [environments]
-vesuvio-development = ["mvesuvio", "developer"]
+vesuvio-developer = ["mvesuvio", "developer"]
 conda-builder = ["conda-builder"]
 pypi-builder = ["pypi-builder"]
 
