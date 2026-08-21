@@ -2,6 +2,9 @@ name: Run tests on PR
 
 on:
   push:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -16,12 +19,6 @@ jobs:
       # Set up pixi environment
       - name: Setup Pixi
         uses: prefix-dev/setup-pixi@v0
-        with:
-          pixi-version: latest
-          environments: default
-
-      - name: Install mvesuvio package
-        run: pixi run dev
 
       - name: Check for analysis files changed 
         run: |
@@ -43,19 +40,19 @@ jobs:
       - name: Run mvesuvio Analysis Unit Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/unit/analysis
+          pixi run -e vesuvio-developer test-analysis-unit
 
       - name: Run mvesuvio Analysis System Tests
         if: ${{ env.analysis-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/system/analysis
+          pixi run -e vesuvio-developer test-analysis-system
 
       - name: Run mvesuvio Calibration Unit Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/unit/calibration
+          pixi run -e vesuvio-developer test-calibration-unit
 
       - name: Run Vesuvio Calibration System Tests
         if: ${{ env.calibration-changed == 'true'}}
         run: |
-          pixi run python -m unittest discover -s ./tests/system/calibration
+          pixi run -e vesuvio-developer test-calibration-system

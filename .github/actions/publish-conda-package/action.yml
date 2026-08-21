@@ -25,7 +25,7 @@ runs:
       ANACONDA_REPO: ${{ inputs.repository }}
       ANACONDA_LABEL: ${{ inputs.label }}
     run: |
-      pixi run bash -c \
+      pixi run -e conda-builder bash -c \
         "conda config --add channels conda-forge && \
          conda config --add channels mantid && \
          conda config --add channels mantid/label/nightly && \

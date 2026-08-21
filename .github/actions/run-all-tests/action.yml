@@ -9,24 +9,17 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Set up pixi environment
     - name: Setup Pixi
-      uses: prefix-dev/setup-pixi@v0.8.0
-      with:
-        pixi-version: latest
+      uses: prefix-dev/setup-pixi@v0
 
-    - name: Install mvesuvio package
-      # The editable flag is necessary for coverage to find the src/ files
-      run: pixi run dev
-      shell: bash
-
-    - name: Run default analysis inputs 
-      run: pixi run python src/mvesuvio/config/analysis_inputs.py
+    - name: Run default analysis inputs
+      run: pixi run -e vesuvio-developer default-analysis-inputs
       shell: bash
 
     - name: Run mvesuvio unit tests
       run: |
-        pixi run coverage run -m unittest discover -s ./tests/unit
-        pixi run coverage report
+        pixi run -e vesuvio-developer test-unit-coverage
       shell: bash
 
     - name: Send coverage report to Coveralls
@@ -34,10 +27,10 @@ runs:
       env:
         COVERALLS_REPO_TOKEN : ${{ inputs.token }}
       run: |
-        pixi run coveralls --service=github-actions
+        pixi run -e vesuvio-developer coveralls --service=github-actions
       shell: bash
 
     - name: Run mvesuvio system tests
       run: |
-        pixi run python -m unittest discover -s ./tests/system
+        pixi run -e vesuvio-developer test-system
       shell: bash
