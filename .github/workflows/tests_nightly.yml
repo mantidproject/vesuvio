@@ -1,0 +1,30 @@
+name: Run tests nightly
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+  push:
+    branches:
+      - 235-nightly-workflow-cleanup
+
+jobs:
+  test:
+    strategy:
+      max-parallel: 1
+      matrix:
+        os:
+          - ubuntu-22.04
+          - windows-latest
+    runs-on: ${{ matrix.os }} 
+
+    steps:
+      - name: Checkout mvesuvio
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run all tests
+        uses: ./.github/actions/run-all-tests
+        with:
+          token: ${{ secrets.COVERALLS_REPO_TOKEN }}
