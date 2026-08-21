@@ -5,9 +5,17 @@ on:
   schedule:
     - cron: '0 2 * * *'
   push:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
+    if: github.repository_owner == 'mantidproject'
     strategy:
       max-parallel: 1
       matrix:
