@@ -5,8 +5,6 @@ on:
   schedule:
     - cron: '0 2 * * *'
   push:
-    branches:
-      - 235-nightly-workflow-cleanup
 
 jobs:
   test:
