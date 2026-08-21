@@ -43,6 +43,7 @@ If you see some output then the package is successfully installed and setup!
 ### Installing mantid and mvesuvio using conda/mamba (If the first option failed)
 
 If the previous installation attempt was unsuccessful, then you'll have to use Mantid inside a *conda/mamba* environment. This is the official recommended way of using the mantid with the `mvesuvio` package.
+
 **If you're on your personal machine (i.e. not on ADA):**
 
 To install `mamba`, follow the steps at:
