@@ -4,10 +4,6 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * *'
-  push:
-  pull_request:
-    branches:
-      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,9 +15,7 @@ jobs:
     strategy:
       max-parallel: 1
       matrix:
-        os:
-          - windows-latest
-          - ubuntu-22.04  
+        os: [ubuntu-22.04, windows-latest]
     runs-on: ${{ matrix.os }} 
 
     steps:
