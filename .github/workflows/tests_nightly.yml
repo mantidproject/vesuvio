@@ -1,16 +1,22 @@
-name: Run tests nightly (Linux)
+name: Run tests nightly
 
 on:
   workflow_dispatch:
   schedule:
     - cron: '0 2 * * *'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
-    runs-on: ubuntu-22.04 
-    defaults:
-      run:
-        shell: bash
+    if: github.repository_owner == 'mantidproject'
+    strategy:
+      max-parallel: 1
+      matrix:
+        os: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.os }} 
 
     steps:
       - name: Checkout mvesuvio
