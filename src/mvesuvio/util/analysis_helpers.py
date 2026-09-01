@@ -162,6 +162,8 @@ def create_profiles_table(name, ai):
                 float(wrapb(center_bound[1])),
             ]
         )
+
+    print_table_workspace(table)
     return table
 
 
