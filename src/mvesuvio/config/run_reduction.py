@@ -72,7 +72,8 @@ class BackwardAnalysisInputs(SampleParameters):
     # Known stoichiometry of any mass in the sample to Hydrogen, to estimate intensity ratio as a guess
     chosen_mass_index = 0  # index in 'masses' list (index from 0 to n-1), ignored if H not present
     intensity_ratio_of_hydrogen_to_chosen_mass = (
-        19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
+        0
+        # 19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
     )
     transmission_guess = 0.8  # [1 - 2(1-T)] --> Twice the absorption, T: Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
@@ -143,7 +144,6 @@ class ForwardAnalysisInputs(SampleParameters):
 ########################
 
 mvesuvio.config(analysis_inputs=str(Path(__file__)))
-
 AnalysisDataService.clear()
 
 if BackwardAnalysisInputs.run_this_scattering_type:
@@ -161,13 +161,56 @@ if BackwardAnalysisInputs.run_this_scattering_type:
     Scale(InputWorkspace=raw_name, Factor=BackwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
     Scale(InputWorkspace=empty_name, Factor=BackwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
 
-    ws_to_fit = Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name)
+    Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name)
 
     # TODO: Take out sums from here
     SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
     SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
 
-    reduction_helpers.crop_and_mask_workspace(ws_to_fit, BackwardAnalysisInputs)
-    back_alg = reduction_helpers.init_analysis_algorithm(ws_to_fit, BackwardAnalysisInputs)
 
+if ForwardAnalysisInputs.run_this_scattering_type:
+    raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(ForwardAnalysisInputs)
+
+    raw_name = raw_path.stem
+    empty_name = empty_path.stem
+
+    Load(Filename=str(raw_path), OutputWorkspace=raw_name)
+    Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+
+    Rebin(InputWorkspace=raw_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
+    Rebin(InputWorkspace=empty_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
+
+    Scale(InputWorkspace=raw_name, Factor=ForwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
+    Scale(InputWorkspace=empty_name, Factor=ForwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
+
+    Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name)
+
+    # TODO: Take out sums from here
+    SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
+    SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+
+
+BACK_WS_TO_FIT = BackwardAnalysisInputs.name
+FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+
+reduction_helpers.crop_and_mask_workspace(BACK_WS_TO_FIT, BackwardAnalysisInputs)
+reduction_helpers.crop_and_mask_workspace(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
+back_alg = reduction_helpers.init_analysis_algorithm(BACK_WS_TO_FIT, BackwardAnalysisInputs)
+front_alg = reduction_helpers.init_analysis_algorithm(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
+
+if reduction_helpers.h_ratio_is_zero_when_h_present(BackwardAnalysisInputs, ForwardAnalysisInputs):
+    reduction_helpers.run_estimate_h_ratio(
+        back_alg=back_alg,
+        front_alg=front_alg,
+        back_masses=BackwardAnalysisInputs.masses,
+        back_chosen_mass_index=BackwardAnalysisInputs.chosen_mass_index,
+        rtol=0.01,
+        max_iter=3,
+    )
+
+if BackwardAnalysisInputs.run_this_scattering_type and ForwardAnalysisInputs.run_this_scattering_type:
+    reduction_helpers.execute_joint_algorithms(back_alg=back_alg, front_alg=front_alg)
+elif BackwardAnalysisInputs.run_this_scattering_type:
     back_alg.execute()
+elif ForwardAnalysisInputs.run_this_scattering_type:
+    front_alg.execute()
