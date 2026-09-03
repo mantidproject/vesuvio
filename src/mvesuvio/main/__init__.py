@@ -4,6 +4,7 @@ import argparse
 from os import path
 from pathlib import Path
 from mvesuvio.util import handle_config
+from mvesuvio.util.files_manager import FilesManager
 
 
 def main(manual_args=None):
@@ -113,11 +114,13 @@ def __set_logging_properties():
     ConfigService.setString("logging.loggers.root.channel.class", "SplitterChannel")
     ConfigService.setString("logging.loggers.root.channel.channel1", "consoleChannel")
     ConfigService.setString("logging.loggers.root.channel.channel2", "fileChannel")
-    ConfigService.setString("logging.channels.consoleChannel.class", "ConsoleChannel")
-    ConfigService.setString("logging.channels.fileChannel.class", "FileChannel")
-    ConfigService.setString("logging.channels.fileChannel.path", "mantid.log")
+    ConfigService.setString("logging.channels.fileChannel.path", str(FilesManager.get_mantid_log_file()))
     ConfigService.setString("logging.channels.fileChannel.formatter.class", "PatternFormatter")
     ConfigService.setString("logging.channels.fileChannel.formatter.pattern", "%Y-%m-%d %H:%M:%S,%i [%I] %p %s - %t")
+    ConfigService.setString("logging.channels.fileChannel.rotateOnOpen", "true")
+    ConfigService.setString("logging.channels.fileChannel.purgeCount", "1")
+    ConfigService.setString("logging.channels.fileChannel.class", "FileChannel")
+    ConfigService.setString("logging.channels.consoleChannel.class", "ConsoleChannel")
     # Set properties on Mantid.user.properties not working due to Mantid bug
     # Need to set properties on file in Mantid installation
     mantid_properties_file = path.join(ConfigService.getPropertiesDir(), "Mantid.properties")

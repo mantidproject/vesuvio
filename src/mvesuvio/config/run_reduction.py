@@ -23,7 +23,7 @@ class SampleParameters:
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
-    run_this_scattering_type = True
+    run_this_scattering_type = False
     fit_in_y_space = False
     name = "back"
     minimal_output = False
@@ -72,8 +72,8 @@ class BackwardAnalysisInputs(SampleParameters):
     # Known stoichiometry of any mass in the sample to Hydrogen, to estimate intensity ratio as a guess
     chosen_mass_index = 0  # index in 'masses' list (index from 0 to n-1), ignored if H not present
     intensity_ratio_of_hydrogen_to_chosen_mass = (
-        0
-        # 19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
+        # 0
+        19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
     )
     transmission_guess = 0.8  # [1 - 2(1-T)] --> Twice the absorption, T: Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
@@ -214,3 +214,5 @@ elif BackwardAnalysisInputs.run_this_scattering_type:
     back_alg.execute()
 elif ForwardAnalysisInputs.run_this_scattering_type:
     front_alg.execute()
+
+reduction_helpers.make_summarised_log_file()

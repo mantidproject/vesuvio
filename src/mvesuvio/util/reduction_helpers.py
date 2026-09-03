@@ -29,6 +29,25 @@ if TYPE_CHECKING:
     from mvesuvio.config.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
 
 import ntpath
+import re
+
+
+def make_summarised_log_file() -> None:
+    pattern = re.compile(r"^\d{4}-\d{2}-\d{2}")
+    try:
+        with open(FilesManager.get_mantid_log_file(), "r") as infile, open(FilesManager.get_summarised_log_file(), "w") as outfile:
+            for line in infile:
+                if "VesuvioAnalysisRoutine" in line:
+                    outfile.write(line)
+
+                if "Notice Python" in line:  # For Fitting notices
+                    outfile.write(line)
+
+                if not pattern.match(line):
+                    outfile.write(line)
+    except OSError:
+        logger.error("Mantid log file not available. Unable to produce a summarized log file for this routine.")
+    return
 
 
 def _get_scattering_type(inputs_class) -> str:
@@ -225,6 +244,11 @@ def _get_lightest_profile(p_dict):
 
 
 def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
+    # Skip if workspace not found in ADS
+    if not AnalysisDataService.doesExist(ws_name):
+        logger.warning(f"\n{ws_name} not found in ADS: Skipping cropping and masking ...\n")
+        return
+
     profiles_table = create_profiles_table(ws_name + "_initial_parameters", inputs_class)
     instrument_parameters_file = str(FilesManager.get_instrument_parameters_dir() / inputs_class.instrument_parameters_file)
 

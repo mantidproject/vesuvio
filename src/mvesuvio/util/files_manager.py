@@ -1,6 +1,7 @@
 from mvesuvio import globals
 from mvesuvio.util import handle_config
 from pathlib import Path
+from mantid.kernel import ConfigService
 
 
 class FilesManager:
@@ -47,3 +48,11 @@ class FilesManager:
     @classmethod
     def get_forward_empty_filename(cls) -> str:
         return handle_config.get_script_name() + "_" + "empty" + "_" + globals.FORWARD_TAG + ".nxs"
+
+    @classmethod
+    def get_mantid_log_file(cls) -> Path:
+        return Path(ConfigService.getPropertiesDir(), "mantid.log")
+
+    @classmethod
+    def get_summarised_log_file(cls) -> Path:
+        return cls.get_outputs_dir() / "summary.log"
