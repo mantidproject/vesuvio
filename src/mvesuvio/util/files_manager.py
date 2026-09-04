@@ -64,6 +64,12 @@ class FilesManager:
         return cls.get_outputs_dir() / "fitting"
 
     @classmethod
+    def get_outputs_fitting_inputs_dir(cls) -> Path:
+        fitting_inputs_dir = cls.get_outputs_fitting_dir() / "inputs"
+        fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
+        return fitting_inputs_dir
+
+    @classmethod
     def get_backward_raw_filename(cls) -> str:
         return handle_config.get_script_name() + "_" + "raw" + "_" + globals.BACKWARD_TAG + ".nxs"
 

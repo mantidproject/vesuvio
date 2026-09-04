@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 import mvesuvio
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra
+from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd
 from mantid.kernel import logger
 from pathlib import Path
 from mvesuvio import ConfigArgInputs
+from mvesuvio.util import fitting_helpers
 from mvesuvio.util import reduction_helpers
+from mvesuvio.util.files_manager import FilesManager
 
 
 @dataclass
@@ -26,7 +28,6 @@ class SampleParameters:
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = False
-    fit_in_y_space = False
     name = "back"
     minimal_output = False
 
@@ -70,6 +71,9 @@ class BackwardAnalysisInputs(SampleParameters):
     constraints = ()
 
     number_of_iterations_for_corrections = 0  # 4
+    # Y-space derived inputs are prepared at end of reduction for fitting.
+    range_for_rebinning_in_y_space = "-25, 0.5, 25"
+    subtract_calculated_fse_from_data = True
     do_multiple_scattering_correction = True
     # Known stoichiometry of any mass in the sample to Hydrogen, to estimate intensity ratio as a guess
     chosen_mass_index = 0  # index in 'masses' list (index from 0 to n-1), ignored if H not present
@@ -86,7 +90,6 @@ class BackwardAnalysisInputs(SampleParameters):
 @dataclass
 class ForwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
-    fit_in_y_space = True
     name = "front"
     minimal_output = False
 
@@ -134,6 +137,9 @@ class ForwardAnalysisInputs(SampleParameters):
     constraints = ()
 
     number_of_iterations_for_corrections = 0  # 4
+    # Y-space derived inputs are prepared at end of reduction for fitting.
+    range_for_rebinning_in_y_space = "-25, 0.5, 25"
+    subtract_calculated_fse_from_data = True
     do_multiple_scattering_correction = True
     transmission_guess = 0.9  # T : Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
@@ -145,104 +151,145 @@ class ForwardAnalysisInputs(SampleParameters):
 ### END OF USER EDIT ###
 ########################
 
-mvesuvio.main(ConfigArgInputs(analysis_inputs=str(Path(__file__)), ip_folder=""))
 
-# Optional workspace-name overrides for bootstrap script injection.
-BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
-FRONT_WS_TO_FIT = globals().get("FRONT_WS_TO_FIT", "")
+def main() -> None:
+    mvesuvio.main(ConfigArgInputs(analysis_inputs=str(Path(__file__)), ip_folder=""))
 
-# Preserve standalone behavior when no bootstrap overrides are injected.
-if not BACK_WS_TO_FIT and not FRONT_WS_TO_FIT:
-    AnalysisDataService.clear()
+    # Optional workspace-name overrides for bootstrap script injection.
+    BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
+    FRONT_WS_TO_FIT = globals().get("FRONT_WS_TO_FIT", "")
 
-if BackwardAnalysisInputs.run_this_scattering_type:
-    if BACK_WS_TO_FIT:
-        BackwardAnalysisInputs.name = str(BACK_WS_TO_FIT)
-        if not AnalysisDataService.doesExist(BackwardAnalysisInputs.name):
-            logger.error(f"Injected backward workspace does not exist in ADS: {BackwardAnalysisInputs.name}")
-            BACK_WS_TO_FIT = ""
-    else:
-        raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(BackwardAnalysisInputs)
+    # Preserve standalone behavior when no bootstrap overrides are injected.
+    if not BACK_WS_TO_FIT and not FRONT_WS_TO_FIT:
+        AnalysisDataService.clear()
 
-        raw_name = raw_path.stem
-        empty_name = empty_path.stem
+    if BackwardAnalysisInputs.run_this_scattering_type:
+        if BACK_WS_TO_FIT:
+            BackwardAnalysisInputs.name = str(BACK_WS_TO_FIT)
+            if not AnalysisDataService.doesExist(BackwardAnalysisInputs.name):
+                logger.error(f"Injected backward workspace does not exist in ADS: {BackwardAnalysisInputs.name}")
+                BACK_WS_TO_FIT = ""
+        else:
+            raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(BackwardAnalysisInputs)
 
-        Load(Filename=str(raw_path), OutputWorkspace=raw_name)
-        Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+            raw_name = raw_path.stem
+            empty_name = empty_path.stem
 
-        Rebin(InputWorkspace=raw_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
-        Rebin(InputWorkspace=empty_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
+            Load(Filename=str(raw_path), OutputWorkspace=raw_name)
+            Load(Filename=str(empty_path), OutputWorkspace=empty_name)
 
-        Scale(InputWorkspace=raw_name, Factor=BackwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
-        Scale(InputWorkspace=empty_name, Factor=BackwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
+            Rebin(InputWorkspace=raw_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
+            Rebin(InputWorkspace=empty_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
 
-        Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name)
+            Scale(InputWorkspace=raw_name, Factor=BackwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
+            Scale(InputWorkspace=empty_name, Factor=BackwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
 
-        # TODO: Take out sums from here
-        SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
-        SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name)
+
+            # TODO: Take out sums from here
+            SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
+            SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+            BACK_WS_TO_FIT = BackwardAnalysisInputs.name
+
+    if ForwardAnalysisInputs.run_this_scattering_type:
+        if FRONT_WS_TO_FIT:
+            ForwardAnalysisInputs.name = str(FRONT_WS_TO_FIT)
+            if not AnalysisDataService.doesExist(ForwardAnalysisInputs.name):
+                logger.error(f"Injected forward workspace does not exist in ADS: {ForwardAnalysisInputs.name}")
+                FRONT_WS_TO_FIT = ""
+        else:
+            raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(ForwardAnalysisInputs)
+
+            raw_name = raw_path.stem
+            empty_name = empty_path.stem
+
+            Load(Filename=str(raw_path), OutputWorkspace=raw_name)
+            Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+
+            Rebin(InputWorkspace=raw_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
+            Rebin(InputWorkspace=empty_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
+
+            Scale(InputWorkspace=raw_name, Factor=ForwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
+            Scale(InputWorkspace=empty_name, Factor=ForwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
+
+            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name)
+
+            # TODO: Take out sums from here
+            SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
+            SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+            FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+
+    if not BACK_WS_TO_FIT:
         BACK_WS_TO_FIT = BackwardAnalysisInputs.name
-
-
-if ForwardAnalysisInputs.run_this_scattering_type:
-    if FRONT_WS_TO_FIT:
-        ForwardAnalysisInputs.name = str(FRONT_WS_TO_FIT)
-        if not AnalysisDataService.doesExist(ForwardAnalysisInputs.name):
-            logger.error(f"Injected forward workspace does not exist in ADS: {ForwardAnalysisInputs.name}")
-            FRONT_WS_TO_FIT = ""
-    else:
-        raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(ForwardAnalysisInputs)
-
-        raw_name = raw_path.stem
-        empty_name = empty_path.stem
-
-        Load(Filename=str(raw_path), OutputWorkspace=raw_name)
-        Load(Filename=str(empty_path), OutputWorkspace=empty_name)
-
-        Rebin(InputWorkspace=raw_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
-        Rebin(InputWorkspace=empty_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
-
-        Scale(InputWorkspace=raw_name, Factor=ForwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
-        Scale(InputWorkspace=empty_name, Factor=ForwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
-
-        Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name)
-
-        # TODO: Take out sums from here
-        SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
-        SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+    if not FRONT_WS_TO_FIT:
         FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
 
+    reduction_helpers.crop_and_mask_workspace(BACK_WS_TO_FIT, BackwardAnalysisInputs)
+    reduction_helpers.crop_and_mask_workspace(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
+    back_alg = reduction_helpers.init_analysis_algorithm(BACK_WS_TO_FIT, BackwardAnalysisInputs)
+    front_alg = reduction_helpers.init_analysis_algorithm(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
 
-if not BACK_WS_TO_FIT:
-    BACK_WS_TO_FIT = BackwardAnalysisInputs.name
-if not FRONT_WS_TO_FIT:
-    FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+    if reduction_helpers.h_ratio_is_zero_when_h_present(BackwardAnalysisInputs, ForwardAnalysisInputs):
+        reduction_helpers.run_estimate_h_ratio(
+            back_alg=back_alg,
+            front_alg=front_alg,
+            back_masses=BackwardAnalysisInputs.masses,
+            back_chosen_mass_index=BackwardAnalysisInputs.chosen_mass_index,
+            rtol=0.01,
+            max_iter=3,
+        )
 
-reduction_helpers.crop_and_mask_workspace(BACK_WS_TO_FIT, BackwardAnalysisInputs)
-reduction_helpers.crop_and_mask_workspace(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
-back_alg = reduction_helpers.init_analysis_algorithm(BACK_WS_TO_FIT, BackwardAnalysisInputs)
-front_alg = reduction_helpers.init_analysis_algorithm(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
+    if (
+        BackwardAnalysisInputs.run_this_scattering_type
+        and ForwardAnalysisInputs.run_this_scattering_type
+        and back_alg is not None
+        and front_alg is not None
+    ):
+        reduction_helpers.execute_joint_algorithms(back_alg=back_alg, front_alg=front_alg)
+    elif BackwardAnalysisInputs.run_this_scattering_type and back_alg is not None:
+        back_alg.execute()
+    elif ForwardAnalysisInputs.run_this_scattering_type and front_alg is not None:
+        front_alg.execute()
 
-if reduction_helpers.h_ratio_is_zero_when_h_present(BackwardAnalysisInputs, ForwardAnalysisInputs):
-    reduction_helpers.run_estimate_h_ratio(
-        back_alg=back_alg,
-        front_alg=front_alg,
-        back_masses=BackwardAnalysisInputs.masses,
-        back_chosen_mass_index=BackwardAnalysisInputs.chosen_mass_index,
-        rtol=0.01,
-        max_iter=3,
-    )
+    reduction_helpers.make_summarised_log_file()
 
-if (
-    BackwardAnalysisInputs.run_this_scattering_type
-    and ForwardAnalysisInputs.run_this_scattering_type
-    and back_alg is not None
-    and front_alg is not None
-):
-    reduction_helpers.execute_joint_algorithms(back_alg=back_alg, front_alg=front_alg)
-elif BackwardAnalysisInputs.run_this_scattering_type and back_alg is not None:
-    back_alg.execute()
-elif ForwardAnalysisInputs.run_this_scattering_type and front_alg is not None:
-    front_alg.execute()
+    save_fitting_input_workspaces()
 
-reduction_helpers.make_summarised_log_file()
+
+def save_fitting_input_workspaces() -> None:
+    fitting_inputs_dir = FilesManager.get_outputs_fitting_inputs_dir()
+    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
+    for analysis_inputs in (BackwardAnalysisInputs, ForwardAnalysisInputs):
+        if not analysis_inputs.run_this_scattering_type:
+            continue
+
+        iteration = str(analysis_inputs.number_of_iterations_for_corrections)
+        workspace_name = f"{analysis_inputs.name}_{iteration}"
+        ncp_group_name = f"{workspace_name}_ncp_group"
+
+        # Persist pre-computed Y-space fitting inputs so run_fitting can load them directly.
+        if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
+            logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
+            continue
+
+        ws_to_fit = mtd[workspace_name]
+        ws_to_fit_ncps = mtd[ncp_group_name]
+
+        ws_resolution = fitting_helpers.calculate_resolution(
+            min(analysis_inputs.masses),
+            ws_to_fit,
+            analysis_inputs.range_for_rebinning_in_y_space,
+        )
+        ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
+            ws_to_fit,
+            ws_to_fit_ncps,
+            analysis_inputs.subtract_calculated_fse_from_data,
+        )
+
+        SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
+        SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
+        SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
+
+
+if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
+    main()

@@ -1,9 +1,7 @@
 from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import (
-    calculate_resolution,
     fix_profile_parameters,
-    isolate_lighest_mass_data,
     load_raw_and_empty_from_path,
     cropAndMaskWorkspace,
     calculate_h_ratio,
@@ -15,6 +13,7 @@ from mvesuvio.util.analysis_helpers import (
     print_table_workspace,
     convert_to_list_of_spectrum_numbers,
 )
+from mvesuvio.util.fitting_helpers import calculate_resolution, isolate_lighest_mass_data
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 from mvesuvio import globals
 
