@@ -119,7 +119,7 @@ def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_inde
 
     logger.notice("\nProcedute to estimate Hydrogen ratio finished.\n")
     print_table_workspace(table_h_ratios)
-    return
+    return table_h_ratios
 
 
 def calculate_h_ratio(means_table, chosen_mass):
