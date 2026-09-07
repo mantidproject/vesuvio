@@ -39,28 +39,8 @@ class ConfigArgInputs(ArgInputs):
 
 
 class RunArgInputs(ArgInputs):
-    def __init__(self, back_workspace, front_workspace, minimal_output, outputs_dir):
+    def __init__(self):
         super().__init__("run")
-        self.__back_workspace = back_workspace
-        self.__front_workspace = front_workspace
-        self.__minimal_output = minimal_output
-        self.__outputs_dir = outputs_dir
-
-    @property
-    def back_workspace(self):
-        return self.__back_workspace
-
-    @property
-    def front_workspace(self):
-        return self.__front_workspace
-
-    @property
-    def minimal_output(self):
-        return self.__minimal_output
-
-    @property
-    def outputs_dir(self):
-        return self.__outputs_dir
 
 
 def config(analysis_inputs="", ip_folder=""):
@@ -68,8 +48,8 @@ def config(analysis_inputs="", ip_folder=""):
     main(config_args)
 
 
-def run(back_workspace="", front_workspace="", minimal_output=False, outputs_dir=""):
-    run_args = RunArgInputs(back_workspace, front_workspace, minimal_output, outputs_dir)
+def run():
+    run_args = RunArgInputs()
     main(run_args)
 
 

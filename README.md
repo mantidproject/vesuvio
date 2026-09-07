@@ -180,6 +180,15 @@ The `run` command does not take any arguments and simply runs the routine based 
 Usage example:
 - `mvesuvio run`- Run NCP analysis.
 
+This command now triggers the configured reduction script followed by the configured fitting script.
+
+#### mvesuvio bootstrap
+
+The `bootstrap` command does not take any arguments. It runs the bootstrap script using the configured bootstrap script.
+
+Usage example:
+- `mvesuvio bootstrap` - Run bootstrap reduction using `BOOTSTRAP_INPUTS_DIRECTORY`.
+
 ### Python API
 
 The commands available in the CLI can be triggered from Python by calling the method with the same name.
@@ -198,3 +207,5 @@ from pathlib import Path
 mvesuvio.config(analysis_inputs=str(Path(__file__)))
 mvesuvio.run()
 ```
+
+The Python `mvesuvio.run()` helper mirrors the CLI and no longer accepts workspace/output override arguments.

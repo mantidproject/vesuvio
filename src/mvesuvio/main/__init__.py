@@ -1,6 +1,7 @@
 """Package defining entry points."""
 
 import argparse
+import runpy
 from os import path
 from pathlib import Path
 from mvesuvio.util import handle_config
@@ -44,42 +45,8 @@ def _set_up_parser():
         type=str,
     )
 
-    run_parser = subparsers.add_parser("run", help="Run mvesuvio analysis")
-    run_parser.add_argument(
-        "--back-workspace",
-        "-b",
-        help="Input workspace for vesuvio backward analysis, bypasses loading (and subtracting) raw and empty.",
-        default="",
-        type=str,
-    )
-    run_parser.add_argument(
-        "--front-workspace",
-        "-f",
-        help="Input workspace for vesuvio forward analysis, bypasses loading (and subtracting) raw and empty.",
-        default="",
-        type=str,
-    )
-    run_parser.add_argument(
-        "--minimal-output",
-        action="store_true",
-        help="Flag to set output files to minimum.",
-        default=False,
-    )
-    run_parser.add_argument(
-        "--outputs-dir",
-        "-o",
-        help="Directory for populating with output files.",
-        default="",
-        type=str,
-    )
-    boot_parser = subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
-    boot_parser.add_argument(
-        "--inputs-dir",
-        "-d",
-        help="Directory containing input bootstrap replicas. Replicas should be inside sparate backaward and forward subdirectories.",
-        default="",
-        type=str,
-    )
+    subparsers.add_parser("run", help="Run mvesuvio analysis")
+    subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
     return parser
 
 
@@ -129,25 +96,14 @@ def __set_logging_properties():
 
 
 def _run_analysis(args):
-    from mvesuvio.main.run_routine import Runner
-
-    if not args:
-        Runner().run()
-        return
-    Runner(
-        override_back_workspace=args.back_workspace,
-        override_front_workspace=args.front_workspace,
-        minimal_output=args.minimal_output,
-        output_directory=args.outputs_dir,
-    ).run()
+    config_dir = Path(__file__).resolve().parent.parent / "config"
+    runpy.run_path(str(config_dir / "run_reduction.py"), run_name="__main__")
+    runpy.run_path(str(config_dir / "run_fitting.py"), run_name="__main__")
 
 
 def _run_bootstrap(args):
-    from mvesuvio.main.run_routine import Runner
-
-    if not args:
-        return
-    Runner(bootstrap_inputs_directory=args.inputs_dir, minimal_output=True).run_bootstrap()
+    config_dir = Path(__file__).resolve().parent.parent / "config"
+    runpy.run_path(str(config_dir / "run_bootstrap.py"), run_name="__main__")
 
 
 def _print_version():

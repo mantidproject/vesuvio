@@ -20,10 +20,7 @@ class TestPackageAPI(unittest.TestCase):
     @patch("mvesuvio.main")
     def test_run(self, mock_main):
 
-        mvesuvio.run(back_workspace="bws", front_workspace="fws", minimal_output=True, outputs_dir="out")
+        mvesuvio.run()
 
         args, _kwargs = mock_main.call_args
-        self.assertEqual(args[0].back_workspace, "bws")
-        self.assertEqual(args[0].front_workspace, "fws")
-        self.assertEqual(args[0].minimal_output, True)
-        self.assertEqual(args[0].outputs_dir, "out")
+        self.assertEqual(args[0].command, "run")

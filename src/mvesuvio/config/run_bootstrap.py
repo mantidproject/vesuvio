@@ -26,6 +26,7 @@ RUN_REDUCTION_PATH = Path(__file__).with_name("run_reduction.py")
 def _run_reduction_with_injected_workspaces(back_ws_to_fit: str = "", front_ws_to_fit: str = ""):
     runpy.run_path(
         str(RUN_REDUCTION_PATH),
+        run_name="__main__",
         init_globals={
             "BACK_WS_TO_FIT": back_ws_to_fit,
             "FRONT_WS_TO_FIT": front_ws_to_fit,
