@@ -115,7 +115,7 @@ def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_inde
 
         table_h_ratios.addRow([current_ratio])
 
-        SaveAscii(table_h_ratios.name(), str(FilesManager.get_outputs_dir() / table_h_ratios.name()))
+        SaveAscii(table_h_ratios.name(), str(FilesManager.get_experiment_dir() / table_h_ratios.name()))
 
     logger.notice("\nProcedute to estimate Hydrogen ratio finished.\n")
     print_table_workspace(table_h_ratios)
@@ -274,7 +274,7 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
         "MultipleScatteringOrder": int(inputs_class.multiple_scattering_order),
         "NumberOfEvents": int(inputs_class.multiple_scattering_number_of_events),
         "Constraints": str(dill.dumps(inputs_class.constraints)),
-        "ResultsPath": str(FilesManager.get_outputs_reduction_dir().absolute()),
+        "ResultsPath": str(FilesManager.get_reduction_outputs_dir().absolute()),
         "MinimalOutputFiles": inputs_class.minimal_output,
         "OutputMeansTable": " Final_Means",
     }
@@ -320,12 +320,12 @@ def load_and_save_input_ws_if_not_on_path(
     scattering_type = _get_scattering_type(inputs_class)
 
     if scattering_type == "backward":
-        raw_path = FilesManager.get_inputs_ws_dir() / FilesManager.get_backward_raw_filename()
-        empty_path = FilesManager.get_inputs_ws_dir() / FilesManager.get_backward_empty_filename()
+        raw_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_backward_raw_filename()
+        empty_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_backward_empty_filename()
 
     elif scattering_type == "forward":
-        raw_path = FilesManager.get_inputs_ws_dir() / FilesManager.get_forward_raw_filename()
-        empty_path = FilesManager.get_inputs_ws_dir() / FilesManager.get_forward_empty_filename()
+        raw_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_forward_raw_filename()
+        empty_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_forward_empty_filename()
     else:
         raise ValueError(f"Input class for workspace not valid: {inputs_class.__name__}")
 

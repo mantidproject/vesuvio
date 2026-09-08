@@ -1,2 +1,2 @@
-BACKWARD_TAG = "bckwd"
-FORWARD_TAG = "fwd"
+BACKWARD_TAG = "back"
+FORWARD_TAG = "front"

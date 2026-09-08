@@ -20,6 +20,7 @@ from mvesuvio.util.files_manager import FilesManager
 
 # Set this path before running this script.
 BOOTSTRAP_INPUTS_DIRECTORY = Path(__file__).with_name("boot_inputs")
+BOOTSTRAP_OUTPUTS_DIRECTORY = Path(__file__).with_name("boot_outputs")
 RUN_REDUCTION_PATH = Path(__file__).with_name("run_reduction.py")
 
 
@@ -52,8 +53,7 @@ def run_bootstrap(bootstrap_inputs_directory: Path):
         return
     inputs_parent_path, inputs_backward_path, inputs_forward_path = input_dirs
 
-    boot_outputs_dir_path = inputs_parent_path.parent / (inputs_parent_path.name + "_outputs")
-    boot_outputs_dir_path.mkdir(exist_ok=True)
+    BOOTSTRAP_OUTPUTS_DIRECTORY.mkdir(exist_ok=True)
 
     sample_index = 1
     while True:
@@ -65,7 +65,7 @@ def run_bootstrap(bootstrap_inputs_directory: Path):
             break
 
         # TODO: Replace "boot_" with sample name
-        FilesManager.set_outputs_dir(Path(boot_outputs_dir_path, "boot_" + str(sample_index)))
+        FilesManager.set_experiment_dir(Path(BOOTSTRAP_OUTPUTS_DIRECTORY, "boot_" + str(sample_index)))
         AnalysisDataService.clear()
         Load(Filename=str(back_ws_path), OutputWorkspace=back_ws_path.stem)
         Load(Filename=str(front_ws_path), OutputWorkspace=front_ws_path.stem)

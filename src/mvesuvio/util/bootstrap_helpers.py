@@ -91,20 +91,5 @@ def update_sample_inputs_outputs(
 ) -> None:
     output_path.mkdir(exist_ok=True)
     apply_bootstrap_overrides(back_inputs, front_inputs, back_ws_path, front_ws_path)
-
-    FilesManager.set_outputs_dir(output_path)
-
-    # if hasattr(back_inputs, "output_directory"):
-    #     back_inputs.output_directory = str(output_path)
-    # if hasattr(front_inputs, "output_directory"):
-    #     front_inputs.output_directory = str(output_path)
-
-    # if hasattr(back_inputs, "reduction_directory"):
-    #     back_inputs.reduction_directory = FilesManager.get_outputs_reduction_dir()
-    # if hasattr(front_inputs, "reduction_directory"):
-    #     front_inputs.reduction_directory = FilesManager.get_outputs_reduction_dir()
-
-    # if hasattr(back_inputs, "fitting_directory"):
-    #     back_inputs.fitting_directory = FilesManager.get_outputs_fitting_dir()
-    # if hasattr(front_inputs, "fitting_directory"):
-    #     front_inputs.fitting_directory = FilesManager.get_outputs_fitting_dir()
+    FilesManager.set_experiment_dir(output_path)
+    return

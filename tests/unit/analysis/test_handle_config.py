@@ -5,7 +5,6 @@ import tempfile
 from textwrap import dedent
 import os
 from pathlib import Path
-import shutil
 
 class TestHandleConfig(unittest.TestCase):
     @classmethod
@@ -35,16 +34,12 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_set_config_vars(self):
         mock_dir = tempfile.TemporaryDirectory()
-        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
-        mock_file = Path(mock_file)
-        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         mock_file.write_text("")
 
         with (
             patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
-            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
-            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name)
-
+            patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file)
         ):
             mock_read_config.return_value = ['\n', 'caching.inputs=\n', 'caching.ipfolder=\n']
             handle_config.set_config_vars({'caching.inputs': '/inputs.py', 'caching.ipfolder': '/ipfiles'})
@@ -58,25 +53,19 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_set_default_config_vars(self):
         mock_dir = tempfile.TemporaryDirectory()
-        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
-        mock_file = Path(mock_file)
-        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         mock_file.write_text("")
 
         with (
             patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
-            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
-            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name),
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", str(Path("path", "to", ".mvesuvio"))),
-            patch.object(handle_config, "ANALYSIS_INPUTS_FILE", "analysis_inputs.py"),
-            patch.object(handle_config, "IP_FOLDER", "ip_files"),
-
+            patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
+            patch.object(handle_config, "USER_CONFIG_PATH", Path("path", "to", ".mvesuvio")),
         ):
             mock_read_config.return_value = ['\n', 'caching.inputs=\n', 'caching.ipfolder=\n']
             handle_config.set_default_config_vars()
 
             file = open(mock_file, "r")
-            self.assertEqual(file.read(), f"\ncaching.inputs={str(Path('path', 'to', '.mvesuvio', 'analysis_inputs.py'))}\ncaching.ipfolder={str(Path('path', 'to', '.mvesuvio', 'ip_files'))}\n")
+            self.assertEqual(file.read(), f"\ncaching.inputs={str(Path('path', 'to', '.mvesuvio', 'experiment_template'))}\ncaching.ipfolder={str(Path('path', 'to', '.mvesuvio', 'ip_files'))}\n")
 
             file.close()
             mock_dir.cleanup()
@@ -84,14 +73,11 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_read_config_vars(self):
         mock_dir = tempfile.TemporaryDirectory()
-        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
-        mock_file = Path(mock_file)
-        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         mock_file.write_text("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
 
         with (
-            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
-            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name)
+            patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
         ):
             self.assertEqual(handle_config.read_cached_var('caching.inputs'), '/inputs.py')
             self.assertEqual(handle_config.read_cached_var('caching.ipfolder'), '/ipfiles')
@@ -101,193 +87,166 @@ class TestHandleConfig(unittest.TestCase):
     def test_read_config_vars_throws(self):
 
         mock_dir = tempfile.TemporaryDirectory()
-        mock_file = os.path.join(mock_dir.name, "config", "mock.vesuvio.properties")
-        mock_file = Path(mock_file)
-        mock_file.parent.mkdir(parents=True, exist_ok=True)
+        mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         mock_file.write_text("\ncaching.inputs=/inputs.py\ncaching.ipfolder=/ipfiles\n")
 
         with (
-            patch.object(handle_config, "VESUVIO_PACKAGE_PATH", mock_dir.name),
-            patch.object(handle_config, "VESUVIO_PROPERTIES_FILE", mock_file.name),
+            patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
             self.assertRaises(ValueError)
         ):
             handle_config.read_cached_var('non.existent')
             mock_dir.cleanup()
 
 
-    def test_get_script_name(self):
+    def test_read_cached_var_uses_default_package_properties_path(self):
+        mock_dir = tempfile.TemporaryDirectory()
+        mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         with (
-            patch("mvesuvio.util.handle_config.os.path.basename") as mock_basename,
-            patch("mvesuvio.util.handle_config.read_cached_var") as mock_read_cached_var # noqa : F841
+            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
         ):
-            mock_basename.return_value = "inputs.py"
-            self.assertEqual(handle_config.get_script_name(), "inputs")
+            mock_read_config.return_value = ["caching.inputs=/inputs.py\n"]
+            handle_config.read_cached_var("caching.inputs")
+            mock_read_config.assert_called_once_with(mock_file, True)
 
 
-    def test_setup_config_dir(self):
-        # Use string because want to test when directory does not exist
-        tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
-        # Clean up any mess from previous tests
-        shutil.rmtree(tempdir, ignore_errors=True)
+    def test_set_config_vars_uses_default_package_properties_path(self):
+        mock_dir = tempfile.TemporaryDirectory()
+        mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
+        with (
+            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
+            patch("mvesuvio.util.handle_config.open", create=True) as mock_open,
+        ):
+            mock_read_config.return_value = ["caching.inputs=\n"]
+            handle_config.set_config_vars({"caching.inputs": "/inputs.py"})
 
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
-            handle_config.setup_config_dir()
-
-            self.assertTrue(Path(tempdir).exists())
-
-        shutil.rmtree(tempdir)
+            mock_read_config.assert_called_once_with(mock_file)
+            mock_open.assert_called_once_with(mock_file, "w")
 
 
-    def test_setup_config_dir_dir_already_exists(self):
+    def test_get_experiment_name(self):
+        with patch("mvesuvio.util.handle_config.read_cached_var") as mock_read_cached_var:
+            mock_read_cached_var.return_value = str(Path("path", "to", "experiment"))
+            self.assertEqual(handle_config.get_experiment_name(), "experiment")
+
+
+    def test_refresh_config_dir_and_contents_creates_user_config_dir_when_missing(self):
         tempdir = tempfile.TemporaryDirectory()
-        with (
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
-            patch("mvesuvio.util.handle_config.os.makedirs") as mock_mkdirs,
-            patch("mvesuvio.util.handle_config.copyfile") as mock_copyfile
-        ):
-            handle_config.setup_config_dir()
-            mock_mkdirs.assert_not_called()
-            mock_copyfile.assert_not_called()
-            tempdir.cleanup()
+        missing_dir = Path(tempdir.name, "missing_config_dir")
 
+        self.assertFalse(missing_dir.exists())
 
-    def test_setup_default_ipfile_dir(self):
-        tempdir = tempfile.TemporaryDirectory()
-
-        mock_path = os.path.join(tempdir.name, 'ip_folder')
-        with (
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
-            patch.object(handle_config, "IP_FOLDER", "ip_folder"),
-        ):
-            handle_config.setup_default_ipfile_dir()
-
-            # Check all par files inside config/ip_files were copied to destination
-            for ip_file in Path(handle_config.VESUVIO_PACKAGE_PATH, "config", "ip_files").iterdir():
-                if not ip_file.name.endswith("par"):
-                    continue
-
-                self.assertTrue(Path(mock_path, ip_file.name).exists())
-
-            tempdir.cleanup()
-
-
-    def test_setup_default_ipfile_dir_dir_already_exists(self):
-        tempdir = tempfile.TemporaryDirectory()
-        # Create ip folder
-        Path(tempdir.name, "ip_folder").mkdir()
-        self.assertTrue(Path(tempdir.name, "ip_folder").exists())
-
-        with (
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
-            patch.object(handle_config, "IP_FOLDER", "ip_folder"),
-            patch("mvesuvio.util.handle_config.copytree") as mock_mkdirs,
-        ):
-            handle_config.setup_default_ipfile_dir()
-            mock_mkdirs.assert_not_called()
-            tempdir.cleanup()
-
-
-    def test_setup_default_inputs(self):
-        tempdir = tempfile.TemporaryDirectory()
-        mock_path = os.path.join(tempdir.name, 'analysis_inputs.py')
-        with (
-            patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name),
-            patch.object(handle_config, "ANALYSIS_INPUTS_FILE", "analysis_inputs.py"),
-        ):
-
-            handle_config.setup_default_inputs()
-
-            file = open(mock_path, 'r')
-            original_content = file.read()
-            file.close()
-
-            file = open(mock_path, 'w+')
-            file.write('Overwrite file!')
-            file.seek(0)
-            # Check that file was overwritten
-            self.assertEqual("Overwrite file!", file.read())
-            file.close()
-
-            handle_config.setup_default_inputs()
-
-            file = open(mock_path, 'r')
-            self.assertEqual(original_content, file.read())
-            file.close()
-            tempdir.cleanup()
-
-
-    def test_refresh_config_dir_and_contents_dir_doesnt_exist(self):
-        # Use string because want to test when directory does not exist
-        tempdir = os.path.join(tempfile.gettempdir(), ".mvesuvio")
-        # Clean up any mess from previous tests
-        shutil.rmtree(tempdir, ignore_errors=True)
-
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir):
+        with patch.object(handle_config, "USER_CONFIG_PATH", missing_dir):
             handle_config.refresh_config_dir_and_contents()
 
-        self.assertTrue(Path(tempdir, "script_to_create_figures.py").exists())
-        self.assertTrue(Path(tempdir, "vesuvio.plots.mplstyle").exists())
-        self.assertTrue(Path(tempdir, "analysis_inputs.py").exists())
-        self.assertTrue(Path(tempdir, "ip_files").exists())
-
-        shutil.rmtree(tempdir)
-
-    def test_refresh_config_dir_and_contents_dir_exists(self):
-        tempdir = tempfile.TemporaryDirectory()
-
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name):
-            handle_config.refresh_config_dir_and_contents()
-
-            self.assertTrue(Path(tempdir.name, "script_to_create_figures.py").exists())
-            self.assertTrue(Path(tempdir.name, "vesuvio.plots.mplstyle").exists())
-            self.assertTrue(Path(tempdir.name, "analysis_inputs.py").exists())
-            self.assertTrue(Path(tempdir.name, "ip_files").exists())
-        tempdir.cleanup()
-
-    def test_refresh_config_dir_and_contents_dont_overwrite_ip_files(self):
-        tempdir = tempfile.TemporaryDirectory()
-        Path(tempdir.name, "ip_files").mkdir()
-        Path(tempdir.name, "ip_files", "ip.par").touch()
-
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name):
-            handle_config.refresh_config_dir_and_contents()
-            # Did not overwrite ip files
-            self.assertTrue(Path(tempdir.name, "ip_files", "ip.par").exists())
+        self.assertTrue(missing_dir.exists())
         tempdir.cleanup()
 
 
-    def test_refresh_config_dir_and_contents_dont_overwrite_plots_config(self):
+    def test_refresh_config_dir_and_contents_when_dir_exists_does_not_reset_dir(self):
         tempdir = tempfile.TemporaryDirectory()
-        Path(tempdir.name, "vesuvio.plots.mplstyle").write_text("mock config")
+        preserved_file = Path(tempdir.name, "custom_local_file.txt")
+        preserved_file.write_text("keep me")
 
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name):
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
             handle_config.refresh_config_dir_and_contents()
-            # Check did not overwrite plots config
-            self.assertEqual(Path(tempdir.name, "vesuvio.plots.mplstyle").read_text(), "mock config")
+
+        self.assertTrue(preserved_file.exists())
+        self.assertEqual(preserved_file.read_text(), "keep me")
         tempdir.cleanup()
 
 
-    def test_refresh_config_dir_and_contents_dont_overwrite_script_figures(self):
+    def test_refresh_config_dir_and_contents_copies_dict_config_when_dir_missing(self):
         tempdir = tempfile.TemporaryDirectory()
-        Path(tempdir.name, "script_to_create_figures.py").write_text("mock script")
 
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name):
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
             handle_config.refresh_config_dir_and_contents()
-            # Check did not overwrite plots config
-            self.assertEqual(Path(tempdir.name, "script_to_create_figures.py").read_text(), "mock script")
+
+        self.assertTrue(Path(tempdir.name, "ip_files").exists())
+        self.assertTrue(Path(tempdir.name, "vesuvio.plots.mplstyle").exists())
+        self.assertTrue(Path(tempdir.name, "experiment_template", "script_to_create_figures.py").exists())
+        self.assertTrue(Path(tempdir.name, "experiment_template", "run_reduction.py").exists())
+        self.assertTrue(Path(tempdir.name, "experiment_template", "run_fitting.py").exists())
+
         tempdir.cleanup()
 
 
-    def test_refresh_config_dir_and_contents_dont_overwrites_analysis_inputs(self):
+    def test_refresh_config_dir_and_contents_never_copies_dunder_files(self):
         tempdir = tempfile.TemporaryDirectory()
-        Path(tempdir.name, "analysis_inputs.py").write_text("mock script")
 
-        with patch.object(handle_config, "VESUVIO_CONFIG_PATH", tempdir.name):
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
             handle_config.refresh_config_dir_and_contents()
 
-            # Analysis inputs overwritten
-            self.assertEqual(
-                Path(tempdir.name, "analysis_inputs.py").read_text(),
-                Path(handle_config.VESUVIO_PACKAGE_PATH, "config", "analysis_inputs.py").read_text()
-            )
+        self.assertFalse(Path(tempdir.name, "__init__.py").exists())
+        self.assertFalse(Path(tempdir.name, "__pycache__").exists())
+        self.assertFalse(any(Path(tempdir.name).rglob("__*.py")))
+        tempdir.cleanup()
+
+
+    def test_refresh_config_dir_and_contents_never_copies_vesuvio_user_properties(self):
+        tempdir = tempfile.TemporaryDirectory()
+
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
+            handle_config.refresh_config_dir_and_contents()
+
+        self.assertFalse(Path(tempdir.name, "vesuvio.user.properties").exists())
+        tempdir.cleanup()
+
+
+    def test_refresh_config_dir_and_contents_dont_overwrite_copy_if_present_file(self):
+        tempdir = tempfile.TemporaryDirectory()
+        template_dir = Path(tempdir.name, "experiment_template")
+        template_dir.mkdir(parents=True, exist_ok=True)
+        script_path = template_dir / "script_to_create_figures.py"
+        script_path.write_text("mock script")
+
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
+            handle_config.refresh_config_dir_and_contents()
+
+        self.assertEqual(script_path.read_text(), "mock script")
+        tempdir.cleanup()
+
+
+    def test_refresh_config_dir_and_contents_dont_overwrite_copy_if_present_dir(self):
+        tempdir = tempfile.TemporaryDirectory()
+        ip_dir = Path(tempdir.name, "ip_files")
+        ip_dir.mkdir(parents=True, exist_ok=True)
+        marker = ip_dir / "ip.par"
+        marker.write_text("keep")
+
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
+            handle_config.refresh_config_dir_and_contents()
+
+        self.assertEqual(marker.read_text(), "keep")
+        tempdir.cleanup()
+
+
+    def test_refresh_config_dir_and_contents_overwrites_always_copy_file(self):
+        tempdir = tempfile.TemporaryDirectory()
+        target = Path(tempdir.name, "experiment_template", "run_reduction.py")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("old content")
+
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
+            handle_config.refresh_config_dir_and_contents()
+
+        self.assertEqual(
+            target.read_text(),
+            Path(
+                handle_config.PACKAGE_CONFIG_PATH,
+                "experiment_template",
+                "run_reduction.py",
+            ).read_text(),
+        )
+        tempdir.cleanup()
+
+
+    def test_refresh_config_dir_and_contents_ignores_dunder_files_in_ip_dir_copy(self):
+        tempdir = tempfile.TemporaryDirectory()
+
+        with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir.name)):
+            handle_config.refresh_config_dir_and_contents()
+
+        self.assertFalse(Path(tempdir.name, "ip_files", "__init__.py").exists())
         tempdir.cleanup()

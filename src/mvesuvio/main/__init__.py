@@ -61,9 +61,9 @@ def _setup_config(args):
     inputs = handle_config.read_cached_var("caching.inputs")
     ipfolder_dir = handle_config.read_cached_var("caching.ipfolder")
 
-    if args and args.analysis_inputs:
+    if args and args.analysis_inputs and handle_config.is_dir(args.analysis_inputs):
         inputs = str(Path(args.analysis_inputs).absolute())
-    if args and args.ip_folder:
+    if args and args.ip_folder and handle_config.is_dir(args.ip_folder):
         ipfolder_dir = str(Path(args.ip_folder).absolute())
 
     handle_config.set_config_vars(
@@ -72,12 +72,18 @@ def _setup_config(args):
             "caching.ipfolder": ipfolder_dir,
         }
     )
-    handle_config.check_dir_exists("IP folder", ipfolder_dir)
+    return
 
 
 def __set_logging_properties():
     from mantid.kernel import ConfigService
 
+    # Good to have
+    ConfigService.setString("default.facility", "ISIS")
+    ConfigService.setString("default.instrument", "Vesuvio")
+    ConfigService.setString("datasearch.searcharchive", "On")
+
+    # Logging
     ConfigService.setString("logging.loggers.root.channel.class", "SplitterChannel")
     ConfigService.setString("logging.loggers.root.channel.channel1", "consoleChannel")
     ConfigService.setString("logging.loggers.root.channel.channel2", "fileChannel")

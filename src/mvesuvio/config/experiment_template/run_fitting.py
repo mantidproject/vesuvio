@@ -1,9 +1,32 @@
 from mvesuvio.analysis_fitting import FitInYSpace
-from mvesuvio.config.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
 from mvesuvio.util.files_manager import FilesManager
 from mantid.api import AnalysisDataService
 from mantid.kernel import logger
 from mantid.simpleapi import Load, SaveAscii, mtd
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
+else:
+    try:
+        # Preferred import path when this module is executed as part of the package.
+        from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
+    except ImportError:
+        # Fallback for direct/script execution: load sibling run_reduction.py by file path.
+        import importlib.util
+        from pathlib import Path
+
+        _run_reduction_path = Path(__file__).resolve().parent / "run_reduction.py"
+        _module_name = "mvesuvio.config.experiment_template._local_run_reduction"
+        _spec = importlib.util.spec_from_file_location(_module_name, _run_reduction_path)
+        if _spec is None or _spec.loader is None:
+            raise ImportError(f"Could not load run_reduction module from {_run_reduction_path}")
+
+        _run_reduction = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_run_reduction)
+
+        BackwardAnalysisInputs = _run_reduction.BackwardAnalysisInputs
+        ForwardAnalysisInputs = _run_reduction.ForwardAnalysisInputs
 
 
 class BackwardFittingInputs(BackwardAnalysisInputs):
@@ -69,7 +92,7 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
 
 
 def load_saved_fitting_input_workspaces() -> None:
-    fitting_inputs_dir = FilesManager.get_outputs_fitting_inputs_dir()
+    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
     if not fitting_inputs_dir.exists():
         logger.notice(f"No saved fitting input workspaces found in {fitting_inputs_dir}. Skipping workspace reload.")
         return
@@ -98,7 +121,7 @@ def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | 
             and AnalysisDataService.doesExist(lightest_data_name)
             and AnalysisDataService.doesExist(lightest_ncp_name)
         ):
-            fitting_directory = FilesManager.get_outputs_fitting_dir()
+            fitting_directory = FilesManager.get_fitting_outputs_dir()
             fitting_directory.mkdir(parents=True, exist_ok=True)
             SaveAscii(resolution_name, str(fitting_directory / resolution_name))
 

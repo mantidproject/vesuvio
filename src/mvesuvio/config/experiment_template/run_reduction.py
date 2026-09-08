@@ -153,7 +153,7 @@ class ForwardAnalysisInputs(SampleParameters):
 
 
 def main() -> None:
-    mvesuvio.main(ConfigArgInputs(analysis_inputs=str(Path(__file__)), ip_folder=""))
+    mvesuvio.main(ConfigArgInputs(analysis_inputs=str(Path(__file__).parent), ip_folder=""))
 
     # Optional workspace-name overrides for bootstrap script injection.
     BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
@@ -257,7 +257,7 @@ def main() -> None:
 
 
 def save_fitting_input_workspaces() -> None:
-    fitting_inputs_dir = FilesManager.get_outputs_fitting_inputs_dir()
+    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
     fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
     for analysis_inputs in (BackwardAnalysisInputs, ForwardAnalysisInputs):
         if not analysis_inputs.run_this_scattering_type:
