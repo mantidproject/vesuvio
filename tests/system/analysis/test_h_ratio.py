@@ -1,43 +1,47 @@
+import runpy
 import unittest
+from unittest.mock import patch
 from pathlib import Path
-from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
+from mvesuvio import ConfigArgInputs
+from shutil import copytree
 import mvesuvio
-from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces
-import os
+from mantid.simpleapi import LoadAscii, CompareWorkspaces
 
 
-class TestReduction(unittest.TestCase):
+class TestHRatioRoutine(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        handle_config.refresh_config_dir_and_contents()
+        mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        copytree(
+            handle_config.PACKAGE_CONFIG_PATH / "experiment_template" / "reduction_inputs",
+            handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_inputs",
+            dirs_exist_ok=True
+            )
         pass
 
     def setUp(self):
         pass
 
-    def test_reduction(self):
+    def test_h_ratio_routine(self):
+        reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"
+        namespace = runpy.run_path(str(reduction_script), run_name="test_h_ratio_run_reduction")
+        namespace["BackwardAnalysisInputs"].run_this_scattering_type = True
+        namespace["ForwardAnalysisInputs"].run_this_scattering_type = True
+        namespace["BackwardAnalysisInputs"].intensity_ratio_of_hydrogen_to_chosen_mass = 0
+        namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
+        namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
+        with patch("builtins.input", return_value=""):
+            namespace["main"]()
+
         benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "h_ratio" / "hydrogen_intensity_ratios_estimates"
-        results_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs" / "output_files" / "hydrogen_intensity_ratios_estimates"
+        result_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "hydrogen_intensity_ratios_estimates"
 
-        mvesuvio.config(
-            ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-            analysis_inputs=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
-        )
-        # Delete outputs from previous runs
-        if results_path.is_file():
-            os.remove(str(results_path))
+        bench_name = "bench_h_ratios"
+        result_name = "result_h_ratios"
 
-        runner = Runner(running_tests=True)
-        runner.bckwd_ai.intensity_ratio_of_hydrogen_to_chosen_mass = 0
-        runner.run()
-
-        AnalysisDataService.clear()
-        LoadAscii(str(benchmark_path), Separator="CSV", OutputWorkspace="bench_"+benchmark_path.name)
-        LoadAscii(str(results_path), Separator="CSV", OutputWorkspace=results_path.name)
-
-        for ws_name in mtd.getObjectNames():
-            if ws_name.startswith('bench'):
-                tol = 1e-3
-                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=tol)
-                self.assertTrue(result)
-
+        LoadAscii(str(benchmark_path), Separator="CSV", OutputWorkspace=bench_name)
+        LoadAscii(str(result_path), Separator="CSV", OutputWorkspace=result_name)
+        (result, _messages) = CompareWorkspaces(bench_name, result_name, Tolerance=1e-3)
+        self.assertTrue(result)

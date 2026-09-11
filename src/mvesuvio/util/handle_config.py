@@ -1,25 +1,24 @@
-import os
 from shutil import copyfile, copytree, ignore_patterns
 from pathlib import Path
 
+PACKAGE_CONFIG_PATH = Path(__file__).absolute().parent.with_name("default_config")
+USER_CONFIG_PATH = Path.home() / "mvesuvio"
+VESUVIO_PROPERTIES_PATH = PACKAGE_CONFIG_PATH / "vesuvio.user.properties"
+PLOTS_CONFIG_PATH = PACKAGE_CONFIG_PATH / "vesuvio.plots.mplstyle"
 
-### PATH CONSTANTS ###
-VESUVIO_PACKAGE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-VESUVIO_CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".mvesuvio")
-VESUVIO_PROPERTIES_FILE = "vesuvio.user.properties"
-ANALYSIS_INPUTS_FILE = "analysis_inputs.py"
-MANTID_CONFIG_FILE = "Mantid.user.properties"
-PLOTS_CONFIG_FILE = "vesuvio.plots.mplstyle"
-SCRIPT_FIGUES_FILE = "script_to_create_figures.py"
-IP_FOLDER = "ip_files"
-######################
+COPY_IF_NOT_PRESENT = {"ip_files": "dir", "experiment_template/script_to_create_figures.py": "file", "vesuvio.plots.mplstyle": "file"}
+
+ALWAYS_COPY = {
+    "experiment_template/run_reduction.py": "file",
+    "experiment_template/run_fitting.py": "file",
+}
 
 
 def set_default_config_vars():
     set_config_vars(
         {
-            "caching.inputs": str(Path(VESUVIO_CONFIG_PATH, ANALYSIS_INPUTS_FILE)),
-            "caching.ipfolder": str(Path(VESUVIO_CONFIG_PATH, IP_FOLDER)),
+            "caching.inputs": str(USER_CONFIG_PATH / "experiment_template"),
+            "caching.ipfolder": str(USER_CONFIG_PATH / "ip_files"),
         }
     )
 
@@ -36,7 +35,7 @@ def __read_config(config_file_path, throw_on_not_found=True):
 
 
 def set_config_vars(var_dict):
-    file_path = Path(VESUVIO_PACKAGE_PATH, "config", VESUVIO_PROPERTIES_FILE)
+    file_path = VESUVIO_PROPERTIES_PATH
     lines = __read_config(file_path)
 
     updated_lines = []
@@ -58,8 +57,7 @@ def set_config_vars(var_dict):
 
 
 def read_cached_var(var, throw_on_not_found=True):
-    file_path = Path(VESUVIO_PACKAGE_PATH, "config", VESUVIO_PROPERTIES_FILE)
-    lines = __read_config(file_path, throw_on_not_found)
+    lines = __read_config(VESUVIO_PROPERTIES_PATH, throw_on_not_found)
 
     result = ""
     for line in lines:
@@ -71,59 +69,45 @@ def read_cached_var(var, throw_on_not_found=True):
     return result
 
 
-def get_script_name():
-    filename = os.path.basename(read_cached_var("caching.inputs"))
-    scriptName = filename.removesuffix(".py")
-    return scriptName
+def get_experiment_name():
+    return Path(read_cached_var("caching.inputs")).name
 
 
 def get_plots_config_file() -> str:
-    return os.path.abspath(os.path.join(VESUVIO_CONFIG_PATH, PLOTS_CONFIG_FILE))
+    return str(PLOTS_CONFIG_PATH)
 
 
 def refresh_config_dir_and_contents():
-    setup_config_dir()
-    setup_plots_config_file()
-    setup_script_figures_file()
-    setup_default_inputs()
-    setup_default_ipfile_dir()
+    USER_CONFIG_PATH.mkdir(exist_ok=True)
+    _copy_config_entries(COPY_IF_NOT_PRESENT, overwrite=False)
+    _copy_config_entries(ALWAYS_COPY, overwrite=True)
 
 
-def setup_script_figures_file():
-    if not Path(VESUVIO_CONFIG_PATH, SCRIPT_FIGUES_FILE).exists():
-        copyfile(
-            Path(VESUVIO_PACKAGE_PATH, "config", SCRIPT_FIGUES_FILE),
-            Path(VESUVIO_CONFIG_PATH, SCRIPT_FIGUES_FILE),
-        )
+def _copy_config_entries(entries, overwrite=False):
+    for relative_path, entry_type in entries.items():
+        destination = Path(USER_CONFIG_PATH, relative_path)
+
+        if not overwrite and destination.exists():
+            continue
+
+        _copy_config_entry(relative_path, entry_type, overwrite)
 
 
-def setup_plots_config_file():
-    if not Path(VESUVIO_CONFIG_PATH, PLOTS_CONFIG_FILE).exists():
-        copyfile(
-            Path(VESUVIO_PACKAGE_PATH, "config", PLOTS_CONFIG_FILE),
-            Path(VESUVIO_CONFIG_PATH, PLOTS_CONFIG_FILE),
-        )
+def _copy_config_entry(relative_path, entry_type, overwrite):
+    source = Path(PACKAGE_CONFIG_PATH, relative_path)
+    destination = Path(USER_CONFIG_PATH, relative_path)
 
+    if entry_type == "file":
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        copyfile(source, destination)
+        return
 
-def setup_config_dir():
-    if not os.path.isdir(VESUVIO_CONFIG_PATH):
-        os.makedirs(VESUVIO_CONFIG_PATH)
+    if entry_type == "dir":
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        copytree(source, destination, dirs_exist_ok=overwrite, ignore=ignore_patterns("__*"))
+        return
 
-
-def setup_default_inputs():
-    copyfile(
-        Path(VESUVIO_PACKAGE_PATH, "config", ANALYSIS_INPUTS_FILE),
-        Path(VESUVIO_CONFIG_PATH, ANALYSIS_INPUTS_FILE),
-    )
-
-
-def setup_default_ipfile_dir():
-    if not Path(VESUVIO_CONFIG_PATH, IP_FOLDER).is_dir():
-        copytree(
-            Path(VESUVIO_PACKAGE_PATH, "config", "ip_files"),
-            Path(VESUVIO_CONFIG_PATH, IP_FOLDER),
-            ignore=ignore_patterns("__*"),
-        )
+    raise ValueError(f"Unknown config entry type: {entry_type}")
 
 
 def is_cache_set():
@@ -133,8 +117,8 @@ def is_cache_set():
         return False
 
 
-def check_dir_exists(type, path):
-    if not os.path.isdir(path):
-        print(f"Directory of {type} could not be found at location: {path}")
+def is_dir(path):
+    if not Path(path).is_dir():
+        print(f"\nError setting directory: {path}\nUsing default.")
         return False
     return True

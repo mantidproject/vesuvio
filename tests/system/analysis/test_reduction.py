@@ -1,53 +1,53 @@
+import runpy
 import unittest
 from pathlib import Path
-from mvesuvio.main.run_routine import Runner
 from mvesuvio.util import handle_config
+from mvesuvio import ConfigArgInputs
+from shutil import copytree
 import mvesuvio
-from mantid.simpleapi import Load, LoadAscii, mtd, CompareWorkspaces, AnalysisDataService
-import shutil
+from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
 
 class TestReduction(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        handle_config.refresh_config_dir_and_contents()
+        mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        copytree(
+            handle_config.PACKAGE_CONFIG_PATH / "experiment_template" / "reduction_inputs",
+            handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_inputs",
+            dirs_exist_ok=True
+            )
         pass
 
     def setUp(self):
         pass
 
-    def test_reduction(self):
-        benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
-        results_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs" / "output_files" / "reduction"
-
-        mvesuvio.config(
-            ip_folder=str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files")),
-            analysis_inputs=str(Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs.py")
-        )
-
-        # Delete outputs from previous runs
-        if results_path.exists():
-            shutil.rmtree(str(results_path))
-
-        Runner().run()
+    def test_reduction_routine(self):
+        reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"
+        namespace = runpy.run_path(str(reduction_script), run_name="test_reduction_run_reduction")
+        namespace["BackwardAnalysisInputs"].run_this_scattering_type = True
+        namespace["ForwardAnalysisInputs"].run_this_scattering_type = True
+        namespace["BackwardAnalysisInputs"].name = "back"
+        namespace["ForwardAnalysisInputs"].name = "front"
+        namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
+        namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 1
+        namespace["ForwardAnalysisInputs"].mask_of_time_of_flight_range = "110-140"
+        namespace["main"]()
 
         AnalysisDataService.clear()
 
-        for p in benchmark_path.iterdir():
-            if p.is_dir():
-                continue
-            if p.name.endswith("nxs"):
-                Load(str(p), OutputWorkspace="bench_"+p.stem)
-                continue
-            # TODO: Rename ascii files to include a .txt extension
-            LoadAscii(str(p), Separator="CSV", OutputWorkspace="bench_"+p.name)
+        benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
+        results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_outputs"
 
-        for p in results_path.iterdir():
-            if p.is_dir():
-                continue
-            if p.name.endswith("nxs"):
-                Load(str(p), OutputWorkspace=p.stem)
-                continue
-            LoadAscii(str(p), Separator="CSV", OutputWorkspace=p.stem)
+        for prefix, path in zip(("bench", "result"), (benchmark_path, results_path)):
+            for p in path.iterdir():
+                if p.is_dir():
+                    continue
+                if p.name.endswith("nxs"):
+                    Load(str(p), OutputWorkspace=prefix+"_"+p.stem)
+                    continue
+                LoadAscii(str(p), Separator="CSV", OutputWorkspace=prefix+"_"+p.stem)
 
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
@@ -57,8 +57,8 @@ class TestReduction(unittest.TestCase):
                     continue
                 else:
                     tol = 1e-3
-                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=tol)
-                self.assertTrue(result)
+                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench", "result"), Tolerance=tol)
+                self.assertTrue(result, f"Comparison failed for workspace: {ws_name}")
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):

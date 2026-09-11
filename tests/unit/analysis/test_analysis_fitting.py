@@ -74,5 +74,7 @@ class TestAnalysisFitting(unittest.TestCase):
         plt.close(fig)
         plt.close('all')
 
+
+
 if __name__ == "__main__":
     unittest.main()

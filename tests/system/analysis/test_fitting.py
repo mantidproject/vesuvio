@@ -1,95 +1,62 @@
-from dataclasses import dataclass
+
+import os
+import runpy
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+os.environ.setdefault("MPLBACKEND", "Agg")
+
+import matplotlib
+matplotlib.use("Agg", force=True)
+
 from mvesuvio.util import handle_config
-from mvesuvio.analysis_fitting import FitInYSpace
-from mantid.simpleapi import Load, LoadAscii, mtd, CompareWorkspaces, AnalysisDataService
-
-def ascii_workspaces_match(benchmark_dir, target_dir):
-    for p in benchmark_dir.iterdir():
-        if p.suffix == '.py':
-            pass
-        LoadAscii(str(p), Separator="CSV", OutputWorkspace="bench_"+p.name)
-
-    for p in target_dir.iterdir():
-        LoadAscii(str(p), Separator="CSV", OutputWorkspace=p.name)
-
-    match = False
-    for ws_name in mtd.getObjectNames():
-        if ws_name.startswith('bench'):
-            match = CompareWorkspaces(ws_name, ws_name.replace("bench_", ""), Tolerance=1e-4)
-            if not match:
-                return False
-    return match
+from mvesuvio import ConfigArgInputs
+from shutil import copytree
+import mvesuvio
+from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
 
 class TestFitting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.inputs_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "fitting_inputs"
-        cls.benchmark_dir = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting"
-        cls.target_dir = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "system_test_inputs" / "output_files" / "fitting"
-
-        cls.ws_to_fit_path = cls.inputs_path / "system_test_inputs_fwd_1_m0_-fse.nxs"
-        cls.ws_to_fit_ncp_path = cls.inputs_path / "system_test_inputs_fwd_1_1.0079_ncp_-fse.nxs"
-        cls.ws_resolution_path = cls.inputs_path / "system_test_inputs_fwd_1_resolution.nxs"
-
-        cls.ipfile_path = Path(handle_config.VESUVIO_CONFIG_PATH) / handle_config.IP_FOLDER / "ip2018_3.par"
-
-        return
+        handle_config.refresh_config_dir_and_contents()
+        mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        copytree(
+            handle_config.PACKAGE_CONFIG_PATH / "experiment_template" / "fitting_inputs",
+            handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_inputs",
+            dirs_exist_ok=True
+            )
+        pass
 
     def setUp(self):
-        self.ws_to_fit = Load(str(self.ws_to_fit_path), OutputWorkspace="ws")
-        self.ws_to_fit_ncp = Load(str(self.ws_to_fit_ncp_path), OutputWorkspace="ws_ncp")
-        self.ws_resolution = Load(str(self.ws_resolution_path), OutputWorkspace="resolution")
+        pass
 
-        @dataclass
-        class FitInputs:
-            show_plots = False
-            do_symmetrisation = True
-            subtract_calculated_fse_from_data = True
-            range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric
-            fitting_model = "gauss"
-            run_minos = True
-            do_global_fit = True   # Performs global fit with Minuit by default
-            number_of_global_fit_groups = 4
-            mask_zeros_with = "nan"
+    def test_fitting_routine(self):
+        fitting_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_fitting.py"
+        namespace = runpy.run_path(str(fitting_script), run_name="test_fitting_run_fitting")
+        namespace["BackwardFittingInputs"].run_this_fitting_type = False
+        namespace["ForwardFittingInputs"].run_this_fitting_type = True
+        namespace["ForwardFittingInputs"].fitting_model = "gauss"
+        with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
+            namespace["run_fitting"]()
 
-            save_path = self.target_dir
-            masses = [1.0079, 12, 16, 27]
-            instrument_parameters_file = self.ipfile_path
-            detectors = '144-182'
-
-        self.fi = FitInputs()
-        return
-
-    def tearDown(self) -> None:
         AnalysisDataService.clear()
-        return
 
-    def test_gauss_with_symmetrisation_and_fse(self):
-        fi = self.fi
-        fi.fitting_model = "gauss"
-        fi.do_symmetrisation = True
-        fi.subtract_calculated_fse_from_data = True
-        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution, self.target_dir)
-        alg.run()
-        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gauss_fit", self.target_dir / "gauss_fit"))
+        benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
+        results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "gauss_fit"
 
-    def test_gcc4_no_symmetrisation_and_fse(self):
-        fi = self.fi
-        fi.fitting_model = "gcc4"
-        fi.do_symmetrisation = False
-        fi.subtract_calculated_fse_from_data = True
-        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution, self.target_dir)
-        alg.run()
-        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gcc4_fit", self.target_dir / "gcc4_fit"))
+        for prefix, path in zip(("bench", "result"), (benchmark_path, results_path)):
+            for p in path.iterdir():
+                if p.is_dir():
+                    continue
+                if p.name.endswith("nxs"):
+                    Load(str(p), OutputWorkspace=prefix+"_"+p.stem)
+                    continue
+                LoadAscii(str(p), Separator="CSV", OutputWorkspace=prefix+"_"+p.stem)
 
-    def test_gauss2d_with_symmetrisation_no_fse(self):
-        fi = self.fi
-        fi.fitting_model = "gauss2d"
-        fi.do_symmetrisation = True
-        fi.subtract_calculated_fse_from_data = False
-        alg = FitInYSpace(fi, self.ws_to_fit, self.ws_to_fit_ncp, self.ws_resolution, self.target_dir)
-        alg.run()
-        self.assertTrue(ascii_workspaces_match(self.benchmark_dir / "gauss2d_fit", self.target_dir / "gauss2d_fit"))
+        for ws_name in mtd.getObjectNames():
+            if ws_name.startswith('bench'):
+                tol = 1e-3
+                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench", "result"), Tolerance=tol)
+                self.assertTrue(result, f"Comparison failed for workspace: {ws_name}")

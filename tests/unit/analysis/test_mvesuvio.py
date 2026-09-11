@@ -9,21 +9,18 @@ class TestPackageAPI(unittest.TestCase):
         pass
 
     @patch("mvesuvio.main")
-    def test_set_config(self, mock_main):
+    def test_config(self, mock_main):
 
-        mvesuvio.config(analysis_inputs="mock_file", ip_folder="mock_ipfolder")
+        mvesuvio.config(experiment_dir="mock_file", ip_dir="mock_ipfolder")
 
         args, _kwargs = mock_main.call_args
-        self.assertEqual(args[0].analysis_inputs, "mock_file")
-        self.assertEqual(args[0].ip_folder, "mock_ipfolder")
+        self.assertEqual(args[0].experiment_dir, "mock_file")
+        self.assertEqual(args[0].ip_dir, "mock_ipfolder")
 
     @patch("mvesuvio.main")
     def test_run(self, mock_main):
 
-        mvesuvio.run(back_workspace="bws", front_workspace="fws", minimal_output=True, outputs_dir="out")
+        mvesuvio.run()
 
         args, _kwargs = mock_main.call_args
-        self.assertEqual(args[0].back_workspace, "bws")
-        self.assertEqual(args[0].front_workspace, "fws")
-        self.assertEqual(args[0].minimal_output, True)
-        self.assertEqual(args[0].outputs_dir, "out")
+        self.assertEqual(args[0].command, "run")

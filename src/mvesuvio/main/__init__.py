@@ -1,9 +1,11 @@
 """Package defining entry points."""
 
 import argparse
+import runpy
 from os import path
 from pathlib import Path
 from mvesuvio.util import handle_config
+from mvesuvio.util.files_manager import FilesManager
 
 
 def main(manual_args=None):
@@ -34,51 +36,17 @@ def _set_up_parser():
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("version", help="Display the version of mvesuvio")
     config_parser = subparsers.add_parser("config", help="Set mvesuvio configuration")
-    config_parser.add_argument("--analysis-inputs", "-i", help="Set the inputs python file", default="", type=str)
+    config_parser.add_argument("--experiment-dir", "-e", help="Set the experiment directory", default="", type=str)
     config_parser.add_argument(
-        "--ip-folder",
-        "-p",
-        help="Set the intrument parameters directory",
+        "--ip-dir",
+        "-i",
+        help="Set the instrument parameters directory",
         default="",
         type=str,
     )
 
-    run_parser = subparsers.add_parser("run", help="Run mvesuvio analysis")
-    run_parser.add_argument(
-        "--back-workspace",
-        "-b",
-        help="Input workspace for vesuvio backward analysis, bypasses loading (and subtracting) raw and empty.",
-        default="",
-        type=str,
-    )
-    run_parser.add_argument(
-        "--front-workspace",
-        "-f",
-        help="Input workspace for vesuvio forward analysis, bypasses loading (and subtracting) raw and empty.",
-        default="",
-        type=str,
-    )
-    run_parser.add_argument(
-        "--minimal-output",
-        action="store_true",
-        help="Flag to set output files to minimum.",
-        default=False,
-    )
-    run_parser.add_argument(
-        "--outputs-dir",
-        "-o",
-        help="Directory for populating with output files.",
-        default="",
-        type=str,
-    )
-    boot_parser = subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
-    boot_parser.add_argument(
-        "--inputs-dir",
-        "-d",
-        help="Directory containing input bootstrap replicas. Replicas should be inside sparate backaward and forward subdirectories.",
-        default="",
-        type=str,
-    )
+    subparsers.add_parser("run", help="Run mvesuvio analysis")
+    subparsers.add_parser("bootstrap", help="Run bootstrap of vesuvio analysis (without y-space fitting)")
     return parser
 
 
@@ -93,10 +61,10 @@ def _setup_config(args):
     inputs = handle_config.read_cached_var("caching.inputs")
     ipfolder_dir = handle_config.read_cached_var("caching.ipfolder")
 
-    if args and args.analysis_inputs:
-        inputs = str(Path(args.analysis_inputs).absolute())
-    if args and args.ip_folder:
-        ipfolder_dir = str(Path(args.ip_folder).absolute())
+    if args and args.experiment_dir and handle_config.is_dir(args.experiment_dir):
+        inputs = str(Path(args.experiment_dir).absolute())
+    if args and args.ip_dir and handle_config.is_dir(args.ip_dir):
+        ipfolder_dir = str(Path(args.ip_dir).absolute())
 
     handle_config.set_config_vars(
         {
@@ -104,20 +72,28 @@ def _setup_config(args):
             "caching.ipfolder": ipfolder_dir,
         }
     )
-    handle_config.check_dir_exists("IP folder", ipfolder_dir)
+    return
 
 
 def __set_logging_properties():
     from mantid.kernel import ConfigService
 
+    # Good to have
+    ConfigService.setString("default.facility", "ISIS")
+    ConfigService.setString("default.instrument", "Vesuvio")
+    ConfigService.setString("datasearch.searcharchive", "On")
+
+    # Logging
     ConfigService.setString("logging.loggers.root.channel.class", "SplitterChannel")
     ConfigService.setString("logging.loggers.root.channel.channel1", "consoleChannel")
     ConfigService.setString("logging.loggers.root.channel.channel2", "fileChannel")
-    ConfigService.setString("logging.channels.consoleChannel.class", "ConsoleChannel")
-    ConfigService.setString("logging.channels.fileChannel.class", "FileChannel")
-    ConfigService.setString("logging.channels.fileChannel.path", "mantid.log")
+    ConfigService.setString("logging.channels.fileChannel.path", str(FilesManager.get_mantid_log_file()))
     ConfigService.setString("logging.channels.fileChannel.formatter.class", "PatternFormatter")
     ConfigService.setString("logging.channels.fileChannel.formatter.pattern", "%Y-%m-%d %H:%M:%S,%i [%I] %p %s - %t")
+    ConfigService.setString("logging.channels.fileChannel.rotateOnOpen", "true")
+    ConfigService.setString("logging.channels.fileChannel.purgeCount", "1")
+    ConfigService.setString("logging.channels.fileChannel.class", "FileChannel")
+    ConfigService.setString("logging.channels.consoleChannel.class", "ConsoleChannel")
     # Set properties on Mantid.user.properties not working due to Mantid bug
     # Need to set properties on file in Mantid installation
     mantid_properties_file = path.join(ConfigService.getPropertiesDir(), "Mantid.properties")
@@ -126,25 +102,14 @@ def __set_logging_properties():
 
 
 def _run_analysis(args):
-    from mvesuvio.main.run_routine import Runner
-
-    if not args:
-        Runner().run()
-        return
-    Runner(
-        override_back_workspace=args.back_workspace,
-        override_front_workspace=args.front_workspace,
-        minimal_output=args.minimal_output,
-        output_directory=args.outputs_dir,
-    ).run()
+    config_dir = Path(__file__).resolve().parent.parent / "default_config"
+    runpy.run_path(str(config_dir / "run_reduction.py"), run_name="__main__")
+    runpy.run_path(str(config_dir / "run_fitting.py"), run_name="__main__")
 
 
 def _run_bootstrap(args):
-    from mvesuvio.main.run_routine import Runner
-
-    if not args:
-        return
-    Runner(bootstrap_inputs_directory=args.inputs_dir, minimal_output=True).run_bootstrap()
+    config_dir = Path(__file__).resolve().parent.parent / "default_config"
+    runpy.run_path(str(config_dir / "run_bootstrap.py"), run_name="__main__")
 
 
 def _print_version():
