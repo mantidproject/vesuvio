@@ -23,7 +23,7 @@ Run `mamba install mantid/label/nightly::mvesuvio` followed by `!mvesuvio versio
 
 ![linux ipython install](images/linux_ipython_install.png)
 
-**WARNING: This command alone may not create the .mvesuvio folder in the home directory. This needs to be forced by running the command `!mvesuvio config` in the `IPython` editor. The command will output the locations of *analysis_inputs.py* and *ip_files*.**
+**WARNING: This command alone may not create the .mvesuvio folder in the home directory. This needs to be forced by running the command `!mvesuvio config` in the `IPython` editor. The command will output the configured *experiment directory* and *ip directory*.**
 ![config output](<images/config_output.png>)
 
 **If you're on Windows:**
@@ -162,16 +162,16 @@ Currently, the commands that are stable are `config`, `run` and `version`. All o
 
 #### mvesuvio config
 
-The `config` command is used to display or set the analysis inputs script or the folder to look for the instrument parameters.
+The `config` command is used to display or set the experiment directory and the folder used to look for the instrument parameters.
 You can do so by providing two optional arguments:
-- `--analysis-inputs` - Set the location of the analysis inputs python file (default is `analysis_inputs.py` in `.mvesuvio` folder).
-- `--ip-folder` - Set the directory for the instrument parameter files (default is `ip_files` in `.mvesuvio` folder).
+- `--experiment-dir` - Set the location of the experiment directory (default is the `experiment_template` directory inside `.mvesuvio`).
+- `--ip-dir` - Set the directory for the instrument parameter files (default is `ip_files` in `.mvesuvio` folder).
 
-If you run `mvesuvio config` with no arguments then the output will tell you the current locations for the analysis inputs file and the instrument parameters folder.
+If you run `mvesuvio config` with no arguments then the output will tell you the current experiment directory and instrument parameters directory.
 
 Usage examples:
-- `mvesuvio config --ip-folder C:\IPFolder` - Set instrument parameters folder.
-- `mvesuvio config --analysis-inputs C:\Vesuvio\experiment\inputs.py` - Set inputs file.
+- `mvesuvio config --ip-dir C:\IPFolder` - Set instrument parameters folder.
+- `mvesuvio config --experiment-dir C:\Vesuvio\experiment` - Set experiment directory.
 
 #### mvesuvio run
 
@@ -196,15 +196,15 @@ So for example to set the configuration from a Python script (or from `IPython` 
 
 ```
 import mvesuvio
-mv.config(analysis_inputs='C:\Vesuvio\experiment\inputs.py', ip_folder='C:\IPFolder')
+mvesuvio.config(experiment_dir='C:\Vesuvio\experiment', ip_dir='C:\IPFolder')
 ```
-In fact, this functionality is what you see at the end of the `analysis_inputs.py` file, which sets the inputs script to the currently opened script:
+In fact, this functionality is what you see at the end of the `analysis_inputs.py` file, which sets the experiment directory based on the currently opened script location:
 
 ```
 import mvesuvio
 from pathlib import Path
 
-mvesuvio.config(analysis_inputs=str(Path(__file__)))
+mvesuvio.config(experiment_dir=str(Path(__file__).parent), ip_dir='')
 mvesuvio.run()
 ```
 

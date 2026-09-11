@@ -11,7 +11,7 @@ from mvesuvio.main import main
 
 __project_url__ = "https://github.com/mantidproject/vesuvio"
 
-__all__ = ["__version__", "__project_url__"]
+__all__ = ["__version__", "__project_url__", "config", "set_config", "run", "version"]
 
 
 class ArgInputs:
@@ -24,18 +24,18 @@ class ArgInputs:
 
 
 class ConfigArgInputs(ArgInputs):
-    def __init__(self, analysis_inputs, ip_folder):
+    def __init__(self, experiment_dir, ip_dir):
         super().__init__("config")
-        self.__set_inputs = analysis_inputs
-        self.__set_ipfolder = ip_folder
+        self.__set_experiment_dir = experiment_dir
+        self.__set_ip_dir = ip_dir
 
     @property
-    def analysis_inputs(self):
-        return self.__set_inputs
+    def experiment_dir(self):
+        return self.__set_experiment_dir
 
     @property
-    def ip_folder(self):
-        return self.__set_ipfolder
+    def ip_dir(self):
+        return self.__set_ip_dir
 
 
 class RunArgInputs(ArgInputs):
@@ -43,9 +43,18 @@ class RunArgInputs(ArgInputs):
         super().__init__("run")
 
 
-def config(analysis_inputs="", ip_folder=""):
-    config_args = ConfigArgInputs(analysis_inputs, ip_folder)
+def _run_config(experiment_dir="", ip_dir=""):
+    config_args = ConfigArgInputs(experiment_dir, ip_dir)
     main(config_args)
+
+
+def config(experiment_dir="", ip_dir=""):
+    _run_config(experiment_dir, ip_dir)
+
+
+def set_config(experiment_dir="", ip_dir=""):
+    """Backward-compatible alias for config()."""
+    config(experiment_dir, ip_dir)
 
 
 def run():

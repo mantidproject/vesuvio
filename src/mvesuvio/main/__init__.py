@@ -36,11 +36,11 @@ def _set_up_parser():
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("version", help="Display the version of mvesuvio")
     config_parser = subparsers.add_parser("config", help="Set mvesuvio configuration")
-    config_parser.add_argument("--analysis-inputs", "-i", help="Set the inputs python file", default="", type=str)
+    config_parser.add_argument("--experiment-dir", "-e", help="Set the experiment directory", default="", type=str)
     config_parser.add_argument(
-        "--ip-folder",
-        "-p",
-        help="Set the intrument parameters directory",
+        "--ip-dir",
+        "-i",
+        help="Set the instrument parameters directory",
         default="",
         type=str,
     )
@@ -61,10 +61,10 @@ def _setup_config(args):
     inputs = handle_config.read_cached_var("caching.inputs")
     ipfolder_dir = handle_config.read_cached_var("caching.ipfolder")
 
-    if args and args.analysis_inputs and handle_config.is_dir(args.analysis_inputs):
-        inputs = str(Path(args.analysis_inputs).absolute())
-    if args and args.ip_folder and handle_config.is_dir(args.ip_folder):
-        ipfolder_dir = str(Path(args.ip_folder).absolute())
+    if args and args.experiment_dir and handle_config.is_dir(args.experiment_dir):
+        inputs = str(Path(args.experiment_dir).absolute())
+    if args and args.ip_dir and handle_config.is_dir(args.ip_dir):
+        ipfolder_dir = str(Path(args.ip_dir).absolute())
 
     handle_config.set_config_vars(
         {
@@ -102,13 +102,13 @@ def __set_logging_properties():
 
 
 def _run_analysis(args):
-    config_dir = Path(__file__).resolve().parent.parent / "config"
+    config_dir = Path(__file__).resolve().parent.parent / "default_config"
     runpy.run_path(str(config_dir / "run_reduction.py"), run_name="__main__")
     runpy.run_path(str(config_dir / "run_fitting.py"), run_name="__main__")
 
 
 def _run_bootstrap(args):
-    config_dir = Path(__file__).resolve().parent.parent / "config"
+    config_dir = Path(__file__).resolve().parent.parent / "default_config"
     runpy.run_path(str(config_dir / "run_bootstrap.py"), run_name="__main__")
 
 

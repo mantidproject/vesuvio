@@ -26,7 +26,7 @@ from mantid.api import AlgorithmFactory, AlgorithmManager
 from mantid.simpleapi import mtd, RenameWorkspace
 
 if TYPE_CHECKING:
-    from mvesuvio.config.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
+    from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
 
 import ntpath
 import re

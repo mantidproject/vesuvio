@@ -23,7 +23,7 @@ class TestAnalysisReduction(unittest.TestCase):
         kwargs = {
             "InputWorkspace": CreateSampleWorkspace(OutputWorkspace="input-ws").name(),
             "InputProfiles": CreateEmptyTableWorkspace(OutputWorkspace="profiles-table").name(),
-            "InstrumentParametersFile": str(Path(handle_config.VESUVIO_PACKAGE_PATH).joinpath("config", "ip_files", "ip2018_3.par")),
+            "InstrumentParametersFile": str(Path(handle_config.PACKAGE_CONFIG_PATH) / "ip_files" / "ip2018_3.par"),
             "ChosenMassIndex": 0,
             "HRatioToChosenMass": 0,
             "NumberOfIterations": 4,

@@ -1,7 +1,7 @@
 from shutil import copyfile, copytree, ignore_patterns
 from pathlib import Path
 
-PACKAGE_CONFIG_PATH = Path(__file__).absolute().parent.with_name("config")
+PACKAGE_CONFIG_PATH = Path(__file__).absolute().parent.with_name("default_config")
 USER_CONFIG_PATH = Path.home() / "mvesuvio"
 VESUVIO_PROPERTIES_PATH = PACKAGE_CONFIG_PATH / "vesuvio.user.properties"
 PLOTS_CONFIG_PATH = PACKAGE_CONFIG_PATH / "vesuvio.plots.mplstyle"

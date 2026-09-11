@@ -10,9 +10,6 @@ from mvesuvio.util import reduction_helpers
 
 class TestReductionHelpers(unittest.TestCase):
     def test_make_summarised_log_file(self):
-        # Skip if on windows
-        if os.name == "nt":
-            return
 
         with tempfile.NamedTemporaryFile(delete=False) as mock_mantid_log_file, tempfile.NamedTemporaryFile(delete=False) as mock_summary_file:
             mock_mantid_log_file.write(

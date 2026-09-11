@@ -17,7 +17,7 @@ else:
         from pathlib import Path
 
         _run_reduction_path = Path(__file__).resolve().parent / "run_reduction.py"
-        _module_name = "mvesuvio.config.experiment_template._local_run_reduction"
+        _module_name = "mvesuvio.default_config.experiment_template._local_run_reduction"
         _spec = importlib.util.spec_from_file_location(_module_name, _run_reduction_path)
         if _spec is None or _spec.loader is None:
             raise ImportError(f"Could not load run_reduction module from {_run_reduction_path}")

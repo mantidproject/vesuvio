@@ -13,7 +13,7 @@ class TestHRatioRoutine(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         handle_config.refresh_config_dir_and_contents()
-        mvesuvio.main(ConfigArgInputs(analysis_inputs="", ip_folder=""))
+        mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
         copytree(
             handle_config.PACKAGE_CONFIG_PATH / "experiment_template" / "reduction_inputs",
             handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_inputs",

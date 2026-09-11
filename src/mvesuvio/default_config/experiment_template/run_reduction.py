@@ -27,7 +27,7 @@ class SampleParameters:
 
 @dataclass
 class BackwardAnalysisInputs(SampleParameters):
-    run_this_scattering_type = False
+    run_this_scattering_type = True
     name = "back"
     minimal_output = False
 
@@ -153,7 +153,7 @@ class ForwardAnalysisInputs(SampleParameters):
 
 
 def main() -> None:
-    mvesuvio.main(ConfigArgInputs(analysis_inputs=str(Path(__file__).parent), ip_folder=""))
+    mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
 
     # Optional workspace-name overrides for bootstrap script injection.
     BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")

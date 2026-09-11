@@ -13,17 +13,17 @@ class TestParser(unittest.TestCase):
 
     def test_set_up_parser_config(self):
         parser = _set_up_parser()
-        args = parser.parse_args(["config", "--analysis-inputs", "analysis_inputs.py", "--ip-folder", "mock_ip_folder"])
+        args = parser.parse_args(["config", "--experiment-dir", "analysis_inputs.py", "--ip-dir", "mock_ip_folder"])
 
-        self.assertEqual(args.analysis_inputs, "analysis_inputs.py")
-        self.assertEqual(args.ip_folder, "mock_ip_folder")
+        self.assertEqual(args.experiment_dir, "analysis_inputs.py")
+        self.assertEqual(args.ip_dir, "mock_ip_folder")
 
     def test_set_up_parser_config_defaults(self):
         parser = _set_up_parser()
         args = parser.parse_args(["config"])
 
-        self.assertEqual(args.analysis_inputs, "")
-        self.assertEqual(args.ip_folder, "")
+        self.assertEqual(args.experiment_dir, "")
+        self.assertEqual(args.ip_dir, "")
 
     def test_set_up_parser_run(self):
         parser = _set_up_parser()
@@ -51,10 +51,10 @@ class TestParser(unittest.TestCase):
 
     def test_set_up_parser_config_short_flags(self):
         parser = _set_up_parser()
-        args = parser.parse_args(["config", "-i", "inputs.py", "-p", "/ip/folder"])
+        args = parser.parse_args(["config", "-e", "inputs.py", "-i", "/ip/folder"])
 
-        self.assertEqual(args.analysis_inputs, "inputs.py")
-        self.assertEqual(args.ip_folder, "/ip/folder")
+        self.assertEqual(args.experiment_dir, "inputs.py")
+        self.assertEqual(args.ip_dir, "/ip/folder")
 
     def test_set_up_parser_requires_command(self):
         parser = _set_up_parser()
@@ -72,8 +72,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         mock_args = MagicMock()
-        mock_args.analysis_inputs = None
-        mock_args.ip_folder = None
+        mock_args.experiment_dir = None
+        mock_args.ip_dir = None
 
         _setup_config(mock_args)
 
@@ -94,8 +94,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_path.return_value = mock_path_obj
 
         mock_args = MagicMock()
-        mock_args.analysis_inputs = "/custom/inputs.py"
-        mock_args.ip_folder = None
+        mock_args.experiment_dir = "/custom/inputs.py"
+        mock_args.ip_dir = None
 
         _setup_config(mock_args)
 
@@ -120,8 +120,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_path.return_value = mock_path_obj
 
         mock_args = MagicMock()
-        mock_args.analysis_inputs = None
-        mock_args.ip_folder = "/custom/ip_folder"
+        mock_args.experiment_dir = None
+        mock_args.ip_dir = "/custom/ip_folder"
 
         _setup_config(mock_args)
 
