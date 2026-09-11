@@ -1,7 +1,15 @@
 
+import os
 import runpy
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+os.environ.setdefault("MPLBACKEND", "Agg")
+
+import matplotlib
+matplotlib.use("Agg", force=True)
+
 from mvesuvio.util import handle_config
 from mvesuvio import ConfigArgInputs
 from shutil import copytree
@@ -30,7 +38,8 @@ class TestFitting(unittest.TestCase):
         namespace["BackwardFittingInputs"].run_this_fitting_type = False
         namespace["ForwardFittingInputs"].run_this_fitting_type = True
         namespace["ForwardFittingInputs"].fitting_model = "gauss"
-        namespace["run_fitting"]()
+        with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
+            namespace["run_fitting"]()
 
         AnalysisDataService.clear()
 
