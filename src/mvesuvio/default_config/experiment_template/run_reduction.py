@@ -6,6 +6,7 @@ from mantid.kernel import logger
 from pathlib import Path
 from mvesuvio import ConfigArgInputs
 from mvesuvio.util import fitting_helpers
+from mvesuvio.util import general_helpers
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
@@ -251,7 +252,7 @@ def main() -> None:
     elif ForwardAnalysisInputs.run_this_scattering_type and front_alg is not None:
         front_alg.execute()
 
-    reduction_helpers.make_summarised_log_file()
+    general_helpers.make_summarised_log_file()
 
     save_fitting_input_workspaces()
 

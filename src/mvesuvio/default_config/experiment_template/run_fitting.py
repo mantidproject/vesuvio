@@ -1,4 +1,5 @@
 from mvesuvio.analysis_fitting import FitInYSpace
+from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mantid.api import AnalysisDataService
 from mantid.kernel import logger
@@ -163,3 +164,4 @@ if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.executi
     BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
     FRONT_WS_TO_FIT = globals().get("FRONT_WS_TO_FIT", "")
     run_fitting(back_ws_to_fit=BACK_WS_TO_FIT, front_ws_to_fit=FRONT_WS_TO_FIT)
+    general_helpers.make_summarised_log_file()
