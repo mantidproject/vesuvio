@@ -25,44 +25,46 @@ class FilesManager:
         return cls._experiment_dir
 
     @classmethod
+    def _get_experiment_subdir(cls, name: str) -> Path:
+        subdir = cls.get_experiment_dir() / name
+        subdir.mkdir(parents=True, exist_ok=True)
+        return subdir
+
+    @classmethod
     def get_reduction_outputs_dir(cls) -> Path:
-        reduction_outputs = cls.get_experiment_dir() / "reduction_outputs"
-        reduction_outputs.mkdir(parents=True, exist_ok=True)
-        return reduction_outputs
+        return cls._get_experiment_subdir("reduction_outputs")
 
     @classmethod
     def get_reduction_inputs_dir(cls) -> Path:
-        inputs_ws_dir = cls.get_experiment_dir() / "reduction_inputs"
-        inputs_ws_dir.mkdir(parents=True, exist_ok=True)
-        return inputs_ws_dir
+        return cls._get_experiment_subdir("reduction_inputs")
 
     @classmethod
     def get_fitting_outputs_dir(cls) -> Path:
-        fitting_outputs = cls.get_experiment_dir() / "fitting_outputs"
-        fitting_outputs.mkdir(parents=True, exist_ok=True)
-        return fitting_outputs
+        return cls._get_experiment_subdir("fitting_outputs")
 
     @classmethod
     def get_fitting_inputs_dir(cls) -> Path:
-        fitting_inputs_dir = cls.get_experiment_dir() / "fitting_inputs"
-        fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
-        return fitting_inputs_dir
+        return cls._get_experiment_subdir("fitting_inputs")
+
+    @staticmethod
+    def _get_detector_filename(tag: str, kind: str) -> str:
+        return handle_config.get_experiment_name() + "_" + kind + "_" + tag + ".nxs"
 
     @staticmethod
     def get_backward_raw_filename() -> str:
-        return handle_config.get_experiment_name() + "_" + "raw" + "_" + Tags.Backward + ".nxs"
+        return FilesManager._get_detector_filename(Tags.Backward, "raw")
 
     @staticmethod
     def get_backward_empty_filename() -> str:
-        return handle_config.get_experiment_name() + "_" + "empty" + "_" + Tags.Backward + ".nxs"
+        return FilesManager._get_detector_filename(Tags.Backward, "empty")
 
     @staticmethod
     def get_forward_raw_filename() -> str:
-        return handle_config.get_experiment_name() + "_" + "raw" + "_" + Tags.Forward + ".nxs"
+        return FilesManager._get_detector_filename(Tags.Forward, "raw")
 
     @staticmethod
     def get_forward_empty_filename() -> str:
-        return handle_config.get_experiment_name() + "_" + "empty" + "_" + Tags.Forward + ".nxs"
+        return FilesManager._get_detector_filename(Tags.Forward, "empty")
 
     @staticmethod
     def get_mantid_log_file() -> Path:
