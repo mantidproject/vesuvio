@@ -110,7 +110,34 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mvesuvio.main.Path")
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
+    def test_setup_config_warns_for_invalid_custom_paths(self, mock_config_service, mock_handle_config, mock_path):
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
+        mock_experiment_path = MagicMock()
+        mock_experiment_path.is_dir.return_value = False
+        mock_ip_path = MagicMock()
+        mock_ip_path.is_dir.return_value = False
+        mock_path.side_effect = [mock_experiment_path, mock_ip_path]
+
+        mock_args = MagicMock()
+        mock_args.experiment_dir = "/custom/inputs.py"
+        mock_args.ip_dir = "/custom/ip_folder"
+
+        with patch("builtins.print") as mock_print:
+            _setup_config(mock_args)
+
+        self.assertEqual(mock_print.call_count, 2)
+        mock_print.assert_any_call("\nError setting directory: /custom/inputs.py\nUsing default.")
+        mock_print.assert_any_call("\nError setting directory: /custom/ip_folder\nUsing default.")
+        mock_handle_config.set_config_vars.assert_called_once()
+        call_args = mock_handle_config.set_config_vars.call_args[0][0]
+        self.assertEqual(call_args["caching.inputs"], "/default/inputs.py")
+        self.assertEqual(call_args["caching.ipfolder"], "/default/ip_folder")
+
+    @patch("mvesuvio.main.Path")
+    @patch("mvesuvio.main.handle_config")
+    @patch("mantid.kernel.ConfigService")
     def test_setup_config_with_custom_ip_folder(self, mock_config_service, mock_handle_config, mock_path):
         mock_handle_config.is_cache_set.return_value = True
         mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]

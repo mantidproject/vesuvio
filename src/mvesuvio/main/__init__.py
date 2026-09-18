@@ -61,10 +61,19 @@ def _setup_config(args):
     inputs = handle_config.read_cached_var("caching.inputs")
     ipfolder_dir = handle_config.read_cached_var("caching.ipfolder")
 
-    if args and args.experiment_dir and handle_config.is_dir(args.experiment_dir):
-        inputs = str(Path(args.experiment_dir).absolute())
-    if args and args.ip_dir and handle_config.is_dir(args.ip_dir):
-        ipfolder_dir = str(Path(args.ip_dir).absolute())
+    if args and args.experiment_dir:
+        experiment_dir = Path(args.experiment_dir)
+        if experiment_dir.is_dir():
+            inputs = str(experiment_dir.absolute())
+        else:
+            print(f"\nError setting directory: {args.experiment_dir}\nUsing default.")
+
+    if args and args.ip_dir:
+        ip_dir = Path(args.ip_dir)
+        if ip_dir.is_dir():
+            ipfolder_dir = str(ip_dir.absolute())
+        else:
+            print(f"\nError setting directory: {args.ip_dir}\nUsing default.")
 
     handle_config.set_config_vars(
         {

@@ -115,10 +115,3 @@ def is_cache_set():
         return True
     else:
         return False
-
-
-def is_dir(path):
-    if not Path(path).is_dir():
-        print(f"\nError setting directory: {path}\nUsing default.")
-        return False
-    return True
