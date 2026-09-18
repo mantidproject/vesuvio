@@ -41,13 +41,13 @@ test:
     - tests/unit/
     - tests/data/analysis/inputs/system_test_inputs.py      # Not a test, used by log file unit test
     - tests/data/analysis/unit/                             # Data used by several unit tests
-    - src/mvesuvio/config/analysis_inputs.py                # Used to run basic mvesuvio run
-    - src/mvesuvio/config/analysis_inputs/input_workspaces  # Inputs needed to run mvesuvio
+    - src/mvesuvio/default_config/analysis_inputs.py                # Used to run basic mvesuvio run
+    - src/mvesuvio/default_config/analysis_inputs/input_workspaces  # Inputs needed to run mvesuvio
     - tools/
   commands:
     - pytest
     - mvesuvio version
-    - python src/mvesuvio/config/analysis_inputs.py
+    - python src/mvesuvio/default_config/analysis_inputs.py
 
 about:
   home: https://github.com/mantidproject/vesuvio

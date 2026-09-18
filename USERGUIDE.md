@@ -27,7 +27,6 @@ Here, the geometry of the sample is stored, the latter being considered as a sla
 In this example, the sample was in a 2mm thick clamped cell, covering the whole cross-section of the beam:
 
 ```python
-@dataclass
 class SampleParameters:
     # Sample slab parameters, expressed in meters
     slab_height = 0.1
@@ -57,7 +56,6 @@ Here we provide a step-by-step guide on how to fill in the Backward analysis inp
 When the script is run, it will perform all tasks that the user asked to be done. For both Forward and Backward scattering, there is an analysis routine that calculates all the corrections and a fitting of the NCP. In both classes, the 2 procedures can be enabled are not, using `True` or `False`. This is useful if only the fitting of the forward or backward scattering data is desired.
 
 ```python
-@dataclass
 class BackwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
     fit_in_y_space = True
