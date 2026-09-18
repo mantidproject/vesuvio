@@ -25,6 +25,7 @@ import jacobi
 import time
 from mantid.kernel import logger
 
+from mvesuvio.globals import FitModels
 from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
 
@@ -450,11 +451,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     m = Minuit(costFun, **defaultPars)
 
     m.limits["A"] = (0, None)
-    if yFitIC.fitting_model == "doublewell":
+    if yFitIC.fitting_model == FitModels.doublewell:
         m.limits["d"] = (0, None)
         m.limits["R"] = (0, None)
 
-    if yFitIC.fitting_model == "gauss":
+    if yFitIC.fitting_model == FitModels.gauss:
         m.simplex()
         m.migrad()
 
@@ -522,7 +523,7 @@ def selectModelAndPars(modelFlag):
     The defaultPars should be in the same order as the signature of the function
     """
 
-    if modelFlag == "gauss":
+    if modelFlag == FitModels.gauss:
 
         def model(x, A, x0, sigma):
             return A / (2 * np.pi) ** 0.5 / sigma * np.exp(-((x - x0) ** 2) / 2 / sigma**2)
@@ -530,7 +531,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma": 5}
         sharedPars = ["sigma"]  # Used only in Global fit
 
-    elif modelFlag == "gauss_cntr":
+    elif modelFlag == FitModels.gauss_cntr:
 
         def model(x, A, sigma):
             return A / (2 * np.pi) ** 0.5 / sigma * np.exp(-(x**2) / 2 / sigma**2)
@@ -538,7 +539,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "sigma": 5}
         sharedPars = ["sigma"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4c6":
+    elif modelFlag == FitModels.gcc4c6:
 
         def model(x, A, x0, sigma1, c4, c6):
             return (
@@ -562,7 +563,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0}
         sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4c6_cntr":
+    elif modelFlag == FitModels.gcc4c6_cntr:
 
         def model(x, A, sigma1, c4, c6):
             return (
@@ -586,7 +587,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}
         sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4":
+    elif modelFlag == FitModels.gcc4:
 
         def model(x, A, x0, sigma1, c4):
             return (
@@ -599,7 +600,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}
         sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
-    elif modelFlag == "gcc4_cntr":
+    elif modelFlag == FitModels.gcc4_cntr:
 
         def model(x, A, sigma1, c4):
             return (
@@ -612,7 +613,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "sigma1": 6, "c4": 0}
         sharedPars = ["sigma1", "c4"]  # Used only in Global fit
 
-    elif modelFlag == "gcc6":
+    elif modelFlag == FitModels.gcc6:
 
         def model(x, A, x0, sigma1, c6):
             return (
@@ -635,7 +636,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}
         sharedPars = ["sigma1", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "gcc6_cntr":
+    elif modelFlag == FitModels.gcc6_cntr:
 
         def model(x, A, sigma1, c6):
             return (
@@ -658,7 +659,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "sigma1": 6, "c6": 0}
         sharedPars = ["sigma1", "c6"]  # Used only in Global fit
 
-    elif modelFlag == "doublewell":
+    elif modelFlag == FitModels.doublewell:
 
         def model(x, A, d, R, sig1, sig2):
             # h = 2.04
@@ -686,7 +687,7 @@ def selectModelAndPars(modelFlag):
         }  # TODO: Starting parameters and bounds?
         sharedPars = ["d", "R", "sig1", "sig2"]  # Only varying parameter is amplitude A
 
-    elif modelFlag == "gauss2d":
+    elif modelFlag == FitModels.gauss2d:
         # Anisotropic case
         def model(x, A, sig1, sig2):
             # h = 2.04
@@ -705,7 +706,7 @@ def selectModelAndPars(modelFlag):
         defaultPars = {"A": 1, "sig1": 3, "sig2": 5}
         sharedPars = ["sig1", "sig2"]
 
-    elif modelFlag == "gauss3d":
+    elif modelFlag == FitModels.gauss3d:
 
         def model(x, A, sig_x, sig_y, sig_z):
             y = x[:, np.newaxis, np.newaxis]
@@ -853,7 +854,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         bestFitVals[p] = v
         bestFitErrs[p] = e
 
-    if yFitIC.fitting_model == "gauss":  # Case with no positivity constraint, can use automatic minos()
+    if yFitIC.fitting_model == FitModels.gauss:  # Case with no positivity constraint, can use automatic minos()
         mObj.minos()
         me = mObj.merrors
 
@@ -1131,13 +1132,13 @@ def oddPointsRes(x, res):
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     logger.notice("\nFitting on the sum of spectra in the West domain ...\n")
     for minimizer in ["Levenberg-Marquardt", "Simplex"]:
-        if yFitIC.fitting_model == "gauss":
+        if yFitIC.fitting_model == FitModels.gauss:
             function = f"""composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()"""
 
-        elif yFitIC.fitting_model == "gcc4c6":
+        elif yFitIC.fitting_model == FitModels.gcc4c6:
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -1146,7 +1147,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
             """
-        elif yFitIC.fitting_model == "gcc4":
+        elif yFitIC.fitting_model == FitModels.gcc4:
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -1154,7 +1155,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,ties=()
             """
-        elif yFitIC.fitting_model == "gcc6":
+        elif yFitIC.fitting_model == FitModels.gcc6:
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -1163,13 +1164,13 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
         elif (
-            (yFitIC.fitting_model == "doublewell")
-            | (yFitIC.fitting_model == "gauss2d")
-            | (yFitIC.fitting_model == "gauss3d")
-            | (yFitIC.fitting_model == "gauss_cntr")
-            | (yFitIC.fitting_model == "gcc4c6_cntr")
-            | (yFitIC.fitting_model == "gcc4_cntr")
-            | (yFitIC.fitting_model == "gcc6_cntr")
+            (yFitIC.fitting_model == FitModels.doublewell)
+            | (yFitIC.fitting_model == FitModels.gauss2d)
+            | (yFitIC.fitting_model == FitModels.gauss3d)
+            | (yFitIC.fitting_model == FitModels.gauss_cntr)
+            | (yFitIC.fitting_model == FitModels.gcc4c6_cntr)
+            | (yFitIC.fitting_model == FitModels.gcc4_cntr)
+            | (yFitIC.fitting_model == FitModels.gcc6_cntr)
         ):
             logger.warning("Fitting model recognized but not currently implemented in Mantid Fit. Skipping Mantid Fit ...")
             return
@@ -1240,12 +1241,12 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     for i in range(len(dataY)):  # Set limits for unshared parameters
         m.limits["A" + str(i)] = (0, np.inf)
 
-    if IC.fitting_model == "doublewell":
+    if IC.fitting_model == FitModels.doublewell:
         m.limits["d"] = (0, np.inf)  # Shared parameters
         m.limits["R"] = (0, np.inf)
 
     t0 = time.time()
-    if IC.fitting_model == "gauss":
+    if IC.fitting_model == FitModels.gauss:
         m.simplex()
         m.migrad()
 

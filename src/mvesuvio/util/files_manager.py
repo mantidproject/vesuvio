@@ -1,4 +1,4 @@
-from mvesuvio import globals
+from mvesuvio.globals import Tags
 from mvesuvio.util import handle_config
 from pathlib import Path
 from mantid.kernel import ConfigService
@@ -50,19 +50,19 @@ class FilesManager:
 
     @classmethod
     def get_backward_raw_filename(cls) -> str:
-        return handle_config.get_experiment_name() + "_" + "raw" + "_" + globals.BACKWARD_TAG + ".nxs"
+        return handle_config.get_experiment_name() + "_" + "raw" + "_" + Tags.Backward + ".nxs"
 
     @classmethod
     def get_backward_empty_filename(cls) -> str:
-        return handle_config.get_experiment_name() + "_" + "empty" + "_" + globals.BACKWARD_TAG + ".nxs"
+        return handle_config.get_experiment_name() + "_" + "empty" + "_" + Tags.Backward + ".nxs"
 
     @classmethod
     def get_forward_raw_filename(cls) -> str:
-        return handle_config.get_experiment_name() + "_" + "raw" + "_" + globals.FORWARD_TAG + ".nxs"
+        return handle_config.get_experiment_name() + "_" + "raw" + "_" + Tags.Forward + ".nxs"
 
     @classmethod
     def get_forward_empty_filename(cls) -> str:
-        return handle_config.get_experiment_name() + "_" + "empty" + "_" + globals.FORWARD_TAG + ".nxs"
+        return handle_config.get_experiment_name() + "_" + "empty" + "_" + Tags.Forward + ".nxs"
 
     @classmethod
     def get_mantid_log_file(cls) -> Path:

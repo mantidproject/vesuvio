@@ -1,4 +1,5 @@
 from mvesuvio.analysis_fitting import FitInYSpace
+from mvesuvio.globals import FitModels
 from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mantid.api import AnalysisDataService
@@ -37,18 +38,18 @@ class BackwardFittingInputs(BackwardAnalysisInputs):
     subtract_calculated_fse_from_data = True
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     # Fitting model options
-    # 'gauss': Single Gaussian
-    # 'gauss_cntr': Single Gaussian with fixed center at zero
-    # 'gcc4': Gram-Charlier with C4 parameter
-    # 'gcc4_cntr': Gram-Charlier with C4 parameter with fixed center at zero
-    # 'gcc6': Gram-Charlier with C6 parameter
-    # 'gcc6_cntr': Gram-Charlier with C6 parameter with fixed center at zero
-    # 'gcc4c6': Gram-Charlier with C4 and C6 parameter
-    # 'gcc4c6_cntr': Gram-Charlier with C4 and C6 parameter and fixed center at zero
-    # 'doublewell': Double Well function
-    # 'gauss2d': Anisotropic Gaussian
-    # 'gauss3d': 3-Dimensional Gaussian
-    fitting_model = "gauss"
+    # FitModels.gauss: Single Gaussian
+    # FitModels.gauss_cntr: Single Gaussian with fixed center at zero
+    # FitModels.gcc4: Gram-Charlier with C4 parameter
+    # FitModels.gcc4_cntr: Gram-Charlier with C4 parameter with fixed center at zero
+    # FitModels.gcc6: Gram-Charlier with C6 parameter
+    # FitModels.gcc6_cntr: Gram-Charlier with C6 parameter with fixed center at zero
+    # FitModels.gcc4c6: Gram-Charlier with C4 and C6 parameter
+    # FitModels.gcc4c6_cntr: Gram-Charlier with C4 and C6 parameter and fixed center at zero
+    # FitModels.doublewell: Double Well function
+    # FitModels.gauss2d: Anisotropic Gaussian
+    # FitModels.gauss3d: 3-Dimensional Gaussian
+    fitting_model = FitModels.gauss
     run_minos = True
     do_global_fit = True  # Performs global fit with Minuit by default
     # Number of groups of detectors to perform global (simultaneous) fit on
@@ -68,18 +69,18 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     subtract_calculated_fse_from_data = True
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     # Fitting model options
-    # 'gauss': Single Gaussian
-    # 'gauss_cntr': Single Gaussian with fixed center at zero
-    # 'gcc4': Gram-Charlier with C4 parameter
-    # 'gcc4_cntr': Gram-Charlier with C4 parameter with fixed center at zero
-    # 'gcc6': Gram-Charlier with C6 parameter
-    # 'gcc6_cntr': Gram-Charlier with C6 parameter with fixed center at zero
-    # 'gcc4c6': Gram-Charlier with C4 and C6 parameter
-    # 'gcc4c6_cntr': Gram-Charlier with C4 and C6 parameter and fixed center at zero
-    # 'doublewell': Double Well function
-    # 'gauss2d': Anisotropic Gaussian
-    # 'gauss3d': 3-Dimensional Gaussian
-    fitting_model = "gauss"
+    # FitModels.gauss: Single Gaussian
+    # FitModels.gauss_cntr: Single Gaussian with fixed center at zero
+    # FitModels.gcc4: Gram-Charlier with C4 parameter
+    # FitModels.gcc4_cntr: Gram-Charlier with C4 parameter with fixed center at zero
+    # FitModels.gcc6: Gram-Charlier with C6 parameter
+    # FitModels.gcc6_cntr: Gram-Charlier with C6 parameter with fixed center at zero
+    # FitModels.gcc4c6: Gram-Charlier with C4 and C6 parameter
+    # FitModels.gcc4c6_cntr: Gram-Charlier with C4 and C6 parameter and fixed center at zero
+    # FitModels.doublewell: Double Well function
+    # FitModels.gauss2d: Anisotropic Gaussian
+    # FitModels.gauss3d: 3-Dimensional Gaussian
+    fitting_model = FitModels.gauss
     run_minos = True
     do_global_fit = True  # Performs global fit with Minuit by default
     # Number of groups of detectors to perform global (simultaneous) fit on

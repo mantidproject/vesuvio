@@ -18,7 +18,7 @@ import numpy as np
 import math
 from pathlib import Path
 
-from mvesuvio import globals
+from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 import dill  # To convert constraints to string
@@ -370,9 +370,9 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
 
 def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
-    if globals.BACKWARD_TAG in ws_path.stem:
+    if Tags.Backward in ws_path.stem:
         spectra = "3-134"
-    elif globals.FORWARD_TAG in ws_path.stem:
+    elif Tags.Forward in ws_path.stem:
         spectra = "135-198"
     else:
         raise ValueError(f"Invalid name to save workspace: {ws_path.name}")
