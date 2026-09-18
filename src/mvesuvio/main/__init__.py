@@ -51,7 +51,7 @@ def _set_up_parser():
 
 
 def _setup_config(args):
-    __set_logging_properties()
+    _set_logging_properties()
 
     handle_config.refresh_config_dir_and_contents()
 
@@ -75,7 +75,7 @@ def _setup_config(args):
     return
 
 
-def __set_logging_properties():
+def _set_logging_properties():
     from mantid.kernel import ConfigService
 
     # Good to have

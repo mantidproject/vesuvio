@@ -21,7 +21,7 @@ class TestHandleConfig(unittest.TestCase):
         file.seek(0)
         file.flush()
         file.close()
-        lines = getattr(handle_config, "__read_config")(file.name)
+        lines = getattr(handle_config, "_read_config")(file.name)
         self.assertEqual(lines, ['\n', "caching.inputs=/inputs.py\n", "caching.ipfolder=/ip_files\n"])
         file.close()
         os.unlink(file.name)
@@ -29,7 +29,7 @@ class TestHandleConfig(unittest.TestCase):
 
     def test_read_config_throws(self):
         with self.assertRaises(RuntimeError):
-            getattr(handle_config, "__read_config")("/not.there")
+            getattr(handle_config, "_read_config")("/not.there")
 
 
     def test_set_config_vars(self):
@@ -38,7 +38,7 @@ class TestHandleConfig(unittest.TestCase):
         mock_file.write_text("")
 
         with (
-            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch("mvesuvio.util.handle_config._read_config") as mock_read_config,
             patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file)
         ):
             mock_read_config.return_value = ['\n', 'caching.inputs=\n', 'caching.ipfolder=\n']
@@ -57,7 +57,7 @@ class TestHandleConfig(unittest.TestCase):
         mock_file.write_text("")
 
         with (
-            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch("mvesuvio.util.handle_config._read_config") as mock_read_config,
             patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
             patch.object(handle_config, "USER_CONFIG_PATH", Path("path", "to", ".mvesuvio")),
         ):
@@ -102,7 +102,7 @@ class TestHandleConfig(unittest.TestCase):
         mock_dir = tempfile.TemporaryDirectory()
         mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         with (
-            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch("mvesuvio.util.handle_config._read_config") as mock_read_config,
             patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
         ):
             mock_read_config.return_value = ["caching.inputs=/inputs.py\n"]
@@ -114,7 +114,7 @@ class TestHandleConfig(unittest.TestCase):
         mock_dir = tempfile.TemporaryDirectory()
         mock_file = Path(mock_dir.name, "mock.vesuvio.properties")
         with (
-            patch("mvesuvio.util.handle_config.__read_config") as mock_read_config,
+            patch("mvesuvio.util.handle_config._read_config") as mock_read_config,
             patch.object(handle_config, "VESUVIO_PROPERTIES_PATH", mock_file),
             patch("mvesuvio.util.handle_config.open", create=True) as mock_open,
         ):

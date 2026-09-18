@@ -23,7 +23,7 @@ def set_default_config_vars():
     )
 
 
-def __read_config(config_file_path, throw_on_not_found=True):
+def _read_config(config_file_path, throw_on_not_found=True):
     lines = ""
     try:
         with open(config_file_path, "r") as file:
@@ -36,7 +36,7 @@ def __read_config(config_file_path, throw_on_not_found=True):
 
 def set_config_vars(var_dict):
     file_path = VESUVIO_PROPERTIES_PATH
-    lines = __read_config(file_path)
+    lines = _read_config(file_path)
 
     updated_lines = []
     for line in lines:
@@ -57,7 +57,7 @@ def set_config_vars(var_dict):
 
 
 def read_cached_var(var, throw_on_not_found=True):
-    lines = __read_config(VESUVIO_PROPERTIES_PATH, throw_on_not_found)
+    lines = _read_config(VESUVIO_PROPERTIES_PATH, throw_on_not_found)
 
     result = ""
     for line in lines:
