@@ -4,7 +4,7 @@ from unittest.mock import patch
 from pathlib import Path
 from mvesuvio.util import handle_config
 from mvesuvio import ConfigArgInputs
-from shutil import copytree
+from shutil import copytree, rmtree
 import mvesuvio
 from mantid.simpleapi import LoadAscii, CompareWorkspaces
 
@@ -14,6 +14,8 @@ class TestHRatioRoutine(unittest.TestCase):
     def setUpClass(cls):
         handle_config.refresh_config_dir_and_contents()
         mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "h_ratio" / "hydrogen_intensity_ratios_estimates"
+        cls.result_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "hydrogen_intensity_ratios_estimates"
         reduction_inputs = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "reduction"
         copytree(
             reduction_inputs,
@@ -23,7 +25,10 @@ class TestHRatioRoutine(unittest.TestCase):
         pass
 
     def setUp(self):
-        pass
+        if self.result_path.is_dir():
+            rmtree(self.result_path, ignore_errors=True)
+        else:
+            self.result_path.unlink(missing_ok=True)
 
     def test_h_ratio_routine(self):
         reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"
@@ -36,13 +41,10 @@ class TestHRatioRoutine(unittest.TestCase):
         with patch("builtins.input", return_value=""):
             namespace["main"]()
 
-        benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "h_ratio" / "hydrogen_intensity_ratios_estimates"
-        result_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "hydrogen_intensity_ratios_estimates"
-
         bench_name = "bench_h_ratios"
         result_name = "result_h_ratios"
 
-        LoadAscii(str(benchmark_path), Separator="CSV", OutputWorkspace=bench_name)
-        LoadAscii(str(result_path), Separator="CSV", OutputWorkspace=result_name)
+        LoadAscii(str(self.benchmark_path), Separator="CSV", OutputWorkspace=bench_name)
+        LoadAscii(str(self.result_path), Separator="CSV", OutputWorkspace=result_name)
         (result, _messages) = CompareWorkspaces(bench_name, result_name, Tolerance=1e-3)
         self.assertTrue(result)

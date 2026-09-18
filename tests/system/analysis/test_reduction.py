@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from mvesuvio.util import handle_config
 from mvesuvio import ConfigArgInputs
-from shutil import copytree
+from shutil import copytree, rmtree
 import mvesuvio
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
@@ -13,6 +13,8 @@ class TestReduction(unittest.TestCase):
     def setUpClass(cls):
         handle_config.refresh_config_dir_and_contents()
         mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
+        cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_outputs"
         reduction_inputs = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "reduction"
         copytree(
             reduction_inputs,
@@ -22,7 +24,7 @@ class TestReduction(unittest.TestCase):
         pass
 
     def setUp(self):
-        pass
+        rmtree(self.results_path, ignore_errors=True)
 
     def test_reduction_routine(self):
         reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"
@@ -38,10 +40,7 @@ class TestReduction(unittest.TestCase):
 
         AnalysisDataService.clear()
 
-        benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
-        results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_outputs"
-
-        for prefix, path in zip(("bench", "result"), (benchmark_path, results_path)):
+        for prefix, path in zip(("bench", "result"), (self.benchmark_path, self.results_path)):
             for p in path.iterdir():
                 if p.is_dir():
                     continue

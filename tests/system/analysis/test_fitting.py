@@ -25,6 +25,8 @@ class TestFitting(unittest.TestCase):
     def setUpClass(cls):
         handle_config.refresh_config_dir_and_contents()
         mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
+        cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "gauss_fit"
         copytree(
             FITTING_INPUTS_PATH,
             handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_inputs",
@@ -33,8 +35,7 @@ class TestFitting(unittest.TestCase):
         pass
 
     def setUp(self):
-        output_dir = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs"
-        rmtree(output_dir, ignore_errors=True)
+        rmtree(self.results_path, ignore_errors=True)
 
     def test_fitting_routine(self):
         fitting_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_fitting.py"
@@ -47,10 +48,7 @@ class TestFitting(unittest.TestCase):
 
         AnalysisDataService.clear()
 
-        benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
-        results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "gauss_fit"
-
-        for prefix, path in zip(("bench", "result"), (benchmark_path, results_path)):
+        for prefix, path in zip(("bench", "result"), (self.benchmark_path, self.results_path)):
             for p in path.iterdir():
                 if p.is_dir():
                     continue
