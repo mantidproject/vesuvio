@@ -41,8 +41,8 @@ where = ["src"]
 namespaces = false
 
 [tool.setuptools.package-data]
-"mvesuvio.config.ip_files" = ["*.par"]
-"mvesuvio.config" = ["*.properties", "*.mplstyle"]
+"mvesuvio.default_config.ip_files" = ["*.par"]
+"mvesuvio.default_config" = ["*.properties", "*.mplstyle"]
 
 [tool.pytest.ini_options]
 pythonpath = [
@@ -62,7 +62,7 @@ omit = [
     "*tests*",
     "*unpackaged*",
     "*legacy*",
-    "*/src/mvesuvio/config/*",
+    "*/src/mvesuvio/default_config/*",
     "*/src/mvesuvio/globals.py*",
     "*/src/mvesuvio/_version.py*"
 ]
@@ -88,7 +88,7 @@ distance-dirty = "{version}.{distance}"
 file = "src/mvesuvio/_version.py"
 
 [tool.ruff]
-exclude = [".git", "build", "buildconfig", "unpackaged", "legacy", "src/mvesuvio/config/analysis_inputs.py"]
+exclude = [".git", "build", "buildconfig", "unpackaged", "legacy", "src/mvesuvio/default_config/analysis_inputs.py"]
 line-length = 140
 
 [tool.ruff.lint]
