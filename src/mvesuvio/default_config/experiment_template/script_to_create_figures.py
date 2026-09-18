@@ -55,19 +55,18 @@ for file_name in file_names:
 
     # Read legend from first lines of file
     # Expects file format from ascii produced by Mantid
-    file = open(file_name, "r")
-    line = file.readline()
     labels = []
-    # If custom header is present containing the legend info
-    if not line.startswith("#"):
-        header = ""
-        while line.strip() != "":
-            header += line
-            line = file.readline()
-        labels = [label.strip() for label in header.split(",Not defined,")]
-        labels.pop(-1)
-        print("Found the following labels in file:\n", labels)
-    file.close()
+    with open(file_name, "r") as file:
+        line = file.readline()
+        # If custom header is present containing the legend info
+        if not line.startswith("#"):
+            header = ""
+            while line.strip() != "":
+                header += line
+                line = file.readline()
+            labels = [label.strip() for label in header.split(",Not defined,")]
+            labels.pop(-1)
+            print("Found the following labels in file:\n", labels)
 
     ws_name = Path(file_name).stem
     ws = LoadAscii(file_name, OutputWorkspace=ws_name)
