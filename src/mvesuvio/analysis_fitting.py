@@ -27,7 +27,7 @@ from mantid.kernel import logger
 
 from mvesuvio.globals import FitModels
 from mvesuvio.util import handle_config
-from mvesuvio.util.analysis_helpers import print_table_workspace, pass_data_into_ws
+from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])

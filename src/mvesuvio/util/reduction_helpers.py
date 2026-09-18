@@ -20,6 +20,7 @@ from pathlib import Path
 
 from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 import dill  # To convert constraints to string
 from mantid.api import AlgorithmFactory, AlgorithmManager
@@ -417,15 +418,6 @@ def extractWS(ws):
     return ws.extractX(), ws.extractY(), ws.extractE()
 
 
-def pass_data_into_ws(dataX, dataY, dataE, ws):
-    "Modifies ws data to input data"
-    for i in range(ws.getNumberHistograms()):
-        ws.dataX(i)[:] = dataX[i, :]
-        ws.dataY(i)[:] = dataY[i, :]
-        ws.dataE(i)[:] = dataE[i, :]
-    return ws
-
-
 def create_profiles_table(name, ai):
     table = CreateEmptyTableWorkspace(OutputWorkspace=name)
     table.addColumn(type="str", name="label")
@@ -473,24 +465,3 @@ def create_profiles_table(name, ai):
 
     print_table_workspace(table)
     return table
-
-
-def print_table_workspace(table, precision=3):
-    table_dict = table.toDict()
-    # Convert floats into strings
-    for key, values in table_dict.items():
-        new_column = [int(item) if (isinstance(item, float) and item.is_integer()) else item for item in values]
-        table_dict[key] = [f"{item:.{precision}f}" if isinstance(item, float) else str(item) for item in new_column]
-
-    max_spacing = [max([len(item) for item in values] + [len(key)]) for key, values in table_dict.items()]
-    header = "|" + "|".join(f"{item}{' ' * (spacing - len(item))}" for item, spacing in zip(table_dict.keys(), max_spacing)) + "|"
-    logger.notice(f"Table {table.name()}:")
-    logger.notice(" " + "-" * (len(header) - 2) + " ")
-    logger.notice(header)
-    for i in range(table.rowCount()):
-        table_row = "|".join(
-            f"{values[i]}{' ' * (spacing - len(str(values[i])))}" for values, spacing in zip(table_dict.values(), max_spacing)
-        )
-        logger.notice("|" + table_row + "|")
-    logger.notice(" " + "-" * (len(header) - 2) + " ")
-    return
