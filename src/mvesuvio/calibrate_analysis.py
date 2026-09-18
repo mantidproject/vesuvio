@@ -155,8 +155,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._calculate_time_delay(t0_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE)
         else:
             # Just copy values over from parameter file
-            t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0", EVSGlobals.DETECTOR_RANGE)
-            L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0", EVSGlobals.DETECTOR_RANGE)
+            t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0")
+            L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0")
             self._set_table_column(self._current_workspace, "t0", t0)
             self._set_table_column(self._current_workspace, "L0", L0)
 
@@ -234,10 +234,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 self._create_calib_parameter_table(self._current_workspace)
 
                 # copy over L0 and t0 parameters to new table
-                t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0", EVSGlobals.DETECTOR_RANGE)
-                t0_error = EVSMiscFunctions.read_table_column(self._param_table, "t0_Err", EVSGlobals.DETECTOR_RANGE)
-                L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0", EVSGlobals.DETECTOR_RANGE)
-                L0_error = EVSMiscFunctions.read_table_column(self._param_table, "L0_Err", EVSGlobals.DETECTOR_RANGE)
+                t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0")
+                t0_error = EVSMiscFunctions.read_table_column(self._param_table, "t0_Err")
+                L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0")
+                L0_error = EVSMiscFunctions.read_table_column(self._param_table, "L0_Err")
 
                 self._set_table_column(self._current_workspace, "t0", t0)
                 self._set_table_column(self._current_workspace, "L0", L0)
@@ -429,7 +429,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._set_table_column(self._current_workspace, "E1_Err", E1_error)
 
         if calculate_global:  # This fn will need updating for the only global option
-            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(peak_table[1], "f1.LorentzPos", [0])
+            peak_centre = EVSMiscFunctions.read_table_column(peak_table[1], "f1.LorentzPos", [0])
             peak_centre = [peak_centre] * len(peak_centres)
 
             delta_t = (peak_centre - t0) / 1e6
