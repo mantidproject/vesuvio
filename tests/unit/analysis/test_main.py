@@ -7,59 +7,40 @@ from mvesuvio.main import _set_up_parser, _setup_config
 class TestParser(unittest.TestCase):
     """Test cases for command-line parser setup."""
 
-    @classmethod
-    def setUpClass(cls):
-        pass
+    def setUp(self):
+        self.parser = _set_up_parser()
 
     def test_set_up_parser_config(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["config", "--experiment-dir", "analysis_inputs.py", "--ip-dir", "mock_ip_folder"])
+        args = self.parser.parse_args(["config", "--experiment-dir", "analysis_inputs.py", "--ip-dir", "mock_ip_folder"])
 
         self.assertEqual(args.experiment_dir, "analysis_inputs.py")
         self.assertEqual(args.ip_dir, "mock_ip_folder")
 
     def test_set_up_parser_config_defaults(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["config"])
+        args = self.parser.parse_args(["config"])
 
         self.assertEqual(args.experiment_dir, "")
         self.assertEqual(args.ip_dir, "")
 
     def test_set_up_parser_run(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["run"])
-
-        self.assertEqual(args.command, "run")
-
-    def test_set_up_parser_run_defaults(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["run"])
+        args = self.parser.parse_args(["run"])
 
         self.assertEqual(args.command, "run")
 
     def test_set_up_parser_bootstrap(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["bootstrap"])
-
-        self.assertEqual(args.command, "bootstrap")
-
-    def test_set_up_parser_bootstrap_defaults(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["bootstrap"])
+        args = self.parser.parse_args(["bootstrap"])
 
         self.assertEqual(args.command, "bootstrap")
 
     def test_set_up_parser_config_short_flags(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["config", "-e", "inputs.py", "-i", "/ip/folder"])
+        args = self.parser.parse_args(["config", "-e", "inputs.py", "-i", "/ip/folder"])
 
         self.assertEqual(args.experiment_dir, "inputs.py")
         self.assertEqual(args.ip_dir, "/ip/folder")
 
     def test_set_up_parser_requires_command(self):
-        parser = _set_up_parser()
         with self.assertRaises(SystemExit):
-            parser.parse_args([])
+            self.parser.parse_args([])
 
 
 class TestSetupConfig(unittest.TestCase):

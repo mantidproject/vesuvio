@@ -5,7 +5,8 @@ import dill
 from pathlib import Path
 from mock import Mock, patch, call
 from mvesuvio.util.analysis_helpers import extend_range_of_array, load_instrument_params, load_resolution, numerical_third_derivative,  \
-    make_gamma_correction_input_string, make_multiple_scattering_input_string, print_table_workspace, pseudo_voigt
+    make_gamma_correction_input_string, make_multiple_scattering_input_string, pseudo_voigt
+from mvesuvio.util.general_helpers import print_table_workspace
 from mantid.simpleapi import AnalysisDataService
 
 class TestAnalysisHelpers(unittest.TestCase):
@@ -87,7 +88,7 @@ class TestAnalysisHelpers(unittest.TestCase):
         mock_table.rowCount.return_value = 3
         mock_table.name.side_effect = lambda: "Mock Table Name"
 
-        with patch('mvesuvio.util.analysis_helpers.logger') as mock_logger:
+        with patch('mvesuvio.util.general_helpers.logger') as mock_logger:
 
             print_table_workspace(mock_table)
 

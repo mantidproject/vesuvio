@@ -124,12 +124,16 @@ class TestReductionHelpers(unittest.TestCase):
         self.assertEqual(h_ratio, 0.85 / 0.05)
 
     def test_is_hydrogen_present_bad_inputs(self):
-        with self.assertRaises(AssertionError):
-            reduction_helpers.is_hydrogen_present(np.array([1.01]))
-        with self.assertRaises(AssertionError):
-            reduction_helpers.is_hydrogen_present(np.array([2.0, 1.0, 12.0]))
-        with self.assertRaises(AssertionError):
-            reduction_helpers.is_hydrogen_present(np.array([1.0, 1.0078, 12.0]))
+        invalid_cases = [
+            np.array([1.01]),
+            np.array([2.0, 1.0, 12.0]),
+            np.array([1.0, 1.0078, 12.0]),
+        ]
+
+        for masses in invalid_cases:
+            with self.subTest(masses=masses):
+                with self.assertRaises(AssertionError):
+                    reduction_helpers.is_hydrogen_present(masses)
 
     def test_create_profiles_table(self):
 
@@ -163,21 +167,16 @@ class TestReductionHelpers(unittest.TestCase):
                 call(['16.0', 16.0, 1.0, 0.0, np.inf, 13.0, 11.0, 15.0, 0.0, -1.0, 3.0])
             ])
 
-    def test_is_hydrogen_present_with_hydrogen(self):
-        masses = np.array([1.0078, 12.0, 16.0])
-        is_present = reduction_helpers.is_hydrogen_present(masses)
-        self.assertTrue(is_present)
+    def test_is_hydrogen_present(self):
+        valid_cases = [
+            (np.array([1.0078, 12.0, 16.0]), True),
+            (np.array([2.0, 12.0, 16.0]), False),
+            (np.array([2.0]), False),
+        ]
 
-
-    def test_is_hydrogen_present_without_hydrogen(self):
-        masses = np.array([2.0, 12.0, 16.0])
-        is_present = reduction_helpers.is_hydrogen_present(masses)
-        self.assertFalse(is_present)
-
-    def test_is_hydrogen_present_one_mass_no_hydrogen(self):
-        masses = np.array([2.0])
-        is_present = reduction_helpers.is_hydrogen_present(masses)
-        self.assertFalse(is_present)
+        for masses, expected in valid_cases:
+            with self.subTest(masses=masses):
+                self.assertEqual(reduction_helpers.is_hydrogen_present(masses), expected)
 
     def test_ws_history_matches_inputs_invalid_path(self):
         path = Path("notthere.nxs")
@@ -187,76 +186,9 @@ class TestReductionHelpers(unittest.TestCase):
             self.assertFalse(match)
 
 
-    @patch('mvesuvio.util.reduction_helpers.Load')
-    def test_ws_history_matches_inputs_bad_runs(self, mock_load):
-        path = Mock()
-        path.is_file.return_value = True
-        props = {
-            "Filename": "1234-1235",
-            "Mode": "SingleDifference",
-            "InstrumentParFile": "ip_par.txt"
-        }
-        mock_metadata = Mock()
-        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
-        mock_history = Mock()
-        mock_history.getAlgorithmHistory.return_value = mock_metadata
-        mock_ws = Mock()
-        mock_ws.getHistory.return_value = mock_history
-        mock_load.return_value = mock_ws
-
-        with patch('mvesuvio.util.reduction_helpers.logger') as mock_logger:
-            match = reduction_helpers.ws_history_matches_inputs("0000", "SingleDifference", "ip_par.txt", path)
-            mock_logger.notice.assert_has_calls([call('Filename in saved workspace did not match: 1234-1235 and 0000')])
-            self.assertFalse(match)
-
-
-    @patch('mvesuvio.util.reduction_helpers.Load')
-    def test_ws_history_matches_inputs_bad_mode(self, mock_load):
-        path = Mock()
-        path.is_file.return_value = True
-        props = {
-            "Filename": "1234-1235",
-            "Mode": "SingleDifference",
-            "InstrumentParFile": "ip_par.txt"
-        }
-        mock_metadata = Mock()
-        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
-        mock_history = Mock()
-        mock_history.getAlgorithmHistory.return_value = mock_metadata
-        mock_ws = Mock()
-        mock_ws.getHistory.return_value = mock_history
-        mock_load.return_value = mock_ws
-
-        with patch('mvesuvio.util.reduction_helpers.logger') as mock_logger:
-            match = reduction_helpers.ws_history_matches_inputs("1234-1235", "DoubleDifference", "ip_par.txt", path)
-            mock_logger.notice.assert_has_calls([call('Mode in saved workspace did not match: SingleDifference and DoubleDifference')])
-            self.assertFalse(match)
-
-    @patch('mvesuvio.util.reduction_helpers.Load')
-    def test_ws_history_matches_inputs_bad_ipfile(self, mock_load):
-        path = Mock()
-        path.is_file.return_value = True
-        props = {
-            "Filename": "1234-1235",
-            "Mode": "SingleDifference",
-            "InstrumentParFile": "ip_par.txt"
-        }
-        mock_metadata = Mock()
-        mock_metadata.getPropertyValue.side_effect = lambda key: props[key]
-        mock_history = Mock()
-        mock_history.getAlgorithmHistory.return_value = mock_metadata
-        mock_ws = Mock()
-        mock_ws.getHistory.return_value = mock_history
-        mock_load.return_value = mock_ws
-
-        with patch('mvesuvio.util.reduction_helpers.logger') as mock_logger:
-            match = reduction_helpers.ws_history_matches_inputs("1234-1235", "SingleDifference", "new_par.txt", path)
-            mock_logger.notice.assert_has_calls([call('IP files in saved workspace did not match: ip_par.txt and new_par.txt')])
-            self.assertFalse(match)
-
     @patch('mvesuvio.util.reduction_helpers.DeleteWorkspace')
     @patch('mvesuvio.util.reduction_helpers.Load')
-    def test_ws_history_matches_good_inputs(self, mock_load, mock_delete):
+    def test_ws_history_matches_inputs(self, mock_load, mock_delete):
         path = Mock()
         path.is_file.return_value = True
         props = {
@@ -272,10 +204,24 @@ class TestReductionHelpers(unittest.TestCase):
         mock_ws.getHistory.return_value = mock_history
         mock_load.return_value = mock_ws
 
-        with patch('mvesuvio.util.reduction_helpers.logger') as mock_logger:
-            match = reduction_helpers.ws_history_matches_inputs("1234-1235", "SingleDifference", "ip_par.txt", path)
-            mock_logger.notice.assert_has_calls([call('\nLocally saved workspace metadata matched with analysis inputs.\n')])
-            self.assertTrue(match)
+        cases = [
+            ("0000", "SingleDifference", "ip_par.txt", False, 'Filename in saved workspace did not match: 1234-1235 and 0000'),
+            ("1234-1235", "DoubleDifference", "ip_par.txt", False, 'Mode in saved workspace did not match: SingleDifference and DoubleDifference'),
+            ("1234-1235", "SingleDifference", "new_par.txt", False, 'IP files in saved workspace did not match: ip_par.txt and new_par.txt'),
+            ("1234-1235", "SingleDifference", "ip_par.txt", True, '\nLocally saved workspace metadata matched with analysis inputs.\n'),
+        ]
+
+        for runs, mode, ip_file, expected, expected_message in cases:
+            with self.subTest(runs=runs, mode=mode, ip_file=ip_file):
+                mock_delete.reset_mock()
+                with patch('mvesuvio.util.reduction_helpers.logger') as mock_logger:
+                    match = reduction_helpers.ws_history_matches_inputs(runs, mode, ip_file, path)
+                    mock_logger.notice.assert_has_calls([call(expected_message)])
+                    self.assertEqual(match, expected)
+                    if expected:
+                        mock_delete.assert_called_once_with(mock_ws)
+                    else:
+                        mock_delete.assert_not_called()
 
 
     @patch('mvesuvio.util.reduction_helpers.SaveNexus')
@@ -365,19 +311,16 @@ class TestReductionHelpers(unittest.TestCase):
         ])
         mock_save_ws.assert_not_called()
 
-    def test_convert_to_list_of_spectrum_numbers_string(self):
-        res = reduction_helpers.convert_to_list_of_spectrum_numbers("1, 3-6, 8-8, 10")
-        self.assertEqual(res, [1, 3, 4, 5, 6, 8, 10])
+    def test_convert_to_list_of_spectrum_numbers(self):
+        cases = [
+            ("1, 3-6, 8-8, 10", [1, 3, 4, 5, 6, 8, 10]),
+            (["1", 3, 5, 6, "7"], [1, 3, 5, 6, 7]),
+            ([1, 3, 5, 6, 7], [1, 3, 5, 6, 7]),
+        ]
 
-
-    def test_convert_to_list_of_spectrum_numbers_list_mixed(self):
-        res = reduction_helpers.convert_to_list_of_spectrum_numbers(["1", 3, 5, 6, "7"])
-        self.assertEqual(res, [1, 3, 5, 6, 7])
-
-
-    def test_convert_to_list_of_spectrum_numbers_list_integers(self):
-        res = reduction_helpers.convert_to_list_of_spectrum_numbers([1, 3, 5, 6, 7])
-        self.assertEqual(res, [1, 3, 5, 6, 7])
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(reduction_helpers.convert_to_list_of_spectrum_numbers(value), expected)
 
 
 
