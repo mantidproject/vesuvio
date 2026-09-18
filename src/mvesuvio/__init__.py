@@ -43,18 +43,9 @@ class RunArgInputs(ArgInputs):
         super().__init__("run")
 
 
-def _run_config(experiment_dir="", ip_dir=""):
+def config(experiment_dir="", ip_dir=""):
     config_args = ConfigArgInputs(experiment_dir, ip_dir)
     main(config_args)
-
-
-def config(experiment_dir="", ip_dir=""):
-    _run_config(experiment_dir, ip_dir)
-
-
-def set_config(experiment_dir="", ip_dir=""):
-    """Backward-compatible alias for config()."""
-    config(experiment_dir, ip_dir)
 
 
 def run():
