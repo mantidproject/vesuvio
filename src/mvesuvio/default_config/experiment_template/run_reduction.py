@@ -4,6 +4,7 @@ from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, m
 from mantid.kernel import logger
 from pathlib import Path
 from mvesuvio import ConfigArgInputs
+from mvesuvio.globals import Mode
 from mvesuvio.util import fitting_helpers
 from mvesuvio.util import general_helpers
 from mvesuvio.util import reduction_helpers
@@ -31,7 +32,7 @@ class BackwardAnalysisInputs(SampleParameters):
 
     runs = "43066-43076"  # Runs of your sample dataset
     empty_runs = "41876-41923"  # Empty CCR
-    mode = "DoubleDifference"
+    mode = Mode.DoubleDifference
     instrument_parameters_file = "ip2019.par"
     detectors = "3-134"
     mask_detectors = [18, 34, 42, 43, 59, 60, 62, 118, 119, 133]  # Can also be a string "18, 34, 42-43, 59-60, 62, 118-119, 133"
@@ -92,7 +93,7 @@ class ForwardAnalysisInputs(SampleParameters):
 
     runs = "43066-43076"
     empty_runs = "43868-43911"  # Empty CCR
-    mode = "SingleDifference"
+    mode = Mode.SingleDifference
     instrument_parameters_file = "ip2018_3.par"
     detectors = "144-182"
     mask_detectors = [173, 174, 179]  # Can also be a string "173-174, 179"

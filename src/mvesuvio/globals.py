@@ -18,3 +18,17 @@ class FitModels(StrEnum):
     doublewell = "doublewell"
     gauss2d = "gauss2d"
     gauss3d = "gauss3d"
+
+
+class Masking(StrEnum):
+    nan = "nan"
+    ncp = "ncp"
+
+
+class Mode(StrEnum):
+    SingleDifference = "SingleDifference"
+    DoubleDifference = "DoubleDifference"
+    ThickDifference = "ThickDifference"
+    FoilOut = "FoilOut"
+    FoilIn = "FoilIn"
+    FoilInOut = "FoilInOut"

@@ -1,5 +1,5 @@
 from mvesuvio.analysis_fitting import FitInYSpace
-from mvesuvio.globals import FitModels
+from mvesuvio.globals import FitModels, Masking
 from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mantid.api import AnalysisDataService
@@ -57,9 +57,9 @@ class BackwardFittingInputs(BackwardAnalysisInputs):
     # or option 'all', which does not form groups and fits all spectra simultaneously and individualy
     number_of_global_fit_groups = 4
     # Type of masking
-    # 'nan': Zeros in workspace being fit are ignored
-    # 'ncp': Zeros in workspace being fit are replaced by the fitted neutron compton profile
-    mask_zeros_with = "nan"
+    # Masking.nan: Zeros in workspace being fit are ignored
+    # Masking.ncp: Zeros in workspace being fit are replaced by the fitted neutron compton profile
+    mask_zeros_with = Masking.nan
 
 
 class ForwardFittingInputs(ForwardAnalysisInputs):
@@ -88,9 +88,9 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     # or option 'all', which does not form groups and fits all spectra simultaneously and individualy
     number_of_global_fit_groups = 4
     # Type of masking
-    # 'nan': Zeros in workspace being fit are ignored
-    # 'ncp': Zeros in workspace being fit are replaced by the fitted neutron compton profile
-    mask_zeros_with = "nan"
+    # Masking.nan: Zeros in workspace being fit are ignored
+    # Masking.ncp: Zeros in workspace being fit are replaced by the fitted neutron compton profile
+    mask_zeros_with = Masking.nan
 
 
 def load_saved_fitting_input_workspaces() -> None:

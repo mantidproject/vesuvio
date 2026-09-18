@@ -25,7 +25,7 @@ import jacobi
 import time
 from mantid.kernel import logger
 
-from mvesuvio.globals import FitModels
+from mvesuvio.globals import FitModels, Masking
 from mvesuvio.util import handle_config
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace
 
@@ -85,7 +85,7 @@ def ySpaceReduction(wsTOF, ws_ncp, ic):
     rebinPars = ic.range_for_rebinning_in_y_space
 
     if np.any(np.all(wsTOF.extractY() == 0, axis=0)):  # Masked columns present
-        if ic.mask_zeros_with == "nan":
+        if ic.mask_zeros_with == Masking.nan:
             # Build special workspace to store accumulated points
             wsJoY = convertToYSpace(wsTOF, mass0)
             xp = buildXRangeFromRebinPars(ic)
@@ -101,7 +101,7 @@ def ySpaceReduction(wsTOF, ws_ncp, ic):
             wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
             return wsJoYN, wsJoYAvg
 
-        elif ic.mask_zeros_with == "ncp":
+        elif ic.mask_zeros_with == Masking.ncp:
             wsTOF = replaceZerosWithNCP(wsTOF, ncp)
 
         else:
@@ -1513,7 +1513,7 @@ def avgWeightDetGroups(dataX, dataY, dataE, dataRes, idxList, yFitIC):
         f"Input data should not include masked spectra at: {np.argwhere(np.all(dataY == 0, axis=1))}"
     )
 
-    if yFitIC.mask_zeros_with == "nan":
+    if yFitIC.mask_zeros_with == Masking.nan:
         return avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC)
 
     # Use Default for unmasked or NCP masked
