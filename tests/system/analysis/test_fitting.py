@@ -37,6 +37,9 @@ class TestFitting(unittest.TestCase):
     def setUp(self):
         rmtree(self.results_path, ignore_errors=True)
 
+    def tearDown(self) -> None:
+        AnalysisDataService.clear()
+
     def test_fitting_routine(self):
         fitting_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_fitting.py"
         namespace = runpy.run_path(str(fitting_script), run_name="test_fitting_run_fitting")
@@ -60,5 +63,5 @@ class TestFitting(unittest.TestCase):
         for ws_name in mtd.getObjectNames():
             if ws_name.startswith('bench'):
                 tol = 1e-3
-                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench", "result"), Tolerance=tol)
+                result, _ = CompareWorkspaces(ws_name, ws_name.replace("bench", "result"), Tolerance=tol)
                 self.assertTrue(result, f"Comparison failed for workspace: {ws_name}")

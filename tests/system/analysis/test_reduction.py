@@ -26,6 +26,9 @@ class TestReduction(unittest.TestCase):
     def setUp(self):
         rmtree(self.results_path, ignore_errors=True)
 
+    def tearDown(self) -> None:
+        AnalysisDataService.clear()
+
     def test_reduction_routine(self):
         reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"
         namespace = runpy.run_path(str(reduction_script), run_name="test_reduction_run_reduction")
@@ -57,7 +60,7 @@ class TestReduction(unittest.TestCase):
                     continue
                 else:
                     tol = 1e-3
-                (result, messages) = CompareWorkspaces(ws_name, ws_name.replace("bench", "result"), Tolerance=tol)
+                result, _ = CompareWorkspaces(ws_name, ws_name.replace("bench", "result"), Tolerance=tol)
                 self.assertTrue(result, f"Comparison failed for workspace: {ws_name}")
 
 

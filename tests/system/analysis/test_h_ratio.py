@@ -6,7 +6,7 @@ from mvesuvio.util import handle_config
 from mvesuvio import ConfigArgInputs
 from shutil import copytree, rmtree
 import mvesuvio
-from mantid.simpleapi import LoadAscii, CompareWorkspaces
+from mantid.simpleapi import LoadAscii, CompareWorkspaces, AnalysisDataService
 
 
 class TestHRatioRoutine(unittest.TestCase):
@@ -30,6 +30,9 @@ class TestHRatioRoutine(unittest.TestCase):
         else:
             self.result_path.unlink(missing_ok=True)
 
+    def tearDown(self) -> None:
+        AnalysisDataService.clear()
+
     def test_h_ratio_routine(self):
         reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"
         namespace = runpy.run_path(str(reduction_script), run_name="test_h_ratio_run_reduction")
@@ -46,5 +49,5 @@ class TestHRatioRoutine(unittest.TestCase):
 
         LoadAscii(str(self.benchmark_path), Separator="CSV", OutputWorkspace=bench_name)
         LoadAscii(str(self.result_path), Separator="CSV", OutputWorkspace=result_name)
-        (result, _messages) = CompareWorkspaces(bench_name, result_name, Tolerance=1e-3)
+        result, _ = CompareWorkspaces(bench_name, result_name, Tolerance=1e-3)
         self.assertTrue(result)
