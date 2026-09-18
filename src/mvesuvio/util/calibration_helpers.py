@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.typing as npt
 import scipy.constants
 from mantid.simpleapi import CreateEmptyTableWorkspace, mtd
 
@@ -7,10 +8,10 @@ class EVSGlobals:
     # Configuration for Uranium runs / Indium runs
     # ----------------------------------------------------------------------------------------
     # Uranium sample & background run numbers
-    U_FRONTSCATTERING_SAMPLE = [14025]  # [14025]  for U foil in the beam,   [19129, 19130] for In foil in the beam
+    U_FRONTSCATTERING_SAMPLE: list[int] = [14025]  # [14025]  for U foil in the beam,   [19129, 19130] for In foil in the beam
 
     #  ['12570']  or [19132, 19134, 19136, 19138, 19140, 19142,19144, 19146, 19148, 19150, 19152] or [42209, 42210, 42211, 42212, 42213, 42214, 42215, 42216, 42217, 42218, 42219, 42220, 42221, 42222, 42223, 42224, 42225, 42226, 42227,42228] for Pb 2mm with U foil out
-    U_FRONTSCATTERING_BACKGROUND = [
+    U_FRONTSCATTERING_BACKGROUND: list[int] = [
         42209,
         42210,
         42211,
@@ -34,7 +35,7 @@ class EVSGlobals:
     ]
 
     #  ['12570']  or [19132, 19134, 19136, 19138, 19140, 19142,19144, 19146, 19148, 19150, 19152] or [42209, 42210, 42211, 42212, 42213, 42214, 42215, 42216, 42217, 42218, 42219, 42220, 42221, 42222, 42223, 42224, 42225, 42226, 42227,42228] for Pb 2mm with U foil out
-    U_BACKSCATTERING_SAMPLE = [
+    U_BACKSCATTERING_SAMPLE: list[int] = [
         42209,
         42210,
         42211,
@@ -58,7 +59,7 @@ class EVSGlobals:
     ]
 
     # ['12571'] or [42229,42230,42231,42232,42233,42234,42235,42236,42237,42238,42239,42240,42241,42242,42243,42244,42245,42246,42247,42248,42249,42250,42251,42252,42253] or  [19131, 19133, 19135, 19137, 19139, 19141, 19143, 19145, 19147, 19149, 19151]  for Pb 2mm with U foil in
-    U_BACKSCATTERING_BACKGROUND = [
+    U_BACKSCATTERING_BACKGROUND: list[int] = [
         42229,
         42230,
         42231,
@@ -87,54 +88,54 @@ class EVSGlobals:
     ]
 
     # peak enegy for U/In in mev
-    U_PEAK_ENERGIES = [36684, 20874, 6672]  # [36684, 20874, 6672] for uranium, [39681,22723,14599,12056,9088,3855] for indium
+    U_PEAK_ENERGIES: list[int] = [36684, 20874, 6672]  # [36684, 20874, 6672] for uranium, [39681,22723,14599,12056,9088,3855] for indium
     # U mass/ In mass  in amu
-    U_MASS = 238.0289  # 113 for indium
+    U_MASS: float = 238.0289  # 113 for indium
 
     # misc global variables
     # ----------------------------------------------------------------------------------------
     # full range of both the front and backscattering banks
-    FRONTSCATTERING_RANGE = [135, 198]
-    BACKSCATTERING_RANGE = [3, 134]
-    DETECTOR_RANGE = [BACKSCATTERING_RANGE[0], FRONTSCATTERING_RANGE[1]]
+    FRONTSCATTERING_RANGE: list[int] = [135, 198]
+    BACKSCATTERING_RANGE: list[int] = [3, 134]
+    DETECTOR_RANGE: list[int] = [BACKSCATTERING_RANGE[0], FRONTSCATTERING_RANGE[1]]
 
     # file loading modes
-    MODES = ["SingleDifference", "DoubleDifference", "ThickDifference", "FoilOut", "FoilIn", "FoilInOut"]
+    MODES: list[str] = ["SingleDifference", "DoubleDifference", "ThickDifference", "FoilOut", "FoilIn", "FoilInOut"]
 
     # Different peak types that will be fit
-    PEAK_TYPES = ["Resonance", "Recoil", "Bragg"]
+    PEAK_TYPES: list[str] = ["Resonance", "Recoil", "Bragg"]
 
     # self._fit_window_range applies bith to fitting the resonances and the lead recoil peaks
     # it is defined as the range left and right from the peak centre (i. e. the whole fitting window is twice the fitting range)
 
-    BRAGG_PEAK_CROP_RANGE = (2000, 20000)
-    BRAGG_FIT_WINDOW_RANGE = 500
-    BRAGG_PEAK_POSITION_TOLERANCE = 1000
+    BRAGG_PEAK_CROP_RANGE: tuple[int, int] = (2000, 20000)
+    BRAGG_FIT_WINDOW_RANGE: int = 500
+    BRAGG_PEAK_POSITION_TOLERANCE: int = 1000
 
-    RECOIL_PEAK_CROP_RANGE = (300, 500)
-    RECOIL_FIT_WINDOW_RANGE = 300
+    RECOIL_PEAK_CROP_RANGE: tuple[int, int] = (300, 500)
+    RECOIL_FIT_WINDOW_RANGE: int = 300
 
-    RESONANCE_PEAK_CROP_RANGE = (100, 350)
-    RESONANCE_FIT_WINDOW_RANGE = 50
+    RESONANCE_PEAK_CROP_RANGE: tuple[int, int] = (100, 350)
+    RESONANCE_FIT_WINDOW_RANGE: int = 50
 
-    PEAK_HEIGHT_RELATIVE_THRESHOLD = 0.25
+    PEAK_HEIGHT_RELATIVE_THRESHOLD: float = 0.25
 
     # energy used to estimate peak position
-    ENERGY_ESTIMATE = 4897.3
+    ENERGY_ESTIMATE: float = 4897.3
 
     # physical constants
     # ----------------------------------------------------------------------------------------
     # convert to 1 / v and scale for fitting
-    U_NEUTRON_VELOCITY = np.array(
+    U_NEUTRON_VELOCITY: npt.NDArray[np.float64] = np.array(
         [83769.7, 63190.5, 35725.4]
     )  # np.array([83769.7, 63190.5, 35725.4]) # for U  # np.array([87124.5,65929.8,52845.8,48023.1,41694.9,27155.7])  # for indium
     U_NEUTRON_VELOCITY = 1.0 / U_NEUTRON_VELOCITY
     U_NEUTRON_VELOCITY *= 1e6
 
     # mass of a neutron in amu
-    NEUTRON_MASS_AMU = scipy.constants.value("neutron mass in u")
+    NEUTRON_MASS_AMU: float = scipy.constants.value("neutron mass in u")
     # 1 meV in Joules
-    MEV_CONVERSION = 1.602176487e-22
+    MEV_CONVERSION: float = 1.602176487e-22
 
 
 class EVSMiscFunctions:
@@ -152,7 +153,6 @@ class EVSMiscFunctions:
         r_theta = (np.cos(rad_theta) + np.sqrt((sample_mass / EVSGlobals.NEUTRON_MASS_AMU) ** 2 - np.sin(rad_theta) ** 2)) / (
             (sample_mass / EVSGlobals.NEUTRON_MASS_AMU) + 1
         )
-
         return r_theta
 
     # The IP text file load function skips the first 3 rows of the text file.
@@ -202,38 +202,17 @@ class EVSMiscFunctions:
         @return numpy array of values in the spec_list range
         """
 
-        offset = EVSGlobals.DETECTOR_RANGE[0]
-        if len(spec_list) > 1:
-            lower, upper = spec_list
-        else:
-            lower = spec_list[0]
+        lower = spec_list[0]
+        if len(spec_list) == 2:
+            upper = spec_list[1]
+        elif len(spec_list) == 1:
             upper = spec_list[0]
+        else:
+            raise ValueError("The spectrum list must have atleast one element and a maximum of two elements")
 
         column_values = mtd[table_name].column(column_name)
 
-        return np.array(column_values[lower - offset : upper + 1 - offset])
-
-    @staticmethod
-    def read_fitting_result_table_column(table_name, column_name, spec_list):
-        """
-        Read a column from a table workspace resulting from fitting and return the data as an array.
-
-        @param table_name - name of the table workspace
-        @param column_name - name of the column to select
-        @param spec_list - range of spectra to use
-        @return numpy array of values in the spec_list range
-        """
-
-        offset = spec_list[0]
-        if len(spec_list) > 1:
-            lower, upper = spec_list
-        else:
-            lower = spec_list[0]
-            upper = spec_list[0]
-
-        column_values = mtd[table_name].column(column_name)
-
-        return np.array(column_values[lower - offset : upper + 1 - offset])
+        return np.array(column_values[0 : upper - lower + 1])
 
     @staticmethod
     def generate_fit_function_header(function_type, error=False):
@@ -244,7 +223,7 @@ class EVSMiscFunctions:
             error_str = "_Err" if error else ""
             func_header = {"Height": "Height", "Width": "Sigma", "Position": "PeakCentre"}
         else:
-            raise ValueError("Unsupported fit function type: %s" % function_type)
+            raise ValueError(f"Unsupported fit function type: {function_type}")
 
         return {k: v + error_str for k, v in func_header.items()}
 
@@ -313,7 +292,7 @@ class InvalidDetectors:
         """
 
         invalid_detectors = self.identify_and_set_invalid_detectors_from_range(detector_range, peak_table)
-        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzPos", detector_range)
+        peak_centres = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzPos", detector_range)
         peak_centres[invalid_detectors] = np.nan
         return peak_centres
 
@@ -326,8 +305,8 @@ class InvalidDetectors:
         @returns invalid_detectors - a list of the index's of invalid detector, in the context of the range they belong to.
         """
 
-        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzPos", detector_range)
-        peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzPos_Err", detector_range)
+        peak_centres = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzPos", detector_range)
+        peak_centres_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzPos_Err", detector_range)
 
         if detector_range == EVSGlobals.FRONTSCATTERING_RANGE:
             if not self._detectors_preset and not self._invalid_detectors_front.any():
@@ -367,12 +346,12 @@ class InvalidDetectors:
         @param spec_list - spectrum range to inspect.
         @return a list of invalid spectra.
         """
-        peak_Gaussian_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.GaussianFWHM", spec_list)
-        peak_Gaussian_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.GaussianFWHM_Err", spec_list)
-        peak_Lorentz_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzFWHM", spec_list)
-        peak_Lorentz_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzFWHM_Err", spec_list)
-        peak_Lorentz_Amp = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzAmp", spec_list)
-        peak_Lorentz_Amp_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzAmp_Err", spec_list)
+        peak_Gaussian_FWHM = EVSMiscFunctions.read_table_column(peak_table, "f1.GaussianFWHM", spec_list)
+        peak_Gaussian_FWHM_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.GaussianFWHM_Err", spec_list)
+        peak_Lorentz_FWHM = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzFWHM", spec_list)
+        peak_Lorentz_FWHM_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzFWHM_Err", spec_list)
+        peak_Lorentz_Amp = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzAmp", spec_list)
+        peak_Lorentz_Amp_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzAmp_Err", spec_list)
 
         invalid_spectra = np.argwhere(
             (np.isinf(peak_Lorentz_Amp_errors))
