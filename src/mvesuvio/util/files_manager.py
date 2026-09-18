@@ -7,8 +7,8 @@ from mantid.kernel import ConfigService
 class FilesManager:
     _experiment_dir: Path | None = None
 
-    @classmethod
-    def get_instrument_parameters_dir(cls) -> Path:
+    @staticmethod
+    def get_instrument_parameters_dir() -> Path:
         return Path(handle_config.read_cached_var("caching.ipfolder"))
 
     @classmethod
@@ -48,24 +48,24 @@ class FilesManager:
         fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
         return fitting_inputs_dir
 
-    @classmethod
-    def get_backward_raw_filename(cls) -> str:
+    @staticmethod
+    def get_backward_raw_filename() -> str:
         return handle_config.get_experiment_name() + "_" + "raw" + "_" + Tags.Backward + ".nxs"
 
-    @classmethod
-    def get_backward_empty_filename(cls) -> str:
+    @staticmethod
+    def get_backward_empty_filename() -> str:
         return handle_config.get_experiment_name() + "_" + "empty" + "_" + Tags.Backward + ".nxs"
 
-    @classmethod
-    def get_forward_raw_filename(cls) -> str:
+    @staticmethod
+    def get_forward_raw_filename() -> str:
         return handle_config.get_experiment_name() + "_" + "raw" + "_" + Tags.Forward + ".nxs"
 
-    @classmethod
-    def get_forward_empty_filename(cls) -> str:
+    @staticmethod
+    def get_forward_empty_filename() -> str:
         return handle_config.get_experiment_name() + "_" + "empty" + "_" + Tags.Forward + ".nxs"
 
-    @classmethod
-    def get_mantid_log_file(cls) -> Path:
+    @staticmethod
+    def get_mantid_log_file() -> Path:
         return Path(ConfigService.getPropertiesDir(), "mantid.log")
 
     @classmethod
