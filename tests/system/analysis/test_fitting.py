@@ -12,9 +12,12 @@ matplotlib.use("Agg", force=True)
 
 from mvesuvio.util import handle_config
 from mvesuvio import ConfigArgInputs
-from shutil import copytree
+from shutil import copytree, rmtree
 import mvesuvio
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
+
+TESTS_ROOT = Path(__file__).resolve().parents[2]
+FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
 
 
 class TestFitting(unittest.TestCase):
@@ -23,14 +26,15 @@ class TestFitting(unittest.TestCase):
         handle_config.refresh_config_dir_and_contents()
         mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
         copytree(
-            handle_config.PACKAGE_CONFIG_PATH / "experiment_template" / "fitting_inputs",
+            FITTING_INPUTS_PATH,
             handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_inputs",
             dirs_exist_ok=True
             )
         pass
 
     def setUp(self):
-        pass
+        output_dir = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs"
+        rmtree(output_dir, ignore_errors=True)
 
     def test_fitting_routine(self):
         fitting_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_fitting.py"

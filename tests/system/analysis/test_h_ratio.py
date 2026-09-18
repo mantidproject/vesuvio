@@ -14,8 +14,9 @@ class TestHRatioRoutine(unittest.TestCase):
     def setUpClass(cls):
         handle_config.refresh_config_dir_and_contents()
         mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
+        reduction_inputs = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "reduction"
         copytree(
-            handle_config.PACKAGE_CONFIG_PATH / "experiment_template" / "reduction_inputs",
+            reduction_inputs,
             handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_inputs",
             dirs_exist_ok=True
             )
