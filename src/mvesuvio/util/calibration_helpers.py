@@ -202,40 +202,17 @@ class EVSMiscFunctions:
         @return numpy array of values in the spec_list range
         """
 
-        offset = EVSGlobals.DETECTOR_RANGE[0]
+        lower = spec_list[0]
         if len(spec_list) == 2:
-            lower, upper = spec_list
+            upper = spec_list[1]
         elif len(spec_list) == 1:
-            lower = upper = spec_list[0]
+            upper = spec_list[0]
         else:
             raise ValueError("The spectrum list must have atleast one element and a maximum of two elements")
 
         column_values = mtd[table_name].column(column_name)
 
-        return np.array(column_values[lower - offset : upper + 1 - offset])
-
-    # Repeated remove
-    @staticmethod
-    def read_fitting_result_table_column(table_name, column_name, spec_list):
-        """
-        Read a column from a table workspace resulting from fitting and return the data as an array.
-
-        @param table_name - name of the table workspace
-        @param column_name - name of the column to select
-        @param spec_list - range of spectra to use
-        @return numpy array of values in the spec_list range
-        """
-
-        offset = spec_list[0]
-        if len(spec_list) > 1:
-            lower, upper = spec_list
-        else:
-            lower = spec_list[0]
-            upper = spec_list[0]
-
-        column_values = mtd[table_name].column(column_name)
-
-        return np.array(column_values[lower - offset : upper + 1 - offset])
+        return np.array(column_values[0 : upper - lower + 1])
 
     @staticmethod
     def generate_fit_function_header(function_type, error=False):
@@ -246,7 +223,7 @@ class EVSMiscFunctions:
             error_str = "_Err" if error else ""
             func_header = {"Height": "Height", "Width": "Sigma", "Position": "PeakCentre"}
         else:
-            raise ValueError("Unsupported fit function type: %s" % function_type)
+            raise ValueError(f"Unsupported fit function type: {function_type}")
 
         return {k: v + error_str for k, v in func_header.items()}
 
@@ -315,7 +292,7 @@ class InvalidDetectors:
         """
 
         invalid_detectors = self.identify_and_set_invalid_detectors_from_range(detector_range, peak_table)
-        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzPos", detector_range)
+        peak_centres = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzPos", detector_range)
         peak_centres[invalid_detectors] = np.nan
         return peak_centres
 
@@ -328,8 +305,8 @@ class InvalidDetectors:
         @returns invalid_detectors - a list of the index's of invalid detector, in the context of the range they belong to.
         """
 
-        peak_centres = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzPos", detector_range)
-        peak_centres_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzPos_Err", detector_range)
+        peak_centres = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzPos", detector_range)
+        peak_centres_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzPos_Err", detector_range)
 
         if detector_range == EVSGlobals.FRONTSCATTERING_RANGE:
             if not self._detectors_preset and not self._invalid_detectors_front.any():
@@ -369,12 +346,12 @@ class InvalidDetectors:
         @param spec_list - spectrum range to inspect.
         @return a list of invalid spectra.
         """
-        peak_Gaussian_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.GaussianFWHM", spec_list)
-        peak_Gaussian_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.GaussianFWHM_Err", spec_list)
-        peak_Lorentz_FWHM = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzFWHM", spec_list)
-        peak_Lorentz_FWHM_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzFWHM_Err", spec_list)
-        peak_Lorentz_Amp = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzAmp", spec_list)
-        peak_Lorentz_Amp_errors = EVSMiscFunctions.read_fitting_result_table_column(peak_table, "f1.LorentzAmp_Err", spec_list)
+        peak_Gaussian_FWHM = EVSMiscFunctions.read_table_column(peak_table, "f1.GaussianFWHM", spec_list)
+        peak_Gaussian_FWHM_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.GaussianFWHM_Err", spec_list)
+        peak_Lorentz_FWHM = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzFWHM", spec_list)
+        peak_Lorentz_FWHM_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzFWHM_Err", spec_list)
+        peak_Lorentz_Amp = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzAmp", spec_list)
+        peak_Lorentz_Amp_errors = EVSMiscFunctions.read_table_column(peak_table, "f1.LorentzAmp_Err", spec_list)
 
         invalid_spectra = np.argwhere(
             (np.isinf(peak_Lorentz_Amp_errors))
