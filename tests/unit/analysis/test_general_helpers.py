@@ -4,10 +4,24 @@ import unittest
 from textwrap import dedent
 from unittest.mock import patch
 
+import numpy as np
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+
 from mvesuvio.util import general_helpers
 
 
 class TestGeneralHelpers(unittest.TestCase):
+
+    def test_extract_ws(self):
+        data = [1, 2, 3]
+        ws = CreateWorkspace(DataX=data, DataY=data, DataE=data, NSpec=1, UnitX="some_unit")
+
+        dataX, dataY, dataE = general_helpers.extractWS(ws)
+        np.testing.assert_array_equal([data], dataX)
+        np.testing.assert_array_equal([data], dataY)
+        np.testing.assert_array_equal([data], dataE)
+
+        DeleteWorkspace(ws)
 
     def test_make_summarised_log_file(self):
         with tempfile.NamedTemporaryFile(delete=False) as mock_mantid_log_file, tempfile.NamedTemporaryFile(delete=False) as mock_summary_file:

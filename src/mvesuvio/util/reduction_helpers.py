@@ -20,7 +20,7 @@ from pathlib import Path
 
 from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
-from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace
+from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 import dill  # To convert constraints to string
 from mantid.api import AlgorithmFactory, AlgorithmManager
@@ -411,11 +411,6 @@ def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
 
     pass_data_into_ws(dataX, dataY, dataE, ws)
     return
-
-
-def extractWS(ws):
-    """Directly extracts data from workspace into arrays"""
-    return ws.extractX(), ws.extractY(), ws.extractE()
 
 
 def create_profiles_table(name, ai):

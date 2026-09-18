@@ -14,6 +14,11 @@ def pass_data_into_ws(dataX, dataY, dataE, ws):
     return ws
 
 
+def extractWS(ws):
+    """Directly extracts data from a workspace into arrays."""
+    return ws.extractX(), ws.extractY(), ws.extractE()
+
+
 def print_table_workspace(table, precision=3):
     table_dict = table.toDict()
     # Convert floats into strings

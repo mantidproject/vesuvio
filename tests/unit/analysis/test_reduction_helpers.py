@@ -7,21 +7,9 @@ import numpy as np
 
 from mvesuvio.globals import Tags
 from mvesuvio.util import reduction_helpers
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
 
 
 class TestReductionHelpers(unittest.TestCase):
-
-    def test_extract_ws(self):
-        data = [1, 2, 3]
-        ws = CreateWorkspace(DataX=data, DataY=data, DataE=data, NSpec=1, UnitX="some_unit")
-
-        dataX, dataY, dataE = reduction_helpers.extractWS(ws)
-        np.testing.assert_array_equal([data], dataX)
-        np.testing.assert_array_equal([data], dataY)
-        np.testing.assert_array_equal([data], dataE)
-
-        DeleteWorkspace(ws)
 
     def test_convert_dict_to_table(self):
         d = {'H': {'label': 'H', 'mass': 1, 'intensity': 1}}

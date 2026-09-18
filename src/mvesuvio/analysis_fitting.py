@@ -27,7 +27,7 @@ from mantid.kernel import logger
 
 from mvesuvio.globals import FitModels, Masking
 from mvesuvio.util import handle_config
-from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace
+from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
@@ -333,11 +333,6 @@ def normalise_workspace(ws_name):
     tmp_norm = Integration(ws_name)
     Divide(LHSWorkspace=ws_name, RHSWorkspace=tmp_norm, OutputWorkspace=ws_name)
     DeleteWorkspace("tmp_norm")
-
-
-def extractWS(ws):
-    """Directly exctracts data from workspace into arrays"""
-    return ws.extractX(), ws.extractY(), ws.extractE()
 
 
 def symmetrizeWs(avgYSpace):
