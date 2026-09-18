@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import mvesuvio
 from mantid.api import AnalysisDataService
 from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd
@@ -11,7 +10,6 @@ from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
 
-@dataclass
 class SampleParameters:
     # Sample slab parameters, expressed in meters
     slab_height = 0.1
@@ -26,7 +24,6 @@ class SampleParameters:
         </cuboid>'''
 
 
-@dataclass
 class BackwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
     name = "back"
@@ -88,7 +85,6 @@ class BackwardAnalysisInputs(SampleParameters):
     do_gamma_correction = False
 
 
-@dataclass
 class ForwardAnalysisInputs(SampleParameters):
     run_this_scattering_type = True
     name = "front"
