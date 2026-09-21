@@ -2,27 +2,27 @@ from enum import StrEnum
 
 
 class Tags(StrEnum):
-    Backward = "back"
-    Forward = "front"
+    BACKWARD = "back"
+    FORWARD = "front"
 
 
 class FitModels(StrEnum):
-    gauss = "gauss"
-    gauss_cntr = "gauss_cntr"
-    gcc4 = "gcc4"
-    gcc4_cntr = "gcc4_cntr"
-    gcc6 = "gcc6"
-    gcc6_cntr = "gcc6_cntr"
-    gcc4c6 = "gcc4c6"
-    gcc4c6_cntr = "gcc4c6_cntr"
-    doublewell = "doublewell"
-    gauss2d = "gauss2d"
-    gauss3d = "gauss3d"
+    GAUSS = "gauss"
+    GAUSS_CNTR = "gauss_cntr"
+    GCC4 = "gcc4"
+    GCC4_CNTR = "gcc4_cntr"
+    GCC6 = "gcc6"
+    GCC6_CNTR = "gcc6_cntr"
+    GCC4C6 = "gcc4c6"
+    GCC4C6_CNTR = "gcc4c6_cntr"
+    DOUBLEWELL = "doublewell"
+    GAUSS2D = "gauss2d"
+    GAUSS3D = "gauss3d"
 
 
 class Masking(StrEnum):
-    nan = "nan"
-    ncp = "ncp"
+    NAN = "nan"
+    NCP = "ncp"
 
 
 class Mode(StrEnum):
