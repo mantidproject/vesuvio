@@ -12,6 +12,7 @@ from tools.calibration_scripts.calibrate_vesuvio_analysis import EVSCalibrationA
 from tools.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
 from copy import copy, deepcopy
 from os import path
+from mvesuvio.globals import Mode
 
 
 class TestEVSCalibrationAnalysis(EVSCalibrationTest):
@@ -35,7 +36,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._current_run = None
 
         # Lists in order of call of EVSCalibrationFit in the EVSCalibrationAnalysis function
-        self._mode = ['FoilOut', 'SingleDifference', 'SingleDifference']
+        self._mode = [Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
         self._spec_range = [EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
         self._E1_fit = [False, True, True]
         self._L0_fit = [False]
@@ -123,7 +124,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._setup_copper_test()
         self._L0_fit = [True, True, True, False, False, False]
         self._output_workspace = "copper_analysis_test"
-        self._mode = ['FoilOut', 'FoilOut', 'FoilOut', 'FoilOut', 'SingleDifference', 'SingleDifference']
+        self._mode = [Mode.FOIL_OUT, Mode.FOIL_OUT, Mode.FOIL_OUT, Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
         self._spec_range = [EVSGlobals.FRONTSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE, EVSGlobals.BACKSCATTERING_RANGE,
                             EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
         self._E1_fit = [False, False, False, False, True, True]

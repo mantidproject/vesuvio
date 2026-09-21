@@ -1,6 +1,7 @@
 import numpy as np
 from pathlib import Path
 from mvesuvio.scripts import handle_config
+from mvesuvio.globals import Mode
 
 ipFilesPath = Path(handle_config.read_config_var("caching.ipfolder"))
 ipFilePath = ipFilesPath / "ip2018_3.par"
@@ -12,7 +13,7 @@ class LoadVesuvioBackParameters:
         "41876-41923"  # 77K         # The numbers of the empty runs to be subtracted
     )
     spectra = "3-134"  # Spectra to be analysed
-    mode = "DoubleDifference"
+    mode = Mode.DOUBLE_DIFFERENCE
     ipfile = ipFilesPath / "ip2019.par"
 
     subEmptyFromRaw = True  # Flag to control wether empty ws gets subtracted from raw
@@ -26,7 +27,7 @@ class LoadVesuvioFrontParameters:
         "43868-43911"  # 100K        # The numbers of the empty runs to be subtracted
     )
     spectra = "144-182"  # Spectra to be analysed
-    mode = "SingleDifference"
+    mode = Mode.SINGLE_DIFFERENCE
     ipfile = ipFilesPath / "ip2018_3.par"
 
     subEmptyFromRaw = False  # Flag to control wether empty ws gets subtracted from raw

@@ -11,6 +11,7 @@ from tests.testhelpers.calibration.system_test_base import EVSCalibrationTest, T
 from tests.testhelpers.calibration.system_test_misc_functions import assert_allclose_excluding_bad_detectors
 from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSMiscFunctions, EVSGlobals
 from tools.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
+from mvesuvio.globals import Mode
 from os import path
 
 
@@ -35,7 +36,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._current_run = None
 
         # Lists in order of call of EVSCalibrationFit in the EVSCalibrationAnalysis function
-        self._mode = ['FoilOut']
+        self._mode = [Mode.FOIL_OUT]
         self._spec_range = [EVSGlobals.FRONTSCATTERING_RANGE]
         self._E1_fit = [False]
         self._L0_fit = [False]
@@ -71,7 +72,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._E1_fit_active = True
         self._E1_fit = [True]
         self._output_workspace = "copper_peak_fit"
-        self._mode = ['SingleDifference']
+        self._mode = [Mode.SINGLE_DIFFERENCE]
 
         load_file_mock.side_effect = self._load_file_side_effect
 
@@ -85,7 +86,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._E1_fit_active = True
         self._E1_fit = [True]
         self._output_workspace = "lead_peak_fit"
-        self._mode = ['SingleDifference']
+        self._mode = [Mode.SINGLE_DIFFERENCE]
 
         load_file_mock.side_effect = self._load_file_side_effect
 
