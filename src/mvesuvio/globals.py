@@ -26,9 +26,15 @@ class Masking(StrEnum):
 
 
 class Mode(StrEnum):
-    SingleDifference = "SingleDifference"
-    DoubleDifference = "DoubleDifference"
-    ThickDifference = "ThickDifference"
-    FoilOut = "FoilOut"
-    FoilIn = "FoilIn"
-    FoilInOut = "FoilInOut"
+    SINGLE_DIFFERENCE = "SingleDifference"
+    DOUBLE_DIFFERENCE = "DoubleDifference"
+    THICK_DIFFERENCE = "ThickDifference"
+    FOIL_OUT = "FoilOut"
+    FOIL_IN = "FoilIn"
+    FOIL_IN_OUT = "FoilInOut"
+
+
+class PeakType(StrEnum):
+    RESONANCE = "Resonance"
+    BRAGG = "Bragg"
+    RECOIL = "Recoil"
