@@ -99,12 +99,6 @@ class EVSGlobals:
     BACKSCATTERING_RANGE: list[int] = [3, 134]
     DETECTOR_RANGE: list[int] = [BACKSCATTERING_RANGE[0], FRONTSCATTERING_RANGE[1]]
 
-    # file loading modes
-    MODES: list[str] = ["SingleDifference", "DoubleDifference", "ThickDifference", "FoilOut", "FoilIn", "FoilInOut"]
-
-    # Different peak types that will be fit
-    PEAK_TYPES: list[str] = ["Resonance", "Recoil", "Bragg"]
-
     # self._fit_window_range applies bith to fitting the resonances and the lead recoil peaks
     # it is defined as the range left and right from the peak centre (i. e. the whole fitting window is twice the fitting range)
 
