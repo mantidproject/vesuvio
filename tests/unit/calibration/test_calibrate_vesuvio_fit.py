@@ -3,6 +3,7 @@ from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlob
 from mock import MagicMock, patch, call
 from functools import partial
 from mantid.kernel import IntArrayProperty, StringArrayProperty, FloatArrayProperty
+from mvesuvio.globals import Mode
 
 import unittest
 import numpy as np
@@ -349,7 +350,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     def test_PyInit_property_defaults(self):
         alg = EVSCalibrationFit()
         alg.PyInit()
-        properties = {'Samples': [], 'Background': [], 'Mode': 'FoilOut', 'Function': 'Gaussian',
+        properties = {'Samples': [], 'Background': [], 'Mode': Mode.FOIL_OUT, 'Function': 'Gaussian',
                       'SpectrumRange': EVSGlobals.DETECTOR_RANGE, 'Mass': 207.19, 'DSpacings': [], 'Energy': [EVSGlobals.ENERGY_ESTIMATE],
                       'InstrumentParameterFile': '', 'PeakType': '', 'InstrumentParameterWorkspace': None, 'CreateOutput': False,
                       'OutputWorkspace': ''}
@@ -608,7 +609,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg = EVSCalibrationFit()
         ws_name = 'test_file'
         output_name = 'test_ws'
-        mode = 'FoilOut'
+        mode = Mode.FOIL_OUT
         spec_list = [3, 4, 5, 6]
         alg._mode = mode
         alg._spec_list = spec_list
@@ -626,7 +627,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg = EVSCalibrationFit()
         ws_name = 'test_file'
         output_name = 'test_ws'
-        mode = 'FoilOut'
+        mode = Mode.FOIL_OUT
         spec_list = [3, 4, 5, 6]
         alg._mode = mode
         alg._spec_list = spec_list
