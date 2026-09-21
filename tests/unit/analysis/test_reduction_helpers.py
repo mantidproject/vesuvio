@@ -227,10 +227,10 @@ class TestReductionHelpers(unittest.TestCase):
     @patch('mvesuvio.util.reduction_helpers.SaveNexus')
     @patch('mvesuvio.util.reduction_helpers.LoadVesuvio')
     def test_save_ws_from_load_vesuvio_backward(self, mock_load_vesuvio, mock_save_nexus):
-        path = Path(f'notthere/raw_{Tags.Backward}.nxs')
+        path = Path(f'notthere/raw_{Tags.BACKWARD}.nxs')
         reduction_helpers.save_ws_from_load_vesuvio("1234", Mode.SINGLE_DIFFERENCE, "ipfile.txt", path)
         mock_load_vesuvio.assert_has_calls([
-            call(Filename='1234', SpectrumList='3-134', Mode=Mode.SINGLE_DIFFERENCE, InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.Backward}.nxs', LoadLogFiles=False)
+            call(Filename='1234', SpectrumList='3-134', Mode=Mode.SINGLE_DIFFERENCE, InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.BACKWARD}.nxs', LoadLogFiles=False)
         ])
         _, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
@@ -239,10 +239,10 @@ class TestReductionHelpers(unittest.TestCase):
     @patch('mvesuvio.util.reduction_helpers.SaveNexus')
     @patch('mvesuvio.util.reduction_helpers.LoadVesuvio')
     def test_save_ws_from_load_vesuvio_forward(self, mock_load_vesuvio, mock_save_nexus):
-        path = Path(f'notthere/raw_{Tags.Forward}.nxs')
+        path = Path(f'notthere/raw_{Tags.FORWARD}.nxs')
         reduction_helpers.save_ws_from_load_vesuvio("1234", Mode.SINGLE_DIFFERENCE, "ipfile.txt", path)
         mock_load_vesuvio.assert_has_calls([
-            call(Filename='1234', SpectrumList="135-198", Mode=Mode.SINGLE_DIFFERENCE, InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.Forward}.nxs', LoadLogFiles=False)
+            call(Filename='1234', SpectrumList="135-198", Mode=Mode.SINGLE_DIFFERENCE, InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.FORWARD}.nxs', LoadLogFiles=False)
         ])
         args, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))

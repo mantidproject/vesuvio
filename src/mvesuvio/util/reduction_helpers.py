@@ -371,9 +371,9 @@ def ws_history_matches_inputs(runs, mode, ipfile, ws_path):
 
 
 def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
-    if Tags.Backward in ws_path.stem:
+    if Tags.BACKWARD in ws_path.stem:
         spectra = "3-134"
-    elif Tags.Forward in ws_path.stem:
+    elif Tags.FORWARD in ws_path.stem:
         spectra = "135-198"
     else:
         raise ValueError(f"Invalid name to save workspace: {ws_path.name}")
