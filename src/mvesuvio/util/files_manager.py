@@ -52,19 +52,19 @@ class FilesManager:
 
     @staticmethod
     def get_backward_raw_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Backward, "raw")
+        return FilesManager._get_detector_filename(Tags.BACKWARD, "raw")
 
     @staticmethod
     def get_backward_empty_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Backward, "empty")
+        return FilesManager._get_detector_filename(Tags.BACKWARD, "empty")
 
     @staticmethod
     def get_forward_raw_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Forward, "raw")
+        return FilesManager._get_detector_filename(Tags.FORWARD, "raw")
 
     @staticmethod
     def get_forward_empty_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Forward, "empty")
+        return FilesManager._get_detector_filename(Tags.FORWARD, "empty")
 
     @staticmethod
     def get_mantid_log_file() -> Path:
