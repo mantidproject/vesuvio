@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from mvesuvio.main import _set_up_parser, _setup_config
 
@@ -6,73 +7,40 @@ from mvesuvio.main import _set_up_parser, _setup_config
 class TestParser(unittest.TestCase):
     """Test cases for command-line parser setup."""
 
-    @classmethod
-    def setUpClass(cls):
-        pass
+    def setUp(self):
+        self.parser = _set_up_parser()
 
     def test_set_up_parser_config(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["config", "--analysis-inputs", "analysis_inputs.py", "--ip-folder", "mock_ip_folder"])
+        args = self.parser.parse_args(["config", "--experiment-dir", "analysis_inputs.py", "--ip-dir", "mock_ip_folder"])
 
-        self.assertEqual(args.analysis_inputs, "analysis_inputs.py")
-        self.assertEqual(args.ip_folder, "mock_ip_folder")
+        self.assertEqual(args.experiment_dir, "analysis_inputs.py")
+        self.assertEqual(args.ip_dir, "mock_ip_folder")
 
     def test_set_up_parser_config_defaults(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["config"])
+        args = self.parser.parse_args(["config"])
 
-        self.assertEqual(args.analysis_inputs, "")
-        self.assertEqual(args.ip_folder, "")
+        self.assertEqual(args.experiment_dir, "")
+        self.assertEqual(args.ip_dir, "")
 
     def test_set_up_parser_run(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["run", "--front-workspace", "fws", "--back-workspace", "bws", "--minimal-output", "--outputs-dir", "out"])
+        args = self.parser.parse_args(["run"])
 
-        self.assertEqual(args.front_workspace, "fws")
-        self.assertEqual(args.back_workspace, "bws")
-        self.assertEqual(args.minimal_output, True)
-        self.assertEqual(args.outputs_dir, "out")
-
-    def test_set_up_parser_run_defaults(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["run"])
-
-        self.assertEqual(args.front_workspace, "")
-        self.assertEqual(args.back_workspace, "")
-        self.assertEqual(args.minimal_output, False)
-        self.assertEqual(args.outputs_dir, "")
+        self.assertEqual(args.command, "run")
 
     def test_set_up_parser_bootstrap(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["bootstrap", "--inputs-dir", "/path/to/inputs"])
+        args = self.parser.parse_args(["bootstrap"])
 
-        self.assertEqual(args.inputs_dir, "/path/to/inputs")
-
-    def test_set_up_parser_bootstrap_defaults(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["bootstrap"])
-
-        self.assertEqual(args.inputs_dir, "")
+        self.assertEqual(args.command, "bootstrap")
 
     def test_set_up_parser_config_short_flags(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["config", "-i", "inputs.py", "-p", "/ip/folder"])
+        args = self.parser.parse_args(["config", "-e", "inputs.py", "-i", "/ip/folder"])
 
-        self.assertEqual(args.analysis_inputs, "inputs.py")
-        self.assertEqual(args.ip_folder, "/ip/folder")
-
-    def test_set_up_parser_run_short_flags(self):
-        parser = _set_up_parser()
-        args = parser.parse_args(["run", "-b", "back_ws", "-f", "front_ws", "-o", "/output"])
-
-        self.assertEqual(args.back_workspace, "back_ws")
-        self.assertEqual(args.front_workspace, "front_ws")
-        self.assertEqual(args.outputs_dir, "/output")
+        self.assertEqual(args.experiment_dir, "inputs.py")
+        self.assertEqual(args.ip_dir, "/ip/folder")
 
     def test_set_up_parser_requires_command(self):
-        parser = _set_up_parser()
         with self.assertRaises(SystemExit):
-            parser.parse_args([])
+            self.parser.parse_args([])
 
 
 class TestSetupConfig(unittest.TestCase):
@@ -85,8 +53,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
         mock_args = MagicMock()
-        mock_args.analysis_inputs = None
-        mock_args.ip_folder = None
+        mock_args.experiment_dir = None
+        mock_args.ip_dir = None
 
         _setup_config(mock_args)
 
@@ -107,8 +75,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_path.return_value = mock_path_obj
 
         mock_args = MagicMock()
-        mock_args.analysis_inputs = "/custom/inputs.py"
-        mock_args.ip_folder = None
+        mock_args.experiment_dir = "/custom/inputs.py"
+        mock_args.ip_dir = None
 
         _setup_config(mock_args)
 
@@ -123,7 +91,34 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mvesuvio.main.Path")
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
+    def test_setup_config_warns_for_invalid_custom_paths(self, mock_config_service, mock_handle_config, mock_path):
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
 
+        mock_experiment_path = MagicMock()
+        mock_experiment_path.is_dir.return_value = False
+        mock_ip_path = MagicMock()
+        mock_ip_path.is_dir.return_value = False
+        mock_path.side_effect = [mock_experiment_path, mock_ip_path]
+
+        mock_args = MagicMock()
+        mock_args.experiment_dir = "/custom/inputs.py"
+        mock_args.ip_dir = "/custom/ip_folder"
+
+        with patch("builtins.print") as mock_print:
+            _setup_config(mock_args)
+
+        self.assertEqual(mock_print.call_count, 2)
+        mock_print.assert_any_call("\nError setting directory: /custom/inputs.py\nUsing default.")
+        mock_print.assert_any_call("\nError setting directory: /custom/ip_folder\nUsing default.")
+        mock_handle_config.set_config_vars.assert_called_once()
+        call_args = mock_handle_config.set_config_vars.call_args[0][0]
+        self.assertEqual(call_args["caching.inputs"], "/default/inputs.py")
+        self.assertEqual(call_args["caching.ipfolder"], "/default/ip_folder")
+
+    @patch("mvesuvio.main.Path")
+    @patch("mvesuvio.main.handle_config")
+    @patch("mantid.kernel.ConfigService")
     def test_setup_config_with_custom_ip_folder(self, mock_config_service, mock_handle_config, mock_path):
         mock_handle_config.is_cache_set.return_value = True
         mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
@@ -133,8 +128,8 @@ class TestSetupConfig(unittest.TestCase):
         mock_path.return_value = mock_path_obj
 
         mock_args = MagicMock()
-        mock_args.analysis_inputs = None
-        mock_args.ip_folder = "/custom/ip_folder"
+        mock_args.experiment_dir = None
+        mock_args.ip_dir = "/custom/ip_folder"
 
         _setup_config(mock_args)
 
@@ -210,71 +205,63 @@ class TestMainFunction(unittest.TestCase):
 class TestRunAnalysis(unittest.TestCase):
     """Test cases for _run_analysis function."""
 
-    @patch("mvesuvio.main.run_routine.Runner")
-    def test_run_analysis_with_no_args(self, mock_runner_class):
+    @patch("mvesuvio.main.runpy.run_path")
+    def test_run_analysis_with_no_args(self, mock_run_path):
         from mvesuvio.main import _run_analysis
-
-        mock_runner_instance = MagicMock()
-        mock_runner_class.return_value = mock_runner_instance
 
         _run_analysis(None)
 
-        mock_runner_class.assert_called_once_with()
-        mock_runner_instance.run.assert_called_once()
+        self.assertEqual(mock_run_path.call_count, 2)
+        first_call_path = mock_run_path.call_args_list[0].args[0]
+        second_call_path = mock_run_path.call_args_list[1].args[0]
+        self.assertEqual(Path(first_call_path).name, "run_reduction.py")
+        self.assertEqual(Path(second_call_path).name, "run_fitting.py")
+        self.assertEqual(mock_run_path.call_args_list[0].kwargs["run_name"], "__main__")
+        self.assertEqual(mock_run_path.call_args_list[1].kwargs["run_name"], "__main__")
 
-    @patch("mvesuvio.main.run_routine.Runner")
-    def test_run_analysis_with_all_args(self, mock_runner_class):
+    @patch("mvesuvio.main.runpy.run_path")
+    def test_run_analysis_with_all_args(self, mock_run_path):
         from mvesuvio.main import _run_analysis
 
-        mock_runner_instance = MagicMock()
-        mock_runner_class.return_value = mock_runner_instance
-
         mock_args = MagicMock()
-        mock_args.back_workspace = "back_workspace_path"
-        mock_args.front_workspace = "front_workspace_path"
-        mock_args.minimal_output = True
-        mock_args.outputs_dir = "/output/dir"
 
         _run_analysis(mock_args)
 
-        mock_runner_class.assert_called_once_with(
-            override_back_workspace="back_workspace_path",
-            override_front_workspace="front_workspace_path",
-            minimal_output=True,
-            output_directory="/output/dir",
-        )
-        mock_runner_instance.run.assert_called_once()
+        self.assertEqual(mock_run_path.call_count, 2)
+        first_call_path = mock_run_path.call_args_list[0].args[0]
+        second_call_path = mock_run_path.call_args_list[1].args[0]
+        self.assertEqual(Path(first_call_path).name, "run_reduction.py")
+        self.assertEqual(Path(second_call_path).name, "run_fitting.py")
+        self.assertEqual(mock_run_path.call_args_list[0].kwargs["run_name"], "__main__")
+        self.assertEqual(mock_run_path.call_args_list[1].kwargs["run_name"], "__main__")
 
 
 class TestRunBootstrap(unittest.TestCase):
     """Test cases for _run_bootstrap function."""
 
-    @patch("mvesuvio.main.run_routine.Runner")
-    def test_run_bootstrap_with_no_args(self, mock_runner_class):
+    @patch("mvesuvio.main.runpy.run_path")
+    def test_run_bootstrap_with_no_args(self, mock_run_path):
         from mvesuvio.main import _run_bootstrap
 
         _run_bootstrap(None)
 
-        # Runner should not be instantiated, function should return early
-        mock_runner_class.assert_not_called()
+        mock_run_path.assert_called_once()
+        call_path = mock_run_path.call_args.args[0]
+        self.assertEqual(Path(call_path).name, "run_bootstrap.py")
+        self.assertEqual(mock_run_path.call_args.kwargs["run_name"], "__main__")
 
-    @patch("mvesuvio.main.run_routine.Runner")
-    def test_run_bootstrap_with_inputs_dir(self, mock_runner_class):
+    @patch("mvesuvio.main.runpy.run_path")
+    def test_run_bootstrap_with_inputs_dir(self, mock_run_path):
         from mvesuvio.main import _run_bootstrap
 
-        mock_runner_instance = MagicMock()
-        mock_runner_class.return_value = mock_runner_instance
-
         mock_args = MagicMock()
-        mock_args.inputs_dir = "/path/to/inputs"
 
         _run_bootstrap(mock_args)
 
-        mock_runner_class.assert_called_once_with(
-            bootstrap_inputs_directory="/path/to/inputs",
-            minimal_output=True,
-        )
-        mock_runner_instance.run_bootstrap.assert_called_once()
+        mock_run_path.assert_called_once()
+        call_path = mock_run_path.call_args.args[0]
+        self.assertEqual(Path(call_path).name, "run_bootstrap.py")
+        self.assertEqual(mock_run_path.call_args.kwargs["run_name"], "__main__")
 
 
 if __name__ == "__main__":

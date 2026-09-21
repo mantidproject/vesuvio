@@ -43,11 +43,11 @@ from mvesuvio.util.analysis_helpers import (
     load_resolution,
     load_instrument_params,
     extend_range_of_array,
-    print_table_workspace,
     make_gamma_correction_input_string,
     make_multiple_scattering_input_string,
     pseudo_voigt,
 )
+from mvesuvio.util.general_helpers import print_table_workspace
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
