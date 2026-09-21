@@ -48,7 +48,7 @@ from mantid.simpleapi import (
 )
 from functools import partial
 from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-
+from mvesuvio.globals import Mode, PeakType
 import os
 import sys
 import scipy.constants
@@ -71,7 +71,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self.declareProperty(
             "Mode",
             "FoilOut",
-            StringListValidator(EVSGlobals.MODES),
+            StringListValidator([mode.value for mode in Mode]),
             doc="Mode to load files with. This is passed to the LoadVesuvio algorithm. Default is FoilOut.",
         )
 
@@ -112,7 +112,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self.declareProperty(
             "PeakType",
             "",
-            StringListValidator(EVSGlobals.PEAK_TYPES),
+            StringListValidator([peak.value for peak in PeakType]),
             doc="Choose the peak type that is being fitted.Note that supplying a set of dspacings overrides the setting here",
         )
 
