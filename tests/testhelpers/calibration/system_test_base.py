@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 from mantid.simpleapi import LoadVesuvio, LoadRaw, mtd, ConvertToDistribution
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
+from mvesuvio.util.calibration_helpers import EVSGlobals
 from os import path
 
 

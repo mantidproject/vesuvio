@@ -22,8 +22,8 @@ from mantid.simpleapi import (
     PlotPeakByLogValue,
     RenameWorkspace,
 )
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-from globals import PeakType, Mode
+from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
+from mvesuvio.globals import PeakType, Mode
 
 import os
 import sys
