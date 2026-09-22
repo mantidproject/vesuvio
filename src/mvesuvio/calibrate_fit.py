@@ -47,7 +47,7 @@ from mantid.simpleapi import (
     CreateWorkspace,
 )
 from functools import partial
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
+from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
 from mvesuvio.globals import Mode, PeakType
 import os
 import sys
