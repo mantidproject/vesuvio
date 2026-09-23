@@ -1,4 +1,4 @@
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSMiscFunctions, InvalidDetectors
+from mvesuvio.util.calibration_helpers import EVSMiscFunctions, InvalidDetectors
 from mock import MagicMock, patch
 
 import unittest
@@ -34,7 +34,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         with self.assertRaises(ValueError):
             EVSMiscFunctions.generate_fit_function_header("Invalid")
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('mvesuvio.util.calibration_helpers.mtd')
     def test_identify_invalid_spectra_no_invalid(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [0.1, 0.2, 0.3],
@@ -46,7 +46,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         np.testing.assert_equal(np.argwhere([]),
                                 InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('mvesuvio.util.calibration_helpers.mtd')
     def test_identify_invalid_spectra_nan_in_errors(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [np.nan, 0.2, 0.3],
@@ -58,7 +58,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         np.testing.assert_equal(np.argwhere(np.array([True, False, True])),
                                 InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('mvesuvio.util.calibration_helpers.mtd')
     def test_identify_invalid_spectra_inf_in_errors(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [0.1, 0.2, 0.3],
@@ -70,7 +70,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         np.testing.assert_equal(np.argwhere(np.array([True, True, False])),
                                 InvalidDetectors._identify_invalid_spectra('peak_table', [5, 10, 20], [0.1, 0.15, 0.2], [0, 2]))
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions.mtd')
+    @patch('mvesuvio.util.calibration_helpers.mtd')
     def test_identify_invalid_spectra_error_greater_than_peak(self, mock_mtd):
         ws_mock = MagicMock()
         mock_column_output_dict = {'f1.GaussianFWHM': [1, 2, 3], 'f1.GaussianFWHM_Err': [0.1, 0.2, 0.3],
@@ -110,29 +110,26 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), input_invalid_detectors)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.EVSMiscFunctions.read_fitting_result_table_column')
-    def test_filter_peak_centres_for_invalid_detectors_front(self, mock_read_fitting_result):
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_filter_peak_centres_for_invalid_detectors_front(self, mock_read_table_column):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         peak_table = 'input_peak_table'
-        mock_read_fitting_result.return_value = np.array([[float(x)] for x in range(3, 198, 1)])
+        mock_read_table_column.return_value = np.array([[float(x)] for x in range(3, 198, 1)])
 
         out_peak_centres = invalid_detectors.filter_peak_centres_for_invalid_detectors([3, 134], peak_table)
         self.assertEqual(list(np.argwhere(np.isnan(out_peak_centres)).transpose()[0]), [7, 17, 27])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.EVSMiscFunctions.read_fitting_result_table_column')
-    def test_filter_peak_centres_for_invalid_detectors_back(self, mock_read_fitting_result):
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_filter_peak_centres_for_invalid_detectors_back(self, mock_read_table_column):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         peak_table = 'input_peak_table'
-        mock_read_fitting_result.return_value = np.array([[float(x)] for x in range(3, 198, 1)])
+        mock_read_table_column.return_value = np.array([[float(x)] for x in range(3, 198, 1)])
 
         out_peak_centres = invalid_detectors.filter_peak_centres_for_invalid_detectors([135, 198], peak_table)
         self.assertEqual(list(np.argwhere(np.isnan(out_peak_centres)).transpose()[0]), [15, 25, 35])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.EVSMiscFunctions.read_fitting_result_table_column')
-    def test_filter_peak_centres_for_invalid_detectors_invalid_range(self, mock_read_fitting_result):
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_filter_peak_centres_for_invalid_detectors_invalid_range(self, mock_read_table_column):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         peak_table = 'input_peak_table'
         with self.assertRaises(AttributeError):
@@ -158,11 +155,9 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         invalid_detectors.add_invalid_detectors([10, 20, 25, 30, 180, 190])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), [10, 20, 25, 30, 150, 160, 170, 180, 190])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.InvalidDetectors._identify_invalid_spectra')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.EVSMiscFunctions.read_fitting_result_table_column')
-    def test_add_invalid_detectors_no_preset_identify_called_front(self, mock_read_fitting_result, mock_identify):
+    @patch('mvesuvio.util.calibration_helpers.InvalidDetectors._identify_invalid_spectra')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_add_invalid_detectors_no_preset_identify_called_front(self, mock_read_table_column, mock_identify):
         invalid_detectors = InvalidDetectors([])
         invalid_detectors.add_invalid_detectors([180, 190])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), [180, 190])
@@ -172,11 +167,9 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         invalid_detectors.filter_peak_centres_for_invalid_detectors([3, 134], peak_table)
         mock_identify.assert_called_once()
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.InvalidDetectors._identify_invalid_spectra')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.EVSMiscFunctions.read_fitting_result_table_column')
-    def test_add_invalid_detectors_no_preset_identify_called_back(self, mock_read_fitting_result, mock_identify):
+    @patch('mvesuvio.util.calibration_helpers.InvalidDetectors._identify_invalid_spectra')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_add_invalid_detectors_no_preset_identify_called_back(self, mock_read_table_column, mock_identify):
         invalid_detectors = InvalidDetectors([])
         invalid_detectors.add_invalid_detectors([31, 32])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), [31, 32])
@@ -186,11 +179,9 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         invalid_detectors.filter_peak_centres_for_invalid_detectors([135, 198], peak_table)
         mock_identify.assert_called_once()
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.InvalidDetectors._identify_invalid_spectra')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_helper_functions'
-           '.EVSMiscFunctions.read_fitting_result_table_column')
-    def test_add_invalid_detectors_preset_identify_not_called(self, mock_read_fitting_result, mock_identify):
+    @patch('mvesuvio.util.calibration_helpers.InvalidDetectors._identify_invalid_spectra')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_add_invalid_detectors_preset_identify_not_called(self, mock_read_table_column, mock_identify):
         invalid_detectors = InvalidDetectors([180, 190])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), [180, 190])
         self.assertEqual(invalid_detectors._detectors_preset, True)

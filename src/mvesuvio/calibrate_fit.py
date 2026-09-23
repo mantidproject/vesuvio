@@ -47,8 +47,8 @@ from mantid.simpleapi import (
     CreateWorkspace,
 )
 from functools import partial
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-
+from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
+from mvesuvio.globals import Mode, PeakType
 import os
 import sys
 import scipy.constants
@@ -71,7 +71,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self.declareProperty(
             "Mode",
             "FoilOut",
-            StringListValidator(EVSGlobals.MODES),
+            StringListValidator([mode.value for mode in Mode]),
             doc="Mode to load files with. This is passed to the LoadVesuvio algorithm. Default is FoilOut.",
         )
 
@@ -112,7 +112,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self.declareProperty(
             "PeakType",
             "",
-            StringListValidator(EVSGlobals.PEAK_TYPES),
+            StringListValidator([peak.value for peak in PeakType]),
             doc="Choose the peak type that is being fitted.Note that supplying a set of dspacings overrides the setting here",
         )
 
@@ -688,17 +688,13 @@ class EVSCalibrationFit(PythonAlgorithm):
             self._shared_parameter_fit(output_parameter_table_name, output_parameter_table_headers)
 
     def _shared_parameter_fit(self, output_parameter_table_name, output_parameter_table_headers):
-        init_Gaussian_FWHM = EVSMiscFunctions.read_fitting_result_table_column(
-            output_parameter_table_name, "f1.GaussianFWHM", self._spec_list
-        )
+        init_Gaussian_FWHM = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.GaussianFWHM", self._spec_list)
         init_Gaussian_FWHM = np.nanmean(init_Gaussian_FWHM[init_Gaussian_FWHM != 0])
-        init_Lorentz_FWHM = EVSMiscFunctions.read_fitting_result_table_column(
-            output_parameter_table_name, "f1.LorentzFWHM", self._spec_list
-        )
+        init_Lorentz_FWHM = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.LorentzFWHM", self._spec_list)
         init_Lorentz_FWHM = np.nanmean(init_Lorentz_FWHM[init_Lorentz_FWHM != 0])
-        init_Lorentz_Amp = EVSMiscFunctions.read_fitting_result_table_column(output_parameter_table_name, "f1.LorentzAmp", self._spec_list)
+        init_Lorentz_Amp = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.LorentzAmp", self._spec_list)
         init_Lorentz_Amp = np.nanmean(init_Lorentz_Amp[init_Lorentz_Amp != 0])
-        init_Lorentz_Pos = EVSMiscFunctions.read_fitting_result_table_column(output_parameter_table_name, "f1.LorentzPos", self._spec_list)
+        init_Lorentz_Pos = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.LorentzPos", self._spec_list)
         init_Lorentz_Pos = np.nanmean(init_Lorentz_Pos[init_Lorentz_Pos != 0])
 
         initial_params = {

@@ -1,8 +1,9 @@
-from tools.calibration_scripts.calibrate_vesuvio_fit import EVSCalibrationFit
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals
+from mvesuvio.calibrate_fit import EVSCalibrationFit
+from mvesuvio.util.calibration_helpers import EVSGlobals
 from mock import MagicMock, patch, call
 from functools import partial
 from mantid.kernel import IntArrayProperty, StringArrayProperty, FloatArrayProperty
+from mvesuvio.globals import Mode
 
 import unittest
 import numpy as np
@@ -30,9 +31,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     def side_effect_cell(row_index, col_index, peaks):
         return peaks[row_index]
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_perfect_match(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -64,9 +65,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_no_match(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -96,9 +97,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                 OutputWorkspace=find_peaks_output_name + '_unfiltered')
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_one_match(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -129,9 +130,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                 OutputWorkspace=find_peaks_output_name + '_unfiltered')
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_two_match(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -163,9 +164,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_does_not_include_higher_found_peak(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -196,9 +197,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                 OutputWorkspace=find_peaks_output_name + '_unfiltered')
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_does_not_include_lower_found_peak(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -230,9 +231,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_handles_multiple_peaks(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -263,9 +264,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
     #Found peaks sometimes returns 'zero' peaks, usually at the end of the table workspace.
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CloneWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_filter_peaks_handles_zero_position_in_found_peaks(self, mock_mtd, mock_clone_workspace, mock_del_workspace):
         alg = EVSCalibrationFit()
 
@@ -316,7 +317,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         np.testing.assert_almost_equal([9629.84, 13619.43, 15727.03], estimated_positions.flatten().tolist(), 0.01)
         print(estimated_positions)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_check_nans_false(self, mock_mtd):
         alg = EVSCalibrationFit()
         table_ws = 'table_ws'
@@ -331,7 +332,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.assertFalse(alg._check_nans(table_ws))
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_check_nans_true(self, mock_mtd):
         alg = EVSCalibrationFit()
         table_ws = 'table_ws'
@@ -349,7 +350,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     def test_PyInit_property_defaults(self):
         alg = EVSCalibrationFit()
         alg.PyInit()
-        properties = {'Samples': [], 'Background': [], 'Mode': 'FoilOut', 'Function': 'Gaussian',
+        properties = {'Samples': [], 'Background': [], 'Mode': Mode.FOIL_OUT, 'Function': 'Gaussian',
                       'SpectrumRange': EVSGlobals.DETECTOR_RANGE, 'Mass': 207.19, 'DSpacings': [], 'Energy': [EVSGlobals.ENERGY_ESTIMATE],
                       'InstrumentParameterFile': '', 'PeakType': '', 'InstrumentParameterWorkspace': None, 'CreateOutput': False,
                       'OutputWorkspace': ''}
@@ -360,12 +361,12 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
             self.assertEqual(expected_value, properties[prop], f'Property {prop}. Expected: {expected_value},'
                                                                f'Actual: {properties[prop]}')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._setup_spectra_list')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._setup_run_numbers_and_output_workspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._setup_function_type')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._setup_parameter_workspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._setup_peaks_and_set_crop_and_fit_ranges')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._setup_class_variables_from_properties')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._setup_spectra_list')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._setup_run_numbers_and_output_workspace')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._setup_function_type')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._setup_parameter_workspace')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._setup_peaks_and_set_crop_and_fit_ranges')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._setup_class_variables_from_properties')
     def test_setup_calls_all_functions(self, mock_setup_vars, mock_setup_peaks, mock_setup_param_ws, mock_setup_fn_type,
                                         mock_setup_run_nos, mock_setup_spec):
         alg = EVSCalibrationFit()
@@ -480,7 +481,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertEqual('test_ws', alg._param_workspace)
         self.assertEqual('test_ws', alg._param_table)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSMiscFunctions.load_instrument_parameters')
+    @patch('mvesuvio.calibrate_fit.EVSMiscFunctions.load_instrument_parameters')
     def test_setup_parameter_workspace_no_ws(self, mock_load_instrument_parameters):
         alg = EVSCalibrationFit()
         alg.declareProperty('InstrumentParameterWorkspace', '')
@@ -517,8 +518,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertEqual(EVSGlobals.RESONANCE_PEAK_CROP_RANGE, alg._ws_crop_range)
         self.assertEqual(EVSGlobals.RESONANCE_FIT_WINDOW_RANGE, alg._fit_window_range)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.ReplaceSpecialValues')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_to_ads_and_crop')
+    @patch('mvesuvio.calibrate_fit.ReplaceSpecialValues')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_to_ads_and_crop')
     def test_preprocess_no_bg(self, mock_load_to_ads_and_crop, mock_replace_special_values):
         test_run_numbers = [1, 2, 3, 4]
         test_crop_range = [3, 10]
@@ -535,9 +536,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_replace_special_values.assert_called_once_with(test_sample_ws_name, NaNValue=0, NaNError=0, InfinityValue=0,
                                                             InfinityError=0, OutputWorkspace=test_sample_ws_name)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._normalise_sample_by_background')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.ReplaceSpecialValues')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_to_ads_and_crop')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._normalise_sample_by_background')
+    @patch('mvesuvio.calibrate_fit.ReplaceSpecialValues')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_to_ads_and_crop')
     def test_preprocess_with_bg(self, mock_load_to_ads_and_crop, mock_replace_special_values, mock_normalise_sample):
         test_run_numbers = [1, 2, 3, 4]
         test_bg_run_numbers = [5, 6]
@@ -559,8 +560,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_replace_special_values.assert_called_once_with(test_sample_ws_name, NaNValue=0, NaNError=0, InfinityValue=0,
                                                             InfinityError=0, OutputWorkspace=test_sample_ws_name)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CropWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_files')
+    @patch('mvesuvio.calibrate_fit.CropWorkspace')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_files')
     def test_load_to_ads_and_crop(self, mock_load_files, mock_crop_workspace):
         alg = EVSCalibrationFit()
         run_numbers = [1, 2, 3, 4]
@@ -572,9 +573,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_load_files.assert_called_once_with(run_numbers, output)
         mock_crop_workspace.assert_called_once_with(output, XMin=xmin, XMax=xmax, OutputWorkspace=output)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.Divide')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.RebinToWorkspace')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.Divide')
+    @patch('mvesuvio.calibrate_fit.RebinToWorkspace')
     def test_normalise_sample_by_background(self, mock_rebin, mock_divide, mock_delete):
         alg = EVSCalibrationFit()
         sample_ws = 'test_ws'
@@ -588,9 +589,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_divide.assert_called_once_with(sample_ws, bg_ws, OutputWorkspace=sample_ws)
         mock_delete.assert_called_once_with(bg_ws)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.Plus')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._load_file')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.Plus')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
     def test_load_files(self, mock_load_file, mock_plus, mock_delete):
         alg = EVSCalibrationFit()
         ws_numbers = ['1-4']  # Note this is parsed as '1-3', is this intentional?
@@ -602,13 +603,13 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                     call(output_name, '__EVS_calib_temp_ws', OutputWorkspace=output_name)])
         mock_delete.assert_has_calls([call('__EVS_calib_temp_ws'), call('__EVS_calib_temp_ws')])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.LoadRaw')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.LoadVesuvio')
+    @patch('mvesuvio.calibrate_fit.LoadRaw')
+    @patch('mvesuvio.calibrate_fit.LoadVesuvio')
     def test_load_file_vesuvio(self, mock_load_vesuvio, mock_load_raw):
         alg = EVSCalibrationFit()
         ws_name = 'test_file'
         output_name = 'test_ws'
-        mode = 'FoilOut'
+        mode = Mode.FOIL_OUT
         spec_list = [3, 4, 5, 6]
         alg._mode = mode
         alg._spec_list = spec_list
@@ -619,14 +620,14 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                   EnableLogging=False)
         mock_load_raw.assert_not_called()
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.ConvertToDistribution')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.LoadRaw')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.LoadVesuvio')
+    @patch('mvesuvio.calibrate_fit.ConvertToDistribution')
+    @patch('mvesuvio.calibrate_fit.LoadRaw')
+    @patch('mvesuvio.calibrate_fit.LoadVesuvio')
     def test_load_file_raw(self, mock_load_vesuvio, mock_load_raw, mock_convert_to_dist):
         alg = EVSCalibrationFit()
         ws_name = 'test_file'
         output_name = 'test_ws'
-        mode = 'FoilOut'
+        mode = Mode.FOIL_OUT
         spec_list = [3, 4, 5, 6]
         alg._mode = mode
         alg._spec_list = spec_list
@@ -638,7 +639,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                               EnableLogging=False)
         mock_convert_to_dist.assert_called_once_with(output_name, EnableLogging=False)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
+    @patch('mvesuvio.calibrate_fit.GroupWorkspaces')
     def test_fit_peaks_individual(self, group_workspaces_mock):
         alg = EVSCalibrationFit()
         alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
@@ -660,8 +661,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         group_workspaces_mock.assert_called_once_with(['output_ws_name_Peak_0_Parameters', 'output_ws_name_Peak_1_Parameters'],
                                                       OutputWorkspace='output_ws_name_Peak_Parameters')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._shared_parameter_fit')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._shared_parameter_fit')
+    @patch('mvesuvio.calibrate_fit.GroupWorkspaces')
     def test_fit_peaks_shared(self, group_workspaces_mock, shared_parameter_fit_mock):
         alg = EVSCalibrationFit()
         alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
@@ -684,8 +685,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                       OutputWorkspace='output_ws_name_Peak_Parameters')
         shared_parameter_fit_mock.assert_called_once_with('output_ws_name_Peak_1_Parameters', ['a', 'b', 'c'])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._shared_parameter_fit')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._shared_parameter_fit')
+    @patch('mvesuvio.calibrate_fit.GroupWorkspaces')
     def test_fit_peaks_both(self, group_workspaces_mock, shared_parameter_fit_mock):
         alg = EVSCalibrationFit()
         alg._estimate_peak_positions = MagicMock(return_value=np.asarray([[5, 10, 15], [2.5, 7.5, 10.5]]))
@@ -723,7 +724,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         return alg
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.Fit')
+    @patch('mvesuvio.calibrate_fit.Fit')
     def test_fit_peak(self, mock_fit):
         alg = self._setup_alg_mocks_fit_peak()
 
@@ -747,9 +748,9 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
         self.assertEqual(fit_workspace_name, 'fws')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
+    @patch('mvesuvio.calibrate_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.FindPeaks')
     def test_find_peaks_and_output_params(self, find_peaks_mock, delete_workspace_mock, mtd_mock):
         alg = EVSCalibrationFit()
         alg._sample = 'sample'
@@ -767,11 +768,11 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         peak_table_name_ws.rowCount.assert_called_once()
         delete_workspace_mock.assert_called_once_with('__sample_peaks_table_0_3')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.sys')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.logger.error')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.EVSCalibrationFit._get_find_peak_parameters')
+    @patch('mvesuvio.calibrate_fit.sys')
+    @patch('mvesuvio.calibrate_fit.logger.error')
+    @patch('mvesuvio.calibrate_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.FindPeaks')
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._get_find_peak_parameters')
     def test_find_peaks_and_output_params_no_peaks_found(self, find_peak_params_mock, find_peaks_mock, mtd_mock, logger_mock,
                                                          sys_mock):
         alg = EVSCalibrationFit()
@@ -802,7 +803,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertEqual(3, xmin)
         self.assertEqual(7, xmax)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.logger.warning')
+    @patch('mvesuvio.calibrate_fit.logger.warning')
     def test_find_fit_x_window_position_less_than_1(self, logger_mock):
         alg = EVSCalibrationFit()
         alg._func_param_names = {'Position': 'Position_key'}
@@ -823,7 +824,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         else:
             raise ValueError("incorrect column index supplied")
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_output_fit_params_to_table_ws(self, mtd_mock):
         alg = EVSCalibrationFit()
         spec_num = 45
@@ -838,22 +839,22 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mtd_mock.__getitem__.assert_called_once_with(output_table_name)
         output_table_ws_mock.addRow.assert_called_once_with([spec_num, 1, 0.1, 2, 0.2, 3, 0.3])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     def test_del_fit_workspace(self, del_ws_mock):
         alg = EVSCalibrationFit()
         alg._create_output = True
         alg._del_fit_workspaces('ncm', 'params', 'fws')
         del_ws_mock.assert_has_calls([call('ncm'), call('params')])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     def test_del_fit_workspace_create_output_true(self, del_ws_mock):
         alg = EVSCalibrationFit()
         alg._create_output = False
         alg._del_fit_workspaces('ncm', 'params', 'fws')
         del_ws_mock.assert_has_calls([call('ncm'), call('params'), call('fws')])
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.CreateEmptyTableWorkspace')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.AnalysisDataService')
+    @patch('mvesuvio.calibrate_fit.CreateEmptyTableWorkspace')
+    @patch('mvesuvio.calibrate_fit.AnalysisDataService')
     def test_create_output_parameters_table_ws(self, mock_ADS, mock_create_empty_table_ws):
         output_table_name = 'test_output_table'
         num_estimated_peaks = 3
@@ -920,7 +921,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertEqual(selected_params, fit_results['params'])
         self.assertFalse(unconstrained_fit_selected)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_output_params_to_table(self, mock_mtd_module):
         alg = EVSCalibrationFit()
         spec_num = 1
@@ -949,7 +950,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         expected_row = [1, 0.1, 2, 0.2, 3, 0.3, 4, 0.4, 5, 0.5]
         mock_output_table.addRow.assert_called_once_with([spec_num] + expected_row)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     def test_get_output_and_clean_workspaces_unconstrained_not_performed(self, mock_delete_ws):
         alg = EVSCalibrationFit()
         find_peaks_output_name = 'test_find_output_name'
@@ -960,7 +961,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                          call(find_peaks_output_name)])
         self.assertEqual(output_ws, fit_peaks_output_name + '_Workspace')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     def test_get_output_and_clean_workspaces_unconstrained_performed(self, mock_delete_ws):
         alg = EVSCalibrationFit()
         find_peaks_output_name = 'test_find_output_name'
@@ -975,7 +976,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                         call(fit_peaks_output_name + '_unconstrained_Workspace')])
         self.assertEqual(output_ws, fit_peaks_output_name + '_Workspace')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.DeleteWorkspace')
+    @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     def test_get_output_and_clean_workspaces_unconstrained_performed_and_selected(self, mock_delete_ws):
         alg = EVSCalibrationFit()
         find_peaks_output_name = 'test_find_output_name'
@@ -1026,8 +1027,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mtd_mock_obj.__getitem__.side_effect = lambda name: mock_find_peaks_output if\
             name == find_peaks_name else None
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.FindPeaks')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_run_find_peaks_peaks_found(self, mock_mtd_module, mock_find_peaks):
         alg, fn_args = self._setup_run_find_peaks_test(unconstrained=False)
 
@@ -1037,8 +1038,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_find_peaks.assert_called_once()
         self.assertTrue(result)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.FindPeaks')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_run_find_peaks_no_peaks_found_raises_value_error(self, mock_mtd_module, mock_find_peaks):
         alg, fn_args = self._setup_run_find_peaks_test(unconstrained=False)
 
@@ -1048,8 +1049,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
             alg._run_find_peaks(**fn_args)
         mock_find_peaks.assert_called_once()
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.mtd')
+    @patch('mvesuvio.calibrate_fit.FindPeaks')
+    @patch('mvesuvio.calibrate_fit.mtd')
     def test_run_find_peaks_unconstrained_no_peaks_found_no_error(self, mock_mtd_module, mock_find_peaks):
         alg, fn_args = self._setup_run_find_peaks_test(unconstrained=True)
 
@@ -1059,7 +1060,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_find_peaks.assert_called_once()
         self.assertFalse(result)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.FindPeaks')
+    @patch('mvesuvio.calibrate_fit.FindPeaks')
     def test_run_find_peaks_unconstrained_peaks_found_raises_error(self, mock_find_peaks):
         alg, fn_args = self._setup_run_find_peaks_test(unconstrained=True)
 
@@ -1221,7 +1222,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                 except ValueError:
                     np.testing.assert_array_equal(arg, expected_arg)
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
+    @patch('mvesuvio.calibrate_fit.GroupWorkspaces')
     def test_fit_bragg_peaks_success(self, group_workspaces_mock):
         fit_result_ret_val = {'status': 'success'}
         fit_results = lambda *args: fit_result_ret_val  # noqa : E731
@@ -1243,7 +1244,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                                call(False, False, False, 'sample_peaks_table_2', 'output_Spec_2')])
         group_workspaces_mock.assert_called_once_with(','.join(output_workspaces), OutputWorkspace='output_Peak_Fits')
 
-    @patch('tools.calibration_scripts.calibrate_vesuvio_fit.GroupWorkspaces')
+    @patch('mvesuvio.calibrate_fit.GroupWorkspaces')
     def test_fit_bragg_peaks_not_success(self, group_workspaces_mock):
         x_range = (1, 2)
         fit_res = {'status': 'failure', 'xmin': x_range[0], 'xmax': x_range[1]}

@@ -32,7 +32,7 @@ class BackwardAnalysisInputs(SampleParameters):
 
     runs = "43066-43076"  # Runs of your sample dataset
     empty_runs = "41876-41923"  # Empty CCR
-    mode = Mode.DoubleDifference
+    mode = Mode.DOUBLE_DIFFERENCE
     instrument_parameters_file = "ip2019.par"
     detectors = "3-134"
     mask_detectors = [18, 34, 42, 43, 59, 60, 62, 118, 119, 133]  # Can also be a string "18, 34, 42-43, 59-60, 62, 118-119, 133"
@@ -93,7 +93,7 @@ class ForwardAnalysisInputs(SampleParameters):
 
     runs = "43066-43076"
     empty_runs = "43868-43911"  # Empty CCR
-    mode = Mode.SingleDifference
+    mode = Mode.SINGLE_DIFFERENCE
     instrument_parameters_file = "ip2018_3.par"
     detectors = "144-182"
     mask_detectors = [173, 174, 179]  # Can also be a string "173-174, 179"
