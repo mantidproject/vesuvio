@@ -22,7 +22,6 @@ class TestHRatioRoutine(unittest.TestCase):
             handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_inputs",
             dirs_exist_ok=True
             )
-        pass
 
     def setUp(self):
         if self.result_path.is_dir():

@@ -6,13 +6,6 @@ import numpy as np
 
 
 class TestVesuvioCalibrationMisc(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        pass
-
-    def setUp(self):
-        pass
-
     def test_generate_header_function_gaussian(self):
         header = EVSMiscFunctions.generate_fit_function_header("Gaussian")
         self.assertEqual({'Height': 'Height', 'Width': 'Sigma', 'Position': 'PeakCentre'}, header)

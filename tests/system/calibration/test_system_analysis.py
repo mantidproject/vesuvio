@@ -256,16 +256,13 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
             raise AssertionError(f"Theta: {theta_errors})\n L1: {L1_errors}")
 
     @staticmethod
-    def _extract_tolerances(tolerances: dict) -> (dict, dict):
-        theta_tol = {}
-        L1_tol = {}
-        if tolerances:
-            if "Theta" in tolerances:
-                theta_tol = tolerances["Theta"]
-                if TestConstants.INVALID_DETECTOR in theta_tol.values():
-                    raise ValueError('INVALID DETECTORS ONLY RELATE TO L1 TOLERANCES')
-            if "L1" in tolerances:
-                L1_tol = tolerances["L1"]
+    def _extract_tolerances(tolerances: dict) -> tuple[dict, dict]:
+        theta_tol = tolerances.get("Theta", {})
+        L1_tol = tolerances.get("L1", {})
+
+        if TestConstants.INVALID_DETECTOR in theta_tol.values():
+            raise ValueError('INVALID DETECTORS ONLY RELATE TO L1 TOLERANCES')
+
         return theta_tol, L1_tol
 
     def _create_evs_calibration_alg(self):

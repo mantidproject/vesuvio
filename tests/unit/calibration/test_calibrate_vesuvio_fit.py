@@ -10,9 +10,6 @@ import numpy as np
 
 
 class TestVesuvioCalibrationFit(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        pass
 
     def setUp(self):
         self.set_cell_list = []

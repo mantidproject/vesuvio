@@ -12,8 +12,6 @@ np.set_printoptions(suppress=True, precision=6, linewidth=200)
 
 
 class TestAnalysisFitting(unittest.TestCase):
-    def setUp(self):
-        pass
 
     def test_plot_global_fit(self):
 
