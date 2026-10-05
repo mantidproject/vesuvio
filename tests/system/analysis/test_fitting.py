@@ -33,7 +33,6 @@ class TestFitting(unittest.TestCase):
             handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_inputs",
             dirs_exist_ok=True
             )
-        pass
 
     def setUp(self):
         rmtree(self.results_path, ignore_errors=True)
