@@ -249,7 +249,6 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
         "NumberOfIterations": int(inputs_class.number_of_iterations_for_corrections),
         "InvalidDetectors": convert_to_list_of_spectrum_numbers(inputs_class.mask_detectors),
         "MultipleScatteringCorrection": inputs_class.do_multiple_scattering_correction,
-        "SampleShapeXml": inputs_class.sample_shape_xml,
         "GammaCorrection": inputs_class.do_gamma_correction,
         "ModeRunning": "BACKWARD" if scattering_type == "backward" else "FORWARD",
         "TransmissionGuess": inputs_class.transmission_guess,

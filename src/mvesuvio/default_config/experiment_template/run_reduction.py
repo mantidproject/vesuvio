@@ -1,8 +1,10 @@
 import mvesuvio
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd
+from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd, SetSample
 from mantid.kernel import logger
 from pathlib import Path
+import math
+from typing import Dict
 from mvesuvio import ConfigArgInputs
 from mvesuvio.globals import Mode
 from mvesuvio.util import fitting_helpers
@@ -11,21 +13,52 @@ from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
 
-class SampleParameters:
-    # Sample slab parameters, expressed in meters
-    slab_height = 0.1
-    slab_width = 0.1
-    slab_thickness = 0.001
+class SharedGeometry:
+    """Sample physical dimensions, in cm"""
 
-    sample_shape_xml = f'''<cuboid id="sample-shape">
-        <left-front-bottom-point x="{slab_width / 2}" y="{-slab_height / 2}" z="{slab_thickness / 2}" />
-        <left-front-top-point x="{slab_width / 2}" y="{slab_height / 2}" z="{slab_thickness / 2}" />
-        <left-back-bottom-point x="{slab_width / 2}" y="{-slab_height / 2}" z="{-slab_thickness / 2}" />
-        <right-front-bottom-point x="{-slab_width / 2}" y="{-slab_height / 2}" z="{slab_thickness / 2}" />
-        </cuboid>'''
+    slab_height_cm: float = 10.0
+    slab_width_cm: float = 10.0
+    slab_thickness_cm: float = 0.1
+    cylinder_height_cm: float = 10.0
+
+    @property
+    def slab_volume_cm3(self) -> float:
+        return self.slab_height_cm * self.slab_width_cm * self.slab_thickness_cm
+
+    @property
+    def cylinder_radius_cm(self) -> float:
+        return math.sqrt(self.slab_volume_cm3 / (math.pi * self.cylinder_height_cm))
+
+    @property
+    def cylinder_volume_cm3(self) -> float:
+        return math.pi * self.cylinder_radius_cm**2 * self.cylinder_height_cm
+
+    def slab_dict(self) -> Dict[str, object]:
+        """SetSample FlatPlate dictionary, dimensions in cm."""
+        return {
+            "Shape": "FlatPlate",
+            "Width": self.slab_width_cm,
+            "Height": self.slab_height_cm,
+            "Thick": self.slab_thickness_cm,
+            "Center": [0.0, 0.0, 0.0],
+            "Angle": 0.0,
+        }
+
+    def cylinder_dict(self) -> Dict[str, object]:
+        """SetSample Cylinder dictionary, dimensions in cm."""
+        return {
+            "Shape": "Cylinder",
+            "Height": self.cylinder_height_cm,
+            "Radius": self.cylinder_radius_cm,
+            "Center": [0.0, 0.0, 0.0],
+            "Axis": [0.0, 1.0, 0.0],
+        }
 
 
-class BackwardAnalysisInputs(SampleParameters):
+SAMPLE_SHAPE = SharedGeometry().slab_dict()
+
+
+class BackwardAnalysisInputs:
     run_this_scattering_type = True
     name = "back"
     minimal_output = False
@@ -86,7 +119,7 @@ class BackwardAnalysisInputs(SampleParameters):
     do_gamma_correction = False
 
 
-class ForwardAnalysisInputs(SampleParameters):
+class ForwardAnalysisInputs:
     run_this_scattering_type = True
     name = "front"
     minimal_output = False
@@ -221,6 +254,10 @@ def main() -> None:
         BACK_WS_TO_FIT = BackwardAnalysisInputs.name
     if not FRONT_WS_TO_FIT:
         FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+
+    # Set sample shape
+    SetSample(InputWorkspace=BACK_WS_TO_FIT, Geometry=SAMPLE_SHAPE)
+    SetSample(InputWorkspace=FRONT_WS_TO_FIT, Geometry=SAMPLE_SHAPE)
 
     reduction_helpers.crop_and_mask_workspace(BACK_WS_TO_FIT, BackwardAnalysisInputs)
     reduction_helpers.crop_and_mask_workspace(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
