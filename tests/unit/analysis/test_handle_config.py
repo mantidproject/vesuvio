@@ -7,10 +7,6 @@ import os
 from pathlib import Path
 
 class TestHandleConfig(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        pass
-
 
     def test_read_config(self):
         with tempfile.NamedTemporaryFile(delete=False) as file:
