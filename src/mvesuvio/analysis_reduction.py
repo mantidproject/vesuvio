@@ -24,7 +24,6 @@ from mantid.simpleapi import (
     Scale,
     RenameWorkspace,
     Minus,
-    CreateSampleShape,
     VesuvioThickness,
     Integration,
     Divide,
@@ -102,16 +101,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self.declareProperty(name="MultipleScatteringCorrection", defaultValue=False, doc="Whether to run multiple scattering correction.")
         self.declareProperty(name="GammaCorrection", defaultValue=False, doc="Whether to run gamma correction.")
         self.declareProperty(
-            name="SampleShapeXml",
-            defaultValue="""<cuboid id="sample-shape">
-                <left-front-bottom-point x="0.05" y="-0.05" z="0.005" />
-                <left-front-top-point x="0.05" y="0.05" z="0.005"/>
-                <left-back-bottom-point x="0.05" y="-0.05" z="-0.005" />
-                <right-front-bottom-point x="-0.05" y="-0.05" z="0.005" />
-                </cuboid>""",
-            doc="XML string that describes the shape of the sample. Used in MS correction.",
-        )
-        self.declareProperty(
             name="ModeRunning",
             defaultValue="BACKWARD",
             validator=StringListValidator(["BACKWARD", "FORWARD"]),
@@ -151,7 +140,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._transmission_guess = self.getProperty("TransmissionGuess").value
         self._multiple_scattering_order = self.getProperty("MultipleScatteringOrder").value
         self._number_of_events = self.getProperty("NumberOfEvents").value
-        self._sample_shape_xml = self.getProperty("SampleShapeXml").value
         self._mode_running = self.getProperty("ModeRunning").value
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value
         self._gamma_correction = self.getProperty("GammaCorrection").value
@@ -659,8 +647,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         """Creates _MulScattering and _TotScattering workspaces used for the MS correction"""
         self.log().notice("\nEvaluating multiple scattering correction ...\n")
 
-        CreateSampleShape(self._workspace_for_corrections, self._sample_shape_xml)
-
         # Make local variables
         masses = self._masses
         mean_widths = self._mean_widths
@@ -683,6 +669,9 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         )
         ws_corrections_name = self._workspace_for_corrections.name()
         atomic_properties_list = make_multiple_scattering_input_string(masses, mean_widths, mean_intensity_ratios)
+
+        # NOTE: Sample shape in the input workspace of VesuvioCalculateMS matters!
+        # The input workspace to VesuvioAnalysisRoutine should have the sample set beorehand!
         VesuvioCalculateMS(
             InputWorkspace=ws_corrections_name,
             NoOfMasses=len(masses),
