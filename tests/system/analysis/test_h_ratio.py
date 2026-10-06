@@ -41,6 +41,10 @@ class TestHRatioRoutine(unittest.TestCase):
         namespace["BackwardAnalysisInputs"].intensity_ratio_of_hydrogen_to_chosen_mass = 0
         namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
+        namespace["BackwardAnalysisInputs"].chosen_mass_index = 0
+        namespace["BackwardAnalysisInputs"].intensity_ratio_of_hydrogen_to_chosen_mass = 0
+        namespace["BackwardAnalysisInputs"].constraints = ()
+        namespace["ForwardAnalysisInputs"].constraints = ()
         with patch("builtins.input", return_value=""):
             namespace["main"]()
 

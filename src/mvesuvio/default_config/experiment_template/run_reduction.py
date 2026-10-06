@@ -1,6 +1,6 @@
 import mvesuvio
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd, SetSample
+from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd, SetSample, SaveAscii
 from mantid.kernel import logger
 from pathlib import Path
 import math
@@ -14,7 +14,10 @@ from mvesuvio.util.files_manager import FilesManager
 
 
 class SharedGeometry:
-    """Sample physical dimensions, in cm"""
+    """
+    Sample physical dimensions, in cm.
+    Cylinder volume is the same as slab volume.
+    """
 
     slab_height_cm: float = 10.0
     slab_width_cm: float = 10.0
@@ -55,7 +58,17 @@ class SharedGeometry:
         }
 
 
+# Pick Slab or Cylinder geometry
 SAMPLE_SHAPE = SharedGeometry().slab_dict()
+
+# Example stoichiometry, replace with actual values
+STOICHIOMETRY = {"H": 4, "C": 1, "O": 2, "Al": 1}
+
+BOUND_SCATTERING_XS_BARN = {"H": 82.0, "C": 5.55, "O": 4.23, "Al": 1.49}
+
+
+# Bound-cross-section-weighted recoil intensities, in a common arbitrary scale
+RECOIL_WEIGHT = {element: STOICHIOMETRY[element] * BOUND_SCATTERING_XS_BARN[element] for element in STOICHIOMETRY}
 
 
 class BackwardAnalysisInputs:
@@ -78,40 +91,30 @@ class BackwardAnalysisInputs:
     # Atomic mass in a.m.u. of each element/isotope present in sample + cell EXCEPT HYDROGEN
     masses = [12, 16, 27]
 
+    # fmt: off
     initial_fitting_parameters = [  # NCP intensities, NCP widths, NCP centers
-        1,
-        12,
-        0.0,
-        1,
-        12,
-        0.0,
-        1,
-        12.5,
-        0.0,
+        1, 12, 0.0,
+        1, 12, 0.0,
+        1, 12.5, 0.0,
     ]
     fitting_bounds = [
-        [0, None],
-        [8, 16],
-        [-3, 1],
-        [0, None],
-        [8, 16],
-        [-3, 1],
-        [0, None],
-        [11, 14],
-        [-3, 1],
+        [0, None], [8, 16], [-3, 1],
+        [0, None], [8, 16], [-3, 1],
+        [0, None], [11, 14], [-3, 1],
     ]
-    constraints = ()
+    # fmt: on
+    constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[0] - RECOIL_WEIGHT["O"] * par[3])}
 
     number_of_iterations_for_corrections = 0  # 4
     # Y-space derived inputs are prepared at end of reduction for fitting.
     range_for_rebinning_in_y_space = "-25, 0.5, 25"
     subtract_calculated_fse_from_data = True
     do_multiple_scattering_correction = True
-    # Known stoichiometry of any mass in the sample to Hydrogen, to estimate intensity ratio as a guess
-    chosen_mass_index = 0  # index in 'masses' list (index from 0 to n-1), ignored if H not present
+    # Exact recoil ratio used to estimate Hydrogen intensity
+    chosen_mass_index = 0  # C is indexed 0 in backward masses list
     intensity_ratio_of_hydrogen_to_chosen_mass = (
-        # 0
-        19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
+        RECOIL_WEIGHT["H"] / RECOIL_WEIGHT["C"]
+        # Set to zero to estimate
     )
     transmission_guess = 0.8  # [1 - 2(1-T)] --> Twice the absorption, T: Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
@@ -137,37 +140,23 @@ class ForwardAnalysisInputs:
     scale_raw_workspace = 1
 
     masses = [1.0079, 12, 16, 27]  # Atomic mass in a.m.u. of each element/isotope present in sample + cell
+    # fmt: off
     initial_fitting_parameters = [  # Intensities, NCP widths, NCP centers
-        1,
-        4.7,
-        0.0,
-        1,
-        12.71,
-        0.0,
-        1,
-        8.76,
-        0.0,
-        1,
-        13.897,
-        0.0,
+        1, 4.7, 0.0,
+        1, 12.71, 0.0,
+        1, 8.76, 0.0,
+        1, 13.897, 0.0,
     ]
     fitting_bounds = [
-        [0, None],
-        [3, 6],
-        [-3, 1],
-        [0, None],
-        [12.71, 12.71],
-        [-3, 1],
-        [0, None],
-        [8.76, 8.76],
-        [-3, 1],
-        [0, None],
-        [13.897, 13.897],
-        [-3, 1],
+        [0, None], [3, 6], [-3, 1],
+        [0, None], [12.71, 12.71], [-3, 1],
+        [0, None], [8.76, 8.76], [-3, 1],
+        [0, None], [13.897, 13.897], [-3, 1],
     ]
-    constraints = ()
+    # fmt: on
+    constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[3] - RECOIL_WEIGHT["O"] * par[6])}
 
-    number_of_iterations_for_corrections = 0  # 4
+    number_of_iterations_for_corrections = 1  # 4
     # Y-space derived inputs are prepared at end of reduction for fitting.
     range_for_rebinning_in_y_space = "-25, 0.5, 25"
     subtract_calculated_fse_from_data = True
@@ -265,7 +254,7 @@ def main() -> None:
     front_alg = reduction_helpers.init_analysis_algorithm(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
 
     if reduction_helpers.h_ratio_is_zero_when_h_present(BackwardAnalysisInputs, ForwardAnalysisInputs):
-        reduction_helpers.run_estimate_h_ratio(
+        h_ratios_table = reduction_helpers.run_estimate_h_ratio(
             back_alg=back_alg,
             front_alg=front_alg,
             back_masses=BackwardAnalysisInputs.masses,
@@ -273,6 +262,7 @@ def main() -> None:
             rtol=0.01,
             max_iter=3,
         )
+        SaveAscii(InputWorkspace=h_ratios_table, Filename=str(FilesManager.get_experiment_dir() / h_ratios_table.name()))
 
     if (
         BackwardAnalysisInputs.run_this_scattering_type
