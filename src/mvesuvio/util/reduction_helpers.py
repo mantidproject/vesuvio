@@ -10,7 +10,6 @@ from mantid.simpleapi import (
     CreateEmptyTableWorkspace,
     DeleteWorkspace,
     SaveNexus,
-    SaveAscii,
     LoadVesuvio,
 )
 from mantid.kernel import logger
@@ -21,8 +20,8 @@ from pathlib import Path
 from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
+from mvesuvio.util.constraints_transport import serialize_constraints
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
-import dill  # To convert constraints to string
 from mantid.api import AlgorithmFactory, AlgorithmManager
 from mantid.simpleapi import mtd, RenameWorkspace
 
@@ -96,8 +95,6 @@ def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_inde
         current_ratio = calculate_h_ratio(means_table, chosen_mass)
 
         table_h_ratios.addRow([current_ratio])
-
-        SaveAscii(table_h_ratios.name(), str(FilesManager.get_experiment_dir() / table_h_ratios.name()))
 
     logger.notice("\nProcedute to estimate Hydrogen ratio finished.\n")
     print_table_workspace(table_h_ratios)
@@ -254,7 +251,7 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
         "TransmissionGuess": inputs_class.transmission_guess,
         "MultipleScatteringOrder": int(inputs_class.multiple_scattering_order),
         "NumberOfEvents": int(inputs_class.multiple_scattering_number_of_events),
-        "Constraints": str(dill.dumps(inputs_class.constraints)),
+        "Constraints": serialize_constraints(inputs_class.constraints),
         "ResultsPath": str(FilesManager.get_reduction_outputs_dir().absolute()),
         "MinimalOutputFiles": inputs_class.minimal_output,
         "OutputMeansTable": " Final_Means",

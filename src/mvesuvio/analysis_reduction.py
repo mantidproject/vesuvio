@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
-import dill  # Only for converting constraints from string
 from pathlib import Path
 from mantid.kernel import (
     StringListValidator,
@@ -47,6 +46,7 @@ from mvesuvio.util.analysis_helpers import (
     pseudo_voigt,
 )
 from mvesuvio.util.general_helpers import print_table_workspace
+from mvesuvio.util.constraints_transport import deserialize_constraints
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
@@ -146,7 +146,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._save_results_path = Path(self.getProperty("ResultsPath").value).absolute()
         self._chosen_index_for_h_ratio = self.getProperty("ChosenMassIndex").value
         self._h_ratio = self.getProperty("HRatioToChosenMass").value
-        self._constraints = dill.loads(eval(self.getProperty("Constraints").value))
+        self._constraints = deserialize_constraints(self.getProperty("Constraints").value)
         self._profiles_table = self.getProperty("InputProfiles").value
         self._minimal_output = self.getProperty("MinimalOutputFiles").value
 
