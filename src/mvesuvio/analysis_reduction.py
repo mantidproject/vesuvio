@@ -114,7 +114,7 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         )
         self.declareProperty(
             name="ModeRunning",
-            defaultValue=ModeRunning.BACKWARD,
+            defaultValue=ModeRunning.BACKWARD.value,
             validator=StringListValidator([mode.value for mode in ModeRunning]),
             doc="Whether running backward or forward scattering.",
         )

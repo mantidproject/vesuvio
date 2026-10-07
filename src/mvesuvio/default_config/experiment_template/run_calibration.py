@@ -1,9 +1,12 @@
+from pathlib import Path
 from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
+from mantid.api import AlgorithmManager, AlgorithmFactory
 from mvesuvio.globals import SharedParameterFitType
-from mantid.kernel import logger
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal
+
+IP_FILES_PATH = Path(__file__).absolute().parent.parent / "ip_files"
 
 
 class EVSCalibrationAnalysisInputs:
@@ -14,7 +17,7 @@ class EVSCalibrationAnalysisInputs:
     Background: str = "17086"
 
     # Filename of the instrument parameter file.
-    InstrumentParameterFile: str = "IP0005.par"
+    InstrumentParameterFile: str = str(IP_FILES_PATH / "IP0005.par")
 
     # Mass of the sample in amu to be used when calculating energy.
     # Default is Pb: 207.19
@@ -66,22 +69,26 @@ class EVSCalibrationAnalysisInputs:
 
 
 def main() -> None:
-    logger.information("Starting the EVSCalibrationAnalysis algorithm")
-    EVSCalibrationAnalysis(
-        Samples=EVSCalibrationAnalysisInputs.Samples,
-        Background=EVSCalibrationAnalysisInputs.Background,
-        InstrumentParameterFile=EVSCalibrationAnalysisInputs.InstrumentParameterFile,
-        Mass=EVSCalibrationAnalysisInputs.Mass,
-        DSpacings=EVSCalibrationAnalysisInputs.DSpacings,
-        E1FixedValueAndError=EVSCalibrationAnalysisInputs.E1FixedValueAndError,
-        InvalidDetectors=EVSCalibrationAnalysisInputs.InvalidDetectors,
-        Iterations=EVSCalibrationAnalysisInputs.Iterations,
-        SharedParameterFitType=EVSCalibrationAnalysisInputs.SharedParameterFitType,
-        CreateOutput=EVSCalibrationAnalysisInputs.CreateOutput,
-        CalculateL0=EVSCalibrationAnalysisInputs.CalculateL0,
-        CreateIPFile=EVSCalibrationAnalysisInputs.CreateIPFile,
-        OutputWorkspace=EVSCalibrationAnalysisInputs.OutputWorkspace,
-    )
+    AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
+
+    alg = AlgorithmManager.createUnmanaged("EVSCalibrationAnalysis")
+    alg.initialize()
+
+    alg.setProperty("Samples", EVSCalibrationAnalysisInputs.Samples)
+    alg.setProperty("Background", EVSCalibrationAnalysisInputs.Background)
+    alg.setProperty("InstrumentParameterFile", EVSCalibrationAnalysisInputs.InstrumentParameterFile)
+    alg.setProperty("Mass", EVSCalibrationAnalysisInputs.Mass)
+    alg.setProperty("DSpacings", EVSCalibrationAnalysisInputs.DSpacings)
+    alg.setProperty("E1FixedValueAndError", EVSCalibrationAnalysisInputs.Samples)
+    alg.setProperty("InvalidDetectors", EVSCalibrationAnalysisInputs.InvalidDetectors)
+    alg.setProperty("Iterations", EVSCalibrationAnalysisInputs.Iterations)
+    alg.setProperty("SharedParameterFitType", EVSCalibrationAnalysisInputs.SharedParameterFitType.value)
+    alg.setProperty("CreateOutput", EVSCalibrationAnalysisInputs.CreateOutput)
+    alg.setProperty("CalculateL0", EVSCalibrationAnalysisInputs.CalculateL0)
+    alg.setProperty("CreateIPFile", EVSCalibrationAnalysisInputs.CreateIPFile)
+    alg.setProperty("OutputWorkspace", EVSCalibrationAnalysisInputs.OutputWorkspace)
+
+    alg.execute()
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
