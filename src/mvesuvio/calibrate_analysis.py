@@ -79,7 +79,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         shared_fit_type_validator = StringListValidator([fit_type.value for fit_type in SharedParameterFitType])
         self.declareProperty(
             "SharedParameterFitType",
-            SharedParameterFitType.INDIVIDUAL,
+            SharedParameterFitType.INDIVIDUAL.value,
             doc="Calculate shared parameters using an individual and/or global fit.",
             validator=shared_fit_type_validator,
         )
