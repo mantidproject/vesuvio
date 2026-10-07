@@ -38,3 +38,19 @@ class PeakType(StrEnum):
     RESONANCE = "Resonance"
     BRAGG = "Bragg"
     RECOIL = "Recoil"
+
+
+class SharedParameterFitType(StrEnum):
+    INDIVIDUAL = "Individual"
+    SHARED = "Shared"
+    BOTH = "Both"
+
+
+class ModeRunning(StrEnum):
+    BACKWARD = "BACKWARD"
+    FORWARD = "FORWARD"
+
+
+class FitFunction(StrEnum):
+    GAUSSIAN = "Gaussian"
+    VOIGT = "Voigt"
