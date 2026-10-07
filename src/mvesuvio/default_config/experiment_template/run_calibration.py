@@ -1,5 +1,6 @@
 from pathlib import Path
 from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
+from mvesuvio.calibrate_fit import EVSCalibrationFit
 from mantid.api import AlgorithmManager, AlgorithmFactory
 from mvesuvio.globals import SharedParameterFitType
 import numpy as np
@@ -60,7 +61,7 @@ class EVSCalibrationAnalysisInputs:
 
     # Name to call the output workspace
     # Default is ""
-    OutputWorkspace = ""
+    OutputWorkspace = "EVSCalibrationAnalysis_Output"
 
 
 ########################
@@ -70,6 +71,7 @@ class EVSCalibrationAnalysisInputs:
 
 def main() -> None:
     AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
+    AlgorithmFactory.subscribe(EVSCalibrationFit)
 
     alg = AlgorithmManager.createUnmanaged("EVSCalibrationAnalysis")
     alg.initialize()
@@ -79,7 +81,7 @@ def main() -> None:
     alg.setProperty("InstrumentParameterFile", EVSCalibrationAnalysisInputs.InstrumentParameterFile)
     alg.setProperty("Mass", EVSCalibrationAnalysisInputs.Mass)
     alg.setProperty("DSpacings", EVSCalibrationAnalysisInputs.DSpacings)
-    alg.setProperty("E1FixedValueAndError", EVSCalibrationAnalysisInputs.Samples)
+    alg.setProperty("E1FixedValueAndError", EVSCalibrationAnalysisInputs.E1FixedValueAndError)
     alg.setProperty("InvalidDetectors", EVSCalibrationAnalysisInputs.InvalidDetectors)
     alg.setProperty("Iterations", EVSCalibrationAnalysisInputs.Iterations)
     alg.setProperty("SharedParameterFitType", EVSCalibrationAnalysisInputs.SharedParameterFitType.value)
