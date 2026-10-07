@@ -69,14 +69,14 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         self.declareProperty(
             "Mode",
-            "FoilOut",
+            Mode.FOIL_OUT,
             StringListValidator([mode.value for mode in Mode]),
             doc="Mode to load files with. This is passed to the LoadVesuvio algorithm. Default is FoilOut.",
         )
 
         self.declareProperty(
             "Function",
-            "Gaussian",
+            FitFunction.GAUSSIAN,
             StringListValidator([func.value for func in FitFunction]),
             doc="Function to fit each of the spectra with. Default is Gaussian",
         )
@@ -118,7 +118,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         shared_fit_type_validator = StringListValidator([fit_type.value for fit_type in SharedParameterFitType])
         self.declareProperty(
             "SharedParameterFitType",
-            "Individual",
+            SharedParameterFitType.INDIVIDUAL,
             doc="Calculate shared parameters using an individual and/orglobal fit.",
             validator=shared_fit_type_validator,
         )
