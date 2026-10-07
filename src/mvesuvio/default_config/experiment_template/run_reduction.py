@@ -1,13 +1,12 @@
 import mvesuvio
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd, SetSample, SaveAscii
+from mantid.simpleapi import Rebin, Scale, Minus, SumSpectra, SetSample, SaveAscii
 from mantid.kernel import logger
 from pathlib import Path
 import math
 from typing import Dict
 from mvesuvio import ConfigArgInputs
 from mvesuvio.globals import Mode
-from mvesuvio.util import fitting_helpers
 from mvesuvio.util import general_helpers
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
@@ -190,13 +189,7 @@ def main() -> None:
                 logger.error(f"Injected backward workspace does not exist in ADS: {BackwardAnalysisInputs.name}")
                 BACK_WS_TO_FIT = ""
         else:
-            raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(BackwardAnalysisInputs)
-
-            raw_name = raw_path.stem
-            empty_name = empty_path.stem
-
-            Load(Filename=str(raw_path), OutputWorkspace=raw_name)
-            Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+            raw_name, empty_name = reduction_helpers.load_input_ws(BackwardAnalysisInputs)
 
             Rebin(InputWorkspace=raw_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
             Rebin(InputWorkspace=empty_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
@@ -218,13 +211,7 @@ def main() -> None:
                 logger.error(f"Injected forward workspace does not exist in ADS: {ForwardAnalysisInputs.name}")
                 FRONT_WS_TO_FIT = ""
         else:
-            raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(ForwardAnalysisInputs)
-
-            raw_name = raw_path.stem
-            empty_name = empty_path.stem
-
-            Load(Filename=str(raw_path), OutputWorkspace=raw_name)
-            Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+            raw_name, empty_name = reduction_helpers.load_input_ws(ForwardAnalysisInputs)
 
             Rebin(InputWorkspace=raw_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
             Rebin(InputWorkspace=empty_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
@@ -278,42 +265,7 @@ def main() -> None:
 
     general_helpers.make_summarised_log_file()
 
-    save_fitting_input_workspaces()
-
-
-def save_fitting_input_workspaces() -> None:
-    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
-    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
-    for analysis_inputs in (BackwardAnalysisInputs, ForwardAnalysisInputs):
-        if not analysis_inputs.run_this_scattering_type:
-            continue
-
-        iteration = str(analysis_inputs.number_of_iterations_for_corrections)
-        workspace_name = f"{analysis_inputs.name}_{iteration}"
-        ncp_group_name = f"{workspace_name}_ncp_group"
-
-        # Persist pre-computed Y-space fitting inputs so run_fitting can load them directly.
-        if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
-            logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
-            continue
-
-        ws_to_fit = mtd[workspace_name]
-        ws_to_fit_ncps = mtd[ncp_group_name]
-
-        ws_resolution = fitting_helpers.calculate_resolution(
-            min(analysis_inputs.masses),
-            ws_to_fit,
-            analysis_inputs.range_for_rebinning_in_y_space,
-        )
-        ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
-            ws_to_fit,
-            ws_to_fit_ncps,
-            analysis_inputs.subtract_calculated_fse_from_data,
-        )
-
-        SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
-        SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
-        SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
+    reduction_helpers.save_fitting_input_workspaces(BackwardAnalysisInputs, ForwardAnalysisInputs)
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):

@@ -5,8 +5,8 @@ from unittest.mock import patch
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
 
 from mvesuvio.default_config.experiment_template.run_fitting import load_saved_fitting_input_workspaces
-from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs, save_fitting_input_workspaces
-from mvesuvio.util import fitting_helpers
+from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
+from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
 
@@ -71,7 +71,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
 
         with patch("mvesuvio.util.fitting_helpers.calculate_resolution", side_effect=self._mock_calculate_resolution):
             with patch("mvesuvio.util.fitting_helpers.VesuvioResolution") as resolution_mock:
-                save_fitting_input_workspaces()
+                reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs, None)
 
         resolution_mock.assert_called_once()
         self.assertEqual(resolution_mock.call_args.kwargs["Workspace"].name(), ws_name)

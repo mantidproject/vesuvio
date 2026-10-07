@@ -21,6 +21,7 @@ from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
 from mvesuvio.util.constraints_transport import serialize_constraints
+from mvesuvio.util import fitting_helpers
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 from mantid.api import AlgorithmFactory, AlgorithmManager
 from mantid.simpleapi import mtd, RenameWorkspace
@@ -292,7 +293,18 @@ def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] 
     return ws_cropped
 
 
-def load_and_save_input_ws_if_not_on_path(
+def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
+    raw_path, empty_path = store_input_ws_if_not_on_path(input_class)
+
+    raw_name = raw_path.stem
+    empty_name = empty_path.stem
+
+    Load(Filename=str(raw_path), OutputWorkspace=raw_name)
+    Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+    return raw_name, empty_name
+
+
+def store_input_ws_if_not_on_path(
     inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs],
 ) -> tuple[Path, Path]:
     scattering_type = _get_scattering_type(inputs_class)
@@ -386,6 +398,53 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
     SaveNexus(vesuvio_ws, Filename=str(ws_path.absolute()))
     print(f"Workspace saved locally at: {ws_path.absolute()}")
     return
+
+
+def save_fitting_input_workspaces(
+    backward_inputs: type[BackwardAnalysisInputs] | None = None,
+    forward_inputs: type[ForwardAnalysisInputs] | None = None,
+) -> None:
+    if backward_inputs is None and forward_inputs is None:
+        try:
+            from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
+        except ImportError as exc:  # pragma: no cover - defensive fallback when run_reduction is not importable.
+            raise RuntimeError(
+                "BackwardAnalysisInputs and ForwardAnalysisInputs are required when save_fitting_input_workspaces is called without arguments."
+            ) from exc
+        backward_inputs = BackwardAnalysisInputs
+        forward_inputs = ForwardAnalysisInputs
+
+    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
+    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
+    for analysis_inputs in (backward_inputs, forward_inputs):
+        if analysis_inputs is None or not analysis_inputs.run_this_scattering_type:
+            continue
+
+        iteration = str(analysis_inputs.number_of_iterations_for_corrections)
+        workspace_name = f"{analysis_inputs.name}_{iteration}"
+        ncp_group_name = f"{workspace_name}_ncp_group"
+
+        if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
+            logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
+            continue
+
+        ws_to_fit = mtd[workspace_name]
+        ws_to_fit_ncps = mtd[ncp_group_name]
+
+        ws_resolution = fitting_helpers.calculate_resolution(
+            min(analysis_inputs.masses),
+            ws_to_fit,
+            analysis_inputs.range_for_rebinning_in_y_space,
+        )
+        ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
+            ws_to_fit,
+            ws_to_fit_ncps,
+            analysis_inputs.subtract_calculated_fse_from_data,
+        )
+
+        SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
+        SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
+        SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):

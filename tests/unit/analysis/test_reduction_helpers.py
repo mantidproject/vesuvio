@@ -1,15 +1,51 @@
 
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch, Mock, MagicMock, call
 
 import numpy as np
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
 
+from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
 from mvesuvio.globals import Tags
 from mvesuvio.util import reduction_helpers
+from mvesuvio.util.files_manager import FilesManager
 
 
 class TestReductionHelpers(unittest.TestCase):
+
+    def test_save_fitting_input_workspaces_uses_helper_module(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            FilesManager.set_experiment_dir(temp_dir)
+            AnalysisDataService.clear()
+
+            ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ws, "front_0")
+
+            ncp_a = CreateWorkspace(DataX=[0, 1, 2], DataY=[4, 5, 6], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ncp_a, "front_0_1.0079_ncp")
+
+            ncp_b = CreateWorkspace(DataX=[0, 1, 2], DataY=[7, 8, 9], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ncp_b, "front_0_12_ncp")
+
+            GroupWorkspaces(["front_0_1.0079_ncp", "front_0_12_ncp"], OutputWorkspace="front_0_ncp_group")
+
+            with patch.object(reduction_helpers, "SaveNexus") as mock_save_nexus:
+                with patch.object(reduction_helpers.fitting_helpers, "calculate_resolution", return_value=MagicMock()):
+                    with patch.object(reduction_helpers.fitting_helpers, "isolate_lighest_mass_data", return_value=(MagicMock(), MagicMock())):
+                        ForwardAnalysisInputs.name = "front"
+                        ForwardAnalysisInputs.run_this_scattering_type = True
+                        ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
+                        ForwardAnalysisInputs.subtract_calculated_fse_from_data = False
+
+                        reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs, None)
+
+            self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
+
+            AnalysisDataService.clear()
+            FilesManager._experiment_dir = None
 
     def test_convert_dict_to_table(self):
         d = {'H': {'label': 'H', 'mass': 1, 'intensity': 1}}
@@ -268,7 +304,7 @@ class TestReductionHelpers(unittest.TestCase):
             patch.object(reduction_helpers.FilesManager, "get_instrument_parameters_dir", return_value=Path("/tmp/ip")), \
             patch.object(reduction_helpers, "ws_history_matches_inputs", side_effect=[False, True]) as mock_matches, \
             patch.object(reduction_helpers, "save_ws_from_load_vesuvio") as mock_save_ws:
-            result_raw_path, result_empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(BackwardInputs)
+            result_raw_path, result_empty_path = reduction_helpers.store_input_ws_if_not_on_path(BackwardInputs)
 
         self.assertEqual(result_raw_path, raw_path)
         self.assertEqual(result_empty_path, empty_path)
@@ -301,7 +337,7 @@ class TestReductionHelpers(unittest.TestCase):
             patch.object(reduction_helpers.FilesManager, "get_instrument_parameters_dir", return_value=Path("/tmp/ip")), \
             patch.object(reduction_helpers, "ws_history_matches_inputs", return_value=True) as mock_matches, \
             patch.object(reduction_helpers, "save_ws_from_load_vesuvio") as mock_save_ws:
-            result_raw_path, result_empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(ForwardInputs)
+            result_raw_path, result_empty_path = reduction_helpers.store_input_ws_if_not_on_path(ForwardInputs)
 
         self.assertEqual(result_raw_path, raw_path)
         self.assertEqual(result_empty_path, empty_path)
@@ -310,6 +346,29 @@ class TestReductionHelpers(unittest.TestCase):
             call("6789", "SingleDifference", "ipfile.txt", empty_path),
         ])
         mock_save_ws.assert_not_called()
+
+    @patch('mvesuvio.util.reduction_helpers.Load')
+    @patch('mvesuvio.util.reduction_helpers.store_input_ws_if_not_on_path')
+    def test_load_input_ws_loads_raw_and_empty_workspaces(self, mock_store, mock_load):
+        class DummyInputs:
+            name = "backward"
+            mode = "SingleDifference"
+            runs = "1234"
+            empty_runs = "5678"
+            instrument_parameters_file = "ipfile.txt"
+
+        raw_path = Path("/tmp/reduction_inputs/experiment_raw_backward.nxs")
+        empty_path = Path("/tmp/reduction_inputs/experiment_empty_backward.nxs")
+        mock_store.return_value = (raw_path, empty_path)
+
+        result = reduction_helpers.load_input_ws(DummyInputs)
+
+        self.assertEqual(result, ("experiment_raw_backward", "experiment_empty_backward"))
+        mock_store.assert_called_once_with(DummyInputs)
+        mock_load.assert_has_calls([
+            call(Filename=str(raw_path), OutputWorkspace="experiment_raw_backward"),
+            call(Filename=str(empty_path), OutputWorkspace="experiment_empty_backward"),
+        ])
 
     def test_convert_to_list_of_spectrum_numbers(self):
         cases = [
