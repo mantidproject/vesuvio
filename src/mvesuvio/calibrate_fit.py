@@ -48,11 +48,10 @@ from mantid.simpleapi import (
 )
 from functools import partial
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-from mvesuvio.globals import Mode, PeakType
+from mvesuvio.globals import Mode, PeakType, SharedParameterFitType, FitFunction
 import os
 import sys
 import scipy.constants
-import scipy.stats
 import numpy as np
 
 
@@ -78,7 +77,7 @@ class EVSCalibrationFit(PythonAlgorithm):
         self.declareProperty(
             "Function",
             "Gaussian",
-            StringListValidator(["Gaussian", "Voigt"]),
+            StringListValidator([func.value for func in FitFunction]),
             doc="Function to fit each of the spectra with. Default is Gaussian",
         )
 
@@ -116,7 +115,7 @@ class EVSCalibrationFit(PythonAlgorithm):
             doc="Choose the peak type that is being fitted.Note that supplying a set of dspacings overrides the setting here",
         )
 
-        shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+        shared_fit_type_validator = StringListValidator([fit_type.value for fit_type in SharedParameterFitType])
         self.declareProperty(
             "SharedParameterFitType",
             "Individual",
