@@ -23,7 +23,7 @@ from mantid.simpleapi import (
     RenameWorkspace,
 )
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-from mvesuvio.globals import PeakType, Mode
+from mvesuvio.globals import PeakType, Mode, SharedParameterFitType
 
 import os
 import sys
@@ -76,7 +76,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         self.declareProperty("Iterations", 2, validator=IntBoundedValidator(lower=1), doc="Number of iterations to perform. Default is 2.")
 
-        shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+        shared_fit_type_validator = StringListValidator([fit_type.value for fit_type in SharedParameterFitType])
         self.declareProperty(
             "SharedParameterFitType",
             "Individual",
