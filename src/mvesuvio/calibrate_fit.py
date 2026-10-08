@@ -21,6 +21,7 @@ from mantid.api import (
     PythonAlgorithm,
     WorkspaceFactory,
     AnalysisDataService,
+    WorkspaceGroup,
 )
 from mantid.simpleapi import (
     CreateEmptyTableWorkspace,
@@ -53,6 +54,8 @@ import os
 import sys
 import scipy.constants
 import numpy as np
+from pathlib import Path
+from mvesuvio.util.files_manager import FilesManager
 
 
 class EVSCalibrationFit(PythonAlgorithm):
@@ -401,10 +404,16 @@ class EVSCalibrationFit(PythonAlgorithm):
             FindPeaks(
                 InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name, **find_peaks_input_params
             )
-            if mtd[find_peaks_output_name].rowCount() > 0:
-                peaks_found = True
+            if isinstance(mtd[find_peaks_output_name], WorkspaceGroup):
+                if any(ws.rowCount() > 0 for ws in mtd[find_peaks_output_name]):
+                    peaks_found = True
+                else:
+                    raise ValueError
             else:
-                raise ValueError
+                if mtd[find_peaks_output_name].rowCount() > 0:
+                    peaks_found = True
+                else:
+                    raise ValueError
         except ValueError:
             peaks_found = False
             if not unconstrained:  # Ignore error if unconstrained, as we will use peaks found during constrained workflow.
@@ -608,7 +617,11 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         if peak_estimates_list is not None:  # If no peak estimates list, we are doing an unconstrained fit
             # Don't yet understand what this is doing here
-            self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
+            if isinstance(peak_table, WorkspaceGroup):
+                for peak in peak_table:
+                    self._set_table_column(peak, position, peak_estimates_list, spec_list=None)
+            else:
+                self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
             unconstrained = False
         else:
             unconstrained = True
@@ -1031,8 +1044,11 @@ class EVSCalibrationFit(PythonAlgorithm):
                 EnableLogging=False,
             )
         except RuntimeError:
+            FILE = Path("EVS" + ws_name + ".raw")
+            FOLDER_PATH = FilesManager.get_experiment_dir() / "calibration_inputs"
+            FILE_PATH = FOLDER_PATH / FILE
             LoadRaw(
-                "EVS" + ws_name + ".raw",
+                str(FILE_PATH),
                 OutputWorkspace=output_name,
                 SpectrumMin=self._spec_list[0],
                 SpectrumMax=self._spec_list[-1],
