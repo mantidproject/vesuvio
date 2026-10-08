@@ -1,16 +1,17 @@
 name: Integration tests on PR
 
 on:
-  pull_request:
-    branches:
-      - main
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   integration-tests:
-    # if: github.event.review.state == 'approved' && github.event.repository.fork == false
+    if: github.event.review.state == 'approved' && github.event.repository.fork == false
     runs-on: ubuntu-22.04
 
     steps:
