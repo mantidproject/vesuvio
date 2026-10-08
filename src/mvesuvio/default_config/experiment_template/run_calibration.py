@@ -1,4 +1,4 @@
-from pathlib import Path
+from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
 from mantid.api import AlgorithmManager, AlgorithmFactory
@@ -6,8 +6,6 @@ from mvesuvio.globals import SharedParameterFitType
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal
-
-IP_FILES_PATH = Path(__file__).absolute().parent.parent / "ip_files"
 
 
 class EVSCalibrationAnalysisInputs:
@@ -18,7 +16,7 @@ class EVSCalibrationAnalysisInputs:
     Background: str = "17086"
 
     # Filename of the instrument parameter file.
-    InstrumentParameterFile: str = str(IP_FILES_PATH / "IP0005.par")
+    InstrumentParameterFile: str = str(FilesManager.get_instrument_parameters_dir() / "IP0005.par")
 
     # Mass of the sample in amu to be used when calculating energy.
     # Default is Pb: 207.19
@@ -61,7 +59,7 @@ class EVSCalibrationAnalysisInputs:
 
     # Name to call the output workspace
     # Default is ""
-    OutputWorkspace = "EVSCalibrationAnalysis_Output"
+    OutputWorkspace: str = "EVSCalibrationAnalysis_Output"
 
 
 ########################
