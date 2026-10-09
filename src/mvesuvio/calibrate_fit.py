@@ -21,7 +21,6 @@ from mantid.api import (
     PythonAlgorithm,
     WorkspaceFactory,
     AnalysisDataService,
-    WorkspaceGroup,
 )
 from mantid.simpleapi import (
     CreateEmptyTableWorkspace,
@@ -402,16 +401,10 @@ class EVSCalibrationFit(PythonAlgorithm):
             FindPeaks(
                 InputWorkspace=self._sample, WorkspaceIndex=workspace_index, PeaksList=find_peaks_output_name, **find_peaks_input_params
             )
-            if isinstance(mtd[find_peaks_output_name], WorkspaceGroup):
-                if any(ws.rowCount() > 0 for ws in mtd[find_peaks_output_name]):
-                    peaks_found = True
-                else:
-                    raise ValueError
+            if mtd[find_peaks_output_name].rowCount() > 0:
+                peaks_found = True
             else:
-                if mtd[find_peaks_output_name].rowCount() > 0:
-                    peaks_found = True
-                else:
-                    raise ValueError
+                raise ValueError
         except ValueError:
             peaks_found = False
             if not unconstrained:  # Ignore error if unconstrained, as we will use peaks found during constrained workflow.
@@ -615,11 +608,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         if peak_estimates_list is not None:  # If no peak estimates list, we are doing an unconstrained fit
             # Don't yet understand what this is doing here
-            if isinstance(peak_table, WorkspaceGroup):
-                for peak in peak_table:
-                    self._set_table_column(peak, position, peak_estimates_list, spec_list=None)
-            else:
-                self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
+            self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
             unconstrained = False
         else:
             unconstrained = True
