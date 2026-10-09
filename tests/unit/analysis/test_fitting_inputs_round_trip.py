@@ -66,12 +66,14 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
 
         ForwardAnalysisInputs.run_this_scattering_type = True
         ForwardAnalysisInputs.name = "front"
+        ForwardAnalysisInputs.name_of_subtracted_workspace = "front"
+        ForwardAnalysisInputs.overwrite_analysis_input_workspace = ""
         ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
         ForwardAnalysisInputs.subtract_calculated_fse_from_data = False
 
         with patch("mvesuvio.util.fitting_helpers.calculate_resolution", side_effect=self._mock_calculate_resolution):
             with patch("mvesuvio.util.fitting_helpers.VesuvioResolution") as resolution_mock:
-                reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs, None)
+                reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
         resolution_mock.assert_called_once()
         self.assertEqual(resolution_mock.call_args.kwargs["Workspace"].name(), ws_name)

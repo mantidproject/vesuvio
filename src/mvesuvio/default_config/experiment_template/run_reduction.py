@@ -1,7 +1,5 @@
 import mvesuvio
-from mantid.api import AnalysisDataService
-from mantid.simpleapi import Rebin, Scale, Minus, SumSpectra, SetSample, SaveAscii
-from mantid.kernel import logger
+from mantid.simpleapi import Rebin, Scale, Minus, SetSample, SaveAscii
 from pathlib import Path
 import math
 from typing import Dict
@@ -72,8 +70,12 @@ RECOIL_WEIGHT = {element: STOICHIOMETRY[element] * BOUND_SCATTERING_XS_BARN[elem
 
 class BackwardAnalysisInputs:
     run_this_scattering_type = True
-    name = "back"
     minimal_output = False
+
+    # Name of workspace to use as input of analysis, instead of using the runs below
+    # If already loaded, picks up the name in Mantid, otherwise attempts to load with Load()
+    # Leave empty to use the runs specified below
+    overwrite_analysis_input_workspace = ""
 
     runs = "43066-43076"  # Runs of your sample dataset
     empty_runs = "41876-41923"  # Empty CCR
@@ -86,6 +88,7 @@ class BackwardAnalysisInputs:
     # Scaling factors, leave at default of 1 for most cases
     scale_empty_workspace = 1
     scale_raw_workspace = 1
+    name_of_subtracted_workspace = "back"
 
     # Atomic mass in a.m.u. of each element/isotope present in sample + cell EXCEPT HYDROGEN
     masses = [12, 16, 27]
@@ -123,8 +126,12 @@ class BackwardAnalysisInputs:
 
 class ForwardAnalysisInputs:
     run_this_scattering_type = True
-    name = "front"
     minimal_output = False
+
+    # Name of workspace to use as input of analysis, instead of using the runs below
+    # If already loaded, picks up the name in Mantid, otherwise attempts to load with Load()
+    # Leave empty to use the runs specified below
+    overwrite_analysis_input_workspace = ""
 
     runs = "43066-43076"
     empty_runs = "43868-43911"  # Empty CCR
@@ -137,6 +144,7 @@ class ForwardAnalysisInputs:
     # Scaling factors, leave at default of 1 for most cases
     scale_empty_workspace = 1
     scale_raw_workspace = 1
+    name_of_subtracted_workspace = "front"
 
     masses = [1.0079, 12, 16, 27]  # Atomic mass in a.m.u. of each element/isotope present in sample + cell
     # fmt: off
@@ -171,25 +179,26 @@ class ForwardAnalysisInputs:
 ########################
 
 
-def main() -> None:
+def run_reduction():
     mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
 
-    # Optional workspace-name overrides for bootstrap script injection.
-    BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
-    FRONT_WS_TO_FIT = globals().get("FRONT_WS_TO_FIT", "")
+    general_helpers.inject_bootstrap_workspace(BackwardAnalysisInputs, globals())
+    general_helpers.inject_bootstrap_workspace(ForwardAnalysisInputs, globals())
 
-    # Preserve standalone behavior when no bootstrap overrides are injected.
-    if not BACK_WS_TO_FIT and not FRONT_WS_TO_FIT:
-        AnalysisDataService.clear()
+    back_input_ws = ""
+    front_input_ws = ""
 
     if BackwardAnalysisInputs.run_this_scattering_type:
-        if BACK_WS_TO_FIT:
-            BackwardAnalysisInputs.name = str(BACK_WS_TO_FIT)
-            if not AnalysisDataService.doesExist(BackwardAnalysisInputs.name):
-                logger.error(f"Injected backward workspace does not exist in ADS: {BackwardAnalysisInputs.name}")
-                BACK_WS_TO_FIT = ""
+        if BackwardAnalysisInputs.overwrite_analysis_input_workspace:
+            reduction_helpers.load_overwritten_workspace_if_specified(BackwardAnalysisInputs)
+            back_input_ws = BackwardAnalysisInputs.overwrite_analysis_input_workspace
         else:
             raw_name, empty_name = reduction_helpers.load_input_ws(BackwardAnalysisInputs)
+
+            ### User Editing Section ###
+            # For some edge cases, you can modify the raw and empty workspaces as needed
+            # You can also apply any modifications to the subtracted workspace
+            # The only requirement is that the final subtracted workspace is called BackwardAnalysisInputs.name_of_subtracted_workspace
 
             Rebin(InputWorkspace=raw_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
             Rebin(InputWorkspace=empty_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
@@ -197,21 +206,22 @@ def main() -> None:
             Scale(InputWorkspace=raw_name, Factor=BackwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
             Scale(InputWorkspace=empty_name, Factor=BackwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
 
-            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name)
+            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name_of_subtracted_workspace)
 
-            # TODO: Take out sums from here
-            SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
-            SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
-            BACK_WS_TO_FIT = BackwardAnalysisInputs.name
+            ### End of User Editing Section ###
+            back_input_ws = BackwardAnalysisInputs.name_of_subtracted_workspace
 
     if ForwardAnalysisInputs.run_this_scattering_type:
-        if FRONT_WS_TO_FIT:
-            ForwardAnalysisInputs.name = str(FRONT_WS_TO_FIT)
-            if not AnalysisDataService.doesExist(ForwardAnalysisInputs.name):
-                logger.error(f"Injected forward workspace does not exist in ADS: {ForwardAnalysisInputs.name}")
-                FRONT_WS_TO_FIT = ""
+        if ForwardAnalysisInputs.overwrite_analysis_input_workspace:
+            reduction_helpers.load_overwritten_workspace_if_specified(ForwardAnalysisInputs)
+            front_input_ws = ForwardAnalysisInputs.overwrite_analysis_input_workspace
         else:
             raw_name, empty_name = reduction_helpers.load_input_ws(ForwardAnalysisInputs)
+
+            ### User Editing Section ###
+            # For some edge cases, you can modify the raw and empty workspaces as needed
+            # You can also apply any modifications to the subtracted workspace
+            # The only requirement is that the final subtracted workspace is called ForwardAnalysisInputs.name_of_subtracted_workspace
 
             Rebin(InputWorkspace=raw_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
             Rebin(InputWorkspace=empty_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
@@ -219,26 +229,19 @@ def main() -> None:
             Scale(InputWorkspace=raw_name, Factor=ForwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
             Scale(InputWorkspace=empty_name, Factor=ForwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
 
-            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name)
+            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name_of_subtracted_workspace)
 
-            # TODO: Take out sums from here
-            SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
-            SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
-            FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
-
-    if not BACK_WS_TO_FIT:
-        BACK_WS_TO_FIT = BackwardAnalysisInputs.name
-    if not FRONT_WS_TO_FIT:
-        FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+            ### End of User Editing Section ###
+            front_input_ws = ForwardAnalysisInputs.name_of_subtracted_workspace
 
     # Set sample shape
-    SetSample(InputWorkspace=BACK_WS_TO_FIT, Geometry=SAMPLE_SHAPE)
-    SetSample(InputWorkspace=FRONT_WS_TO_FIT, Geometry=SAMPLE_SHAPE)
+    SetSample(InputWorkspace=back_input_ws, Geometry=SAMPLE_SHAPE)
+    SetSample(InputWorkspace=front_input_ws, Geometry=SAMPLE_SHAPE)
 
-    reduction_helpers.crop_and_mask_workspace(BACK_WS_TO_FIT, BackwardAnalysisInputs)
-    reduction_helpers.crop_and_mask_workspace(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
-    back_alg = reduction_helpers.init_analysis_algorithm(BACK_WS_TO_FIT, BackwardAnalysisInputs)
-    front_alg = reduction_helpers.init_analysis_algorithm(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
+    reduction_helpers.crop_and_mask_workspace(back_input_ws, BackwardAnalysisInputs)
+    reduction_helpers.crop_and_mask_workspace(front_input_ws, ForwardAnalysisInputs)
+    back_alg = reduction_helpers.init_analysis_algorithm(back_input_ws, BackwardAnalysisInputs)
+    front_alg = reduction_helpers.init_analysis_algorithm(front_input_ws, ForwardAnalysisInputs)
 
     if reduction_helpers.h_ratio_is_zero_when_h_present(BackwardAnalysisInputs, ForwardAnalysisInputs):
         h_ratios_table = reduction_helpers.run_estimate_h_ratio(
@@ -264,9 +267,9 @@ def main() -> None:
         front_alg.execute()
 
     general_helpers.make_summarised_log_file()
-
-    reduction_helpers.save_fitting_input_workspaces(BackwardAnalysisInputs, ForwardAnalysisInputs)
+    reduction_helpers.save_fitting_input_workspaces(BackwardAnalysisInputs)
+    reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
-    main()
+    run_reduction()

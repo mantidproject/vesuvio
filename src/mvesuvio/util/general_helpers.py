@@ -1,8 +1,24 @@
 import re
+from typing import Any
 
 from mantid.kernel import logger
 
 from mvesuvio.util.files_manager import FilesManager
+
+
+def _infer_scattering_type(inputs_class: Any) -> str:
+    """Infer scattering type from user inputs without importing reduction helpers."""
+    name = str(getattr(inputs_class, "name", "")).lower()
+    class_name = getattr(inputs_class, "__name__", "").lower()
+    mode = str(getattr(inputs_class, "mode", "")).lower().replace(" ", "")
+
+    if name.startswith("back") or "backward" in class_name or mode == "doubledifference":
+        return "backward"
+
+    if name.startswith("front") or "forward" in class_name or mode == "singledifference":
+        return "forward"
+
+    raise ValueError(f"Could not infer scattering type for input class: {inputs_class}")
 
 
 def pass_data_into_ws(dataX, dataY, dataE, ws):
@@ -56,3 +72,19 @@ def make_summarised_log_file() -> None:
     except OSError:
         logger.error("Mantid log file not available. Unable to produce a summarized log file for this routine.")
     return
+
+
+def inject_bootstrap_workspace(analysis_inputs: Any, injected_globals: dict | None = None) -> None:
+    """Inject bootstrap workspace override values into analysis input classes."""
+
+    if injected_globals is None:
+        injected_globals = {}
+
+    scattering_type = _infer_scattering_type(analysis_inputs)
+    if scattering_type == "backward":
+        override = injected_globals.get("BACK_OVERWRITE_ANALYSIS_INPUT_WORKSPACE", "")
+    else:
+        override = injected_globals.get("FRONT_OVERWRITE_ANALYSIS_INPUT_WORKSPACE", "")
+
+    if override:
+        analysis_inputs.overwrite_analysis_input_workspace = str(override)

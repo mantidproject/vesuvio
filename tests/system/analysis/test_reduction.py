@@ -2,17 +2,15 @@ import runpy
 import unittest
 from pathlib import Path
 from mvesuvio.util import handle_config
-from mvesuvio import ConfigArgInputs
 from shutil import copytree, rmtree
-import mvesuvio
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
 
 class TestReduction(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        handle_config.set_default_config_vars()
         handle_config.refresh_config_dir_and_contents()
-        mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
         cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_outputs"
         reduction_inputs = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "reduction"
@@ -40,7 +38,7 @@ class TestReduction(unittest.TestCase):
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 1
         namespace["ForwardAnalysisInputs"].mask_of_time_of_flight_range = "110-140"
         namespace["BackwardAnalysisInputs"].chosen_mass_index = 0
-        namespace["main"]()
+        namespace["run_reduction"]()
 
         AnalysisDataService.clear()
 

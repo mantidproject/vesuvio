@@ -29,8 +29,8 @@ def _run_reduction_with_injected_workspaces(back_ws_to_fit: str = "", front_ws_t
         str(RUN_REDUCTION_PATH),
         run_name="__main__",
         init_globals={
-            "BACK_WS_TO_FIT": back_ws_to_fit,
-            "FRONT_WS_TO_FIT": front_ws_to_fit,
+            "BACK_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": back_ws_to_fit,
+            "FRONT_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": front_ws_to_fit,
         },
     )
 

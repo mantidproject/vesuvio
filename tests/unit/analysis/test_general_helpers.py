@@ -12,6 +12,29 @@ from mvesuvio.util import general_helpers
 
 class TestGeneralHelpers(unittest.TestCase):
 
+    def test_inject_bootstrap_workspace_sets_expected_override(self):
+        class BackwardInputs:
+            name = "backward"
+            mode = "DoubleDifference"
+            overwrite_analysis_input_workspace = ""
+
+        class ForwardInputs:
+            name = "forward"
+            mode = "SingleDifference"
+            overwrite_analysis_input_workspace = ""
+
+        general_helpers.inject_bootstrap_workspace(
+            BackwardInputs,
+            {"BACK_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": "back_ws"},
+        )
+        general_helpers.inject_bootstrap_workspace(
+            ForwardInputs,
+            {"FRONT_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": "front_ws"},
+        )
+
+        self.assertEqual(BackwardInputs.overwrite_analysis_input_workspace, "back_ws")
+        self.assertEqual(ForwardInputs.overwrite_analysis_input_workspace, "front_ws")
+
     def test_extract_ws(self):
         data = [1, 2, 3]
         ws = CreateWorkspace(DataX=data, DataY=data, DataE=data, NSpec=1, UnitX="some_unit")

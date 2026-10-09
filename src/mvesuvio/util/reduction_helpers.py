@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from mantid import AnalysisDataService
 from mantid.simpleapi import (
     Load,
+    SumSpectra,
     CropWorkspace,
     MaskDetectors,
     CreateEmptyTableWorkspace,
@@ -293,6 +294,24 @@ def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] 
     return ws_cropped
 
 
+def load_overwritten_workspace_if_specified(analysis_inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]) -> str:
+    """Load workspace override from file path when ``overwrite_analysis_input_workspace`` points to a file."""
+
+    override = str(getattr(analysis_inputs, "overwrite_analysis_input_workspace", "") or "")
+
+    if not override:
+        return ""
+
+    if AnalysisDataService.doesExist(override):
+        SumSpectra(InputWorkspace=override, OutputWorkspace=override + "_sum")
+        return override
+
+    override_name = Path(override).stem
+    Load(Filename=override, OutputWorkspace=override_name)
+    SumSpectra(InputWorkspace=override, OutputWorkspace=override + "_sum")
+    return override_name
+
+
 def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
     raw_path, empty_path = store_input_ws_if_not_on_path(input_class)
 
@@ -301,6 +320,10 @@ def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalys
 
     Load(Filename=str(raw_path), OutputWorkspace=raw_name)
     Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+
+    SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
+    SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+
     return raw_name, empty_name
 
 
@@ -401,50 +424,47 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
 
 
 def save_fitting_input_workspaces(
-    backward_inputs: type[BackwardAnalysisInputs] | None = None,
-    forward_inputs: type[ForwardAnalysisInputs] | None = None,
+    analysis_inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs] | None,
 ) -> None:
-    if backward_inputs is None and forward_inputs is None:
-        try:
-            from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
-        except ImportError as exc:  # pragma: no cover - defensive fallback when run_reduction is not importable.
-            raise RuntimeError(
-                "BackwardAnalysisInputs and ForwardAnalysisInputs are required when save_fitting_input_workspaces is called without arguments."
-            ) from exc
-        backward_inputs = BackwardAnalysisInputs
-        forward_inputs = ForwardAnalysisInputs
-
     fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
     fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
-    for analysis_inputs in (backward_inputs, forward_inputs):
-        if analysis_inputs is None or not analysis_inputs.run_this_scattering_type:
-            continue
+    if analysis_inputs is None:
+        logger.warning("Could not save derived fitting workspaces because the inputs class was not provided.")
+        return
+    if not analysis_inputs.run_this_scattering_type:
+        return
 
-        iteration = str(analysis_inputs.number_of_iterations_for_corrections)
-        workspace_name = f"{analysis_inputs.name}_{iteration}"
-        ncp_group_name = f"{workspace_name}_ncp_group"
+    iteration = str(analysis_inputs.number_of_iterations_for_corrections)
+    overwrite_workspace = str(getattr(analysis_inputs, "overwrite_analysis_input_workspace", "") or "").strip()
+    if overwrite_workspace and AnalysisDataService.doesExist(overwrite_workspace):
+        base_workspace_name = overwrite_workspace
+    else:
+        base_workspace_name = str(analysis_inputs.name_of_subtracted_workspace)
 
-        if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
-            logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
-            continue
+    workspace_name = f"{base_workspace_name}_{iteration}"
+    ncp_group_name = f"{workspace_name}_ncp_group"
 
-        ws_to_fit = mtd[workspace_name]
-        ws_to_fit_ncps = mtd[ncp_group_name]
+    if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
+        logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
+        return
 
-        ws_resolution = fitting_helpers.calculate_resolution(
-            min(analysis_inputs.masses),
-            ws_to_fit,
-            analysis_inputs.range_for_rebinning_in_y_space,
-        )
-        ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
-            ws_to_fit,
-            ws_to_fit_ncps,
-            analysis_inputs.subtract_calculated_fse_from_data,
-        )
+    ws_to_fit = mtd[workspace_name]
+    ws_to_fit_ncps = mtd[ncp_group_name]
 
-        SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
-        SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
-        SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
+    ws_resolution = fitting_helpers.calculate_resolution(
+        min(analysis_inputs.masses),
+        ws_to_fit,
+        analysis_inputs.range_for_rebinning_in_y_space,
+    )
+    ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
+        ws_to_fit,
+        ws_to_fit_ncps,
+        analysis_inputs.subtract_calculated_fse_from_data,
+    )
+
+    SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
+    SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
+    SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):

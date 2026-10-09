@@ -35,13 +35,100 @@ class TestReductionHelpers(unittest.TestCase):
                 with patch.object(reduction_helpers.fitting_helpers, "calculate_resolution", return_value=MagicMock()):
                     with patch.object(reduction_helpers.fitting_helpers, "isolate_lighest_mass_data", return_value=(MagicMock(), MagicMock())):
                         ForwardAnalysisInputs.name = "front"
+                        ForwardAnalysisInputs.name_of_subtracted_workspace = "front"
+                        ForwardAnalysisInputs.overwrite_analysis_input_workspace = ""
                         ForwardAnalysisInputs.run_this_scattering_type = True
                         ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
                         ForwardAnalysisInputs.subtract_calculated_fse_from_data = False
 
-                        reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs, None)
+                        reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
             self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
+
+            AnalysisDataService.clear()
+            FilesManager._experiment_dir = None
+
+    def test_save_fitting_input_workspaces_uses_override_workspace_when_present_in_ads(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            FilesManager.set_experiment_dir(temp_dir)
+            AnalysisDataService.clear()
+
+            ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ws, "override_front")
+
+            ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ws, "override_front_0")
+
+            ncp = CreateWorkspace(DataX=[0, 1, 2], DataY=[4, 5, 6], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ncp, "override_front_0_12_ncp")
+            GroupWorkspaces(["override_front_0_12_ncp"], OutputWorkspace="override_front_0_ncp_group")
+
+            with patch.object(reduction_helpers, "SaveNexus") as mock_save_nexus:
+                with patch.object(reduction_helpers.fitting_helpers, "calculate_resolution", return_value=MagicMock()):
+                    with patch.object(
+                        reduction_helpers.fitting_helpers,
+                        "isolate_lighest_mass_data",
+                        return_value=(MagicMock(), MagicMock()),
+                    ):
+                        ForwardAnalysisInputs.run_this_scattering_type = True
+                        ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
+                        ForwardAnalysisInputs.subtract_calculated_fse_from_data = False
+                        ForwardAnalysisInputs.overwrite_analysis_input_workspace = "override_front"
+                        ForwardAnalysisInputs.name_of_subtracted_workspace = "front_subtracted"
+
+                        reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
+
+            self.assertEqual(mock_save_nexus.call_count, 3)
+            saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
+            self.assertTrue(all("override_front_0" in path for path in saved_paths))
+
+            AnalysisDataService.clear()
+            FilesManager._experiment_dir = None
+
+    def test_save_fitting_input_workspaces_falls_back_when_override_not_in_ads(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            FilesManager.set_experiment_dir(temp_dir)
+            AnalysisDataService.clear()
+
+            ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ws, "front_subtracted_0")
+
+            ncp = CreateWorkspace(DataX=[0, 1, 2], DataY=[4, 5, 6], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            RenameWorkspace(ncp, "front_subtracted_0_12_ncp")
+            GroupWorkspaces(["front_subtracted_0_12_ncp"], OutputWorkspace="front_subtracted_0_ncp_group")
+
+            with patch.object(reduction_helpers, "SaveNexus") as mock_save_nexus:
+                with patch.object(reduction_helpers.fitting_helpers, "calculate_resolution", return_value=MagicMock()):
+                    with patch.object(
+                        reduction_helpers.fitting_helpers,
+                        "isolate_lighest_mass_data",
+                        return_value=(MagicMock(), MagicMock()),
+                    ):
+                        ForwardAnalysisInputs.run_this_scattering_type = True
+                        ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
+                        ForwardAnalysisInputs.subtract_calculated_fse_from_data = False
+                        ForwardAnalysisInputs.overwrite_analysis_input_workspace = "override_front"
+                        ForwardAnalysisInputs.name_of_subtracted_workspace = "front_subtracted"
+
+                        reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
+
+            self.assertEqual(mock_save_nexus.call_count, 3)
+            saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
+            self.assertTrue(all("front_subtracted_0" in path for path in saved_paths))
+
+            AnalysisDataService.clear()
+            FilesManager._experiment_dir = None
+
+    def test_save_fitting_input_workspaces_ignores_missing_inputs_class(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            FilesManager.set_experiment_dir(temp_dir)
+            AnalysisDataService.clear()
+
+            with patch.object(reduction_helpers, "SaveNexus") as mock_save_nexus:
+                reduction_helpers.save_fitting_input_workspaces(None)
+
+            mock_save_nexus.assert_not_called()
             self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
 
             AnalysisDataService.clear()
@@ -347,9 +434,10 @@ class TestReductionHelpers(unittest.TestCase):
         ])
         mock_save_ws.assert_not_called()
 
+    @patch('mvesuvio.util.reduction_helpers.SumSpectra')
     @patch('mvesuvio.util.reduction_helpers.Load')
     @patch('mvesuvio.util.reduction_helpers.store_input_ws_if_not_on_path')
-    def test_load_input_ws_loads_raw_and_empty_workspaces(self, mock_store, mock_load):
+    def test_load_input_ws_loads_raw_and_empty_workspaces(self, mock_store, mock_load, mock_sum_spectra):
         class DummyInputs:
             name = "backward"
             mode = "SingleDifference"
@@ -368,6 +456,10 @@ class TestReductionHelpers(unittest.TestCase):
         mock_load.assert_has_calls([
             call(Filename=str(raw_path), OutputWorkspace="experiment_raw_backward"),
             call(Filename=str(empty_path), OutputWorkspace="experiment_empty_backward"),
+        ])
+        mock_sum_spectra.assert_has_calls([
+            call(InputWorkspace="experiment_raw_backward", OutputWorkspace="experiment_raw_backward_sum"),
+            call(InputWorkspace="experiment_empty_backward", OutputWorkspace="experiment_empty_backward_sum"),
         ])
 
     def test_convert_to_list_of_spectrum_numbers(self):

@@ -11,9 +11,7 @@ import matplotlib
 matplotlib.use("Agg", force=True)
 
 from mvesuvio.util import handle_config
-from mvesuvio import ConfigArgInputs
 from shutil import copytree, rmtree
-import mvesuvio
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
 TESTS_ROOT = Path(__file__).resolve().parents[2]
@@ -23,8 +21,8 @@ FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
 class TestFitting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        handle_config.set_default_config_vars()
         handle_config.refresh_config_dir_and_contents()
-        mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
         cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "gauss_fit"
         rmtree(cls.results_path, ignore_errors=True)
