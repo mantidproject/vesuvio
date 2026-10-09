@@ -30,7 +30,7 @@ jobs:
       - name: Check for calibration files changed 
         run: |
           echo "calibration-changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q -e '^tools/calibration_scripts/' -e '^tests/' && echo true || echo false)" >> $GITHUB_ENV
-      
+
       - name: Check if first workflow to run on PR 
         run: |
           # Check if the base commit (before the PR) exists in the history
