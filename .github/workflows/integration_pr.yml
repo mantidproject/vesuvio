@@ -1,0 +1,31 @@
+name: Integration tests on PR
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-tests:
+    if: github.event.review.state == 'approved' && github.event.repository.fork == false
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Set up pixi environment
+      - name: Setup Pixi
+        uses: prefix-dev/setup-pixi@v0
+
+      - name: Run mvesuvio Unit Tests
+        run: pixi run -e vesuvio-developer test-unit
+
+      - name: Run mvesuvio System Tests
+        run: pixi run -e vesuvio-developer test-system
+
