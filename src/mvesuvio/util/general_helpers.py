@@ -1,8 +1,26 @@
 import re
+from pathlib import Path
+from typing import Any
 
 from mantid.kernel import logger
+from mantid.simpleapi import AnalysisDataService, Load, SumSpectra
 
 from mvesuvio.util.files_manager import FilesManager
+
+
+def _infer_scattering_type(inputs_class: Any) -> str:
+    """Infer scattering type from user inputs without importing reduction helpers."""
+    name = str(getattr(inputs_class, "name", "")).lower()
+    class_name = getattr(inputs_class, "__name__", "").lower()
+    mode = str(getattr(inputs_class, "mode", "")).lower().replace(" ", "")
+
+    if name.startswith("back") or "backward" in class_name or mode == "doubledifference":
+        return "backward"
+
+    if name.startswith("front") or "forward" in class_name or mode == "singledifference":
+        return "forward"
+
+    raise ValueError(f"Could not infer scattering type for input class: {inputs_class}")
 
 
 def pass_data_into_ws(dataX, dataY, dataE, ws):
@@ -56,3 +74,31 @@ def make_summarised_log_file() -> None:
     except OSError:
         logger.error("Mantid log file not available. Unable to produce a summarized log file for this routine.")
     return
+
+
+def load_overwritten_workspace_if_specified(analysis_inputs: Any) -> str:
+    """Load a workspace override from ADS or disk when an analysis input class specifies one."""
+
+    override = str(getattr(analysis_inputs, "overwrite_analysis_input_workspace", "") or "")
+
+    if not override:
+        return ""
+
+    if AnalysisDataService.doesExist(override):
+        SumSpectra(InputWorkspace=override, OutputWorkspace=override + "_sum")
+        return override
+
+    if Path(override).exists():
+        override_name = Path(override).stem
+        Load(Filename=override, OutputWorkspace=override_name)
+        SumSpectra(InputWorkspace=override_name, OutputWorkspace=override_name + "_sum")
+        return override_name
+    raise ValueError(f"Override workspace not in ADS and not a path: {override}")
+
+
+def get_workspace_name_if_path(path_or_name: str) -> str:
+    """Return the workspace name if the input is a path, otherwise return the input as is."""
+    path_obj = Path(path_or_name)
+    if path_obj.exists():
+        return path_obj.stem
+    return path_or_name

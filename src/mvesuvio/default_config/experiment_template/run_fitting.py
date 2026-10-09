@@ -112,7 +112,19 @@ def load_saved_fitting_input_workspaces() -> None:
 
 def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | type[ForwardFittingInputs]) -> bool:
     iteration = str(fitting_inputs.number_of_iterations_for_corrections)
-    ws_name_candidates = [f"{fitting_inputs.name}_{iteration}", fitting_inputs.name]
+
+    overwrite_workspace = general_helpers.get_workspace_name_if_path(fitting_inputs.overwrite_analysis_input_workspace)
+    base_workspace_names: list[str] = [
+        overwrite_workspace,
+        str(fitting_inputs.name_of_subtracted_workspace or "").strip(),
+    ]
+    base_workspace_names = [name for name in base_workspace_names if name]
+
+    ws_name_candidates: list[str] = []
+    for base_workspace_name in base_workspace_names:
+        for candidate in (f"{base_workspace_name}_{iteration}", base_workspace_name):
+            if candidate not in ws_name_candidates:
+                ws_name_candidates.append(candidate)
 
     for candidate in ws_name_candidates:
         resolution_name = f"{candidate}_ws_resolution"
@@ -144,25 +156,14 @@ def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | 
     return False
 
 
-def run_fitting(back_ws_to_fit: str = "", front_ws_to_fit: str = "") -> bool:
+def run_fitting() -> None:
     load_saved_fitting_input_workspaces()
-
-    # Optional names let users fit already-loaded workspaces without re-running reduction.
-    if back_ws_to_fit:
-        BackwardFittingInputs.name = str(back_ws_to_fit)
-    if front_ws_to_fit:
-        ForwardFittingInputs.name = str(front_ws_to_fit)
-
-    success = False
     if BackwardFittingInputs.run_this_fitting_type:
-        success |= run_y_space_reduction_and_fit(BackwardFittingInputs)
+        run_y_space_reduction_and_fit(BackwardFittingInputs)
     if ForwardFittingInputs.run_this_fitting_type:
-        success |= run_y_space_reduction_and_fit(ForwardFittingInputs)
-    return success
+        run_y_space_reduction_and_fit(ForwardFittingInputs)
+    general_helpers.make_summarised_log_file()
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
-    BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
-    FRONT_WS_TO_FIT = globals().get("FRONT_WS_TO_FIT", "")
-    run_fitting(back_ws_to_fit=BACK_WS_TO_FIT, front_ws_to_fit=FRONT_WS_TO_FIT)
-    general_helpers.make_summarised_log_file()
+    run_fitting()

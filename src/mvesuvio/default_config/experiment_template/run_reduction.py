@@ -1,34 +1,81 @@
 import mvesuvio
-from mantid.api import AnalysisDataService
-from mantid.simpleapi import Load, Rebin, Scale, Minus, SumSpectra, SaveNexus, mtd
-from mantid.kernel import logger
+from mantid.simpleapi import Rebin, Scale, Minus, SetSample, SaveAscii
 from pathlib import Path
+import math
+from typing import Dict
 from mvesuvio import ConfigArgInputs
 from mvesuvio.globals import Mode
-from mvesuvio.util import fitting_helpers
 from mvesuvio.util import general_helpers
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
 
-class SampleParameters:
-    # Sample slab parameters, expressed in meters
-    slab_height = 0.1
-    slab_width = 0.1
-    slab_thickness = 0.001
+class SharedGeometry:
+    """
+    Sample physical dimensions, in cm.
+    Cylinder volume is the same as slab volume.
+    """
 
-    sample_shape_xml = f'''<cuboid id="sample-shape">
-        <left-front-bottom-point x="{slab_width / 2}" y="{-slab_height / 2}" z="{slab_thickness / 2}" />
-        <left-front-top-point x="{slab_width / 2}" y="{slab_height / 2}" z="{slab_thickness / 2}" />
-        <left-back-bottom-point x="{slab_width / 2}" y="{-slab_height / 2}" z="{-slab_thickness / 2}" />
-        <right-front-bottom-point x="{-slab_width / 2}" y="{-slab_height / 2}" z="{slab_thickness / 2}" />
-        </cuboid>'''
+    slab_height_cm: float = 10.0
+    slab_width_cm: float = 10.0
+    slab_thickness_cm: float = 0.1
+    cylinder_height_cm: float = 10.0
+
+    @property
+    def slab_volume_cm3(self) -> float:
+        return self.slab_height_cm * self.slab_width_cm * self.slab_thickness_cm
+
+    @property
+    def cylinder_radius_cm(self) -> float:
+        return math.sqrt(self.slab_volume_cm3 / (math.pi * self.cylinder_height_cm))
+
+    @property
+    def cylinder_volume_cm3(self) -> float:
+        return math.pi * self.cylinder_radius_cm**2 * self.cylinder_height_cm
+
+    def slab_dict(self) -> Dict[str, object]:
+        """SetSample FlatPlate dictionary, dimensions in cm."""
+        return {
+            "Shape": "FlatPlate",
+            "Width": self.slab_width_cm,
+            "Height": self.slab_height_cm,
+            "Thick": self.slab_thickness_cm,
+            "Center": [0.0, 0.0, 0.0],
+            "Angle": 0.0,
+        }
+
+    def cylinder_dict(self) -> Dict[str, object]:
+        """SetSample Cylinder dictionary, dimensions in cm."""
+        return {
+            "Shape": "Cylinder",
+            "Height": self.cylinder_height_cm,
+            "Radius": self.cylinder_radius_cm,
+            "Center": [0.0, 0.0, 0.0],
+            "Axis": [0.0, 1.0, 0.0],
+        }
 
 
-class BackwardAnalysisInputs(SampleParameters):
+# Pick Slab or Cylinder geometry
+SAMPLE_SHAPE = SharedGeometry().slab_dict()
+
+# Example stoichiometry, replace with actual values
+STOICHIOMETRY = {"H": 4, "C": 1, "O": 2, "Al": 1}
+
+BOUND_SCATTERING_XS_BARN = {"H": 82.0, "C": 5.55, "O": 4.23, "Al": 1.49}
+
+
+# Bound-cross-section-weighted recoil intensities, in a common arbitrary scale
+RECOIL_WEIGHT = {element: STOICHIOMETRY[element] * BOUND_SCATTERING_XS_BARN[element] for element in STOICHIOMETRY}
+
+
+class BackwardAnalysisInputs:
     run_this_scattering_type = True
-    name = "back"
     minimal_output = False
+
+    # Name of workspace to use as input of analysis, instead of using the runs below
+    # If already loaded, picks up the name in Mantid, otherwise attempts to load with Load()
+    # Leave empty to use the runs specified below
+    overwrite_analysis_input_workspace = ""
 
     runs = "43066-43076"  # Runs of your sample dataset
     empty_runs = "41876-41923"  # Empty CCR
@@ -41,44 +88,35 @@ class BackwardAnalysisInputs(SampleParameters):
     # Scaling factors, leave at default of 1 for most cases
     scale_empty_workspace = 1
     scale_raw_workspace = 1
+    name_of_subtracted_workspace = "back"
 
     # Atomic mass in a.m.u. of each element/isotope present in sample + cell EXCEPT HYDROGEN
     masses = [12, 16, 27]
 
+    # fmt: off
     initial_fitting_parameters = [  # NCP intensities, NCP widths, NCP centers
-        1,
-        12,
-        0.0,
-        1,
-        12,
-        0.0,
-        1,
-        12.5,
-        0.0,
+        1, 12, 0.0,
+        1, 12, 0.0,
+        1, 12.5, 0.0,
     ]
     fitting_bounds = [
-        [0, None],
-        [8, 16],
-        [-3, 1],
-        [0, None],
-        [8, 16],
-        [-3, 1],
-        [0, None],
-        [11, 14],
-        [-3, 1],
+        [0, None], [8, 16], [-3, 1],
+        [0, None], [8, 16], [-3, 1],
+        [0, None], [11, 14], [-3, 1],
     ]
-    constraints = ()
+    # fmt: on
+    constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[0] - RECOIL_WEIGHT["O"] * par[3])}
 
     number_of_iterations_for_corrections = 0  # 4
     # Y-space derived inputs are prepared at end of reduction for fitting.
     range_for_rebinning_in_y_space = "-25, 0.5, 25"
     subtract_calculated_fse_from_data = True
     do_multiple_scattering_correction = True
-    # Known stoichiometry of any mass in the sample to Hydrogen, to estimate intensity ratio as a guess
-    chosen_mass_index = 0  # index in 'masses' list (index from 0 to n-1), ignored if H not present
+    # Exact recoil ratio used to estimate Hydrogen intensity
+    chosen_mass_index = 0  # C is indexed 0 in backward masses list
     intensity_ratio_of_hydrogen_to_chosen_mass = (
-        # 0
-        19.0620008206  # Set to zero to estimate, with 1 iteration for corrections, ignored if H not present
+        RECOIL_WEIGHT["H"] / RECOIL_WEIGHT["C"]
+        # Set to zero to estimate
     )
     transmission_guess = 0.8  # [1 - 2(1-T)] --> Twice the absorption, T: Experimental value from VesuvioTransmission
     multiple_scattering_order = 2
@@ -86,10 +124,14 @@ class BackwardAnalysisInputs(SampleParameters):
     do_gamma_correction = False
 
 
-class ForwardAnalysisInputs(SampleParameters):
+class ForwardAnalysisInputs:
     run_this_scattering_type = True
-    name = "front"
     minimal_output = False
+
+    # Name of workspace to use as input of analysis, instead of using the runs below
+    # If already loaded, picks up the name in Mantid, otherwise attempts to load with Load()
+    # Leave empty to use the runs specified below
+    overwrite_analysis_input_workspace = ""
 
     runs = "43066-43076"
     empty_runs = "43868-43911"  # Empty CCR
@@ -102,39 +144,26 @@ class ForwardAnalysisInputs(SampleParameters):
     # Scaling factors, leave at default of 1 for most cases
     scale_empty_workspace = 1
     scale_raw_workspace = 1
+    name_of_subtracted_workspace = "front"
 
     masses = [1.0079, 12, 16, 27]  # Atomic mass in a.m.u. of each element/isotope present in sample + cell
+    # fmt: off
     initial_fitting_parameters = [  # Intensities, NCP widths, NCP centers
-        1,
-        4.7,
-        0.0,
-        1,
-        12.71,
-        0.0,
-        1,
-        8.76,
-        0.0,
-        1,
-        13.897,
-        0.0,
+        1, 4.7, 0.0,
+        1, 12.71, 0.0,
+        1, 8.76, 0.0,
+        1, 13.897, 0.0,
     ]
     fitting_bounds = [
-        [0, None],
-        [3, 6],
-        [-3, 1],
-        [0, None],
-        [12.71, 12.71],
-        [-3, 1],
-        [0, None],
-        [8.76, 8.76],
-        [-3, 1],
-        [0, None],
-        [13.897, 13.897],
-        [-3, 1],
+        [0, None], [3, 6], [-3, 1],
+        [0, None], [12.71, 12.71], [-3, 1],
+        [0, None], [8.76, 8.76], [-3, 1],
+        [0, None], [13.897, 13.897], [-3, 1],
     ]
-    constraints = ()
+    # fmt: on
+    constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[3] - RECOIL_WEIGHT["O"] * par[6])}
 
-    number_of_iterations_for_corrections = 0  # 4
+    number_of_iterations_for_corrections = 1  # 4
     # Y-space derived inputs are prepared at end of reduction for fitting.
     range_for_rebinning_in_y_space = "-25, 0.5, 25"
     subtract_calculated_fse_from_data = True
@@ -150,31 +179,22 @@ class ForwardAnalysisInputs(SampleParameters):
 ########################
 
 
-def main() -> None:
+def run_reduction():
     mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
 
-    # Optional workspace-name overrides for bootstrap script injection.
-    BACK_WS_TO_FIT = globals().get("BACK_WS_TO_FIT", "")
-    FRONT_WS_TO_FIT = globals().get("FRONT_WS_TO_FIT", "")
-
-    # Preserve standalone behavior when no bootstrap overrides are injected.
-    if not BACK_WS_TO_FIT and not FRONT_WS_TO_FIT:
-        AnalysisDataService.clear()
+    back_input_ws = ""
+    front_input_ws = ""
 
     if BackwardAnalysisInputs.run_this_scattering_type:
-        if BACK_WS_TO_FIT:
-            BackwardAnalysisInputs.name = str(BACK_WS_TO_FIT)
-            if not AnalysisDataService.doesExist(BackwardAnalysisInputs.name):
-                logger.error(f"Injected backward workspace does not exist in ADS: {BackwardAnalysisInputs.name}")
-                BACK_WS_TO_FIT = ""
+        if BackwardAnalysisInputs.overwrite_analysis_input_workspace:
+            back_input_ws = general_helpers.load_overwritten_workspace_if_specified(BackwardAnalysisInputs)
         else:
-            raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(BackwardAnalysisInputs)
+            raw_name, empty_name = reduction_helpers.load_input_ws(BackwardAnalysisInputs)
 
-            raw_name = raw_path.stem
-            empty_name = empty_path.stem
-
-            Load(Filename=str(raw_path), OutputWorkspace=raw_name)
-            Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+            ### User Editing Section ###
+            # For some edge cases, you can modify the raw and empty workspaces as needed
+            # You can also apply any modifications to the subtracted workspace
+            # The only requirement is that the final subtracted workspace is called BackwardAnalysisInputs.name_of_subtracted_workspace
 
             Rebin(InputWorkspace=raw_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
             Rebin(InputWorkspace=empty_name, Params=BackwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
@@ -182,27 +202,21 @@ def main() -> None:
             Scale(InputWorkspace=raw_name, Factor=BackwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
             Scale(InputWorkspace=empty_name, Factor=BackwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
 
-            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name)
+            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=BackwardAnalysisInputs.name_of_subtracted_workspace)
 
-            # TODO: Take out sums from here
-            SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
-            SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
-            BACK_WS_TO_FIT = BackwardAnalysisInputs.name
+            ### End of User Editing Section ###
+            back_input_ws = BackwardAnalysisInputs.name_of_subtracted_workspace
 
     if ForwardAnalysisInputs.run_this_scattering_type:
-        if FRONT_WS_TO_FIT:
-            ForwardAnalysisInputs.name = str(FRONT_WS_TO_FIT)
-            if not AnalysisDataService.doesExist(ForwardAnalysisInputs.name):
-                logger.error(f"Injected forward workspace does not exist in ADS: {ForwardAnalysisInputs.name}")
-                FRONT_WS_TO_FIT = ""
+        if ForwardAnalysisInputs.overwrite_analysis_input_workspace:
+            front_input_ws = general_helpers.load_overwritten_workspace_if_specified(ForwardAnalysisInputs)
         else:
-            raw_path, empty_path = reduction_helpers.load_and_save_input_ws_if_not_on_path(ForwardAnalysisInputs)
+            raw_name, empty_name = reduction_helpers.load_input_ws(ForwardAnalysisInputs)
 
-            raw_name = raw_path.stem
-            empty_name = empty_path.stem
-
-            Load(Filename=str(raw_path), OutputWorkspace=raw_name)
-            Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+            ### User Editing Section ###
+            # For some edge cases, you can modify the raw and empty workspaces as needed
+            # You can also apply any modifications to the subtracted workspace
+            # The only requirement is that the final subtracted workspace is called ForwardAnalysisInputs.name_of_subtracted_workspace
 
             Rebin(InputWorkspace=raw_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=raw_name)
             Rebin(InputWorkspace=empty_name, Params=ForwardAnalysisInputs.time_of_flight_binning, OutputWorkspace=empty_name)
@@ -210,25 +224,22 @@ def main() -> None:
             Scale(InputWorkspace=raw_name, Factor=ForwardAnalysisInputs.scale_raw_workspace, OutputWorkspace=raw_name)
             Scale(InputWorkspace=empty_name, Factor=ForwardAnalysisInputs.scale_empty_workspace, OutputWorkspace=empty_name)
 
-            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name)
+            Minus(LHSWorkspace=raw_name, RHSWorkspace=empty_name, OutputWorkspace=ForwardAnalysisInputs.name_of_subtracted_workspace)
 
-            # TODO: Take out sums from here
-            SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
-            SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
-            FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+            ### End of User Editing Section ###
+            front_input_ws = ForwardAnalysisInputs.name_of_subtracted_workspace
 
-    if not BACK_WS_TO_FIT:
-        BACK_WS_TO_FIT = BackwardAnalysisInputs.name
-    if not FRONT_WS_TO_FIT:
-        FRONT_WS_TO_FIT = ForwardAnalysisInputs.name
+    # Set sample shape
+    SetSample(InputWorkspace=back_input_ws, Geometry=SAMPLE_SHAPE)
+    SetSample(InputWorkspace=front_input_ws, Geometry=SAMPLE_SHAPE)
 
-    reduction_helpers.crop_and_mask_workspace(BACK_WS_TO_FIT, BackwardAnalysisInputs)
-    reduction_helpers.crop_and_mask_workspace(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
-    back_alg = reduction_helpers.init_analysis_algorithm(BACK_WS_TO_FIT, BackwardAnalysisInputs)
-    front_alg = reduction_helpers.init_analysis_algorithm(FRONT_WS_TO_FIT, ForwardAnalysisInputs)
+    reduction_helpers.crop_and_mask_workspace(back_input_ws, BackwardAnalysisInputs)
+    reduction_helpers.crop_and_mask_workspace(front_input_ws, ForwardAnalysisInputs)
+    back_alg = reduction_helpers.init_analysis_algorithm(back_input_ws, BackwardAnalysisInputs)
+    front_alg = reduction_helpers.init_analysis_algorithm(front_input_ws, ForwardAnalysisInputs)
 
     if reduction_helpers.h_ratio_is_zero_when_h_present(BackwardAnalysisInputs, ForwardAnalysisInputs):
-        reduction_helpers.run_estimate_h_ratio(
+        h_ratios_table = reduction_helpers.run_estimate_h_ratio(
             back_alg=back_alg,
             front_alg=front_alg,
             back_masses=BackwardAnalysisInputs.masses,
@@ -236,6 +247,7 @@ def main() -> None:
             rtol=0.01,
             max_iter=3,
         )
+        SaveAscii(InputWorkspace=h_ratios_table, Filename=str(FilesManager.get_experiment_dir() / h_ratios_table.name()))
 
     if (
         BackwardAnalysisInputs.run_this_scattering_type
@@ -250,44 +262,9 @@ def main() -> None:
         front_alg.execute()
 
     general_helpers.make_summarised_log_file()
-
-    save_fitting_input_workspaces()
-
-
-def save_fitting_input_workspaces() -> None:
-    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
-    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
-    for analysis_inputs in (BackwardAnalysisInputs, ForwardAnalysisInputs):
-        if not analysis_inputs.run_this_scattering_type:
-            continue
-
-        iteration = str(analysis_inputs.number_of_iterations_for_corrections)
-        workspace_name = f"{analysis_inputs.name}_{iteration}"
-        ncp_group_name = f"{workspace_name}_ncp_group"
-
-        # Persist pre-computed Y-space fitting inputs so run_fitting can load them directly.
-        if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
-            logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
-            continue
-
-        ws_to_fit = mtd[workspace_name]
-        ws_to_fit_ncps = mtd[ncp_group_name]
-
-        ws_resolution = fitting_helpers.calculate_resolution(
-            min(analysis_inputs.masses),
-            ws_to_fit,
-            analysis_inputs.range_for_rebinning_in_y_space,
-        )
-        ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
-            ws_to_fit,
-            ws_to_fit_ncps,
-            analysis_inputs.subtract_calculated_fse_from_data,
-        )
-
-        SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
-        SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
-        SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
+    reduction_helpers.save_fitting_input_workspaces(BackwardAnalysisInputs)
+    reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
-    main()
+    run_reduction()
