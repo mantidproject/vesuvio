@@ -103,7 +103,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), input_invalid_detectors)
 
-    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_fitting_result_table_column')
     def test_filter_peak_centres_for_invalid_detectors_front(self, mock_read_table_column):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         peak_table = 'input_peak_table'
@@ -112,7 +112,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         out_peak_centres = invalid_detectors.filter_peak_centres_for_invalid_detectors([3, 134], peak_table)
         self.assertEqual(list(np.argwhere(np.isnan(out_peak_centres)).transpose()[0]), [7, 17, 27])
 
-    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_fitting_result_table_column')
     def test_filter_peak_centres_for_invalid_detectors_back(self, mock_read_table_column):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         peak_table = 'input_peak_table'
@@ -121,7 +121,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         out_peak_centres = invalid_detectors.filter_peak_centres_for_invalid_detectors([135, 198], peak_table)
         self.assertEqual(list(np.argwhere(np.isnan(out_peak_centres)).transpose()[0]), [15, 25, 35])
 
-    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_fitting_result_table_column')
     def test_filter_peak_centres_for_invalid_detectors_invalid_range(self, mock_read_table_column):
         invalid_detectors = InvalidDetectors([10, 20, 30, 150, 160, 170])
         peak_table = 'input_peak_table'
@@ -149,7 +149,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), [10, 20, 25, 30, 150, 160, 170, 180, 190])
 
     @patch('mvesuvio.util.calibration_helpers.InvalidDetectors._identify_invalid_spectra')
-    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_fitting_result_table_column')
     def test_add_invalid_detectors_no_preset_identify_called_front(self, mock_read_table_column, mock_identify):
         invalid_detectors = InvalidDetectors([])
         invalid_detectors.add_invalid_detectors([180, 190])
@@ -161,7 +161,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         mock_identify.assert_called_once()
 
     @patch('mvesuvio.util.calibration_helpers.InvalidDetectors._identify_invalid_spectra')
-    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_fitting_result_table_column')
     def test_add_invalid_detectors_no_preset_identify_called_back(self, mock_read_table_column, mock_identify):
         invalid_detectors = InvalidDetectors([])
         invalid_detectors.add_invalid_detectors([31, 32])
@@ -173,7 +173,7 @@ class TestVesuvioCalibrationMisc(unittest.TestCase):
         mock_identify.assert_called_once()
 
     @patch('mvesuvio.util.calibration_helpers.InvalidDetectors._identify_invalid_spectra')
-    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_fitting_result_table_column')
     def test_add_invalid_detectors_preset_identify_not_called(self, mock_read_table_column, mock_identify):
         invalid_detectors = InvalidDetectors([180, 190])
         self.assertEqual(invalid_detectors.get_all_invalid_detectors(), [180, 190])
