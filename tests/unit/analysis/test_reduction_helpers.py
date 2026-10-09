@@ -5,7 +5,7 @@ from unittest.mock import patch, Mock, MagicMock, call
 
 import numpy as np
 
-from mvesuvio.globals import Tags
+from mvesuvio.globals import Tags, Mode
 from mvesuvio.util import reduction_helpers
 
 
@@ -193,7 +193,7 @@ class TestReductionHelpers(unittest.TestCase):
         path.is_file.return_value = True
         props = {
             "Filename": "1234-1235",
-            "Mode": "SingleDifference",
+            "Mode": Mode.SINGLE_DIFFERENCE,
             "InstrumentParFile": "ip_par.txt"
         }
         mock_metadata = Mock()
@@ -205,10 +205,10 @@ class TestReductionHelpers(unittest.TestCase):
         mock_load.return_value = mock_ws
 
         cases = [
-            ("0000", "SingleDifference", "ip_par.txt", False, 'Filename in saved workspace did not match: 1234-1235 and 0000'),
-            ("1234-1235", "DoubleDifference", "ip_par.txt", False, 'Mode in saved workspace did not match: SingleDifference and DoubleDifference'),
-            ("1234-1235", "SingleDifference", "new_par.txt", False, 'IP files in saved workspace did not match: ip_par.txt and new_par.txt'),
-            ("1234-1235", "SingleDifference", "ip_par.txt", True, '\nLocally saved workspace metadata matched with analysis inputs.\n'),
+            ("0000", Mode.SINGLE_DIFFERENCE, "ip_par.txt", False, 'Filename in saved workspace did not match: 1234-1235 and 0000'),
+            ("1234-1235", Mode.DOUBLE_DIFFERENCE, "ip_par.txt", False, 'Mode in saved workspace did not match: SingleDifference and DoubleDifference'),
+            ("1234-1235", Mode.SINGLE_DIFFERENCE, "new_par.txt", False, 'IP files in saved workspace did not match: ip_par.txt and new_par.txt'),
+            ("1234-1235", Mode.SINGLE_DIFFERENCE, "ip_par.txt", True, '\nLocally saved workspace metadata matched with analysis inputs.\n'),
         ]
 
         for runs, mode, ip_file, expected, expected_message in cases:
@@ -227,22 +227,22 @@ class TestReductionHelpers(unittest.TestCase):
     @patch('mvesuvio.util.reduction_helpers.SaveNexus')
     @patch('mvesuvio.util.reduction_helpers.LoadVesuvio')
     def test_save_ws_from_load_vesuvio_backward(self, mock_load_vesuvio, mock_save_nexus):
-        path = Path(f'notthere/raw_{Tags.Backward}.nxs')
-        reduction_helpers.save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
+        path = Path(f'notthere/raw_{Tags.BACKWARD}.nxs')
+        reduction_helpers.save_ws_from_load_vesuvio("1234", Mode.SINGLE_DIFFERENCE, "ipfile.txt", path)
         mock_load_vesuvio.assert_has_calls([
-            call(Filename='1234', SpectrumList='3-134', Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.Backward}.nxs', LoadLogFiles=False)
+            call(Filename='1234', SpectrumList='3-134', Mode=Mode.SINGLE_DIFFERENCE, InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.BACKWARD}.nxs', LoadLogFiles=False)
         ])
-        args, kwargs = mock_save_nexus.call_args
+        _, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
 
 
     @patch('mvesuvio.util.reduction_helpers.SaveNexus')
     @patch('mvesuvio.util.reduction_helpers.LoadVesuvio')
     def test_save_ws_from_load_vesuvio_forward(self, mock_load_vesuvio, mock_save_nexus):
-        path = Path(f'notthere/raw_{Tags.Forward}.nxs')
-        reduction_helpers.save_ws_from_load_vesuvio("1234", "SingleDifference", "ipfile.txt", path)
+        path = Path(f'notthere/raw_{Tags.FORWARD}.nxs')
+        reduction_helpers.save_ws_from_load_vesuvio("1234", Mode.SINGLE_DIFFERENCE, "ipfile.txt", path)
         mock_load_vesuvio.assert_has_calls([
-            call(Filename='1234', SpectrumList="135-198", Mode='SingleDifference', InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.Forward}.nxs', LoadLogFiles=False)
+            call(Filename='1234', SpectrumList="135-198", Mode=Mode.SINGLE_DIFFERENCE, InstrumentParFile='ipfile.txt', OutputWorkspace=f'raw_{Tags.FORWARD}.nxs', LoadLogFiles=False)
         ])
         args, kwargs = mock_save_nexus.call_args
         self.assertEqual(kwargs["Filename"], str(path.absolute()))
@@ -251,7 +251,7 @@ class TestReductionHelpers(unittest.TestCase):
     def test_load_and_save_input_ws_if_not_on_path_backward(self):
         class BackwardInputs:
             name = "backward"
-            mode = "SingleDifference"
+            mode = Mode.SINGLE_DIFFERENCE
             runs = "1234"
             empty_runs = "5678"
             instrument_parameters_file = "ipfile.txt"
@@ -273,18 +273,18 @@ class TestReductionHelpers(unittest.TestCase):
         self.assertEqual(result_raw_path, raw_path)
         self.assertEqual(result_empty_path, empty_path)
         mock_matches.assert_has_calls([
-            call("1234", "SingleDifference", "ipfile.txt", raw_path),
-            call("5678", "SingleDifference", "ipfile.txt", empty_path),
+            call("1234", Mode.SINGLE_DIFFERENCE, "ipfile.txt", raw_path),
+            call("5678", Mode.SINGLE_DIFFERENCE, "ipfile.txt", empty_path),
         ])
         mock_save_ws.assert_has_calls([
-            call("1234", "SingleDifference", "/tmp/ip/ipfile.txt", raw_path),
+            call("1234", Mode.SINGLE_DIFFERENCE, "/tmp/ip/ipfile.txt", raw_path),
         ])
 
 
     def test_load_and_save_input_ws_if_not_on_path_forward_uses_cached_files(self):
         class ForwardInputs:
             name = "forward"
-            mode = "SingleDifference"
+            mode = Mode.SINGLE_DIFFERENCE
             runs = "2345"
             empty_runs = "6789"
             instrument_parameters_file = "ipfile.txt"
@@ -306,8 +306,8 @@ class TestReductionHelpers(unittest.TestCase):
         self.assertEqual(result_raw_path, raw_path)
         self.assertEqual(result_empty_path, empty_path)
         mock_matches.assert_has_calls([
-            call("2345", "SingleDifference", "ipfile.txt", raw_path),
-            call("6789", "SingleDifference", "ipfile.txt", empty_path),
+            call("2345", Mode.SINGLE_DIFFERENCE, "ipfile.txt", raw_path),
+            call("6789", Mode.SINGLE_DIFFERENCE, "ipfile.txt", empty_path),
         ])
         mock_save_ws.assert_not_called()
 
