@@ -54,8 +54,6 @@ import os
 import sys
 import scipy.constants
 import numpy as np
-from pathlib import Path
-from mvesuvio.util.files_manager import FilesManager
 
 
 class EVSCalibrationFit(PythonAlgorithm):
@@ -1044,11 +1042,8 @@ class EVSCalibrationFit(PythonAlgorithm):
                 EnableLogging=False,
             )
         except RuntimeError:
-            FILE = Path("EVS" + ws_name + ".raw")
-            FOLDER_PATH = FilesManager.get_experiment_dir() / "calibration_inputs"
-            FILE_PATH = FOLDER_PATH / FILE
             LoadRaw(
-                str(FILE_PATH),
+                "EVS" + ws_name + ".raw",
                 OutputWorkspace=output_name,
                 SpectrumMin=self._spec_list[0],
                 SpectrumMax=self._spec_list[-1],
