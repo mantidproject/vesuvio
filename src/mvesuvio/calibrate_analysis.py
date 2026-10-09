@@ -23,7 +23,7 @@ from mantid.simpleapi import (
     RenameWorkspace,
 )
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-from mvesuvio.globals import PeakType, Mode, SharedParameterFitType
+from mvesuvio.globals import PeakType, Mode, SharedParameterFitType, FitFunction
 
 import os
 import sys
@@ -103,7 +103,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._create_calib_parameter_table(self._current_workspace)
 
         # PEAK FUNCTIONS
-        self._theta_peak_function = "Gaussian"
+        self._theta_peak_function = FitFunction.GAUSSIAN.value
         self._theta_func_param_names = EVSMiscFunctions.generate_fit_function_header(self._theta_peak_function)
         self._theta_func_param_names_error = EVSMiscFunctions.generate_fit_function_header(self._theta_peak_function, error=True)
 
@@ -119,7 +119,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 Energy=EVSGlobals.U_PEAK_ENERGIES,
                 OutputWorkspace=L0_fit,
                 CreateOutput=self._create_output,
-                PeakType=PeakType.RESONANCE,
+                PeakType=PeakType.RESONANCE.value,
             )
             self._L0_peak_fits = L0_fit + "_Peak_Parameters"
             self._calculate_incident_flight_path(self._L0_peak_fits, EVSGlobals.FRONTSCATTERING_RANGE)
@@ -135,7 +135,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 Energy=EVSGlobals.U_PEAK_ENERGIES,
                 OutputWorkspace=t0_fit_front,
                 CreateOutput=self._create_output,
-                PeakType=PeakType.RESONANCE,
+                PeakType=PeakType.RESONANCE.value,
             )
             t0_peak_fits_front = t0_fit_front + "_Peak_Parameters"
             self._calculate_time_delay(t0_peak_fits_front, EVSGlobals.FRONTSCATTERING_RANGE)
@@ -151,7 +151,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 Energy=EVSGlobals.U_PEAK_ENERGIES,
                 OutputWorkspace=t0_fit_back,
                 CreateOutput=self._create_output,
-                PeakType=PeakType.RESONANCE,
+                PeakType=PeakType.RESONANCE.value,
             )
             t0_peak_fits_back = t0_fit_back + "_Peak_Parameters"
             self._calculate_time_delay(t0_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE)
@@ -171,13 +171,13 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 Samples=self._samples,
                 Background=self._background,
                 Function=self._theta_peak_function,
-                Mode=Mode.FOIL_OUT,
+                Mode=Mode.FOIL_OUT.value,
                 SpectrumRange=EVSGlobals.DETECTOR_RANGE,
                 InstrumentParameterWorkspace=self._param_table,
                 DSpacings=self._d_spacings,
                 OutputWorkspace=theta_fit,
                 CreateOutput=self._create_output,
-                PeakType=PeakType.BRAGG,
+                PeakType=PeakType.BRAGG.value,
             )
             self._theta_peak_fits = theta_fit + "_Peak_Parameters"
             self._calculate_scattering_angle(self._theta_peak_fits, EVSGlobals.DETECTOR_RANGE)
@@ -186,14 +186,14 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             E1_fit_back = self._current_workspace + "_E1_back"
             invalid_detectors = self._run_calibration_fit(
                 Samples=self._samples,
-                Function="Voigt",
-                Mode=Mode.SINGLE_DIFFERENCE,
+                Function=FitFunction.VOIGT.value,
+                Mode=Mode.SINGLE_DIFFERENCE.value,
                 SpectrumRange=EVSGlobals.BACKSCATTERING_RANGE,
                 InstrumentParameterWorkspace=self._param_table,
                 Mass=self._sample_mass,
                 OutputWorkspace=E1_fit_back,
                 CreateOutput=self._create_output,
-                PeakType=PeakType.RECOIL,
+                PeakType=PeakType.RECOIL.value,
                 SharedParameterFitType=self._shared_parameter_fit_type,
                 InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors(),
             )
@@ -201,7 +201,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
             E1_peak_fits_back = mtd[self._current_workspace + "_E1_back_Peak_Parameters"].getNames()
             self._calculate_final_energy(
-                E1_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE, self._shared_parameter_fit_type != "Individual"
+                E1_peak_fits_back,
+                EVSGlobals.BACKSCATTERING_RANGE,
+                self._shared_parameter_fit_type != SharedParameterFitType.INDIVIDUAL.value,
             )
 
             # calibrate L1 for backscattering detectors based on the averaged E1 value  and calibrated theta values
@@ -211,14 +213,14 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             E1_fit_front = self._current_workspace + "_E1_front"
             invalid_detectors += self._run_calibration_fit(
                 Samples=self._samples,
-                Function="Voigt",
-                Mode=Mode.SINGLE_DIFFERENCE,
+                Function=FitFunction.VOIGT.value,
+                Mode=Mode.SINGLE_DIFFERENCE.value,
                 SpectrumRange=EVSGlobals.FRONTSCATTERING_RANGE,
                 InstrumentParameterWorkspace=self._param_table,
                 Mass=self._sample_mass,
                 OutputWorkspace=E1_fit_front,
                 CreateOutput=self._create_output,
-                PeakType=PeakType.RECOIL,
+                PeakType=PeakType.RECOIL.value,
                 SharedParameterFitType=self._shared_parameter_fit_type,
                 InvalidDetectors=self._invalid_detectors.get_all_invalid_detectors(),
             )
@@ -236,10 +238,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 self._create_calib_parameter_table(self._current_workspace)
 
                 # copy over L0 and t0 parameters to new table
-                t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0")
-                t0_error = EVSMiscFunctions.read_table_column(self._param_table, "t0_Err")
-                L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0")
-                L0_error = EVSMiscFunctions.read_table_column(self._param_table, "L0_Err")
+                t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0", EVSGlobals.DETECTOR_RANGE)
+                t0_error = EVSMiscFunctions.read_table_column(self._param_table, "t0_Err", EVSGlobals.DETECTOR_RANGE)
+                L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0", EVSGlobals.DETECTOR_RANGE)
+                L0_error = EVSMiscFunctions.read_table_column(self._param_table, "L0_Err", EVSGlobals.DETECTOR_RANGE)
 
                 self._set_table_column(self._current_workspace, "t0", t0)
                 self._set_table_column(self._current_workspace, "L0", L0)
@@ -431,7 +433,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._set_table_column(self._current_workspace, "E1_Err", E1_error)
 
         if calculate_global:  # This fn will need updating for the only global option
-            peak_centre = EVSMiscFunctions.read_table_column(peak_table[1], "f1.LorentzPos", [0])
+            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(peak_table[1], "f1.LorentzPos", [0])
             peak_centre = [peak_centre] * len(peak_centres)
 
             delta_t = (peak_centre - t0) / 1e6
