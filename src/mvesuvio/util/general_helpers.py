@@ -1,7 +1,9 @@
 import re
+from pathlib import Path
 from typing import Any
 
 from mantid.kernel import logger
+from mantid.simpleapi import AnalysisDataService, Load, SumSpectra
 
 from mvesuvio.util.files_manager import FilesManager
 
@@ -74,17 +76,29 @@ def make_summarised_log_file() -> None:
     return
 
 
-def inject_bootstrap_workspace(analysis_inputs: Any, injected_globals: dict | None = None) -> None:
-    """Inject bootstrap workspace override values into analysis input classes."""
+def load_overwritten_workspace_if_specified(analysis_inputs: Any) -> str:
+    """Load a workspace override from ADS or disk when an analysis input class specifies one."""
 
-    if injected_globals is None:
-        injected_globals = {}
+    override = str(getattr(analysis_inputs, "overwrite_analysis_input_workspace", "") or "")
 
-    scattering_type = _infer_scattering_type(analysis_inputs)
-    if scattering_type == "backward":
-        override = injected_globals.get("BACK_OVERWRITE_ANALYSIS_INPUT_WORKSPACE", "")
-    else:
-        override = injected_globals.get("FRONT_OVERWRITE_ANALYSIS_INPUT_WORKSPACE", "")
+    if not override:
+        return ""
 
-    if override:
-        analysis_inputs.overwrite_analysis_input_workspace = str(override)
+    if AnalysisDataService.doesExist(override):
+        SumSpectra(InputWorkspace=override, OutputWorkspace=override + "_sum")
+        return override
+
+    if Path(override).exists():
+        override_name = Path(override).stem
+        Load(Filename=override, OutputWorkspace=override_name)
+        SumSpectra(InputWorkspace=override_name, OutputWorkspace=override_name + "_sum")
+        return override_name
+    raise ValueError(f"Override workspace not in ADS and not a path: {override}")
+
+
+def get_workspace_name_if_path(path_or_name: str) -> str:
+    """Return the workspace name if the input is a path, otherwise return the input as is."""
+    path_obj = Path(path_or_name)
+    if path_obj.exists():
+        return path_obj.stem
+    return path_or_name

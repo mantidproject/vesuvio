@@ -3,7 +3,6 @@ import runpy
 
 import matplotlib.pyplot as plt
 from mantid.api import AnalysisDataService
-from mantid.simpleapi import Load
 from mantid.kernel import logger
 
 from mvesuvio.util import bootstrap_helpers
@@ -11,28 +10,33 @@ from mvesuvio.util.files_manager import FilesManager
 
 # WARNING: Not ready to be used yet, contains basic functionality but lots of details still left to be sorted out.
 # How to use this script:
-# 1. Create a folder named "boot_inputs" next to this file, or change BOOTSTRAP_INPUTS_DIRECTORY to a different directory.
+# 1. Place your bootstrap workspaces under FilesManager.get_bootstrap_inputs_dir().
 # 2. Inside that directory, provide a parent folder containing two subdirectories: one for backward files called "backward" and one for forward files called "forward".
 # 3. Fill the "backward" and "forward" subdirectories with bootstrap workspaces, each workspace needs to end with a sample index!
 # 3. Run this script from inside Manitd editor; it will load the matching workspaces for sample 1, 2, 3, ... by looking for filenames that end with the sample index.
 # 4. The reduction step is then run once per sample using those loaded workspaces and writing results under a sibling "*_outputs" folder.
 # This is intended as a bootstrap workflow for sample-by-sample reduction, not a fully polished user-facing CLI.
 
-# Set this path before running this script.
-BOOTSTRAP_INPUTS_DIRECTORY = Path(__file__).with_name("boot_inputs")
-BOOTSTRAP_OUTPUTS_DIRECTORY = Path(__file__).with_name("boot_outputs")
 RUN_REDUCTION_PATH = Path(__file__).with_name("run_reduction.py")
+RUN_FITTING_PATH = Path(__file__).with_name("run_fitting.py")
 
 
-def _run_reduction_with_injected_workspaces(back_ws_to_fit: str = "", front_ws_to_fit: str = ""):
-    runpy.run_path(
-        str(RUN_REDUCTION_PATH),
-        run_name="__main__",
-        init_globals={
-            "BACK_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": back_ws_to_fit,
-            "FRONT_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": front_ws_to_fit,
-        },
-    )
+def _run_reduction_with_injected_workspaces(back_ws_path: str = "", front_ws_path: str = ""):
+    reduction_namespace = runpy.run_path(str(RUN_REDUCTION_PATH), run_name="run_bootstrap_reduction")
+    reduction_namespace["BackwardAnalysisInputs"].overwrite_analysis_input_workspace = back_ws_path
+    reduction_namespace["BackwardAnalysisInputs"].minimal_output = True
+    reduction_namespace["ForwardAnalysisInputs"].overwrite_analysis_input_workspace = front_ws_path
+    reduction_namespace["ForwardAnalysisInputs"].minimal_output = True
+    reduction_namespace["run_reduction"]()
+
+
+def _run_fitting_with_injected_workspaces(back_ws_path: str = "", front_ws_path: str = ""):
+    fitting_namespace = runpy.run_path(str(RUN_FITTING_PATH), run_name="run_bootstrap_fitting")
+    fitting_namespace["BackwardFittingInputs"].overwrite_analysis_input_workspace = back_ws_path
+    fitting_namespace["BackwardFittingInputs"].minimal_output = True
+    fitting_namespace["ForwardFittingInputs"].overwrite_analysis_input_workspace = front_ws_path
+    fitting_namespace["ForwardFittingInputs"].minimal_output = True
+    fitting_namespace["run_fitting"]()
 
 
 def _find_workspace_path_for_sample_index(directory: Path, sample_index: int) -> Path | None:
@@ -47,13 +51,14 @@ def _find_workspace_path_for_sample_index(directory: Path, sample_index: int) ->
     )
 
 
-def run_bootstrap(bootstrap_inputs_directory: Path):
+def run_bootstrap():
+    bootstrap_inputs_directory = FilesManager.get_bootstrap_inputs_dir()
     input_dirs = bootstrap_helpers.get_bootstrap_input_directories(bootstrap_inputs_directory)
     if not input_dirs:
         return
     inputs_parent_path, inputs_backward_path, inputs_forward_path = input_dirs
 
-    BOOTSTRAP_OUTPUTS_DIRECTORY.mkdir(exist_ok=True)
+    bootstrap_outputs_directory = FilesManager.get_bootstrap_outputs_dir()
 
     sample_index = 1
     while True:
@@ -65,15 +70,14 @@ def run_bootstrap(bootstrap_inputs_directory: Path):
             break
 
         # TODO: Replace "boot_" with sample name
-        FilesManager.set_experiment_dir(Path(BOOTSTRAP_OUTPUTS_DIRECTORY, "boot_" + str(sample_index)))
+        FilesManager.set_experiment_dir(bootstrap_outputs_directory / ("boot_" + str(sample_index)))
         AnalysisDataService.clear()
-        Load(Filename=str(back_ws_path), OutputWorkspace=back_ws_path.stem)
-        Load(Filename=str(front_ws_path), OutputWorkspace=front_ws_path.stem)
-        _run_reduction_with_injected_workspaces(back_ws_to_fit=back_ws_path.stem, front_ws_to_fit=front_ws_path.stem)
+        _run_reduction_with_injected_workspaces(str(back_ws_path), str(front_ws_path))
+        _run_fitting_with_injected_workspaces(str(back_ws_path), str(front_ws_path))
         plt.close("all")
         sample_index += 1
     return
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
-    run_bootstrap(BOOTSTRAP_INPUTS_DIRECTORY)
+    run_bootstrap()

@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING
 
 from mantid import AnalysisDataService
 from mantid.simpleapi import (
+    mtd,
     Load,
+    RenameWorkspace,
     SumSpectra,
     CropWorkspace,
     MaskDetectors,
@@ -20,12 +22,12 @@ from pathlib import Path
 
 from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util import general_helpers
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
 from mvesuvio.util.constraints_transport import serialize_constraints
 from mvesuvio.util import fitting_helpers
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
 from mantid.api import AlgorithmFactory, AlgorithmManager
-from mantid.simpleapi import mtd, RenameWorkspace
 
 if TYPE_CHECKING:
     from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
@@ -294,24 +296,6 @@ def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] 
     return ws_cropped
 
 
-def load_overwritten_workspace_if_specified(analysis_inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]) -> str:
-    """Load workspace override from file path when ``overwrite_analysis_input_workspace`` points to a file."""
-
-    override = str(getattr(analysis_inputs, "overwrite_analysis_input_workspace", "") or "")
-
-    if not override:
-        return ""
-
-    if AnalysisDataService.doesExist(override):
-        SumSpectra(InputWorkspace=override, OutputWorkspace=override + "_sum")
-        return override
-
-    override_name = Path(override).stem
-    Load(Filename=override, OutputWorkspace=override_name)
-    SumSpectra(InputWorkspace=override, OutputWorkspace=override + "_sum")
-    return override_name
-
-
 def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
     raw_path, empty_path = store_input_ws_if_not_on_path(input_class)
 
@@ -435,7 +419,7 @@ def save_fitting_input_workspaces(
         return
 
     iteration = str(analysis_inputs.number_of_iterations_for_corrections)
-    overwrite_workspace = str(getattr(analysis_inputs, "overwrite_analysis_input_workspace", "") or "").strip()
+    overwrite_workspace = general_helpers.get_workspace_name_if_path(analysis_inputs.overwrite_analysis_input_workspace)
     if overwrite_workspace and AnalysisDataService.doesExist(overwrite_workspace):
         base_workspace_name = overwrite_workspace
     else:

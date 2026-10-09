@@ -182,16 +182,12 @@ class ForwardAnalysisInputs:
 def run_reduction():
     mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
 
-    general_helpers.inject_bootstrap_workspace(BackwardAnalysisInputs, globals())
-    general_helpers.inject_bootstrap_workspace(ForwardAnalysisInputs, globals())
-
     back_input_ws = ""
     front_input_ws = ""
 
     if BackwardAnalysisInputs.run_this_scattering_type:
         if BackwardAnalysisInputs.overwrite_analysis_input_workspace:
-            reduction_helpers.load_overwritten_workspace_if_specified(BackwardAnalysisInputs)
-            back_input_ws = BackwardAnalysisInputs.overwrite_analysis_input_workspace
+            back_input_ws = general_helpers.load_overwritten_workspace_if_specified(BackwardAnalysisInputs)
         else:
             raw_name, empty_name = reduction_helpers.load_input_ws(BackwardAnalysisInputs)
 
@@ -213,8 +209,7 @@ def run_reduction():
 
     if ForwardAnalysisInputs.run_this_scattering_type:
         if ForwardAnalysisInputs.overwrite_analysis_input_workspace:
-            reduction_helpers.load_overwritten_workspace_if_specified(ForwardAnalysisInputs)
-            front_input_ws = ForwardAnalysisInputs.overwrite_analysis_input_workspace
+            front_input_ws = general_helpers.load_overwritten_workspace_if_specified(ForwardAnalysisInputs)
         else:
             raw_name, empty_name = reduction_helpers.load_input_ws(ForwardAnalysisInputs)
 

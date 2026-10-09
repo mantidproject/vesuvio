@@ -5,35 +5,55 @@ from textwrap import dedent
 from unittest.mock import patch
 
 import numpy as np
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, DeleteWorkspace, RenameWorkspace, SaveNexus
 
 from mvesuvio.util import general_helpers
 
 
 class TestGeneralHelpers(unittest.TestCase):
 
-    def test_inject_bootstrap_workspace_sets_expected_override(self):
-        class BackwardInputs:
-            name = "backward"
-            mode = "DoubleDifference"
+    def test_load_overwritten_workspace_if_specified(self):
+        class Inputs:
+            overwrite_analysis_input_workspace = "override_front"
+
+        ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+        RenameWorkspace(ws, "override_front")
+
+        result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
+
+        self.assertEqual(result, "override_front")
+        self.assertTrue(AnalysisDataService.doesExist("override_front_sum"))
+
+        DeleteWorkspace("override_front")
+        DeleteWorkspace("override_front_sum")
+
+    def test_load_overwritten_workspace_if_specified_for_path_override(self):
+        class Inputs:
             overwrite_analysis_input_workspace = ""
 
-        class ForwardInputs:
-            name = "forward"
-            mode = "SingleDifference"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            path = os.path.join(temp_dir, "override_front_from_path.nxs")
+            SaveNexus(ws, path)
+            DeleteWorkspace(ws)
+
+            Inputs.overwrite_analysis_input_workspace = path
+
+            result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
+
+            self.assertEqual(result, "override_front_from_path")
+            self.assertTrue(AnalysisDataService.doesExist("override_front_from_path_sum"))
+
+            DeleteWorkspace("override_front_from_path")
+            DeleteWorkspace("override_front_from_path_sum")
+
+    def test_load_overwritten_workspace_if_specified_for_empty_string(self):
+        class Inputs:
             overwrite_analysis_input_workspace = ""
 
-        general_helpers.inject_bootstrap_workspace(
-            BackwardInputs,
-            {"BACK_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": "back_ws"},
-        )
-        general_helpers.inject_bootstrap_workspace(
-            ForwardInputs,
-            {"FRONT_OVERWRITE_ANALYSIS_INPUT_WORKSPACE": "front_ws"},
-        )
+        result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
 
-        self.assertEqual(BackwardInputs.overwrite_analysis_input_workspace, "back_ws")
-        self.assertEqual(ForwardInputs.overwrite_analysis_input_workspace, "front_ws")
+        self.assertEqual(result, "")
 
     def test_extract_ws(self):
         data = [1, 2, 3]

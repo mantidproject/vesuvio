@@ -113,10 +113,10 @@ def load_saved_fitting_input_workspaces() -> None:
 def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | type[ForwardFittingInputs]) -> bool:
     iteration = str(fitting_inputs.number_of_iterations_for_corrections)
 
-    overwrite_workspace = str(getattr(fitting_inputs, "overwrite_analysis_input_workspace", "") or "").strip()
+    overwrite_workspace = general_helpers.get_workspace_name_if_path(fitting_inputs.overwrite_analysis_input_workspace)
     base_workspace_names: list[str] = [
         overwrite_workspace,
-        str(getattr(fitting_inputs, "name_of_subtracted_workspace", "") or "").strip(),
+        str(fitting_inputs.name_of_subtracted_workspace or "").strip(),
     ]
     base_workspace_names = [name for name in base_workspace_names if name]
 
@@ -158,8 +158,6 @@ def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | 
 
 def run_fitting() -> None:
     load_saved_fitting_input_workspaces()
-    general_helpers.inject_bootstrap_workspace(BackwardFittingInputs, globals())
-    general_helpers.inject_bootstrap_workspace(ForwardFittingInputs, globals())
     if BackwardFittingInputs.run_this_fitting_type:
         run_y_space_reduction_and_fit(BackwardFittingInputs)
     if ForwardFittingInputs.run_this_fitting_type:
