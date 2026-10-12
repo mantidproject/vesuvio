@@ -2,6 +2,7 @@ import runpy
 import unittest
 from pathlib import Path
 from mvesuvio.util import handle_config
+from mvesuvio.util.files_manager import FilesManager
 from shutil import copytree, rmtree
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
@@ -9,6 +10,7 @@ from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspa
 class TestReduction(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        FilesManager._experiment_dir = None
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"

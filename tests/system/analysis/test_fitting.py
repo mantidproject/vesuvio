@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from mvesuvio.util.files_manager import FilesManager
+
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 import matplotlib
@@ -21,6 +23,7 @@ FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
 class TestFitting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        FilesManager._experiment_dir = None
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
