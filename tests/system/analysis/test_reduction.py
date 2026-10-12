@@ -9,8 +9,8 @@ from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspa
 class TestReduction(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        handle_config.set_default_config_vars()
         handle_config.refresh_config_dir_and_contents()
+        handle_config.set_default_config_vars()
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "reduction"
         cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "reduction_outputs"
         reduction_inputs = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "inputs" / "reduction"

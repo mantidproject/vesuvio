@@ -16,8 +16,8 @@ BOOTSTRAP_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "bootstrap
 class TestBootstrap(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        handle_config.set_default_config_vars()
         handle_config.refresh_config_dir_and_contents()
+        handle_config.set_default_config_vars()
         FilesManager._experiment_dir = None
         cls.bootstrap_inputs_path = FilesManager.get_bootstrap_inputs_dir()
         cls.bootstrap_output_path = FilesManager.get_bootstrap_outputs_dir()

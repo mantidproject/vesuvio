@@ -21,8 +21,8 @@ FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
 class TestFitting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        handle_config.set_default_config_vars()
         handle_config.refresh_config_dir_and_contents()
+        handle_config.set_default_config_vars()
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
         cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "gauss_fit"
         rmtree(cls.results_path, ignore_errors=True)
