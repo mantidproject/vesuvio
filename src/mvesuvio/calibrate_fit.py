@@ -53,6 +53,7 @@ import os
 import sys
 import scipy.constants
 import numpy as np
+from mvesuvio.util.files_manager import FilesManager
 
 
 class EVSCalibrationFit(PythonAlgorithm):
@@ -1027,8 +1028,11 @@ class EVSCalibrationFit(PythonAlgorithm):
         """
 
         try:
+            file = "EVS" + ws_name + ".raw"
+            file_path = FilesManager.get_calibration_inputs_dir()
+            full_file_path = file_path / file
             LoadVesuvio(
-                Filename=ws_name,
+                Filename=str(full_file_path),
                 Mode=self._mode,
                 OutputWorkspace=output_name,
                 SpectrumList="%d-%d" % (self._spec_list[0], self._spec_list[-1]),

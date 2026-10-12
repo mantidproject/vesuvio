@@ -37,7 +37,6 @@ class EVSCalibrationTest(unittest.TestCase):
         self._mass = TestConstants.MASS_COPPER
         #  d-spacings of a copper sample
         self._d_spacings = np.array(TestConstants.D_SPACINGS_COPPER)
-        self._d_spacings.sort()
         self._energy_estimates = np.array(EVSGlobals.ENERGY_ESTIMATE)
 
     def _setup_lead_test(self):
@@ -47,7 +46,6 @@ class EVSCalibrationTest(unittest.TestCase):
         self._mass = TestConstants.MASS_LEAD
         #  d-spacings of a lead sample
         self._d_spacings = np.array(TestConstants.D_SPACINGS_LEAD)
-        self._d_spacings.sort()
         self._energy_estimates = np.array(EVSGlobals.ENERGY_ESTIMATE)
 
     def _setup_niobium_test(self):
@@ -57,7 +55,6 @@ class EVSCalibrationTest(unittest.TestCase):
         self._mass = TestConstants.MASS_NIOBIUM
         #  d-spacings of a lead sample
         self._d_spacings = np.array(TestConstants.D_SPACINGS_NIOBIUM)
-        self._d_spacings.sort()
         self._energy_estimates = np.array(EVSGlobals.ENERGY_ESTIMATE)
 
     def _setup_uranium_test(self):

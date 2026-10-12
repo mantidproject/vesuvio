@@ -2,7 +2,9 @@ from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
 from mantid.api import AlgorithmManager, AlgorithmFactory
-from mvesuvio.globals import SharedParameterFitType
+from mantid.simpleapi import LoadVesuvio, LoadRaw, ConvertToDistribution
+from mvesuvio.util.calibration_helpers import EVSGlobals
+from mvesuvio.globals import SharedParameterFitType, Mode
 import numpy as np
 from numpy.typing import NDArray
 from typing import Literal
@@ -10,10 +12,10 @@ from typing import Literal
 
 class EVSCalibrationAnalysisInputs:
     # Sample run numbers to fit peaks to (cannot be an empty str)
-    Samples: str = "17087-17088"
+    Samples: str = [17087, 17088]
 
     # Run numbers to use as a background (can be empty)
-    Background: str = "17086"
+    Background: str = [17086]
 
     # Filename of the instrument parameter file.
     InstrumentParameterFile: str = str(FilesManager.get_instrument_parameters_dir() / "IP0005.par")
@@ -37,11 +39,11 @@ class EVSCalibrationAnalysisInputs:
 
     # Number of iterations to perform.
     # Default is 2
-    Iterations: int = 2
+    Iterations: int = 1
 
     # Calculate shared parameters using an individual and/or global fit
     # Default is SharedParameterFitType.INDIVIDUAL
-    SharedParameterFitType: Literal["Individual", "Shared", "Both"] = SharedParameterFitType.INDIVIDUAL
+    SharedParameterFitType: Literal["Individual", "Shared", "Both"] = SharedParameterFitType.INDIVIDUAL.value
 
     # Whether to create output from fitting.
     # Default is False
@@ -59,7 +61,15 @@ class EVSCalibrationAnalysisInputs:
 
     # Name to call the output workspace
     # Default is ""
-    OutputWorkspace: str = "EVSCalibrationAnalysis_Output"
+    OutputWorkspace: str = "copper_analysis_test"
+
+    # Mode to load files with. This is passed to the LoadVesuvio algorithm.
+    # Default is FoilOut
+    Mode: Literal["SingleDifference", "DoubleDifference", "ThickDifference", "FoilOut", "FoilIn", "FoilInOut"] = Mode.FOIL_OUT.value
+
+    # Spectrum range to use.
+    # EVSGlobals.DETECTOR_RANGE [3, 198]
+    SpectrumRange: list[int] = EVSGlobals.DETECTOR_RANGE
 
 
 ########################
@@ -68,6 +78,11 @@ class EVSCalibrationAnalysisInputs:
 
 
 def main() -> None:
+    # Set the
+    calibration_inputs_dir = FilesManager.get_calibration_inputs_dir()
+    for sample in EVSCalibrationAnalysisInputs.Samples:
+        _load_files(calibration_inputs_dir, sample, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode)
+
     AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
     AlgorithmFactory.subscribe(EVSCalibrationFit)
 
@@ -82,13 +97,45 @@ def main() -> None:
     alg.setProperty("E1FixedValueAndError", EVSCalibrationAnalysisInputs.E1FixedValueAndError)
     alg.setProperty("InvalidDetectors", EVSCalibrationAnalysisInputs.InvalidDetectors)
     alg.setProperty("Iterations", EVSCalibrationAnalysisInputs.Iterations)
-    alg.setProperty("SharedParameterFitType", EVSCalibrationAnalysisInputs.SharedParameterFitType.value)
+    alg.setProperty("SharedParameterFitType", EVSCalibrationAnalysisInputs.SharedParameterFitType)
     alg.setProperty("CreateOutput", EVSCalibrationAnalysisInputs.CreateOutput)
     alg.setProperty("CalculateL0", EVSCalibrationAnalysisInputs.CalculateL0)
     alg.setProperty("CreateIPFile", EVSCalibrationAnalysisInputs.CreateIPFile)
     alg.setProperty("OutputWorkspace", EVSCalibrationAnalysisInputs.OutputWorkspace)
 
     alg.execute()
+
+
+def _load_files(path, run_number, spec_list, mode):
+    """
+    Loads the run number into a workspace.
+
+    This will attempt to use LoadVesuvio, but will fall back on LoadRaw if LoadVesuvio fails.
+    @param path - the path to the files.
+    @param run_number - the run to load.
+    @param spec_list - the spect list to load.
+    @param mode - the mode to use when loading files.
+    """
+    output = "EVS" + str(run_number)
+    file = output + ".raw"
+    file_path = str(path / file)
+    try:
+        LoadVesuvio(
+            Filename=file_path,
+            Mode=mode,
+            OutputWorkspace=output,
+            SpectrumList="%d-%d" % (spec_list[0], spec_list[-1]),
+            EnableLogging=False,
+        )
+    except RuntimeError:
+        LoadRaw(
+            file_path,
+            OutputWorkspace=output,
+            SpectrumMin=spec_list[0],
+            SpectrumMax=spec_list[-1],
+            EnableLogging=False,
+        )
+        ConvertToDistribution(output, EnableLogging=False)
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
