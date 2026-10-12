@@ -106,28 +106,29 @@ Which will install version *1.0* of the package.
 
 ### Quickstart (Running your first analysis)
 
-To run your very first analysis (and check that everything is working), go to your home folder and find the folder `.mvesuvio`.
-The `.` in front of the directory name means this folder might be hidden by your OS, so you might have to turn on the option in your file browser of showing hidden folders.
+To run your very first analysis (and check that everything is working), go to your home folder and find the folder `mvesuvio`.
 
 If the folder does not exist, go the the `IPython` tab in Mantid and type:
 
 `!mvesuvio config`
 
-You should see some output of default inputs, which will lead you to the `.mvesuvio` folder.
+You should see some output of default inputs, which will lead you to the `mvesuvio` folder.
 
-Once you have located the `.mvesuvio` folder, open Mantid workbench and inside it open the script `analysis_inputs.py` located inside `.mvesuvio`.
+Once you have located the `mvesuvio` folder, open Mantid workbench and inside it open the script `mvesuvio/emperiment_template/run_reduction.py`.
 
-This script represents the basics for passing in the inputs of the analysis routine.
+This script represents the basics for passing in the inputs of the reduction routine.
 Click the run button on the workbench to start the execution of the script.
 (Check that you have the archive search enabled, the facility is set to ISIS and the instrument set to VESUVIO, otherwise the Vesuvio runs might not be found).
 This script is an example of a well-behaved sample and it should run without issues.
 
-If the run was successful, you will notice that a new folder was created inside `.mvesuvio` containing all sorts of outputs for this script.
+If the run was successful, you will notice that a new folder was created inside `mvesuvio/experiment_template` containing all sorts of outputs for this script.
 
-**IMPORTANT: To run a new sample with different inputs, you should *copy* the example script `analysis_inputs.py` and place it in *any* folder of your choice outside `.mvesuvio`. For providing the instrument parameters files, place them inside `.mvesuvio/ip_files/`.**
+You can also see that the folder `mvesuvio/experiment_template` also contains another script `run_fitting.py` to run the fitting routine after the reduction. When you run `run_reduction.py`, some of the outptus will be placed inside a folder `fitting_inputs` to be used by `run_fitting.py`.
+
+**IMPORTANT: To run a new sample with different inputs, you should *copy* the example folder `experiment_template` and place it in *any* folder of your choice outside `mvesuvio`. For providing the instrument parameters files, place them inside `mvesuvio/ip_files/`.**
 (You can change the directory of the instrument files too, consult next section).
 
-For a more detailed explanation on what the inputs in the `analysis_inputs.py` mean, read [USERGUIDE.md](./USERGUIDE.md)
+For a more detailed explanation on what the inputs in the `run_reduction.py` mean, read [USERGUIDE.md](./USERGUIDE.md)
 
 ## Tips and useful commands
 
@@ -164,8 +165,8 @@ Currently, the commands that are stable are `config`, `run` and `version`. All o
 
 The `config` command is used to display or set the experiment directory and the folder used to look for the instrument parameters.
 You can do so by providing two optional arguments:
-- `--experiment-dir` - Set the location of the experiment directory (default is the `experiment_template` directory inside `.mvesuvio`).
-- `--ip-dir` - Set the directory for the instrument parameter files (default is `ip_files` in `.mvesuvio` folder).
+- `--experiment-dir` - Set the location of the experiment directory (default is the `experiment_template` directory inside `mvesuvio`).
+- `--ip-dir` - Set the directory for the instrument parameter files (default is `ip_files` in `mvesuvio` folder).
 
 If you run `mvesuvio config` with no arguments then the output will tell you the current experiment directory and instrument parameters directory.
 
