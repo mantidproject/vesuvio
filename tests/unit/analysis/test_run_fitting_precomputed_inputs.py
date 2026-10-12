@@ -20,7 +20,7 @@ class TestRunFittingPrecomputedInputs(unittest.TestCase):
             FilesManager.set_experiment_dir(output_dir)
             AnalysisDataService.clear()
 
-            ws_prefix = "front_0"
+            ws_prefix = f"{ForwardFittingInputs.name_of_subtracted_workspace}_0"
             CreateWorkspace(
                 DataX=[0, 1, 2],
                 DataY=[1, 2, 3],
@@ -46,7 +46,6 @@ class TestRunFittingPrecomputedInputs(unittest.TestCase):
                 OutputWorkspace=f"{ws_prefix}_ws_lighest_ncp",
             )
 
-            ForwardFittingInputs.name = "front"
             ForwardFittingInputs.number_of_iterations_for_corrections = 0
 
             result = run_y_space_reduction_and_fit(ForwardFittingInputs)

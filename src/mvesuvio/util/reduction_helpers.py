@@ -4,13 +4,15 @@ from typing import TYPE_CHECKING
 
 from mantid import AnalysisDataService
 from mantid.simpleapi import (
+    mtd,
     Load,
+    RenameWorkspace,
+    SumSpectra,
     CropWorkspace,
     MaskDetectors,
     CreateEmptyTableWorkspace,
     DeleteWorkspace,
     SaveNexus,
-    SaveAscii,
     LoadVesuvio,
 )
 from mantid.kernel import logger
@@ -20,11 +22,12 @@ from pathlib import Path
 
 from mvesuvio.globals import Tags
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util import general_helpers
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
+from mvesuvio.util.constraints_transport import serialize_constraints
+from mvesuvio.util import fitting_helpers
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
-import dill  # To convert constraints to string
 from mantid.api import AlgorithmFactory, AlgorithmManager
-from mantid.simpleapi import mtd, RenameWorkspace
 
 if TYPE_CHECKING:
     from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
@@ -96,8 +99,6 @@ def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_inde
         current_ratio = calculate_h_ratio(means_table, chosen_mass)
 
         table_h_ratios.addRow([current_ratio])
-
-        SaveAscii(table_h_ratios.name(), str(FilesManager.get_experiment_dir() / table_h_ratios.name()))
 
     logger.notice("\nProcedute to estimate Hydrogen ratio finished.\n")
     print_table_workspace(table_h_ratios)
@@ -249,13 +250,12 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
         "NumberOfIterations": int(inputs_class.number_of_iterations_for_corrections),
         "InvalidDetectors": convert_to_list_of_spectrum_numbers(inputs_class.mask_detectors),
         "MultipleScatteringCorrection": inputs_class.do_multiple_scattering_correction,
-        "SampleShapeXml": inputs_class.sample_shape_xml,
         "GammaCorrection": inputs_class.do_gamma_correction,
         "ModeRunning": "BACKWARD" if scattering_type == "backward" else "FORWARD",
         "TransmissionGuess": inputs_class.transmission_guess,
         "MultipleScatteringOrder": int(inputs_class.multiple_scattering_order),
         "NumberOfEvents": int(inputs_class.multiple_scattering_number_of_events),
-        "Constraints": str(dill.dumps(inputs_class.constraints)),
+        "Constraints": serialize_constraints(inputs_class.constraints),
         "ResultsPath": str(FilesManager.get_reduction_outputs_dir().absolute()),
         "MinimalOutputFiles": inputs_class.minimal_output,
         "OutputMeansTable": " Final_Means",
@@ -296,7 +296,22 @@ def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] 
     return ws_cropped
 
 
-def load_and_save_input_ws_if_not_on_path(
+def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
+    raw_path, empty_path = store_input_ws_if_not_on_path(input_class)
+
+    raw_name = raw_path.stem
+    empty_name = empty_path.stem
+
+    Load(Filename=str(raw_path), OutputWorkspace=raw_name)
+    Load(Filename=str(empty_path), OutputWorkspace=empty_name)
+
+    SumSpectra(InputWorkspace=raw_name, OutputWorkspace=raw_name + "_sum")
+    SumSpectra(InputWorkspace=empty_name, OutputWorkspace=empty_name + "_sum")
+
+    return raw_name, empty_name
+
+
+def store_input_ws_if_not_on_path(
     inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs],
 ) -> tuple[Path, Path]:
     scattering_type = _get_scattering_type(inputs_class)
@@ -390,6 +405,50 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
     SaveNexus(vesuvio_ws, Filename=str(ws_path.absolute()))
     print(f"Workspace saved locally at: {ws_path.absolute()}")
     return
+
+
+def save_fitting_input_workspaces(
+    analysis_inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs] | None,
+) -> None:
+    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
+    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
+    if analysis_inputs is None:
+        logger.warning("Could not save derived fitting workspaces because the inputs class was not provided.")
+        return
+    if not analysis_inputs.run_this_scattering_type:
+        return
+
+    iteration = str(analysis_inputs.number_of_iterations_for_corrections)
+    overwrite_workspace = general_helpers.get_workspace_name_if_path(analysis_inputs.overwrite_analysis_input_workspace)
+    if overwrite_workspace and AnalysisDataService.doesExist(overwrite_workspace):
+        base_workspace_name = overwrite_workspace
+    else:
+        base_workspace_name = str(analysis_inputs.name_of_subtracted_workspace)
+
+    workspace_name = f"{base_workspace_name}_{iteration}"
+    ncp_group_name = f"{workspace_name}_ncp_group"
+
+    if not AnalysisDataService.doesExist(workspace_name) or not AnalysisDataService.doesExist(ncp_group_name):
+        logger.warning(f"Could not save derived fitting workspaces because expected reduction outputs are missing: {workspace_name}.")
+        return
+
+    ws_to_fit = mtd[workspace_name]
+    ws_to_fit_ncps = mtd[ncp_group_name]
+
+    ws_resolution = fitting_helpers.calculate_resolution(
+        min(analysis_inputs.masses),
+        ws_to_fit,
+        analysis_inputs.range_for_rebinning_in_y_space,
+    )
+    ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
+        ws_to_fit,
+        ws_to_fit_ncps,
+        analysis_inputs.subtract_calculated_fse_from_data,
+    )
+
+    SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
+    SaveNexus(ws_lighest_data, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_data.nxs"))
+    SaveNexus(ws_lighest_ncp, str(fitting_inputs_dir / f"{workspace_name}_ws_lighest_ncp.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):

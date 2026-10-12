@@ -29,7 +29,6 @@ class TestAnalysisReduction(unittest.TestCase):
             "NumberOfIterations": 4,
             "InvalidDetectors": [3],
             "MultipleScatteringCorrection": False,
-            "SampleShapeXml": "",
             "GammaCorrection": True,
             "ModeRunning": "BACKWARD",
             "TransmissionGuess": 0,
@@ -417,6 +416,46 @@ class TestAnalysisReduction(unittest.TestCase):
 
         np.testing.assert_allclose(fit_parameters_cut[:, 1:-2], fit_parameters_masked[:, 1:-2], atol=1e-6)
         np.testing.assert_allclose(ncp_array_masked[:, cut_off_idx:], ncp_array_cut, atol=1e-6)
+
+
+    @patch("mvesuvio.analysis_reduction.scipy.optimize.minimize")
+    def test_fit_neutron_compton_profiles_to_row_passes_constraints_to_minimize(self, mock_minimize):
+        alg = VesuvioAnalysisRoutine()
+
+        constraints = ({"type": "eq", "fun": lambda par: par[0] - 1.0},)
+        alg._constraints = constraints
+        alg._initial_fit_parameters = [1.0, 5.0, 0.0]
+        alg._initial_fit_bounds = [[0, None], [3, 6], [-1, 1]]
+        alg._row_being_fit = 0
+        alg._dataY = np.array([[1.0, 1.0, 1.0, 1.0]])
+        alg._profiles_table = MagicMock(
+            rowCount=MagicMock(return_value=1),
+            column=MagicMock(return_value=["1"]),
+        )
+        alg._instrument_params = np.array([[144, 144, 54.1686, -0.41, 11.005, 0.720184]])
+
+        alg._table_fit_results = MagicMock()
+        alg._fit_parameters = np.zeros((1, 5))
+
+        ncp_total = np.zeros(4)
+        fse_total = np.zeros(4)
+        alg._fit_profiles_workspaces = {
+            "1": MagicMock(dataY=lambda row: np.zeros(4)),
+            "total": MagicMock(dataY=lambda row: ncp_total),
+        }
+        alg._fit_fse_workspaces = {
+            "1": MagicMock(dataY=lambda row: np.zeros(4)),
+            "total": MagicMock(dataY=lambda row: fse_total),
+        }
+
+        alg._neutron_compton_profiles = MagicMock(return_value=(np.array([[0.1, 0.2, 0.3, 0.4]]), np.array([[0.0, 0.0, 0.0, 0.0]])))
+
+        mock_minimize.return_value = {"x": np.array([1.2, 5.1, 0.1]), "fun": 0.1}
+
+        alg._fit_neutron_compton_profiles_to_row()
+
+        self.assertTrue(mock_minimize.called)
+        self.assertIs(mock_minimize.call_args.kwargs["constraints"], constraints)
 
 
     def test_set_gaussian_resolution(self):

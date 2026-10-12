@@ -46,6 +46,14 @@ class FilesManager:
     def get_fitting_inputs_dir(cls) -> Path:
         return cls._get_experiment_subdir("fitting_inputs")
 
+    @classmethod
+    def get_bootstrap_inputs_dir(cls) -> Path:
+        return cls._get_experiment_subdir("boot_inputs")
+
+    @classmethod
+    def get_bootstrap_outputs_dir(cls) -> Path:
+        return cls._get_experiment_subdir("boot_outputs")
+
     @staticmethod
     def _get_detector_filename(tag: str, kind: str) -> str:
         return handle_config.get_experiment_name() + "_" + kind + "_" + tag + ".nxs"
