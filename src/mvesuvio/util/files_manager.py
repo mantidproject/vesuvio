@@ -2,6 +2,7 @@ from mvesuvio.globals import Tags
 from mvesuvio.util import handle_config
 from pathlib import Path
 from mantid.kernel import ConfigService
+from functools import partialmethod
 
 
 class FilesManager:
@@ -30,21 +31,11 @@ class FilesManager:
         subdir.mkdir(parents=True, exist_ok=True)
         return subdir
 
-    @classmethod
-    def get_reduction_outputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("reduction_outputs")
-
-    @classmethod
-    def get_reduction_inputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("reduction_inputs")
-
-    @classmethod
-    def get_fitting_outputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("fitting_outputs")
-
-    @classmethod
-    def get_fitting_inputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("fitting_inputs")
+    get_reduction_outputs_dir = partialmethod(_get_experiment_subdir, "reduction_outputs")
+    get_reduction_inputs_dir = partialmethod(_get_experiment_subdir, "reduction_inputs")
+    get_fitting_outputs_dir = partialmethod(_get_experiment_subdir, "fitting_outputs")
+    get_fitting_inputs_dir = partialmethod(_get_experiment_subdir, "fitting_inputs")
+    get_calibration_inputs_dir = partialmethod(_get_experiment_subdir, "calibration_inputs")
 
     @staticmethod
     def _get_detector_filename(tag: str, kind: str) -> str:
