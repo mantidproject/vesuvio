@@ -1,5 +1,4 @@
 from mantid.kernel import (
-    StringArrayProperty,
     Direction,
     StringListValidator,
     IntArrayBoundedValidator,
@@ -9,7 +8,7 @@ from mantid.kernel import (
     IntBoundedValidator,
     FloatArrayProperty,
 )
-from mantid.api import FileProperty, FileAction, PythonAlgorithm, AlgorithmManager
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, AlgorithmManager, WorkspaceGroupProperty, WorkspaceGroup
 from mantid.simpleapi import (
     CreateEmptyTableWorkspace,
     DeleteWorkspace,
@@ -21,6 +20,7 @@ from mantid.simpleapi import (
     Transpose,
     PlotPeakByLogValue,
     RenameWorkspace,
+    CloneWorkspace,
 )
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
 from mvesuvio.globals import PeakType, Mode, SharedParameterFitType, FitFunction
@@ -41,9 +41,9 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         return "VesuvioCalibration"
 
     def PyInit(self):
-        self.declareProperty(StringArrayProperty("Samples", Direction.Input), doc="Sample run numbers to fit peaks to.")
+        self.declareProperty(WorkspaceGroupProperty("Samples", "", Direction.Input), doc="Sample workspaces to fit peaks to.")
 
-        self.declareProperty(StringArrayProperty("Background", Direction.Input), doc="Run numbers to use as a background.")
+        self.declareProperty(WorkspaceGroupProperty("Background", "", Direction.Input), doc="Workspace to use as a background.")
 
         self.declareProperty(
             FileProperty("InstrumentParameterFile", "", action=FileAction.Load, extensions=["par"]),
@@ -164,6 +164,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         # repeatedly fit L1, E1 and Theta parameters
         table_group = []
+        group_e1_fit_back = CloneWorkspace(InputWorkspace=self._samples, OutputWorkspace="GroupE1FitBack")
+        group_e1_fit_front = CloneWorkspace(InputWorkspace=self._samples, OutputWorkspace="GroupE1FitFront")
         for i in range(self._iterations):
             # calibrate theta for all detectors
             theta_fit = self._current_workspace + "_theta"
@@ -182,10 +184,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._theta_peak_fits = theta_fit + "_Peak_Parameters"
             self._calculate_scattering_angle(self._theta_peak_fits, EVSGlobals.DETECTOR_RANGE)
 
-            # calibrate  E1 for backscattering detectors and use the backscattering averaged value for all detectors
+            # calibrate E1 for backscattering detectors and use the backscattering averaged value for all detectors
             E1_fit_back = self._current_workspace + "_E1_back"
             invalid_detectors = self._run_calibration_fit(
-                Samples=self._samples,
+                Samples=group_e1_fit_back,
+                Background=WorkspaceGroup(),
                 Function=FitFunction.VOIGT.value,
                 Mode=Mode.SINGLE_DIFFERENCE.value,
                 SpectrumRange=EVSGlobals.BACKSCATTERING_RANGE,
@@ -212,7 +215,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             # calibrate L1 for frontscattering detectors based on the averaged E1 value  and calibrated theta values
             E1_fit_front = self._current_workspace + "_E1_front"
             invalid_detectors += self._run_calibration_fit(
-                Samples=self._samples,
+                Samples=group_e1_fit_front,
+                Background=WorkspaceGroup(),
                 Function=FitFunction.VOIGT.value,
                 Mode=Mode.SINGLE_DIFFERENCE.value,
                 SpectrumRange=EVSGlobals.FRONTSCATTERING_RANGE,
@@ -468,11 +472,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._iterations = self.getProperty("Iterations").value
         self._create_output = self.getProperty("CreateOutput").value
 
-        if len(self._samples) == 0:
+        if self._samples.size() == 0:
             raise ValueError("You must supply at least one sample run number.")
-
-        # if len(self._background) == 0:
-        #  raise ValueError("You must supply at least one background run number.")
 
         self._d_spacings.sort()
 
