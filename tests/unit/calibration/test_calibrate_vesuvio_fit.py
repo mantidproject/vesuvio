@@ -2,7 +2,9 @@ from mvesuvio.calibrate_fit import EVSCalibrationFit
 from mvesuvio.util.calibration_helpers import EVSGlobals
 from mock import MagicMock, patch, call
 from functools import partial
-from mantid.kernel import IntArrayProperty, StringArrayProperty, FloatArrayProperty
+from mantid.kernel import IntArrayProperty, FloatArrayProperty, Direction
+from mantid.api import WorkspaceGroup, WorkspaceGroupProperty
+from mantid.simpleapi import CreateWorkspace, mtd
 from mvesuvio.globals import Mode
 
 import unittest
@@ -347,7 +349,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     def test_PyInit_property_defaults(self):
         alg = EVSCalibrationFit()
         alg.PyInit()
-        properties = {'Samples': [], 'Background': [], 'Mode': Mode.FOIL_OUT, 'Function': 'Gaussian',
+        properties = {'Samples': None, 'Background': None, 'Mode': Mode.FOIL_OUT, 'Function': 'Gaussian',
                       'SpectrumRange': EVSGlobals.DETECTOR_RANGE, 'Mass': 207.19, 'DSpacings': [], 'Energy': [EVSGlobals.ENERGY_ESTIMATE],
                       'InstrumentParameterFile': '', 'PeakType': '', 'InstrumentParameterWorkspace': None, 'CreateOutput': False,
                       'OutputWorkspace': ''}
@@ -413,39 +415,60 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertRaises(ValueError, alg._setup_spectra_list)
 
     def test_setup_run_numbers_and_output_workspace(self):
-        test_sample_list = [3, 4, 5, 6]
-        test_bg_list = [7, 8, 9, 10]
+        test_sample_group = WorkspaceGroup()
+        test_background_group = WorkspaceGroup()
+        CreateWorkspace(DataX=[0, 1], DataY=[3, 4], OutputWorkspace="sample_ws_1")
+        CreateWorkspace(DataX=[0, 1], DataY=[3, 4], OutputWorkspace="sample_ws_2")
+        CreateWorkspace(DataX=[0, 1], DataY=[3, 4], OutputWorkspace="background_ws")
+        test_sample_group.addWorkspace(mtd["sample_ws_1"])
+        test_sample_group.addWorkspace(mtd["sample_ws_2"])
+        test_background_group.addWorkspace(mtd["background_ws"])
         test_ws_name = 'test_ws'
         alg = EVSCalibrationFit()
-        alg.declareProperty(StringArrayProperty('Samples', test_sample_list))
-        alg.declareProperty(StringArrayProperty('Background', test_bg_list))
+        alg.declareProperty(WorkspaceGroupProperty("Samples", "", Direction.Input))
+        alg.declareProperty(WorkspaceGroupProperty("Background", "", Direction.Input))
         alg.declareProperty('OutputWorkspace', test_ws_name)
+
+        alg.setProperty("Samples", test_sample_group)
+        alg.setProperty("Background", test_background_group)
 
         alg._setup_run_numbers_and_output_workspace()
-        self.assertEqual(str(test_bg_list[0]), alg._background)
-        self.assertEqual(test_ws_name + '_Sample_' + '_'.join([str(x) for x in test_sample_list]), alg._sample)
+        self.assertEqual(test_background_group[0].name(), alg._background)
+        suffix = "_".join(ws.name() for ws in test_sample_group)
+        self.assertEqual(test_ws_name + '_Sample_' + suffix, alg._sample)
 
     def test_setup_run_numbers_and_output_workspace_no_bg(self):
-        test_sample_list = [3, 4, 5, 6]
-        test_bg_list = []
+        test_sample_group = WorkspaceGroup()
+        test_background_group = WorkspaceGroup()
+        CreateWorkspace(DataX=[0, 1], DataY=[3, 4], OutputWorkspace="sample_ws")
+        test_sample_group.addWorkspace(mtd["sample_ws"])
         test_ws_name = 'test_ws'
         alg = EVSCalibrationFit()
-        alg.declareProperty(StringArrayProperty('Samples', test_sample_list))
-        alg.declareProperty(StringArrayProperty('Background', test_bg_list))
+        alg.declareProperty(WorkspaceGroupProperty("Samples", "", Direction.Input))
+        alg.declareProperty(WorkspaceGroupProperty("Background", "", Direction.Input))
         alg.declareProperty('OutputWorkspace', test_ws_name)
+
+        alg.setProperty("Samples", test_sample_group)
+        alg.setProperty("Background", test_background_group)
 
         alg._setup_run_numbers_and_output_workspace()
         self.assertFalse(hasattr(alg, '_background'))
-        self.assertEqual(test_ws_name + '_Sample_' + '_'.join([str(x) for x in test_sample_list]), alg._sample)
+        suffix = "_".join(ws.name() for ws in test_sample_group)
+        self.assertEqual(test_ws_name + '_Sample_' + suffix, alg._sample)
 
     def test_setup_run_numbers_and_output_workspace_no_sample(self):
-        test_sample_list = []
-        test_bg_list = [7, 8, 9, 10]
+        test_sample_group = WorkspaceGroup()
+        test_background_group = WorkspaceGroup()
+        CreateWorkspace(DataX=[0, 1], DataY=[10], OutputWorkspace="background_ws")
+        test_background_group.addWorkspace(mtd["background_ws"])
         test_ws_name = 'test_ws'
         alg = EVSCalibrationFit()
-        alg.declareProperty(StringArrayProperty('Samples', test_sample_list))
-        alg.declareProperty(StringArrayProperty('Background', test_bg_list))
+        alg.declareProperty(WorkspaceGroupProperty("Samples", "", Direction.Input))
+        alg.declareProperty(WorkspaceGroupProperty("Background", "", Direction.Input))
         alg.declareProperty('OutputWorkspace', test_ws_name)
+
+        alg.setProperty("Samples", test_sample_group)
+        alg.setProperty("Background", test_background_group)
 
         self.assertRaises(ValueError, alg._setup_run_numbers_and_output_workspace)
 
@@ -516,59 +539,56 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         self.assertEqual(EVSGlobals.RESONANCE_FIT_WINDOW_RANGE, alg._fit_window_range)
 
     @patch('mvesuvio.calibrate_fit.ReplaceSpecialValues')
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_to_ads_and_crop')
-    def test_preprocess_no_bg(self, mock_load_to_ads_and_crop, mock_replace_special_values):
-        test_run_numbers = [1, 2, 3, 4]
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._sum_and_crop_ws')
+    def test_preprocess_no_bg(self, mock_sum_and_crop_ws, mock_replace_special_values):
+        test_sample_group = WorkspaceGroup()
+        CreateWorkspace(DataX=[0, 1], DataY=[1], OutputWorkspace="sample_ws_1")
+        CreateWorkspace(DataX=[0, 1], DataY=[2], OutputWorkspace="sample_ws_2")
+        test_sample_group.addWorkspace(mtd["sample_ws_1"])
+        test_sample_group.addWorkspace(mtd["sample_ws_2"])
         test_crop_range = [3, 10]
         test_sample_ws_name = "test_ws"
 
         alg = EVSCalibrationFit()
         alg._ws_crop_range = test_crop_range
-        alg._sample_run_numbers = test_run_numbers
+        alg._sample_run_numbers = test_sample_group
         alg._sample = test_sample_ws_name
-        alg._bkg_run_numbers = []
+        alg._bkg_run_numbers = WorkspaceGroup()
         alg._preprocess()
-        mock_load_to_ads_and_crop.assert_called_once_with(test_run_numbers, test_sample_ws_name, test_crop_range[0],
-                                                          test_crop_range[-1])
+        mock_sum_and_crop_ws.assert_called_once_with(test_sample_group, test_sample_ws_name, test_crop_range[0],
+                                                     test_crop_range[-1])
         mock_replace_special_values.assert_called_once_with(test_sample_ws_name, NaNValue=0, NaNError=0, InfinityValue=0,
                                                             InfinityError=0, OutputWorkspace=test_sample_ws_name)
 
     @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._normalise_sample_by_background')
     @patch('mvesuvio.calibrate_fit.ReplaceSpecialValues')
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_to_ads_and_crop')
-    def test_preprocess_with_bg(self, mock_load_to_ads_and_crop, mock_replace_special_values, mock_normalise_sample):
-        test_run_numbers = [1, 2, 3, 4]
-        test_bg_run_numbers = [5, 6]
+    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._sum_and_crop_ws')
+    def test_preprocess_with_bg(self, mock_sum_and_crop_ws, mock_replace_special_values, mock_normalise_sample):
+        test_sample_group = WorkspaceGroup()
+        test_background_group = WorkspaceGroup()
+        CreateWorkspace(DataX=[0, 1], DataY=[1], OutputWorkspace="sample_ws_1")
+        CreateWorkspace(DataX=[0, 1], DataY=[2], OutputWorkspace="sample_ws_2")
+        CreateWorkspace(DataX=[0, 1], DataY=[5], OutputWorkspace="background_ws")
+        test_sample_group.addWorkspace(mtd["sample_ws_1"])
+        test_sample_group.addWorkspace(mtd["sample_ws_2"])
+        test_background_group.addWorkspace(mtd["background_ws"])
         test_crop_range = [3, 10]
         test_sample_ws_name = "test_ws"
 
         alg = EVSCalibrationFit()
         alg._ws_crop_range = test_crop_range
-        alg._sample_run_numbers = test_run_numbers
+        alg._sample_run_numbers = test_sample_group
         alg._sample = test_sample_ws_name
-        alg._bkg_run_numbers = test_bg_run_numbers
-        alg._background = test_bg_run_numbers[0]
+        alg._bkg_run_numbers = test_background_group
+        alg._background = test_background_group[0].name()
         alg._preprocess()
-        mock_load_to_ads_and_crop.assert_has_calls([call(test_run_numbers, test_sample_ws_name, test_crop_range[0],
-                                                         test_crop_range[-1]),
-                                                    call(test_bg_run_numbers, test_bg_run_numbers[0], test_crop_range[0],
-                                                         test_crop_range[-1])])
+        mock_sum_and_crop_ws.assert_has_calls([call(test_sample_group, test_sample_ws_name, test_crop_range[0],
+                                                    test_crop_range[-1]),
+                                              call(test_background_group, test_background_group[0].name(), test_crop_range[0],
+                                                    test_crop_range[-1])])
         mock_normalise_sample.assert_called_once()
         mock_replace_special_values.assert_called_once_with(test_sample_ws_name, NaNValue=0, NaNError=0, InfinityValue=0,
                                                             InfinityError=0, OutputWorkspace=test_sample_ws_name)
-
-    @patch('mvesuvio.calibrate_fit.CropWorkspace')
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_files')
-    def test_load_to_ads_and_crop(self, mock_load_files, mock_crop_workspace):
-        alg = EVSCalibrationFit()
-        run_numbers = [1, 2, 3, 4]
-        output = "test_ws"
-        xmin = 3
-        xmax = 10
-
-        alg._load_to_ads_and_crop(run_numbers, output, xmin, xmax)
-        mock_load_files.assert_called_once_with(run_numbers, output)
-        mock_crop_workspace.assert_called_once_with(output, XMin=xmin, XMax=xmax, OutputWorkspace=output)
 
     @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     @patch('mvesuvio.calibrate_fit.Divide')
@@ -586,55 +606,25 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         mock_divide.assert_called_once_with(sample_ws, bg_ws, OutputWorkspace=sample_ws)
         mock_delete.assert_called_once_with(bg_ws)
 
+    @patch('mvesuvio.calibrate_fit.CropWorkspace')
     @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     @patch('mvesuvio.calibrate_fit.Plus')
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_load_files(self, mock_load_file, mock_plus, mock_delete):
+    @patch('mvesuvio.calibrate_fit.RenameWorkspace')
+    def test_sum_and_crop_ws(self, mock_rename, mock_plus, mock_delete, mock_crop):
         alg = EVSCalibrationFit()
-        ws_numbers = ['1-4']  # Note this is parsed as '1-3', is this intentional?
+        test_sample_group = WorkspaceGroup()
+        CreateWorkspace(DataX=[0, 1], DataY=[1], OutputWorkspace="sample_ws_1")
+        CreateWorkspace(DataX=[0, 1], DataY=[2], OutputWorkspace="sample_ws_2")
+        test_sample_group.addWorkspace(mtd["sample_ws_1"])
+        test_sample_group.addWorkspace(mtd["sample_ws_2"])
         output_name = 'test_ws'
-        alg._load_files(ws_numbers, output_name)
-        mock_load_file.assert_has_calls([call('1', output_name), call('2', '__EVS_calib_temp_ws'),
-                                         call('3', '__EVS_calib_temp_ws')])
-        mock_plus.assert_has_calls([call(output_name, '__EVS_calib_temp_ws', OutputWorkspace=output_name),
-                                    call(output_name, '__EVS_calib_temp_ws', OutputWorkspace=output_name)])
-        mock_delete.assert_has_calls([call('__EVS_calib_temp_ws'), call('__EVS_calib_temp_ws')])
-
-    @patch('mvesuvio.calibrate_fit.LoadRaw')
-    @patch('mvesuvio.calibrate_fit.LoadVesuvio')
-    def test_load_file_vesuvio(self, mock_load_vesuvio, mock_load_raw):
-        alg = EVSCalibrationFit()
-        ws_name = 'test_file'
-        output_name = 'test_ws'
-        mode = Mode.FOIL_OUT
-        spec_list = [3, 4, 5, 6]
-        alg._mode = mode
-        alg._spec_list = spec_list
-
-        alg._load_file(ws_name, output_name)
-        mock_load_vesuvio.assert_called_once_with(Filename=ws_name, Mode=mode, OutputWorkspace=output_name,
-                                                  SpectrumList="%d-%d" % (spec_list[0], spec_list[-1]),
-                                                  EnableLogging=False)
-        mock_load_raw.assert_not_called()
-
-    @patch('mvesuvio.calibrate_fit.ConvertToDistribution')
-    @patch('mvesuvio.calibrate_fit.LoadRaw')
-    @patch('mvesuvio.calibrate_fit.LoadVesuvio')
-    def test_load_file_raw(self, mock_load_vesuvio, mock_load_raw, mock_convert_to_dist):
-        alg = EVSCalibrationFit()
-        ws_name = 'test_file'
-        output_name = 'test_ws'
-        mode = Mode.FOIL_OUT
-        spec_list = [3, 4, 5, 6]
-        alg._mode = mode
-        alg._spec_list = spec_list
-        mock_load_vesuvio.side_effect = RuntimeError()
-
-        alg._load_file(ws_name, output_name)
-        mock_load_raw.assert_called_once_with('EVS' + ws_name + '.raw', OutputWorkspace=output_name,
-                                              SpectrumMin=spec_list[0], SpectrumMax=spec_list[-1],
-                                              EnableLogging=False)
-        mock_convert_to_dist.assert_called_once_with(output_name, EnableLogging=False)
+        xmin, xmax = 3, 7
+        alg._sum_and_crop_ws(test_sample_group, output_name, xmin, xmax)
+        mock_rename.assert_has_calls([call(InputWorkspace="sample_ws_1", OutputWorkspace=output_name),
+                                      call(InputWorkspace="sample_ws_2", OutputWorkspace="__EVS_calib_temp_ws")])
+        mock_plus.assert_has_calls([call(output_name, "__EVS_calib_temp_ws", OutputWorkspace='test_ws')])
+        mock_delete.assert_has_calls([call('__EVS_calib_temp_ws')])
+        mock_crop.assert_has_calls([call(output_name, XMin=xmin, XMax=xmax, OutputWorkspace=output_name)])
 
     @patch('mvesuvio.calibrate_fit.GroupWorkspaces')
     def test_fit_peaks_individual(self, group_workspaces_mock):
