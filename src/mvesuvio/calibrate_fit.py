@@ -1,6 +1,5 @@
 from contextlib import suppress
 from mantid.kernel import (
-    StringArrayProperty,
     Direction,
     StringListValidator,
     IntArrayBoundedValidator,
@@ -21,6 +20,7 @@ from mantid.api import (
     PythonAlgorithm,
     WorkspaceFactory,
     AnalysisDataService,
+    WorkspaceGroupProperty,
 )
 from mantid.simpleapi import (
     CreateEmptyTableWorkspace,
@@ -33,9 +33,6 @@ from mantid.simpleapi import (
     GroupWorkspaces,
     mtd,
     Plus,
-    LoadVesuvio,
-    LoadRaw,
-    ConvertToDistribution,
     FindPeakBackground,
     ExtractSingleSpectrum,
     SumSpectra,
@@ -45,14 +42,14 @@ from mantid.simpleapi import (
     MaskDetectors,
     ExtractUnmaskedSpectra,
     CreateWorkspace,
+    RenameWorkspace,
 )
 from functools import partial
-from tools.calibration_scripts.calibrate_vesuvio_helper_functions import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-
+from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
+from mvesuvio.globals import Mode, PeakType, SharedParameterFitType, FitFunction
 import os
 import sys
 import scipy.constants
-import scipy.stats
 import numpy as np
 
 
@@ -64,21 +61,21 @@ class EVSCalibrationFit(PythonAlgorithm):
         return "VesuvioCalibration"
 
     def PyInit(self):
-        self.declareProperty(StringArrayProperty("Samples", Direction.Input), doc="Sample run numbers to fit peaks to.")
+        self.declareProperty(WorkspaceGroupProperty("Samples", "", Direction.Input), doc="Sample workspaces to fit peaks to.")
 
-        self.declareProperty(StringArrayProperty("Background", Direction.Input), doc="Run numbers to use as a background.")
+        self.declareProperty(WorkspaceGroupProperty("Background", "", Direction.Input), doc="Workspace to use as a background.")
 
         self.declareProperty(
             "Mode",
-            "FoilOut",
-            StringListValidator(EVSGlobals.MODES),
+            Mode.FOIL_OUT.value,
+            StringListValidator([mode.value for mode in Mode]),
             doc="Mode to load files with. This is passed to the LoadVesuvio algorithm. Default is FoilOut.",
         )
 
         self.declareProperty(
             "Function",
-            "Gaussian",
-            StringListValidator(["Gaussian", "Voigt"]),
+            FitFunction.GAUSSIAN.value,
+            StringListValidator([func.value for func in FitFunction]),
             doc="Function to fit each of the spectra with. Default is Gaussian",
         )
 
@@ -112,14 +109,14 @@ class EVSCalibrationFit(PythonAlgorithm):
         self.declareProperty(
             "PeakType",
             "",
-            StringListValidator(EVSGlobals.PEAK_TYPES),
+            StringListValidator([peak.value for peak in PeakType]),
             doc="Choose the peak type that is being fitted.Note that supplying a set of dspacings overrides the setting here",
         )
 
-        shared_fit_type_validator = StringListValidator(["Individual", "Shared", "Both"])
+        shared_fit_type_validator = StringListValidator([fit_type.value for fit_type in SharedParameterFitType])
         self.declareProperty(
             "SharedParameterFitType",
-            "Individual",
+            SharedParameterFitType.INDIVIDUAL.value,
             doc="Calculate shared parameters using an individual and/orglobal fit.",
             validator=shared_fit_type_validator,
         )
@@ -197,12 +194,13 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._sample_run_numbers = self.getProperty("Samples").value
         self._bkg_run_numbers = self.getProperty("Background").value
         self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
-        if len(self._sample_run_numbers) == 0:
+        if self._sample_run_numbers.size() == 0:
             raise ValueError("You must supply at least one sample run number.")
-        if len(self._bkg_run_numbers) > 0:
-            self._background = "" + self._bkg_run_numbers[0]
+        if self._bkg_run_numbers.size() > 0:
+            self._background = "" + self._bkg_run_numbers[0].name()
 
-        self._sample = self._output_workspace_name + "_Sample_" + "_".join(self._sample_run_numbers)
+        suffix = "_".join(ws.name() for ws in self._sample_run_numbers)
+        self._sample = self._output_workspace_name + "_Sample_" + suffix
 
     def _setup_function_type(self):
         self._peak_function = self.getProperty("Function").value
@@ -248,21 +246,17 @@ class EVSCalibrationFit(PythonAlgorithm):
         Preprocess a workspace. This include optionally dividing by a background
         """
         xmin, xmax = self._ws_crop_range
-        self._load_to_ads_and_crop(self._sample_run_numbers, self._sample, xmin, xmax)
+        self._sum_and_crop_ws(self._sample_run_numbers, self._sample, xmin, xmax)
 
         if self._background_provided:
-            self._load_to_ads_and_crop(self._bkg_run_numbers, self._background, xmin, xmax)
+            self._sum_and_crop_ws(self._bkg_run_numbers, self._background, xmin, xmax)
             self._normalise_sample_by_background()
 
         ReplaceSpecialValues(self._sample, NaNValue=0, NaNError=0, InfinityValue=0, InfinityError=0, OutputWorkspace=self._sample)
 
     @property
     def _background_provided(self):
-        return len(self._bkg_run_numbers) > 0
-
-    def _load_to_ads_and_crop(self, run_numbers, output, xmin, xmax):
-        self._load_files(run_numbers, output)
-        CropWorkspace(output, XMin=xmin, XMax=xmax, OutputWorkspace=output)
+        return self._bkg_run_numbers.size() > 0
 
     def _normalise_sample_by_background(self):
         RebinToWorkspace(WorkspaceToRebin=self._background, WorkspaceToMatch=self._sample, OutputWorkspace=self._background)
@@ -981,69 +975,25 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         return tof
 
-    def _load_files(self, ws_numbers, output_name):
+    def _sum_and_crop_ws(self, group_ws, output_name, xmin, xmax):
         """
-        Load a list of run numbers and sum each of the runs.
+        Process the workspaces and sum each of the runs and crop the output.
 
-        @param ws_numbers - list of run numbers to load.
+        @param group_ws - A group workspace with the runs loaded.
         @param output_name - name to call the final workspace.
+        @param xmin - The lower limit for the crop.
+        @param xmax - The upper limit for the crop.
         """
-
-        run_numbers = [run for run in self._parse_run_numbers(ws_numbers)]
-
-        self._load_file(run_numbers[0], output_name)
-        temp_ws_name = "__EVS_calib_temp_ws"
-
-        for run_number in run_numbers[1:]:
-            self._load_file(run_number, temp_ws_name)
-            Plus(output_name, temp_ws_name, OutputWorkspace=output_name)
-            DeleteWorkspace(temp_ws_name)
-
-    def _parse_run_numbers(self, run_numbers):
-        """
-        Converts a list of mixed single runs and run ranges
-        into a single flat list of run numbers.
-
-        @param run_numbers - list of mixed single runs and run ranges
-        @return iterator to each run number in the flat list of runs
-        """
-        for run in run_numbers:
-            if "-" in run:
-                sample_range = run.split("-")
-                sample_range = map(int, sample_range)
-
-                for i in range(*sample_range):
-                    yield str(i)
-
+        for ws_ix in range(group_ws.size()):
+            if ws_ix == 0:
+                if group_ws[ws_ix].name() != output_name:
+                    RenameWorkspace(InputWorkspace=group_ws[ws_ix].name(), OutputWorkspace=output_name)
+                temp_ws_name = "__EVS_calib_temp_ws"
             else:
-                yield run
-
-    def _load_file(self, ws_name, output_name):
-        """
-        Load a file into a workspace.
-
-        This will attempt to use LoadVesuvio, but will fall back on LoadRaw if LoadVesuvio fails.
-        @param ws_name - name of the run to load.
-        @param output_name - name to call the loaded workspace
-        """
-
-        try:
-            LoadVesuvio(
-                Filename=ws_name,
-                Mode=self._mode,
-                OutputWorkspace=output_name,
-                SpectrumList="%d-%d" % (self._spec_list[0], self._spec_list[-1]),
-                EnableLogging=False,
-            )
-        except RuntimeError:
-            LoadRaw(
-                "EVS" + ws_name + ".raw",
-                OutputWorkspace=output_name,
-                SpectrumMin=self._spec_list[0],
-                SpectrumMax=self._spec_list[-1],
-                EnableLogging=False,
-            )
-            ConvertToDistribution(output_name, EnableLogging=False)
+                RenameWorkspace(InputWorkspace=group_ws[ws_ix].name(), OutputWorkspace=temp_ws_name)
+                Plus(output_name, temp_ws_name, OutputWorkspace=output_name)
+                DeleteWorkspace(temp_ws_name)
+        CropWorkspace(output_name, XMin=xmin, XMax=xmax, OutputWorkspace=output_name)
 
     def _build_linear_background_function(self, peak, tie_gradient=False):
         """

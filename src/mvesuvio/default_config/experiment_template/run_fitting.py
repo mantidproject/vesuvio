@@ -38,18 +38,18 @@ class BackwardFittingInputs(BackwardAnalysisInputs):
     subtract_calculated_fse_from_data = True
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     # Fitting model options
-    # FitModels.gauss: Single Gaussian
-    # FitModels.gauss_cntr: Single Gaussian with fixed center at zero
-    # FitModels.gcc4: Gram-Charlier with C4 parameter
-    # FitModels.gcc4_cntr: Gram-Charlier with C4 parameter with fixed center at zero
-    # FitModels.gcc6: Gram-Charlier with C6 parameter
-    # FitModels.gcc6_cntr: Gram-Charlier with C6 parameter with fixed center at zero
-    # FitModels.gcc4c6: Gram-Charlier with C4 and C6 parameter
-    # FitModels.gcc4c6_cntr: Gram-Charlier with C4 and C6 parameter and fixed center at zero
-    # FitModels.doublewell: Double Well function
-    # FitModels.gauss2d: Anisotropic Gaussian
-    # FitModels.gauss3d: 3-Dimensional Gaussian
-    fitting_model = FitModels.gauss
+    # FitModels.GAUSS: Single Gaussian
+    # FitModels.GAUSS_CNTR: Single Gaussian with fixed center at zero
+    # FitModels.GCC4: Gram-Charlier with C4 parameter
+    # FitModels.GCC4_CNTR: Gram-Charlier with C4 parameter with fixed center at zero
+    # FitModels.GCC6: Gram-Charlier with C6 parameter
+    # FitModels.GCC6_CNTR: Gram-Charlier with C6 parameter with fixed center at zero
+    # FitModels.GCC4C6: Gram-Charlier with C4 and C6 parameter
+    # FitModels.GCC4C6_CNTR: Gram-Charlier with C4 and C6 parameter and fixed center at zero
+    # FitModels.DOUBLEWELL: Double Well function
+    # FitModels.GAUSS2D: Anisotropic Gaussian
+    # FitModels.GAUSS3D: 3-Dimensional Gaussian
+    fitting_model = FitModels.GAUSS
     run_minos = True
     do_global_fit = True  # Performs global fit with Minuit by default
     # Number of groups of detectors to perform global (simultaneous) fit on
@@ -57,9 +57,9 @@ class BackwardFittingInputs(BackwardAnalysisInputs):
     # or option 'all', which does not form groups and fits all spectra simultaneously and individualy
     number_of_global_fit_groups = 4
     # Type of masking
-    # Masking.nan: Zeros in workspace being fit are ignored
-    # Masking.ncp: Zeros in workspace being fit are replaced by the fitted neutron compton profile
-    mask_zeros_with = Masking.nan
+    # Masking.NAN: Zeros in workspace being fit are ignored
+    # Masking.NCP: Zeros in workspace being fit are replaced by the fitted neutron compton profile
+    mask_zeros_with = Masking.NAN
 
 
 class ForwardFittingInputs(ForwardAnalysisInputs):
@@ -69,18 +69,18 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     subtract_calculated_fse_from_data = True
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     # Fitting model options
-    # FitModels.gauss: Single Gaussian
-    # FitModels.gauss_cntr: Single Gaussian with fixed center at zero
-    # FitModels.gcc4: Gram-Charlier with C4 parameter
-    # FitModels.gcc4_cntr: Gram-Charlier with C4 parameter with fixed center at zero
-    # FitModels.gcc6: Gram-Charlier with C6 parameter
-    # FitModels.gcc6_cntr: Gram-Charlier with C6 parameter with fixed center at zero
-    # FitModels.gcc4c6: Gram-Charlier with C4 and C6 parameter
-    # FitModels.gcc4c6_cntr: Gram-Charlier with C4 and C6 parameter and fixed center at zero
-    # FitModels.doublewell: Double Well function
-    # FitModels.gauss2d: Anisotropic Gaussian
-    # FitModels.gauss3d: 3-Dimensional Gaussian
-    fitting_model = FitModels.gauss
+    # FitModels.GAUSS: Single Gaussian
+    # FitModels.GAUSS_CNTR: Single Gaussian with fixed center at zero
+    # FitModels.GCC4: Gram-Charlier with C4 parameter
+    # FitModels.GCC4_CNTR: Gram-Charlier with C4 parameter with fixed center at zero
+    # FitModels.GCC6: Gram-Charlier with C6 parameter
+    # FitModels.GCC6_CNTR: Gram-Charlier with C6 parameter with fixed center at zero
+    # FitModels.GCC4C6: Gram-Charlier with C4 and C6 parameter
+    # FitModels.GCC4C6_CNTR: Gram-Charlier with C4 and C6 parameter and fixed center at zero
+    # FitModels.DOUBLEWELL: Double Well function
+    # FitModels.GAUSS2D: Anisotropic Gaussian
+    # FitModels.GAUSS3D: 3-Dimensional Gaussian
+    fitting_model = FitModels.GAUSS
     run_minos = True
     do_global_fit = True  # Performs global fit with Minuit by default
     # Number of groups of detectors to perform global (simultaneous) fit on
@@ -88,9 +88,9 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     # or option 'all', which does not form groups and fits all spectra simultaneously and individualy
     number_of_global_fit_groups = 4
     # Type of masking
-    # Masking.nan: Zeros in workspace being fit are ignored
-    # Masking.ncp: Zeros in workspace being fit are replaced by the fitted neutron compton profile
-    mask_zeros_with = Masking.nan
+    # Masking.NAN: Zeros in workspace being fit are ignored
+    # Masking.NCP: Zeros in workspace being fit are replaced by the fitted neutron compton profile
+    mask_zeros_with = Masking.NAN
 
 
 def load_saved_fitting_input_workspaces() -> None:

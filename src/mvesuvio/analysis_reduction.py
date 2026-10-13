@@ -48,6 +48,7 @@ from mvesuvio.util.analysis_helpers import (
     pseudo_voigt,
 )
 from mvesuvio.util.general_helpers import print_table_workspace
+from mvesuvio.globals import ModeRunning
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
@@ -113,8 +114,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         )
         self.declareProperty(
             name="ModeRunning",
-            defaultValue="BACKWARD",
-            validator=StringListValidator(["BACKWARD", "FORWARD"]),
+            defaultValue=ModeRunning.BACKWARD.value,
+            validator=StringListValidator([mode.value for mode in ModeRunning]),
             doc="Whether running backward or forward scattering.",
         )
 
