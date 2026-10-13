@@ -1,8 +1,8 @@
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
-from mantid.api import AlgorithmManager, AlgorithmFactory
-from mantid.simpleapi import LoadVesuvio, LoadRaw, ConvertToDistribution
+from mantid.api import AlgorithmManager, AlgorithmFactory, WorkspaceGroup
+from mantid.simpleapi import LoadVesuvio, LoadRaw, ConvertToDistribution, mtd
 from mvesuvio.util.calibration_helpers import EVSGlobals
 from mvesuvio.globals import SharedParameterFitType, Mode
 import numpy as np
@@ -12,7 +12,8 @@ from typing import Literal
 
 class EVSCalibrationAnalysisInputs:
     # Sample run numbers to fit peaks to (cannot be an empty str)
-    Samples: str = [17087, 17088]
+    # Samples: str = [17087, 17088]
+    Samples: str = [17087]
 
     # Run numbers to use as a background (can be empty)
     Background: str = [17086]
@@ -78,10 +79,10 @@ class EVSCalibrationAnalysisInputs:
 
 
 def main() -> None:
-    # Set the
+    # Load the samples and the background
     calibration_inputs_dir = FilesManager.get_calibration_inputs_dir()
-    for sample in EVSCalibrationAnalysisInputs.Samples:
-        _load_files(calibration_inputs_dir, sample, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode)
+    file_prefix = "EVS"
+    samples_group, background_group = _load_files(calibration_inputs_dir, file_prefix)
 
     AlgorithmFactory.subscribe(EVSCalibrationAnalysis)
     AlgorithmFactory.subscribe(EVSCalibrationFit)
@@ -89,8 +90,8 @@ def main() -> None:
     alg = AlgorithmManager.createUnmanaged("EVSCalibrationAnalysis")
     alg.initialize()
 
-    alg.setProperty("Samples", EVSCalibrationAnalysisInputs.Samples)
-    alg.setProperty("Background", EVSCalibrationAnalysisInputs.Background)
+    alg.setProperty("Samples", samples_group)
+    alg.setProperty("Background", background_group)
     alg.setProperty("InstrumentParameterFile", EVSCalibrationAnalysisInputs.InstrumentParameterFile)
     alg.setProperty("Mass", EVSCalibrationAnalysisInputs.Mass)
     alg.setProperty("DSpacings", EVSCalibrationAnalysisInputs.DSpacings)
@@ -106,7 +107,28 @@ def main() -> None:
     alg.execute()
 
 
-def _load_files(path, run_number, spec_list, mode):
+def _load_files(path, prefix):
+    """
+    Loads the samples and backgrounds into group workspaces.
+
+    @param path - the path to the files.
+    @param prefix - the prefix of files.
+    """
+    samples_group = WorkspaceGroup()
+    background_group = WorkspaceGroup()
+
+    for sample in EVSCalibrationAnalysisInputs.Samples:
+        _load_file(path, sample, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode, prefix)
+        samples_group.addWorkspace(mtd[prefix + str(sample)])
+
+    for background in EVSCalibrationAnalysisInputs.Background:
+        _load_file(path, background, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode, prefix)
+        background_group.addWorkspace(mtd[prefix + str(background)])
+
+    return samples_group, background_group
+
+
+def _load_file(path, run_number, spec_list, mode, prefix):
     """
     Loads the run number into a workspace.
 
@@ -115,8 +137,9 @@ def _load_files(path, run_number, spec_list, mode):
     @param run_number - the run to load.
     @param spec_list - the spect list to load.
     @param mode - the mode to use when loading files.
+    @param prefix - the prefix of files.
     """
-    output = "EVS" + str(run_number)
+    output = prefix + str(run_number)
     file = output + ".raw"
     file_path = str(path / file)
     try:
@@ -124,7 +147,7 @@ def _load_files(path, run_number, spec_list, mode):
             Filename=file_path,
             Mode=mode,
             OutputWorkspace=output,
-            SpectrumList="%d-%d" % (spec_list[0], spec_list[-1]),
+            SpectrumList=f"{spec_list[0]}-{spec_list[-1]}",
             EnableLogging=False,
         )
     except RuntimeError:
