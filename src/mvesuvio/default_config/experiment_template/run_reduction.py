@@ -179,8 +179,9 @@ class ForwardAnalysisInputs:
 ########################
 
 
-def run_reduction():
-    mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
+def run_reduction(configure_with_main: bool = True):
+    if configure_with_main:
+        mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
 
     back_input_ws = ""
     front_input_ws = ""

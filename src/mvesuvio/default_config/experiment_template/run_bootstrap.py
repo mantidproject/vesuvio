@@ -27,7 +27,7 @@ def _run_reduction_with_injected_workspaces(back_ws_path: str = "", front_ws_pat
     reduction_namespace["BackwardAnalysisInputs"].minimal_output = True
     reduction_namespace["ForwardAnalysisInputs"].overwrite_analysis_input_workspace = front_ws_path
     reduction_namespace["ForwardAnalysisInputs"].minimal_output = True
-    reduction_namespace["run_reduction"]()
+    reduction_namespace["run_reduction"](configure_with_main=False)
 
 
 def _run_fitting_with_injected_workspaces(back_ws_path: str = "", front_ws_path: str = ""):
