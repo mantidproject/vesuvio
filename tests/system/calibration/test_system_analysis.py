@@ -12,7 +12,7 @@ from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
 from copy import copy, deepcopy
 from os import path
-from mvesuvio.globals import Mode
+from mvesuvio.globals import Mode, PeakType
 
 
 class TestEVSCalibrationAnalysis(EVSCalibrationTest):
@@ -30,7 +30,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._iterations = 1
         self._alg = None
 
-        # Switches set to none, activated if necessary in the load file side_effect
+        # Switches set to none and activated when configuring each calibration load.
         self._L0_fit_active = None
         self._E1_fit_active = None
         self._current_run = None
@@ -40,13 +40,18 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._spec_range = [EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
         self._E1_fit = [False, True, True]
         self._L0_fit = [False]
+        self._run_calibration_fit = EVSCalibrationAnalysis._run_calibration_fit
+        self._run_calibration_fit_patcher = patch.object(
+            EVSCalibrationAnalysis,
+            "_run_calibration_fit",
+            autospec=True,
+            side_effect=self._run_calibration_fit_with_local_workspaces,
+        )
+        self._run_calibration_fit_patcher.start()
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper(self, load_file_mock):
+    def test_copper(self):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -56,12 +61,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_lead(self, load_file_mock):
+    def test_lead(self):
         self._setup_lead_test()
         self._output_workspace = "lead_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -71,12 +73,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            178, 180, 182, 183]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_niobium(self, load_file_mock):
+    def test_niobium(self):
         self._setup_niobium_test()
         self._output_workspace = "niobium_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -89,12 +88,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            182, 186, 187, 189, 191]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper_with_uranium(self, load_file_mock):
+    def test_copper_with_uranium(self):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -104,12 +100,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_lead_with_uranium(self, load_file_mock):
+    def test_lead_with_uranium(self):
         self._setup_lead_test()
         self._output_workspace = "lead_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -119,17 +112,15 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            178, 180, 182, 183]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper_with_l0_calc(self, load_file_mock):
+    def test_copper_with_l0_calc(self):
         self._setup_copper_test()
+        self._load_l0_workspaces()
         self._L0_fit = [True, True, True, False, False, False]
         self._output_workspace = "copper_analysis_test"
         self._mode = [Mode.FOIL_OUT, Mode.FOIL_OUT, Mode.FOIL_OUT, Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
         self._spec_range = [EVSGlobals.FRONTSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE, EVSGlobals.BACKSCATTERING_RANGE,
                             EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
         self._E1_fit = [False, False, False, False, True, True]
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -139,16 +130,13 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper_with_multiple_iterations(self, load_file_mock):
+    def test_copper_with_multiple_iterations(self):
         self._setup_copper_test()
         self._iterations = 2
         self._output_workspace = "copper_analysis_test"
         self._mode = self._mode + self._mode
         self._spec_range = self._spec_range + self._spec_range
         self._E1_fit = self._E1_fit + self._E1_fit
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -159,12 +147,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper_create_output(self, load_file_mock):
+    def test_copper_create_output(self):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         self._create_evs_calibration_alg()
         self._alg.setProperty("CreateOutput", True)
@@ -176,12 +161,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper_create_invalid_detectors_specified(self, load_file_mock):
+    def test_copper_create_invalid_detectors_specified(self):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         self._create_evs_calibration_alg()
         self._alg.setProperty("InvalidDetectors", [3, 5, 7, 141, 144, 149, 150, 159, 161, 163, 166, 167, 168, 170, 171, 172, 173, 185, 194,
@@ -197,12 +179,9 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         detector_specific_r_tols["L1"].update({k: TestConstants.INVALID_DETECTOR for k in [0, 2, 4]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
 
-    @patch('mvesuvio.calibrate_fit.EVSCalibrationFit._load_file')
-    def test_copper_with_individual_and_global_fit(self, load_file_mock):
+    def test_copper_with_individual_and_global_fit(self):
         self._setup_copper_test()
         self._output_workspace = "copper_analysis_test"
-
-        load_file_mock.side_effect = self._load_file_side_effect
 
         self._create_evs_calibration_alg()
         self._alg.setProperty("SharedParameterFitType", "Both")
@@ -214,6 +193,27 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                                                            165, 167, 168, 169, 170, 182, 191, 192]})
         self._assert_parameters_match_expected(params_table, detector_specific_r_tols)
         self._assert_E1_parameters_match_expected(params_table, 3e-3, "Both")
+
+    def _run_calibration_fit_with_local_workspaces(self, algorithm, **kwargs):
+        spectrum_range = kwargs["SpectrumRange"]
+        peak_type = kwargs["PeakType"]
+
+        if peak_type == PeakType.RECOIL.value:
+            kwargs["Samples"] = (
+                self._backscattering_samples
+                if spectrum_range == EVSGlobals.BACKSCATTERING_RANGE
+                else self._frontscattering_samples
+            )
+            kwargs.pop("Background", None)
+        elif peak_type == PeakType.RESONANCE.value:
+            if spectrum_range == EVSGlobals.BACKSCATTERING_RANGE:
+                kwargs["Samples"] = self._uranium_back_samples
+                kwargs["Background"] = self._uranium_back_background
+            else:
+                kwargs["Samples"] = self._uranium_front_samples
+                kwargs["Background"] = self._uranium_front_background
+
+        return self._run_calibration_fit(algorithm, **kwargs)
 
     def _assert_theta_parameters_match_expected(self, params_table, rel_tolerance):
         thetas = params_table.column('theta')
@@ -284,6 +284,7 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         return self._execute_evs_calibration_analysis()
 
     def tearDown(self):
+        self._run_calibration_fit_patcher.stop()
         mtd.clear()
 
 

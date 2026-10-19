@@ -13,10 +13,10 @@ from typing import Literal
 class EVSCalibrationAnalysisInputs:
     # Sample run numbers to fit peaks to (cannot be an empty str)
     # Samples: str = [17087, 17088]
-    Samples: str = [17087]
+    Samples: list[int] = [17087]
 
     # Run numbers to use as a background (can be empty)
-    Background: str = [17086]
+    Background: list[int] = [17086]
 
     # Filename of the instrument parameter file.
     InstrumentParameterFile: str = str(FilesManager.get_instrument_parameters_dir() / "IP0005.par")

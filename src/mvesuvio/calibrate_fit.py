@@ -42,7 +42,6 @@ from mantid.simpleapi import (
     MaskDetectors,
     ExtractUnmaskedSpectra,
     CreateWorkspace,
-    RenameWorkspace,
 )
 from functools import partial
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
@@ -63,7 +62,10 @@ class EVSCalibrationFit(PythonAlgorithm):
     def PyInit(self):
         self.declareProperty(WorkspaceGroupProperty("Samples", "", Direction.Input), doc="Sample workspaces to fit peaks to.")
 
-        self.declareProperty(WorkspaceGroupProperty("Background", "", Direction.Input), doc="Workspace to use as a background.")
+        self.declareProperty(
+            WorkspaceGroupProperty("Background", "", Direction.Input, PropertyMode.Optional),
+            doc="Optional workspace group to use as a background.",
+        )
 
         self.declareProperty(
             "Mode",
@@ -196,8 +198,9 @@ class EVSCalibrationFit(PythonAlgorithm):
         self._output_workspace_name = self.getPropertyValue("OutputWorkspace")
         if self._sample_run_numbers.size() == 0:
             raise ValueError("You must supply at least one sample run number.")
-        if self._bkg_run_numbers.size() > 0:
-            self._background = "" + self._bkg_run_numbers[0].name()
+        if self._bkg_run_numbers is not None and self._bkg_run_numbers.size() > 0:
+            background_suffix = "_".join(ws.name() for ws in self._bkg_run_numbers)
+            self._background = self._output_workspace_name + "_Background_" + background_suffix
 
         suffix = "_".join(ws.name() for ws in self._sample_run_numbers)
         self._sample = self._output_workspace_name + "_Sample_" + suffix
@@ -256,7 +259,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     @property
     def _background_provided(self):
-        return self._bkg_run_numbers.size() > 0
+        return self._bkg_run_numbers is not None and self._bkg_run_numbers.size() > 0
 
     def _normalise_sample_by_background(self):
         RebinToWorkspace(WorkspaceToRebin=self._background, WorkspaceToMatch=self._sample, OutputWorkspace=self._background)
@@ -986,11 +989,10 @@ class EVSCalibrationFit(PythonAlgorithm):
         """
         for ws_ix in range(group_ws.size()):
             if ws_ix == 0:
-                if group_ws[ws_ix].name() != output_name:
-                    RenameWorkspace(InputWorkspace=group_ws[ws_ix].name(), OutputWorkspace=output_name)
+                CloneWorkspace(InputWorkspace=group_ws[ws_ix], OutputWorkspace=output_name)
                 temp_ws_name = "__EVS_calib_temp_ws"
             else:
-                RenameWorkspace(InputWorkspace=group_ws[ws_ix].name(), OutputWorkspace=temp_ws_name)
+                CloneWorkspace(InputWorkspace=group_ws[ws_ix], OutputWorkspace=temp_ws_name)
                 Plus(output_name, temp_ws_name, OutputWorkspace=output_name)
                 DeleteWorkspace(temp_ws_name)
         CropWorkspace(output_name, XMin=xmin, XMax=xmax, OutputWorkspace=output_name)

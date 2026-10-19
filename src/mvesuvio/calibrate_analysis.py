@@ -8,7 +8,7 @@ from mantid.kernel import (
     IntBoundedValidator,
     FloatArrayProperty,
 )
-from mantid.api import FileProperty, FileAction, PythonAlgorithm, AlgorithmManager, WorkspaceGroupProperty, WorkspaceGroup
+from mantid.api import FileProperty, FileAction, PythonAlgorithm, AlgorithmManager, WorkspaceGroupProperty
 from mantid.simpleapi import (
     CreateEmptyTableWorkspace,
     DeleteWorkspace,
@@ -20,7 +20,6 @@ from mantid.simpleapi import (
     Transpose,
     PlotPeakByLogValue,
     RenameWorkspace,
-    CloneWorkspace,
 )
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
 from mvesuvio.globals import PeakType, Mode, SharedParameterFitType, FitFunction
@@ -164,8 +163,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         # repeatedly fit L1, E1 and Theta parameters
         table_group = []
-        group_e1_fit_back = CloneWorkspace(InputWorkspace=self._samples, OutputWorkspace="GroupE1FitBack")
-        group_e1_fit_front = CloneWorkspace(InputWorkspace=self._samples, OutputWorkspace="GroupE1FitFront")
         for i in range(self._iterations):
             # calibrate theta for all detectors
             theta_fit = self._current_workspace + "_theta"
@@ -187,8 +184,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             # calibrate E1 for backscattering detectors and use the backscattering averaged value for all detectors
             E1_fit_back = self._current_workspace + "_E1_back"
             invalid_detectors = self._run_calibration_fit(
-                Samples=group_e1_fit_back,
-                Background=WorkspaceGroup(),
+                Samples=self._samples,
                 Function=FitFunction.VOIGT.value,
                 Mode=Mode.SINGLE_DIFFERENCE.value,
                 SpectrumRange=EVSGlobals.BACKSCATTERING_RANGE,
@@ -215,8 +211,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             # calibrate L1 for frontscattering detectors based on the averaged E1 value  and calibrated theta values
             E1_fit_front = self._current_workspace + "_E1_front"
             invalid_detectors += self._run_calibration_fit(
-                Samples=group_e1_fit_front,
-                Background=WorkspaceGroup(),
+                Samples=self._samples,
                 Function=FitFunction.VOIGT.value,
                 Mode=Mode.SINGLE_DIFFERENCE.value,
                 SpectrumRange=EVSGlobals.FRONTSCATTERING_RANGE,

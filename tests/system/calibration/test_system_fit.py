@@ -30,7 +30,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._energy_estimates = np.array([EVSGlobals.ENERGY_ESTIMATE])
         self._alg = None
 
-        # Switches set to none, activated if necessary in the load file side_effect
+        # Switches set to none and activated when configuring each calibration load.
         self._L0_fit_active = None
         self._E1_fit_active = None
         self._current_run = None
@@ -47,7 +47,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._spec_range = [EVSGlobals.DETECTOR_RANGE]
         self._output_workspace = "copper_bragg_peak_fit"
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = self._configure_calibration_load
 
         expected_values = self._calculate_theta_peak_positions()
         params_table = self._run_evs_calibration_fit("Bragg")
@@ -59,7 +59,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._spec_range = [EVSGlobals.DETECTOR_RANGE]
         self._output_workspace = "lead_bragg_peak_fit"
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = self._configure_calibration_load
 
         expected_values = self._calculate_theta_peak_positions()
         params_table = self._run_evs_calibration_fit("Bragg")
@@ -74,7 +74,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._output_workspace = "copper_peak_fit"
         self._mode = [Mode.SINGLE_DIFFERENCE]
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = self._configure_calibration_load
 
         expected_values = self._calculate_energy_peak_positions()
         params_table = self._run_evs_calibration_fit("Recoil")
@@ -88,7 +88,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._output_workspace = "lead_peak_fit"
         self._mode = [Mode.SINGLE_DIFFERENCE]
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = self._configure_calibration_load
 
         expected_values = self._calculate_energy_peak_positions()
         params_table = self._run_evs_calibration_fit("Recoil")
@@ -102,7 +102,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._spec_range = [EVSGlobals.FRONTSCATTERING_RANGE]
         self._output_workspace = 'uranium_peak_fit_front'
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = self._configure_calibration_load
 
         expected_values = self._calculate_energy_peak_positions()
         params_table = self._run_evs_calibration_fit("Recoil")
@@ -116,7 +116,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._spec_range = [EVSGlobals.BACKSCATTERING_RANGE]
         self._output_workspace = 'uranium_peak_fit_back'
 
-        load_file_mock.side_effect = self._load_file_side_effect
+        load_file_mock.side_effect = self._configure_calibration_load
 
         expected_values = self._calculate_energy_peak_positions()
         params_table = self._run_evs_calibration_fit("Recoil")

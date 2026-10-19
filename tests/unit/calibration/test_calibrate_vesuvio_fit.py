@@ -1,6 +1,6 @@
 from mvesuvio.calibrate_fit import EVSCalibrationFit
 from mvesuvio.util.calibration_helpers import EVSGlobals
-from mock import MagicMock, patch, call
+from mock import ANY, MagicMock, patch, call
 from functools import partial
 from mantid.kernel import IntArrayProperty, FloatArrayProperty, Direction
 from mantid.api import WorkspaceGroup, WorkspaceGroupProperty
@@ -433,7 +433,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg.setProperty("Background", test_background_group)
 
         alg._setup_run_numbers_and_output_workspace()
-        self.assertEqual(test_background_group[0].name(), alg._background)
+        self.assertEqual(test_ws_name + '_Background_background_ws', alg._background)
         suffix = "_".join(ws.name() for ws in test_sample_group)
         self.assertEqual(test_ws_name + '_Sample_' + suffix, alg._sample)
 
@@ -609,8 +609,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
     @patch('mvesuvio.calibrate_fit.CropWorkspace')
     @patch('mvesuvio.calibrate_fit.DeleteWorkspace')
     @patch('mvesuvio.calibrate_fit.Plus')
-    @patch('mvesuvio.calibrate_fit.RenameWorkspace')
-    def test_sum_and_crop_ws(self, mock_rename, mock_plus, mock_delete, mock_crop):
+    @patch('mvesuvio.calibrate_fit.CloneWorkspace')
+    def test_sum_and_crop_ws(self, mock_clone, mock_plus, mock_delete, mock_crop):
         alg = EVSCalibrationFit()
         test_sample_group = WorkspaceGroup()
         CreateWorkspace(DataX=[0, 1], DataY=[1], OutputWorkspace="sample_ws_1")
@@ -620,8 +620,8 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         output_name = 'test_ws'
         xmin, xmax = 3, 7
         alg._sum_and_crop_ws(test_sample_group, output_name, xmin, xmax)
-        mock_rename.assert_has_calls([call(InputWorkspace="sample_ws_1", OutputWorkspace=output_name),
-                                      call(InputWorkspace="sample_ws_2", OutputWorkspace="__EVS_calib_temp_ws")])
+        mock_clone.assert_has_calls([call(InputWorkspace=ANY, OutputWorkspace=output_name),
+                                     call(InputWorkspace=ANY, OutputWorkspace="__EVS_calib_temp_ws")])
         mock_plus.assert_has_calls([call(output_name, "__EVS_calib_temp_ws", OutputWorkspace='test_ws')])
         mock_delete.assert_has_calls([call('__EVS_calib_temp_ws')])
         mock_crop.assert_has_calls([call(output_name, XMin=xmin, XMax=xmax, OutputWorkspace=output_name)])
