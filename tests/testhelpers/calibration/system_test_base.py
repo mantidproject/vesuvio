@@ -68,6 +68,12 @@ class EVSCalibrationTest(unittest.TestCase):
         self._energy_estimates = np.array(EVSGlobals.U_PEAK_ENERGIES)
         self._energy_estimates.sort()
 
+    def _load_uranium_fit_workspaces(self, samples, backgrounds, spectrum_range):
+        self._selected_mode = "FoilOut"
+        self._selected_spec_range = spectrum_range
+        self._run_range = self._load_group_ws(samples, False, "_uranium_sample")
+        self._background = self._load_group_ws(backgrounds, False, "_uranium_background")
+
     def _select_mode(self):
         self._selected_mode = self._mode.pop(0) if len(self._mode) > 1 else self._mode[0]
 
@@ -144,7 +150,7 @@ class EVSCalibrationTest(unittest.TestCase):
         return run_no
 
     def _background_run_range(self):
-        background = "" if self._E1_fit_active else self._background
+        background = None if self._E1_fit_active else self._background
         return background
 
     def _get_d_spacings(self):
