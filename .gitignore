@@ -9,3 +9,6 @@ figures/
 
 # Pixi environments (but commit pixi.lock for reproducible builds)
 .pixi/
+
+# Launch configurations for vscode debugger
+.vscode/

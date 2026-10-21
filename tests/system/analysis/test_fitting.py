@@ -12,6 +12,7 @@ matplotlib.use("Agg", force=True)
 
 from mvesuvio.util import handle_config
 from mvesuvio import ConfigArgInputs
+from mvesuvio.globals import FitModels
 from shutil import copytree, rmtree
 import mvesuvio
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
@@ -32,7 +33,6 @@ class TestFitting(unittest.TestCase):
             handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_inputs",
             dirs_exist_ok=True
             )
-        pass
 
     def setUp(self):
         rmtree(self.results_path, ignore_errors=True)
@@ -45,7 +45,7 @@ class TestFitting(unittest.TestCase):
         namespace = runpy.run_path(str(fitting_script), run_name="test_fitting_run_fitting")
         namespace["BackwardFittingInputs"].run_this_fitting_type = False
         namespace["ForwardFittingInputs"].run_this_fitting_type = True
-        namespace["ForwardFittingInputs"].fitting_model = "gauss"
+        namespace["ForwardFittingInputs"].fitting_model = FitModels.GAUSS
         with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
             namespace["run_fitting"]()
 
