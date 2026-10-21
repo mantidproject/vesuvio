@@ -11,14 +11,14 @@ from mvesuvio.util.files_manager import FilesManager
 
 
 class TestFittingInputsRoundTrip(unittest.TestCase):
-    def setUp(self):
-        self.output_dir = tempfile.TemporaryDirectory()
-        FilesManager.set_experiment_dir(self.output_dir.name)
+    @classmethod
+    def setUpClass(cls):
+        cls.output_dir = tempfile.TemporaryDirectory()
+        FilesManager.set_experiment_dir(cls.output_dir.name)
         AnalysisDataService.clear()
 
     def tearDown(self):
         AnalysisDataService.clear()
-        FilesManager._experiment_dir = None
         self.output_dir.cleanup()
 
     @staticmethod
@@ -65,7 +65,6 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         )
 
         ForwardAnalysisInputs.run_this_scattering_type = True
-        ForwardAnalysisInputs.name = "front"
         ForwardAnalysisInputs.name_of_subtracted_workspace = "front"
         ForwardAnalysisInputs.overwrite_analysis_input_workspace = ""
         ForwardAnalysisInputs.number_of_iterations_for_corrections = 0

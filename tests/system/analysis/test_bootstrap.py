@@ -24,12 +24,10 @@ class TestBootstrap(unittest.TestCase):
         rmtree(cls.bootstrap_inputs_path, ignore_errors=True)
         rmtree(cls.bootstrap_output_path, ignore_errors=True)
         copytree(BOOTSTRAP_INPUTS_PATH, cls.bootstrap_inputs_path, dirs_exist_ok=True)
-
-    def setUp(self):
-        rmtree(self.bootstrap_output_path, ignore_errors=True)
         AnalysisDataService.clear()
 
-    def tearDown(self) -> None:
+    @classmethod
+    def tearDownClass(cls) -> None:
         # NOTE: Very important to reset experiment directory, otherwise subsequent tests may be affected.
         FilesManager._experiment_dir = None
         AnalysisDataService.clear()
