@@ -20,7 +20,7 @@ import numpy as np
 import math
 from pathlib import Path
 
-from mvesuvio.globals import Tags
+from mvesuvio.globals import ModeRunning, ScatteringType, Tags
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util import general_helpers
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
@@ -33,21 +33,6 @@ if TYPE_CHECKING:
     from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
 
 import ntpath
-
-
-def _get_scattering_type(inputs_class) -> str:
-    """Infer scattering type from user inputs without depending on concrete class symbols."""
-    name = str(getattr(inputs_class, "name", "")).lower()
-    class_name = getattr(inputs_class, "__name__", "").lower()
-    mode = str(getattr(inputs_class, "mode", "")).lower().replace(" ", "")
-
-    if name.startswith("back") or "backward" in class_name or mode == "doubledifference":
-        return "backward"
-
-    if name.startswith("front") or "forward" in class_name or mode == "singledifference":
-        return "forward"
-
-    raise ValueError(f"Could not infer scattering type for input class: {inputs_class}")
 
 
 def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_index, rtol, max_iter):
@@ -235,9 +220,9 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
     profiles_table = create_profiles_table(ws_name + "_initial_parameters", inputs_class)
     instrument_parameters_file = str(FilesManager.get_instrument_parameters_dir() / inputs_class.instrument_parameters_file)
 
-    scattering_type = _get_scattering_type(inputs_class)
+    scattering_type = general_helpers._get_scattering_type(inputs_class)
 
-    if scattering_type == "forward":
+    if scattering_type == ScatteringType.FORWARD:
         inputs_class.chosen_mass_index = 0
         inputs_class.intensity_ratio_of_hydrogen_to_chosen_mass = 0
 
@@ -251,7 +236,7 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
         "InvalidDetectors": convert_to_list_of_spectrum_numbers(inputs_class.mask_detectors),
         "MultipleScatteringCorrection": inputs_class.do_multiple_scattering_correction,
         "GammaCorrection": inputs_class.do_gamma_correction,
-        "ModeRunning": "BACKWARD" if scattering_type == "backward" else "FORWARD",
+        "ModeRunning": ModeRunning.BACKWARD.value if scattering_type == ScatteringType.BACKWARD else ModeRunning.FORWARD.value,
         "TransmissionGuess": inputs_class.transmission_guess,
         "MultipleScatteringOrder": int(inputs_class.multiple_scattering_order),
         "NumberOfEvents": int(inputs_class.multiple_scattering_number_of_events),
@@ -314,13 +299,13 @@ def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalys
 def store_input_ws_if_not_on_path(
     inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs],
 ) -> tuple[Path, Path]:
-    scattering_type = _get_scattering_type(inputs_class)
+    scattering_type = general_helpers._get_scattering_type(inputs_class)
 
-    if scattering_type == "backward":
+    if scattering_type == ScatteringType.BACKWARD:
         raw_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_backward_raw_filename()
         empty_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_backward_empty_filename()
 
-    elif scattering_type == "forward":
+    elif scattering_type == ScatteringType.FORWARD:
         raw_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_forward_raw_filename()
         empty_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_forward_empty_filename()
     else:

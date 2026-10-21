@@ -5,20 +5,21 @@ from typing import Any
 from mantid.kernel import logger
 from mantid.simpleapi import AnalysisDataService, Load, SumSpectra
 
+from mvesuvio.globals import ScatteringType
 from mvesuvio.util.files_manager import FilesManager
 
 
-def _infer_scattering_type(inputs_class: Any) -> str:
-    """Infer scattering type from user inputs without importing reduction helpers."""
+def _get_scattering_type(inputs_class: Any) -> ScatteringType:
+    """Infer scattering type from user inputs."""
     name = str(getattr(inputs_class, "name", "")).lower()
     class_name = getattr(inputs_class, "__name__", "").lower()
     mode = str(getattr(inputs_class, "mode", "")).lower().replace(" ", "")
 
     if name.startswith("back") or "backward" in class_name or mode == "doubledifference":
-        return "backward"
+        return ScatteringType.BACKWARD
 
     if name.startswith("front") or "forward" in class_name or mode == "singledifference":
-        return "forward"
+        return ScatteringType.FORWARD
 
     raise ValueError(f"Could not infer scattering type for input class: {inputs_class}")
 
