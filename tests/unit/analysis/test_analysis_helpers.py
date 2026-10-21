@@ -10,8 +10,6 @@ from mvesuvio.util.general_helpers import print_table_workspace
 from mantid.simpleapi import AnalysisDataService
 
 class TestAnalysisHelpers(unittest.TestCase):
-    def setUp(self):
-        pass
 
     def tearDown(self):
         AnalysisDataService.clear()

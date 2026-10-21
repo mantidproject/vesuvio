@@ -2,6 +2,7 @@ from mvesuvio.globals import Tags
 from mvesuvio.util import handle_config
 from pathlib import Path
 from mantid.kernel import ConfigService
+from functools import partialmethod
 
 
 class FilesManager:
@@ -30,21 +31,11 @@ class FilesManager:
         subdir.mkdir(parents=True, exist_ok=True)
         return subdir
 
-    @classmethod
-    def get_reduction_outputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("reduction_outputs")
-
-    @classmethod
-    def get_reduction_inputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("reduction_inputs")
-
-    @classmethod
-    def get_fitting_outputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("fitting_outputs")
-
-    @classmethod
-    def get_fitting_inputs_dir(cls) -> Path:
-        return cls._get_experiment_subdir("fitting_inputs")
+    get_reduction_outputs_dir = partialmethod(_get_experiment_subdir, "reduction_outputs")
+    get_reduction_inputs_dir = partialmethod(_get_experiment_subdir, "reduction_inputs")
+    get_fitting_outputs_dir = partialmethod(_get_experiment_subdir, "fitting_outputs")
+    get_fitting_inputs_dir = partialmethod(_get_experiment_subdir, "fitting_inputs")
+    get_calibration_inputs_dir = partialmethod(_get_experiment_subdir, "calibration_inputs")
 
     @classmethod
     def get_bootstrap_inputs_dir(cls) -> Path:
@@ -60,19 +51,19 @@ class FilesManager:
 
     @staticmethod
     def get_backward_raw_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Backward, "raw")
+        return FilesManager._get_detector_filename(Tags.BACKWARD, "raw")
 
     @staticmethod
     def get_backward_empty_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Backward, "empty")
+        return FilesManager._get_detector_filename(Tags.BACKWARD, "empty")
 
     @staticmethod
     def get_forward_raw_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Forward, "raw")
+        return FilesManager._get_detector_filename(Tags.FORWARD, "raw")
 
     @staticmethod
     def get_forward_empty_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.Forward, "empty")
+        return FilesManager._get_detector_filename(Tags.FORWARD, "empty")
 
     @staticmethod
     def get_mantid_log_file() -> Path:

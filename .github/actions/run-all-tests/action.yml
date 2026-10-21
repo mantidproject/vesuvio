@@ -18,19 +18,16 @@ runs:
       shell: bash
 
     - name: Run mvesuvio unit tests
-      run: |
-        pixi run -e vesuvio-developer test-unit-coverage
+      run: pixi run -e vesuvio-developer test-unit-coverage
       shell: bash
 
     - name: Send coverage report to Coveralls
       if: runner.os != 'Windows'
       env:
         COVERALLS_REPO_TOKEN : ${{ inputs.token }}
-      run: |
-        pixi run -e vesuvio-developer coveralls --service=github-actions
+      run: pixi run -e vesuvio-developer coveralls --service=github-actions
       shell: bash
 
     - name: Run mvesuvio system tests
-      run: |
-        pixi run -e vesuvio-developer test-system
+      run: pixi run -e vesuvio-developer test-system
       shell: bash

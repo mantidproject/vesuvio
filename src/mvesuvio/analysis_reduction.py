@@ -46,6 +46,7 @@ from mvesuvio.util.analysis_helpers import (
     pseudo_voigt,
 )
 from mvesuvio.util.general_helpers import print_table_workspace
+from mvesuvio.globals import ModeRunning
 from mvesuvio.util.constraints_transport import deserialize_constraints
 
 try:
@@ -102,8 +103,8 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self.declareProperty(name="GammaCorrection", defaultValue=False, doc="Whether to run gamma correction.")
         self.declareProperty(
             name="ModeRunning",
-            defaultValue="BACKWARD",
-            validator=StringListValidator(["BACKWARD", "FORWARD"]),
+            defaultValue=ModeRunning.BACKWARD.value,
+            validator=StringListValidator([mode.value for mode in ModeRunning]),
             doc="Whether running backward or forward scattering.",
         )
 

@@ -15,8 +15,6 @@ np.random.seed(4)
 
 
 class TestAnalysisReduction(unittest.TestCase):
-    def setUp(self):
-        pass
 
     def test_properites_vesuvio_analysis_algorithm(self):
 
