@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, DeleteWorkspace, RenameWorkspace, SaveNexus
 
-from mvesuvio.globals import ScatteringType
+from mvesuvio.globals import ScatteringType, Mode
 from mvesuvio.util import general_helpers
 
 
@@ -15,13 +15,13 @@ class TestGeneralHelpers(unittest.TestCase):
 
     def test_get_scattering_type_returns_backward_enum(self):
         class BackwardInputs:
-            mode = "DoubleDifference"
+            mode = Mode.DOUBLE_DIFFERENCE.value
 
         self.assertIs(general_helpers._get_scattering_type(BackwardInputs), ScatteringType.BACKWARD)
 
     def test_get_scattering_type_returns_forward_enum(self):
         class ForwardInputs:
-            mode = "SingleDifference"
+            mode = Mode.SINGLE_DIFFERENCE.value
 
         self.assertIs(general_helpers._get_scattering_type(ForwardInputs), ScatteringType.FORWARD)
 

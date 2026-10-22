@@ -439,8 +439,8 @@ class TestReductionHelpers(unittest.TestCase):
     @patch('mvesuvio.util.reduction_helpers.store_input_ws_if_not_on_path')
     def test_load_input_ws_loads_raw_and_empty_workspaces(self, mock_store, mock_load, mock_sum_spectra):
         class DummyInputs:
-            name = "backward"
-            mode = "SingleDifference"
+            name = ScatteringType.BACKWARD.value
+            mode = Mode.SINGLE_DIFFERENCE.value
             runs = "1234"
             empty_runs = "5678"
             instrument_parameters_file = "ipfile.txt"
