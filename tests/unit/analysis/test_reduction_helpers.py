@@ -8,7 +8,7 @@ import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
 
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
-from mvesuvio.globals import Tags, Mode
+from mvesuvio.globals import Tags, Mode, ScatteringType
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
