@@ -6,6 +6,11 @@ class Tags(StrEnum):
     FORWARD = "front"
 
 
+class ScatteringType(StrEnum):
+    BACKWARD = "backward"
+    FORWARD = "forward"
+
+
 class FitModels(StrEnum):
     GAUSS = "gauss"
     GAUSS_CNTR = "gauss_cntr"

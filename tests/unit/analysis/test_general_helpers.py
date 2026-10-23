@@ -5,12 +5,68 @@ from textwrap import dedent
 from unittest.mock import patch
 
 import numpy as np
-from mantid.simpleapi import CreateWorkspace, DeleteWorkspace
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, DeleteWorkspace, RenameWorkspace, SaveNexus
 
+from mvesuvio.globals import ScatteringType, Mode
 from mvesuvio.util import general_helpers
 
 
 class TestGeneralHelpers(unittest.TestCase):
+
+    def test_get_scattering_type_returns_backward_enum(self):
+        class BackwardInputs:
+            mode = Mode.DOUBLE_DIFFERENCE.value
+
+        self.assertIs(general_helpers._get_scattering_type(BackwardInputs), ScatteringType.BACKWARD)
+
+    def test_get_scattering_type_returns_forward_enum(self):
+        class ForwardInputs:
+            mode = Mode.SINGLE_DIFFERENCE.value
+
+        self.assertIs(general_helpers._get_scattering_type(ForwardInputs), ScatteringType.FORWARD)
+
+    def test_load_overwritten_workspace_if_specified(self):
+        class Inputs:
+            overwrite_analysis_input_workspace = "override_front"
+
+        ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+        RenameWorkspace(ws, "override_front")
+
+        result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
+
+        self.assertEqual(result, "override_front")
+        self.assertTrue(AnalysisDataService.doesExist("override_front_sum"))
+
+        DeleteWorkspace("override_front")
+        DeleteWorkspace("override_front_sum")
+
+    def test_load_overwritten_workspace_if_specified_for_path_override(self):
+        class Inputs:
+            overwrite_analysis_input_workspace = ""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF")
+            path = os.path.join(temp_dir, "override_front_from_path.nxs")
+            SaveNexus(ws, path)
+            DeleteWorkspace(ws)
+
+            Inputs.overwrite_analysis_input_workspace = path
+
+            result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
+
+            self.assertEqual(result, "override_front_from_path")
+            self.assertTrue(AnalysisDataService.doesExist("override_front_from_path_sum"))
+
+            DeleteWorkspace("override_front_from_path")
+            DeleteWorkspace("override_front_from_path_sum")
+
+    def test_load_overwritten_workspace_if_specified_for_empty_string(self):
+        class Inputs:
+            overwrite_analysis_input_workspace = ""
+
+        result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
+
+        self.assertEqual(result, "")
 
     def test_extract_ws(self):
         data = [1, 2, 3]

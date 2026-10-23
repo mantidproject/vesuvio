@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
+from mvesuvio.globals import ScatteringType
 from mvesuvio.util.analysis_helpers import load_resolution
 from mvesuvio.util import handle_config
 from mantid.simpleapi import CreateWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
@@ -27,7 +28,6 @@ class TestAnalysisReduction(unittest.TestCase):
             "NumberOfIterations": 4,
             "InvalidDetectors": [3],
             "MultipleScatteringCorrection": False,
-            "SampleShapeXml": "",
             "GammaCorrection": True,
             "ModeRunning": "BACKWARD",
             "TransmissionGuess": 0,
@@ -417,6 +417,46 @@ class TestAnalysisReduction(unittest.TestCase):
         np.testing.assert_allclose(ncp_array_masked[:, cut_off_idx:], ncp_array_cut, atol=1e-6)
 
 
+    @patch("mvesuvio.analysis_reduction.scipy.optimize.minimize")
+    def test_fit_neutron_compton_profiles_to_row_passes_constraints_to_minimize(self, mock_minimize):
+        alg = VesuvioAnalysisRoutine()
+
+        constraints = ({"type": "eq", "fun": lambda par: par[0] - 1.0},)
+        alg._constraints = constraints
+        alg._initial_fit_parameters = [1.0, 5.0, 0.0]
+        alg._initial_fit_bounds = [[0, None], [3, 6], [-1, 1]]
+        alg._row_being_fit = 0
+        alg._dataY = np.array([[1.0, 1.0, 1.0, 1.0]])
+        alg._profiles_table = MagicMock(
+            rowCount=MagicMock(return_value=1),
+            column=MagicMock(return_value=["1"]),
+        )
+        alg._instrument_params = np.array([[144, 144, 54.1686, -0.41, 11.005, 0.720184]])
+
+        alg._table_fit_results = MagicMock()
+        alg._fit_parameters = np.zeros((1, 5))
+
+        ncp_total = np.zeros(4)
+        fse_total = np.zeros(4)
+        alg._fit_profiles_workspaces = {
+            "1": MagicMock(dataY=lambda row: np.zeros(4)),
+            "total": MagicMock(dataY=lambda row: ncp_total),
+        }
+        alg._fit_fse_workspaces = {
+            "1": MagicMock(dataY=lambda row: np.zeros(4)),
+            "total": MagicMock(dataY=lambda row: fse_total),
+        }
+
+        alg._neutron_compton_profiles = MagicMock(return_value=(np.array([[0.1, 0.2, 0.3, 0.4]]), np.array([[0.0, 0.0, 0.0, 0.0]])))
+
+        mock_minimize.return_value = {"x": np.array([1.2, 5.1, 0.1]), "fun": 0.1}
+
+        alg._fit_neutron_compton_profiles_to_row()
+
+        self.assertTrue(mock_minimize.called)
+        self.assertIs(mock_minimize.call_args.kwargs["constraints"], constraints)
+
+
     def test_set_gaussian_resolution(self):
 
         alg = VesuvioAnalysisRoutine()
@@ -523,6 +563,24 @@ class TestAnalysisReduction(unittest.TestCase):
         self.assertEqual(alg._std_intensity_ratios[1], np.nanstd(np.array([3.1, np.nan, np.nan, 3.2, 3.1]) / np.array([7.8+3.1, np.nan, np.nan, np.nan, 7.3+3.1])))
 
 
+    def test_create_multiple_scattering_workspaces_adds_hydrogen_for_lowercase_backward_mode(self):
+        alg = VesuvioAnalysisRoutine()
+        alg._masses = np.array([12.0, 16.0])
+        alg._mean_widths = np.array([8.0, 10.0])
+        alg._mean_intensity_ratios = np.array([0.7, 0.3])
+        alg._mode_running = ScatteringType.BACKWARD
+        alg._chosen_index_for_h_ratio = 0
+        alg._h_ratio = 2.0
+        alg._transmission_guess = 0.85
+
+        # Stop right after the mode-dependent block, nothing later is under test
+        with patch("mvesuvio.analysis_reduction.VesuvioThickness", side_effect=StopIteration) as mock_thickness:
+            with self.assertRaises(StopIteration):
+                alg.create_multiple_scattering_workspaces()
+
+        np.testing.assert_allclose(mock_thickness.call_args.kwargs["Masses"], [12.0, 16.0, 1.0079])
+
+
     def test_create_multiple_scattering_workspaces(self):
         unit_test_dir = Path(__file__).parent.parent.parent / "data/analysis/unit"
         ws_input = Load(str(unit_test_dir / "system_test_inputs_bckwd_cropped.nxs"))
@@ -540,7 +598,7 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._masses = np.array([12.0, 16.0, 27.0])
         alg._mean_widths = np.array([15.35080, 8.72859, 13.89955])
         alg._mean_intensity_ratios = np.array([0.53110, 0.17667, 0.29223])
-        alg._mode_running = "BACKWARD"
+        alg._mode_running = "backward"
         alg._chosen_index_for_h_ratio = 0
         alg._h_ratio = 19.0620008206
         alg._transmission_guess = 0.8537

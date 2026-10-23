@@ -71,8 +71,11 @@ def apply_bootstrap_overrides(back_inputs, front_inputs, back_ws_path: Path | No
     back_override = str(back_ws_path.absolute()) if back_ws_path is not None else ""
     front_override = str(front_ws_path.absolute()) if front_ws_path is not None else ""
 
+    # Keep legacy attribute for compatibility while using the new canonical override field.
     setattr(back_inputs, "override_input_workspace", back_override)
     setattr(front_inputs, "override_input_workspace", front_override)
+    setattr(back_inputs, "overwrite_analysis_input_workspace", back_override)
+    setattr(front_inputs, "overwrite_analysis_input_workspace", front_override)
 
     if back_override:
         back_inputs.name = Path(back_override).stem

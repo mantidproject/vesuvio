@@ -36,26 +36,17 @@ class FilesManager:
     get_fitting_outputs_dir = partialmethod(_get_experiment_subdir, "fitting_outputs")
     get_fitting_inputs_dir = partialmethod(_get_experiment_subdir, "fitting_inputs")
     get_calibration_inputs_dir = partialmethod(_get_experiment_subdir, "calibration_inputs")
+    get_bootstrap_inputs_dir = partialmethod(_get_experiment_subdir, "boot_inputs")
+    get_bootstrap_outputs_dir = partialmethod(_get_experiment_subdir, "boot_outputs")
 
     @staticmethod
     def _get_detector_filename(tag: str, kind: str) -> str:
         return handle_config.get_experiment_name() + "_" + kind + "_" + tag + ".nxs"
 
-    @staticmethod
-    def get_backward_raw_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.BACKWARD, "raw")
-
-    @staticmethod
-    def get_backward_empty_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.BACKWARD, "empty")
-
-    @staticmethod
-    def get_forward_raw_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.FORWARD, "raw")
-
-    @staticmethod
-    def get_forward_empty_filename() -> str:
-        return FilesManager._get_detector_filename(Tags.FORWARD, "empty")
+    get_backward_raw_filename = partialmethod(_get_detector_filename, Tags.BACKWARD, "raw")
+    get_backward_empty_filename = partialmethod(_get_detector_filename, Tags.BACKWARD, "empty")
+    get_forward_raw_filename = partialmethod(_get_detector_filename, Tags.FORWARD, "raw")
+    get_forward_empty_filename = partialmethod(_get_detector_filename, Tags.FORWARD, "empty")
 
     @staticmethod
     def get_mantid_log_file() -> Path:
