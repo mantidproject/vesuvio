@@ -4,7 +4,7 @@ from pathlib import Path
 import math
 from typing import Dict
 from mvesuvio import ConfigArgInputs
-from mvesuvio.globals import Mode
+from mvesuvio.globals import Masking, Mode
 from mvesuvio.util import general_helpers
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
@@ -108,9 +108,14 @@ class BackwardAnalysisInputs:
     constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[0] - RECOIL_WEIGHT["O"] * par[3])}
 
     number_of_iterations_for_corrections = 0  # 4
-    # Y-space derived inputs are prepared at end of reduction for fitting.
-    range_for_rebinning_in_y_space = "-25, 0.5, 25"
+    # Y-space reduction is performed at the end of reduction and its outputs are used by run_fitting.py
+    range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     subtract_calculated_fse_from_data = True
+    do_symmetrisation = False
+    # Type of masking
+    # Masking.NAN: Zeros in workspace being fit are ignored
+    # Masking.NCP: Zeros in workspace being fit are replaced by the fitted neutron compton profile
+    mask_zeros_with = Masking.NAN
     do_multiple_scattering_correction = True
     # Exact recoil ratio used to estimate Hydrogen intensity
     chosen_mass_index = 0  # C is indexed 0 in backward masses list
@@ -164,9 +169,14 @@ class ForwardAnalysisInputs:
     constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[3] - RECOIL_WEIGHT["O"] * par[6])}
 
     number_of_iterations_for_corrections = 1  # 4
-    # Y-space derived inputs are prepared at end of reduction for fitting.
-    range_for_rebinning_in_y_space = "-25, 0.5, 25"
+    # Y-space reduction is performed at the end of reduction and its outputs are used by run_fitting.py
+    range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     subtract_calculated_fse_from_data = True
+    do_symmetrisation = False
+    # Type of masking
+    # Masking.NAN: Zeros in workspace being fit are ignored
+    # Masking.NCP: Zeros in workspace being fit are replaced by the fitted neutron compton profile
+    mask_zeros_with = Masking.NAN
     do_multiple_scattering_correction = True
     transmission_guess = 0.9  # T : Experimental value from VesuvioTransmission
     multiple_scattering_order = 2

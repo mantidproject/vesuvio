@@ -34,6 +34,7 @@ class TestHRatioRoutine(unittest.TestCase):
 
     def tearDown(self) -> None:
         AnalysisDataService.clear()
+        FilesManager._experiment_dir = None
 
     def test_h_ratio_routine(self):
         reduction_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_reduction.py"

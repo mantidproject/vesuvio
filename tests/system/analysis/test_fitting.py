@@ -41,6 +41,7 @@ class TestFitting(unittest.TestCase):
 
     def tearDown(self) -> None:
         AnalysisDataService.clear()
+        FilesManager._experiment_dir = None
 
     def test_fitting_routine(self):
         fitting_script = handle_config.USER_CONFIG_PATH / "experiment_template" / "run_fitting.py"

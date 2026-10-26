@@ -14,6 +14,10 @@ from mvesuvio.util.files_manager import FilesManager
 
 
 class TestReductionHelpers(unittest.TestCase):
+    def setUp(self):
+        patcher = patch.object(reduction_helpers, "ySpaceReduction", return_value=(MagicMock(), MagicMock()))
+        self.mock_y_space_reduction = patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_save_fitting_input_workspaces_uses_helper_module(self):
         with tempfile.TemporaryDirectory() as temp_dir:
