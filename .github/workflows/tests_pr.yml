@@ -23,7 +23,7 @@ jobs:
       - name: Setup Pixi
         uses: prefix-dev/setup-pixi@v0
 
-      - name: Check for files changed 
+      - name: Check for files changed
         run: |
           if [[ "${{ github.event.action }}" == "opened" ]]; then
             echo "files-changed=true" >> "$GITHUB_ENV"
