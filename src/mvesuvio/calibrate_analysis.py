@@ -156,8 +156,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._calculate_time_delay(t0_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE)
         else:
             # Just copy values over from parameter file
-            t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0")
-            L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0")
+            t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0", EVSGlobals.DETECTOR_RANGE)
+            L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0", EVSGlobals.DETECTOR_RANGE)
             self._set_table_column(self._current_workspace, "t0", t0)
             self._set_table_column(self._current_workspace, "L0", L0)
 

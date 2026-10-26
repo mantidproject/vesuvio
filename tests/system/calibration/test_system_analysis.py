@@ -35,10 +35,6 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._E1_fit_active = None
         self._current_run = None
 
-        # Lists in order of call of EVSCalibrationFit in the EVSCalibrationAnalysis function
-        self._mode = [Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
-        self._spec_range = [EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
-        self._E1_fit = [False, True, True]
         self._L0_fit = [False]
         self._run_calibration_fit = EVSCalibrationAnalysis._run_calibration_fit
         self._run_calibration_fit_patcher = patch.object(
@@ -133,10 +129,10 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
     def test_copper_with_multiple_iterations(self):
         self._setup_copper_test()
         self._iterations = 2
+        self._mode = [Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
+        self._spec_range = [EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
+        self._E1_fit = [False, True, True]
         self._output_workspace = "copper_analysis_test"
-        self._mode = self._mode + self._mode
-        self._spec_range = self._spec_range + self._spec_range
-        self._E1_fit = self._E1_fit + self._E1_fit
 
         params_table = self._run_evs_calibration_analysis()
 

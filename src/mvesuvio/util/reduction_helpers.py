@@ -41,8 +41,8 @@ def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_inde
     Preliminary forward scattering is run to get rough estimate of H to first mass ratio.
     Runs iterative procedure with alternating back and forward scattering.
     """
-    assert back_alg.getPropertyValue("ModeRunning") == "BACKWARD"
-    assert front_alg.getPropertyValue("ModeRunning") == "FORWARD"
+    assert back_alg.getPropertyValue("ModeRunning") == ModeRunning.BACKWARD.value
+    assert front_alg.getPropertyValue("ModeRunning") == ModeRunning.FORWARD.value
 
     # Ask for explicit consent from user to start procedure
     try:
@@ -126,8 +126,8 @@ def is_hydrogen_present(masses) -> bool:
 
 
 def execute_joint_algorithms(back_alg, front_alg):
-    assert back_alg.getPropertyValue("ModeRunning") == "BACKWARD"
-    assert front_alg.getPropertyValue("ModeRunning") == "FORWARD"
+    assert back_alg.getPropertyValue("ModeRunning") == ModeRunning.BACKWARD.value
+    assert front_alg.getPropertyValue("ModeRunning") == ModeRunning.FORWARD.value
 
     back_alg.execute()
 

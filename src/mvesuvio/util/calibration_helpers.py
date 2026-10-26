@@ -2,6 +2,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy.constants
 from mantid.simpleapi import CreateEmptyTableWorkspace, mtd
+from mvesuvio.globals import FitFunction
 
 
 class EVSGlobals:
@@ -197,15 +198,14 @@ class EVSMiscFunctions:
         """
 
         offset = EVSGlobals.DETECTOR_RANGE[0]
-        if len(spec_list) > 1:
-            lower, upper = spec_list
+        if len(spec_list) == 1:
+            lower = upper = spec_list[0]
         else:
-            lower = spec_list[0]
-            upper = spec_list[0]
+            lower, upper = spec_list
 
         column_values = mtd[table_name].column(column_name)
 
-        return np.array(column_values[lower - offset : upper + 1 - offset])
+        return np.array(column_values[lower - offset : upper - offset + 1])
 
     @staticmethod
     def read_fitting_result_table_column(table_name, column_name, spec_list):
@@ -217,24 +217,21 @@ class EVSMiscFunctions:
         @param spec_list - range of spectra to use
         @return numpy array of values in the spec_list range
         """
-
-        offset = spec_list[0]
-        if len(spec_list) > 1:
-            lower, upper = spec_list
+        if len(spec_list) == 1:
+            upper = lower = spec_list[0]
         else:
-            lower = spec_list[0]
-            upper = spec_list[0]
+            lower, upper = spec_list
 
         column_values = mtd[table_name].column(column_name)
 
-        return np.array(column_values[lower - offset : upper + 1 - offset])
+        return np.array(column_values[0 : upper - lower + 1])
 
     @staticmethod
     def generate_fit_function_header(function_type, error=False):
-        if function_type == "Voigt":
+        if function_type == FitFunction.VOIGT:
             error_str = "Err" if error else ""
             func_header = {"Height": "LorentzAmp", "Position": "LorentzPos", "Width": "LorentzFWHM", "Width_2": "GaussianFWHM"}
-        elif function_type == "Gaussian":
+        elif function_type == FitFunction.GAUSSIAN:
             error_str = "_Err" if error else ""
             func_header = {"Height": "Height", "Width": "Sigma", "Position": "PeakCentre"}
         else:
