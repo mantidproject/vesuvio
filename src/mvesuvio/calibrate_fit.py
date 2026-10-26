@@ -45,7 +45,7 @@ from mantid.simpleapi import (
 )
 from functools import partial
 from mvesuvio.util.calibration_helpers import EVSGlobals, EVSMiscFunctions, InvalidDetectors
-from mvesuvio.globals import Mode, PeakType, SharedParameterFitType, FitFunction
+from mvesuvio.globals import Mode, SharedParameterFitType, FitFunction, PeakType
 import os
 import sys
 import scipy.constants
@@ -238,11 +238,11 @@ class EVSCalibrationFit(PythonAlgorithm):
 
     @property
     def _fitting_recoil_peaks(self):
-        return self._peak_type == "Recoil" and not self._fitting_bragg_peaks
+        return self._peak_type == PeakType.RECOIL.value and not self._fitting_bragg_peaks
 
     @property
     def _fitting_resonance_peaks(self):
-        return self._peak_type == "Resonance" and not self._fitting_bragg_peaks
+        return self._peak_type == PeakType.RESONANCE.value and not self._fitting_bragg_peaks
 
     def _preprocess(self):
         """
@@ -681,7 +681,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         GroupWorkspaces(self._output_parameter_tables, OutputWorkspace=self._output_workspace_name + "_Peak_Parameters")
 
-        if self._shared_parameter_fit_type != "Individual":
+        if self._shared_parameter_fit_type != SharedParameterFitType.INDIVIDUAL.value:
             self._shared_parameter_fit(output_parameter_table_name, output_parameter_table_headers)
 
     def _shared_parameter_fit(self, output_parameter_table_name, output_parameter_table_headers):

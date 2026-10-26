@@ -12,7 +12,7 @@ from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
 from copy import copy, deepcopy
 from os import path
-from mvesuvio.globals import Mode, PeakType
+from mvesuvio.globals import Mode, PeakType, SharedParameterFitType
 
 
 class TestEVSCalibrationAnalysis(EVSCalibrationTest):
@@ -239,11 +239,11 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                        np.ma.masked_array(L1, mask=invalid_detector_mask), rel_tolerance)
 
     def _assert_E1_parameters_match_expected(self, params_table, rel_tolerance, fit_type):
-        if fit_type != "Shared":
+        if fit_type != SharedParameterFitType.SHARED.value:
             E1 = params_table.column('E1')[0]
             self.assertAlmostEqual(E1, EVSGlobals.ENERGY_ESTIMATE, delta=EVSGlobals.ENERGY_ESTIMATE*rel_tolerance)
 
-        if fit_type != "Individual":
+        if fit_type != SharedParameterFitType.INDIVIDUAL.value:
             global_E1 = params_table.column('global_E1')[0]
             self.assertAlmostEqual(global_E1, EVSGlobals.ENERGY_ESTIMATE, delta=EVSGlobals.ENERGY_ESTIMATE*rel_tolerance)
 
