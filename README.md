@@ -6,7 +6,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/mantid/mvesuvio/badges/version.svg)](https://anaconda.org/mantid/mvesuvio)
 [![Anaconda-Server Badge](https://anaconda.org/mantid/mvesuvio/badges/downloads.svg)](https://anaconda.org/mantid/mvesuvio)
 
-This repository contains:
+This repository contains typo:
 - `mvesuvio` package containing Neutron Compton Profile (NCP) analysis procedures for Vesuvio, published nightly.
 - Vesuvio calibration scripts, under the `tools` folder
 

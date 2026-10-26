@@ -95,6 +95,6 @@ line-length = 140
 ignore = ["F405", "F403"]
 
 [tool.ruff.format]
-skip-magic-trailing-comma = false
+skip-magic-trailing-comma = false 
 line-ending = "auto"
 exclude = ["tests/unit/**", "tests/system/**"]
