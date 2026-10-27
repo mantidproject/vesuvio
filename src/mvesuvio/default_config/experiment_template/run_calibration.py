@@ -31,12 +31,12 @@ class EVSCalibrationAnalysisInputs:
     # Value at which to fix E1 value and E1 error (form: E1 value, E1 Error).
     # If no input is provided, values will be calculated
     # Default is []
-    E1FixedValueAndError: list = []
+    E1FixedValueAndError: list[float] = []
 
     # List of detectors to be marked as invalid (3-198),
     # to be excluded from analysis calculations.
     # Default is []
-    InvalidDetectors: list = []
+    InvalidDetectors: list[int] = []
 
     # Number of iterations to perform.
     # Default is 2
