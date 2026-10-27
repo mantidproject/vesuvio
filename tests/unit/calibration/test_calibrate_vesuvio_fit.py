@@ -5,7 +5,7 @@ from functools import partial
 from mantid.kernel import IntArrayProperty, FloatArrayProperty, Direction
 from mantid.api import WorkspaceGroup, WorkspaceGroupProperty
 from mantid.simpleapi import CreateWorkspace, mtd
-from mvesuvio.globals import Mode
+from mvesuvio.globals import Mode, SharedParameterFitType, PeakType, FitFunction
 
 import unittest
 import numpy as np
@@ -474,7 +474,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
     def test_setup_function_type_gaussian(self):
         alg = EVSCalibrationFit()
-        alg.declareProperty('Function', 'Gaussian')
+        alg.declareProperty('Function', FitFunction.GAUSSIAN.value)
         alg._setup_function_type()
         expected_param_names = {'Height': 'Height', 'Width': 'Sigma', 'Position': 'PeakCentre'}
         self.assertEqual(expected_param_names, alg._func_param_names)
@@ -482,7 +482,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
 
     def test_setup_function_type_voigt(self):
         alg = EVSCalibrationFit()
-        alg.declareProperty('Function', 'Voigt')
+        alg.declareProperty('Function', FitFunction.VOIGT.value)
         alg._setup_function_type()
         expected_param_names = {'Height': 'LorentzAmp', 'Position': 'LorentzPos', 'Width': 'LorentzFWHM', 'Width_2': 'GaussianFWHM'}
         self.assertEqual(expected_param_names, alg._func_param_names)
@@ -514,7 +514,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         test_d_spacings = [3.5, 1.5, 2.5]
         alg = EVSCalibrationFit()
         alg.declareProperty(FloatArrayProperty('DSpacings', test_d_spacings))
-        alg.declareProperty('PeakType', 'Bragg')
+        alg.declareProperty('PeakType', PeakType.BRAGG.value)
         alg._setup_peaks_and_set_crop_and_fit_ranges()
         self.assertEqual(sorted(test_d_spacings), list(alg._d_spacings))
         self.assertEqual(EVSGlobals.BRAGG_PEAK_CROP_RANGE, alg._ws_crop_range)
@@ -524,7 +524,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         test_d_spacings = []
         alg = EVSCalibrationFit()
         alg.declareProperty(FloatArrayProperty('DSpacings', test_d_spacings))
-        alg.declareProperty('PeakType', 'Recoil')
+        alg.declareProperty('PeakType', PeakType.RECOIL.value)
         alg._setup_peaks_and_set_crop_and_fit_ranges()
         self.assertEqual(EVSGlobals.RECOIL_PEAK_CROP_RANGE, alg._ws_crop_range)
         self.assertEqual(EVSGlobals.RECOIL_FIT_WINDOW_RANGE, alg._fit_window_range)
@@ -533,7 +533,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         test_d_spacings = []
         alg = EVSCalibrationFit()
         alg.declareProperty(FloatArrayProperty('DSpacings', test_d_spacings))
-        alg.declareProperty('PeakType', 'Resonance')
+        alg.declareProperty('PeakType', PeakType.RESONANCE.value)
         alg._setup_peaks_and_set_crop_and_fit_ranges()
         self.assertEqual(EVSGlobals.RESONANCE_PEAK_CROP_RANGE, alg._ws_crop_range)
         self.assertEqual(EVSGlobals.RESONANCE_FIT_WINDOW_RANGE, alg._fit_window_range)
@@ -633,7 +633,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
         alg._output_workspace_name = 'output_ws_name'
-        alg._shared_parameter_fit_type = 'Individual'
+        alg._shared_parameter_fit_type = SharedParameterFitType.INDIVIDUAL.value
         alg._fit_peaks()
         alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
                                                                          call('output_ws_name_Peak_1_Parameters')])
@@ -656,7 +656,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
         alg._output_workspace_name = 'output_ws_name'
-        alg._shared_parameter_fit_type = 'Shared'
+        alg._shared_parameter_fit_type = SharedParameterFitType.SHARED.value
         alg._fit_peaks()
         alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
                                                                          call('output_ws_name_Peak_1_Parameters')])
@@ -680,7 +680,7 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
         alg._create_parameter_table_and_output_headers = MagicMock(return_value=['a', 'b', 'c'])
         alg._fit_peak = MagicMock(side_effect=lambda a, b, c, d, e: f'fit_ws_{a}_{b}')
         alg._output_workspace_name = 'output_ws_name'
-        alg._shared_parameter_fit_type = 'Both'
+        alg._shared_parameter_fit_type = SharedParameterFitType.BOTH.value
         alg._fit_peaks()
         alg._create_parameter_table_and_output_headers.assert_has_calls([call('output_ws_name_Peak_0_Parameters'),
                                                                          call('output_ws_name_Peak_1_Parameters')])

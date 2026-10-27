@@ -12,3 +12,6 @@ figures/
 
 # Launch configurations for vscode debugger
 .vscode/
+
+# Mac OS X Finder
+.DS_Store

@@ -23,16 +23,12 @@ jobs:
       - name: Setup Pixi
         uses: prefix-dev/setup-pixi@v0
 
-      - name: Check for files changed 
+      - name: Check for files changed
         run: |
-          echo "files-changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q -e '^src/' -e '^tests/' && echo true || echo false)" >> $GITHUB_ENV
-
-      - name: Check if first workflow to run on PR 
-        run: |
-          # Check if the base commit (before the PR) exists in the history
-          if ! git merge-base --is-ancestor ${{ github.event.pull_request.base.sha }} HEAD; then
-            echo "First push detected (or force push), running all tests."
-            echo "files-changed=true" >> $GITHUB_ENV
+          if [[ "${{ github.event.action }}" == "opened" ]]; then
+            echo "files-changed=true" >> "$GITHUB_ENV"
+          else
+            echo "files-changed=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -q -e '^src/' -e '^tests/' && echo true || echo false)" >> $GITHUB_ENV
           fi
 
       - name: Run mvesuvio Analysis Unit Tests
