@@ -26,7 +26,7 @@ from mantid.kernel import logger
 from mvesuvio.globals import FitModels, Masking
 from mvesuvio.util import handle_config
 from mvesuvio.util.general_helpers import print_table_workspace
-from mvesuvio.util.reduction_helpers import buildXRangeFromRebinPars, weightedAvgArr, weightedAvgXBinsArr
+from mvesuvio.util.reduction_helpers import weightedAvgArr, weightedAvgXBinsArr
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
@@ -1213,7 +1213,9 @@ def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
 
     # Build range to average over
-    meanX = buildXRangeFromRebinPars(yFitIC)
+    rebin_pars = yFitIC.range_for_rebinning_in_y_space
+    first, step, last = [float(s) for s in rebin_pars.split(",")]
+    meanX = np.arange(first, last, step) + step / 2  # Correction to match Mantid range
 
     wDataX, wDataY, wDataE, wDataRes = initiateZeroArr((len(idxList), len(meanX)))
     for i, idxs in enumerate(idxList):

@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, DeleteWorkspace, RenameWorkspace, SaveNexus
 
-from mvesuvio.globals import ScatteringType, Mode
+from mvesuvio.globals import Mode, ScatteringType
 from mvesuvio.util import general_helpers
 
 
@@ -77,6 +77,20 @@ class TestGeneralHelpers(unittest.TestCase):
         np.testing.assert_array_equal([data], dataY)
         np.testing.assert_array_equal([data], dataE)
 
+        DeleteWorkspace(ws)
+
+    def test_pass_data_into_single_histogram_workspace_with_1d_arrays(self):
+        ws = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="some_unit")
+        data_x = np.array([3, 4, 5])
+        data_y = np.array([6, 7, 8])
+        data_e = np.array([0.1, 0.2, 0.3])
+
+        result = general_helpers.pass_data_into_ws(data_x, data_y, data_e, ws)
+
+        self.assertIs(result, ws)
+        np.testing.assert_array_equal(data_x, ws.readX(0))
+        np.testing.assert_array_equal(data_y, ws.readY(0))
+        np.testing.assert_array_equal(data_e, ws.readE(0))
         DeleteWorkspace(ws)
 
     def test_make_summarised_log_file(self):

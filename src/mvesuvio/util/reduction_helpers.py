@@ -10,6 +10,7 @@ from mantid.simpleapi import (
     SumSpectra,
     CropWorkspace,
     MaskDetectors,
+    DeleteWorkspaces,
     CreateEmptyTableWorkspace,
     DeleteWorkspace,
     SaveNexus,
@@ -24,6 +25,7 @@ from mantid.simpleapi import (
 from mantid.kernel import logger
 import numpy as np
 import math
+import re
 from pathlib import Path
 
 from mvesuvio.globals import ModeRunning, ScatteringType, Tags, Masking
@@ -262,29 +264,25 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
 def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
     """Returns cloned and cropped workspace with modified name"""
 
-    # Skip if workspace not found in ADS
-    if not AnalysisDataService.doesExist(ws_name):
-        logger.warning(f"\n{ws_name} not found in ADS: Skipping cropping and masking ...\n")
-        return
+    match = re.fullmatch(r"\s*(\d+)\s*-\s*(\d+)\s*", inputs_class.detectors)
+    if match is None:
+        raise ValueError(f"Invalid detectors range: {inputs_class.detectors!r}")
+    first_detector, last_detector = map(int, match.groups())
 
-    first_detector, last_detector = [int(s) for s in inputs_class.detectors.split("-")]
-
-    # Read initial Spectrum number
-    ws = mtd[ws_name]
-    ws_first_detector = ws.getSpectrumNumbers()[0]
-    assert first_detector >= ws_first_detector, "Can't crop workspace, firstSpec < first spectrum in workspace."
-    first_idx = first_detector - ws_first_detector
-    last_idx = last_detector - ws_first_detector
-
-    ws_cropped = CropWorkspace(
+    CropWorkspace(
         InputWorkspace=ws_name,
-        StartWorkspaceIndex=first_idx,
-        EndWorkspaceIndex=last_idx,
+        StartWorkspaceIndex=mtd[ws_name].getIndexFromSpectrumNumber(first_detector),
+        EndWorkspaceIndex=mtd[ws_name].getIndexFromSpectrumNumber(last_detector),
         OutputWorkspace=ws_name,
     )
-    mask_time_of_flight_bins_with_zeros(ws_cropped, inputs_class.mask_time_of_flight_range)  # Used to mask resonance peaks
-    MaskDetectors(Workspace=ws_cropped, SpectraList=inputs_class.mask_detectors)
-    return ws_cropped
+    MaskDetectors(Workspace=ws_name, SpectraList=inputs_class.mask_detectors)
+
+    # NOTE: Did not use MaskBins or RemoveBins from Mantid because those
+    # algorithms act on histogram workspaces. Converting the workspace to
+    # histogram and then back to point data removes masked flag on the bins.
+    # Better to just set y data to zeros directly.
+    mask_time_of_flight_bins_with_zeros(ws_name, inputs_class)
+    return
 
 
 def load_input_ws(input_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
@@ -447,24 +445,22 @@ def save_fitting_input_workspaces(
     SaveNexus(ws_joy_avg, str(fitting_inputs_dir / f"{workspace_name}_joy_avg.nxs"))
 
 
-def mask_time_of_flight_bins_with_zeros(ws, maskTOFRange):
+def mask_time_of_flight_bins_with_zeros(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
     """
     Masks a given TOF range on ws with zeros on dataY.
     Leaves errors dataE unchanged, as they are used by later treatments.
-    Used to mask resonance peaks.
     """
 
-    if maskTOFRange is None:
-        return
+    if inputs_class.mask_time_of_flight_range:
+        match = re.fullmatch(r"\s*(\d+(?:\.\d*)?)\s*-\s*(\d+(?:\.\d*)?)\s*", inputs_class.mask_time_of_flight_range)
+        if match is None:
+            raise ValueError(f"Invalid mask_time_of_flight_range: {inputs_class.mask_time_of_flight_range!r}")
+        x_min, x_max = map(float, match.groups())
 
-    dataX, dataY, dataE = extractWS(ws)
-
-    ranges = [r.split("-") for r in maskTOFRange.replace(" ", "").split(",")]
-    for r in ranges:
-        mask = (dataX >= float(r[0])) & (dataX <= float(r[-1]))
-        dataY[mask] = 0
-
-    pass_data_into_ws(dataX, dataY, dataE, ws)
+        ws = mtd[ws_name]
+        for i in range(ws.getNumberHistograms()):
+            x = ws.dataX(i)
+            ws.mutableY(i)[(x >= x_min) & (x <= x_max)] = 0
     return
 
 
@@ -517,45 +513,36 @@ def create_profiles_table(name, ai):
     return table
 
 
-def ySpaceReduction(wsTOF, ws_ncp, ic):
+def ySpaceReduction(wsTOF, ws_ncp, ic: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
     """Seperate procedures depending on masking specified."""
     mass0 = ic.masses[0]
     ncp = ws_ncp.extractY()
 
-    rebinPars = ic.range_for_rebinning_in_y_space
+    rebin_pars = ic.range_for_rebinning_in_y_space
 
-    if np.any(np.all(wsTOF.extractY() == 0, axis=0)):  # Masked columns present
-        if ic.mask_zeros_with == Masking.NAN:
-            # Build special workspace to store accumulated points
-            wsJoY = convertToYSpace(wsTOF, mass0)
-            xp = buildXRangeFromRebinPars(ic)
-            wsJoYB = dataXBining(wsJoY, xp)  # Unusual ws with several dataY points per each dataX point
+    if ic.mask_time_of_flight_range and ic.mask_zeros_with == Masking.NCP:
+        wsTOF = replaceZerosWithNCP(wsTOF, ncp)
 
-            # Need normalisation values from NCP masked workspace
-            wsTOFNCP = replaceZerosWithNCP(wsTOF, ncp)
-            wsJoYNCP = convertToYSpace(wsTOFNCP, mass0)
-            wsJoYNCPN, wsJoYInt = rebinAndNorm(wsJoYNCP, rebinPars)
+    ws_joy = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
 
-            # Normalize spectra of specieal workspace
-            wsJoYN = Divide(wsJoYB, wsJoYInt, OutputWorkspace=wsJoYB.name() + "_norm")
-            wsJoYAvg = weightedAvgXBins(wsJoYN, xp)
-            return wsJoYN, wsJoYAvg
+    if ic.mask_time_of_flight_range and ic.mask_zeros_with == Masking.NAN:
+        # NOTE: Technically this rebin is general and gives the same result as Rebin when
+        # no zeros are present in dataY, but I didn't make this the default path
+        # because it can be confusing.
+        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars)
+    else:
+        ws_joy_rebin = Rebin(InputWorkspace=ws_joy, Params=rebin_pars, OutputWorkspace=ws_joy.name() + "_rebin")
 
-        elif ic.mask_zeros_with == Masking.NCP:
-            wsTOF = replaceZerosWithNCP(wsTOF, ncp)
+    Integration(ws_joy_rebin, OutputWorkspace="temp_integral")
+    ws_joy_rebin = Divide(LHSWorkspace=ws_joy_rebin, RHSWorkspace="temp_integral", OutputWorkspace=ws_joy_rebin.name() + "_norm")
 
-        else:
-            raise ValueError(
-                """
-            Masked TOF bins were found but no valid procedure in y-space fit was selected.
-            Options: 'nan', 'ncp'
-            """
-            )
+    # Weighted average over spectra
+    ws_joy_rebin_avg = SumSpectra(
+        InputWorkspace=ws_joy_rebin, WeightedSum=True, MultiplyBySpectra=False, OutputWorkspace=ws_joy_rebin.name() + "_avg"
+    )
 
-    wsJoY = convertToYSpace(wsTOF, mass0)
-    wsJoYN, wsJoYI = rebinAndNorm(wsJoY, rebinPars)
-    wsJoYAvg = weightedAvgCols(wsJoYN)
-    return wsJoYN, wsJoYAvg
+    DeleteWorkspace("temp_integral")
+    return ws_joy_rebin, ws_joy_rebin_avg
 
 
 def convertToYSpace(wsTOF, mass0):
@@ -573,6 +560,61 @@ def rebinAndNorm(wsJoY, rebinPars):
     wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name() + "_integrated")
     wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name() + "_norm")
     return wsJoYNorm, wsJoYInt
+
+
+def rebin_masked_weighted(ws_joy, rebin_pars):
+    """
+    Rebins y-space data with masked (zero) points using Mantid Rebin on weighted sums.
+    With w=1/E^2 (w=0 for masked points), Rebin gives sum(f*w*Y) and sum(f*w), where f is the
+    overlap width of the new and old bin divided by the old bin width. Masked points therefore
+    do not contribute.
+    Rebin propagates errors as E^2 = sum(f * E_old^2) (not f^2). Passing E_old=sqrt(w) with the
+    w*Y values then gives var(w*Y sum) = sum(f * w), so that
+    var(mean) = sum(f * w) / sum(f * w)^2 = 1 / sum(f * w).
+    This is exact for f=1 and slightly conservative for partially overlapping bins, where f^2 < f.
+    Returns the per spectrum workspace and the workspace averaged over spectra.
+    """
+    name = ws_joy.name() + "_mantid"
+    dataX, dataY, dataE = extractWS(ws_joy)
+
+    # Masked points can be 0 or NaN, in either dataY, dataE or dataX
+    valid = (dataY != 0) & np.isfinite(dataY) & np.isfinite(dataE) & np.isfinite(dataX)
+    dataY = np.where(valid, dataY, 0)  # Avoids 0 * NaN
+    dataE = np.where(valid, dataE, 0)
+
+    valid &= dataE > 0
+    weights = np.zeros(dataY.shape)
+    weights[valid] = 1 / np.square(dataE[valid])
+
+    CloneWorkspace(InputWorkspace=ws_joy, OutputWorkspace="temp_wy")
+    pass_data_into_ws(dataX, weights * dataY, np.sqrt(weights), mtd["temp_wy"])
+    Rebin(InputWorkspace="temp_wy", Params=rebin_pars, OutputWorkspace="temp_wy")
+
+    CloneWorkspace(InputWorkspace=ws_joy, OutputWorkspace="temp_w")
+    pass_data_into_ws(dataX, weights, np.zeros_like(weights), mtd["temp_w"])
+    Rebin(InputWorkspace="temp_w", Params=rebin_pars, OutputWorkspace="temp_w")
+
+    wy = mtd["temp_wy"].extractY()
+    var = np.square(mtd["temp_wy"].extractE())
+    w = mtd["temp_w"].extractY()
+    dataX_rebin = mtd["temp_wy"].extractX()
+
+    def weighted_mean_and_error(sum_w, sum_wy, var_wy):
+        non_empty = sum_w > 0
+        safe = np.where(non_empty, sum_w, 1)
+        mean_y = np.where(non_empty, sum_wy / safe, 0)
+        mean_e = np.where(non_empty, np.sqrt(var_wy) / safe, 0)
+        return mean_y, mean_e
+
+    # Spectra in y space, one dataY point per bin of each spectrum
+    specY, specE = weighted_mean_and_error(w, wy, var)
+
+    # Use CloneWokspace to copy correct metadata
+    ws_rebin = CloneWorkspace(InputWorkspace="temp_wy", OutputWorkspace=name + "_rebin")
+    pass_data_into_ws(dataX_rebin, specY, specE, ws_rebin)
+
+    DeleteWorkspaces(["temp_wy", "temp_w"])
+    return ws_rebin
 
 
 def replaceZerosWithNCP(ws, ncp):
