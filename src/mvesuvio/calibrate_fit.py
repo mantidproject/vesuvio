@@ -685,17 +685,13 @@ class EVSCalibrationFit(PythonAlgorithm):
             self._shared_parameter_fit(output_parameter_table_name, output_parameter_table_headers)
 
     def _shared_parameter_fit(self, output_parameter_table_name, output_parameter_table_headers):
-        init_Gaussian_FWHM = EVSMiscFunctions.read_fitting_result_table_column(
-            output_parameter_table_name, "f1.GaussianFWHM", self._spec_list
-        )
+        init_Gaussian_FWHM = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.GaussianFWHM", self._spec_list)
         init_Gaussian_FWHM = np.nanmean(init_Gaussian_FWHM[init_Gaussian_FWHM != 0])
-        init_Lorentz_FWHM = EVSMiscFunctions.read_fitting_result_table_column(
-            output_parameter_table_name, "f1.LorentzFWHM", self._spec_list
-        )
+        init_Lorentz_FWHM = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.LorentzFWHM", self._spec_list)
         init_Lorentz_FWHM = np.nanmean(init_Lorentz_FWHM[init_Lorentz_FWHM != 0])
-        init_Lorentz_Amp = EVSMiscFunctions.read_fitting_result_table_column(output_parameter_table_name, "f1.LorentzAmp", self._spec_list)
+        init_Lorentz_Amp = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.LorentzAmp", self._spec_list)
         init_Lorentz_Amp = np.nanmean(init_Lorentz_Amp[init_Lorentz_Amp != 0])
-        init_Lorentz_Pos = EVSMiscFunctions.read_fitting_result_table_column(output_parameter_table_name, "f1.LorentzPos", self._spec_list)
+        init_Lorentz_Pos = EVSMiscFunctions.read_table_column(output_parameter_table_name, "f1.LorentzPos", self._spec_list)
         init_Lorentz_Pos = np.nanmean(init_Lorentz_Pos[init_Lorentz_Pos != 0])
 
         initial_params = {
@@ -927,11 +923,16 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         @return list of estimates in tof for the peak centres
         """
-        L0 = self._read_param_column("L0", self._spec_list)
-        L1 = self._read_param_column("L1", self._spec_list)
-        t0 = self._read_param_column("t0", self._spec_list)
+        kwargs = {
+            "table_name": self._param_table,
+            "spec_list": self._spec_list,
+            "offset": EVSGlobals.DETECTOR_RANGE[0],
+        }
+        L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
+        L1 = EVSMiscFunctions.read_table_column(column_name="L1", **kwargs)
+        t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
         t0 /= 1e6
-        thetas = self._read_param_column("theta", self._spec_list)
+        thetas = EVSMiscFunctions.read_table_column(column_name="theta", **kwargs)
         r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, thetas)
 
         self._energy_estimates = self._energy_estimates.reshape(1, self._energy_estimates.size).T
@@ -959,11 +960,15 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         @return estimates of peak positions in TOF for all spectra
         """
-
-        L0 = self._read_param_column("L0", self._spec_list)
-        L1 = self._read_param_column("L1", self._spec_list)
-        t0 = self._read_param_column("t0", self._spec_list)
-        thetas = self._read_param_column("theta", self._spec_list)
+        kwargs = {
+            "table_name": self._param_table,
+            "spec_list": self._spec_list,
+            "offset": EVSGlobals.DETECTOR_RANGE[0],
+        }
+        L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
+        L1 = EVSMiscFunctions.read_table_column(column_name="L1", **kwargs)
+        t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
+        thetas = EVSMiscFunctions.read_table_column(column_name="theta", **kwargs)
 
         t0 /= 1e6
 
@@ -1083,17 +1088,6 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_func += self._build_peak_function(peak)
 
         return fit_func
-
-    def _read_param_column(self, column_name, spec_list=EVSGlobals.DETECTOR_RANGE):
-        """
-        Read a column from a table workspace and return the data as an array.
-
-        @param column_name - name of the column to select
-        @param spec_list - range of spectra to use
-        @return numpy array of values in the spec_list range
-        """
-
-        return EVSMiscFunctions.read_table_column(self._param_table, column_name, spec_list)
 
     def _set_table_column(self, table_name, column_name, data, spec_list=None):
         """

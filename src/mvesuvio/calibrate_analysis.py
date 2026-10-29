@@ -121,7 +121,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 PeakType=PeakType.RESONANCE.value,
             )
             self._L0_peak_fits = L0_fit + "_Peak_Parameters"
-            self._calculate_incident_flight_path(self._L0_peak_fits, EVSGlobals.FRONTSCATTERING_RANGE)
+            self._calculate_incident_flight_path(self._L0_peak_fits)
 
             # calibrate t0 from the front scattering detectors
             t0_fit_front = self._current_workspace + "_t0_front"
@@ -156,8 +156,13 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             self._calculate_time_delay(t0_peak_fits_back, EVSGlobals.BACKSCATTERING_RANGE)
         else:
             # Just copy values over from parameter file
-            t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0", EVSGlobals.DETECTOR_RANGE)
-            L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0", EVSGlobals.DETECTOR_RANGE)
+            kwargs = {
+                "table_name": self._param_table,
+                "spec_list": EVSGlobals.DETECTOR_RANGE,
+                "offset": EVSGlobals.DETECTOR_RANGE[0],
+            }
+            t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
+            L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
             self._set_table_column(self._current_workspace, "t0", t0)
             self._set_table_column(self._current_workspace, "L0", L0)
 
@@ -237,10 +242,15 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 self._create_calib_parameter_table(self._current_workspace)
 
                 # copy over L0 and t0 parameters to new table
-                t0 = EVSMiscFunctions.read_table_column(self._param_table, "t0", EVSGlobals.DETECTOR_RANGE)
-                t0_error = EVSMiscFunctions.read_table_column(self._param_table, "t0_Err", EVSGlobals.DETECTOR_RANGE)
-                L0 = EVSMiscFunctions.read_table_column(self._param_table, "L0", EVSGlobals.DETECTOR_RANGE)
-                L0_error = EVSMiscFunctions.read_table_column(self._param_table, "L0_Err", EVSGlobals.DETECTOR_RANGE)
+                kwargs = {
+                    "table_name": self._param_table,
+                    "spec_list": EVSGlobals.DETECTOR_RANGE,
+                    "offset": EVSGlobals.DETECTOR_RANGE[0],
+                }
+                t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
+                t0_error = EVSMiscFunctions.read_table_column(column_name="t0_Err", **kwargs)
+                L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
+                L0_error = EVSMiscFunctions.read_table_column(column_name="L0_Err", **kwargs)
 
                 self._set_table_column(self._current_workspace, "t0", t0)
                 self._set_table_column(self._current_workspace, "L0", L0)
@@ -293,14 +303,13 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         DeleteWorkspace(t0_param_table)
 
-    def _calculate_incident_flight_path(self, table_name, spec_list):
+    def _calculate_incident_flight_path(self, table_name):
         """
         Calculate incident flight path from frontscattering detectors.
         This takes the average value of a fit over all detectors for the value of L0
         and t0.
 
         @param table_name - name of table containing fitted parameters for the peak centres
-        @param spec_list - spectrum range to calculate t0 for.
         """
         L0_param_table = self._current_workspace + "_L0_Parameters"
         self._fit_linear(table_name, L0_param_table)
@@ -326,12 +335,16 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
 
         @param spec_list - spectrum range to calculate t0 for.
         """
-
-        E1 = EVSMiscFunctions.read_table_column(self._current_workspace, "E1", spec_list)
-        t0 = EVSMiscFunctions.read_table_column(self._current_workspace, "t0", spec_list)
-        t0_error = EVSMiscFunctions.read_table_column(self._current_workspace, "t0_Err", spec_list)
-        L0 = EVSMiscFunctions.read_table_column(self._current_workspace, "L0", spec_list)
-        theta = EVSMiscFunctions.read_table_column(self._current_workspace, "theta", spec_list)
+        kwargs = {
+            "table_name": self._current_workspace,
+            "spec_list": spec_list,
+            "offset": EVSGlobals.DETECTOR_RANGE[0],
+        }
+        E1 = EVSMiscFunctions.read_table_column(column_name="E1", **kwargs)
+        t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
+        t0_error = EVSMiscFunctions.read_table_column(column_name="t0_Err", **kwargs)
+        L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
+        theta = EVSMiscFunctions.read_table_column(column_name="theta", **kwargs)
         r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
 
         peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, peak_table)
@@ -354,10 +367,13 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         @param table_name - name of table containing fitted parameters for the peak centres
         @param spec_list - spectrum range to calculate t0 for.
         """
-
-        t0 = EVSMiscFunctions.read_table_column(self._current_workspace, "t0", spec_list)
-        L0 = EVSMiscFunctions.read_table_column(self._current_workspace, "L0", spec_list)
-        L1 = EVSMiscFunctions.read_table_column(self._param_table, "L1", spec_list)
+        kwargs = {
+            "spec_list": spec_list,
+            "offset": EVSGlobals.DETECTOR_RANGE[0],
+        }
+        t0 = EVSMiscFunctions.read_table_column(table_name=self._current_workspace, column_name="t0", **kwargs)
+        L0 = EVSMiscFunctions.read_table_column(table_name=self._current_workspace, column_name="L0", **kwargs)
+        L1 = EVSMiscFunctions.read_table_column(table_name=self._param_table, column_name="L1", **kwargs)
         L1_nan_to_num = np.nan_to_num(L1)
 
         t0 /= 1e6
@@ -403,11 +419,15 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         global_E1_error = np.empty(spec_range)
 
         if not self._E1_value_and_error:
-            t0 = EVSMiscFunctions.read_table_column(self._current_workspace, "t0", spec_list)
-            L0 = EVSMiscFunctions.read_table_column(self._current_workspace, "L0", spec_list)
+            kwargs = {
+                "spec_list": spec_list,
+                "offset": EVSGlobals.DETECTOR_RANGE[0],
+            }
+            t0 = EVSMiscFunctions.read_table_column(table_name=self._current_workspace, column_name="t0", **kwargs)
+            L0 = EVSMiscFunctions.read_table_column(table_name=self._current_workspace, column_name="L0", **kwargs)
 
-            L1 = EVSMiscFunctions.read_table_column(self._param_table, "L1", spec_list)
-            theta = EVSMiscFunctions.read_table_column(self._current_workspace, "theta", spec_list)
+            L1 = EVSMiscFunctions.read_table_column(table_name=self._param_table, column_name="L1", **kwargs)
+            theta = EVSMiscFunctions.read_table_column(table_name=self._current_workspace, column_name="theta", **kwargs)
             r_theta = EVSMiscFunctions.calculate_r_theta(self._sample_mass, theta)
 
             peak_centres = self._invalid_detectors.filter_peak_centres_for_invalid_detectors(spec_list, peak_table[0])
@@ -432,7 +452,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         self._set_table_column(self._current_workspace, "E1_Err", E1_error)
 
         if calculate_global:  # This fn will need updating for the only global option
-            peak_centre = EVSMiscFunctions.read_fitting_result_table_column(peak_table[1], "f1.LorentzPos", [0])
+            peak_centre = EVSMiscFunctions.read_table_column(peak_table[1], "f1.LorentzPos", [0])
             peak_centre = [peak_centre] * len(peak_centres)
 
             delta_t = (peak_centre - t0) / 1e6
@@ -565,11 +585,16 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         file_header = "\t".join(["plik", "det", "theta", "t0", "L0", "L1"])
         fmt = "%d  %d  %.4f  %.4f  %.3f  %.4f"
 
-        det = EVSMiscFunctions.read_table_column(ws_name, "Spectrum", spec_list)
-        t0 = EVSMiscFunctions.read_table_column(ws_name, "t0", spec_list)
-        L0 = EVSMiscFunctions.read_table_column(ws_name, "L0", spec_list)
-        L1 = EVSMiscFunctions.read_table_column(ws_name, "L1", spec_list)
-        theta = EVSMiscFunctions.read_table_column(ws_name, "theta", spec_list)
+        kwargs = {
+            "table_name": ws_name,
+            "spec_list": spec_list,
+            "offset": EVSGlobals.DETECTOR_RANGE[0],
+        }
+        det = EVSMiscFunctions.read_table_column(column_name="Spectrum", **kwargs)
+        t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
+        L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
+        L1 = EVSMiscFunctions.read_table_column(column_name="L1", **kwargs)
+        theta = EVSMiscFunctions.read_table_column(column_name="theta", **kwargs)
 
         # pad the start of the file with dummy data for the monitors
         file_data = np.asarray([[1, 1, 0, 0, 0, 0], [2, 2, 0, 0, 0, 0]])

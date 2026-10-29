@@ -295,21 +295,22 @@ class TestVesuvioCalibrationFit(unittest.TestCase):
                                                 OutputWorkspace=find_peaks_output_name + '_unfiltered')
         mock_del_workspace.assert_called_with(find_peaks_output_name + '_unfiltered')
 
-    def test_estimate_bragg_peak_positions(self):
-        def side_effect(arg1, arg2):
-            if arg1 == 'L0':
+    @patch('mvesuvio.util.calibration_helpers.EVSMiscFunctions.read_table_column')
+    def test_estimate_bragg_peak_positions(self, mock_read_table_column):
+        def side_effect(column_name, **kwargs):
+            if column_name == 'L0':
                 return 11.05
-            elif arg1 == 'L1':
+            elif column_name == 'L1':
                 return 0.5505
-            elif arg1 == 't0':
+            elif column_name == 't0':
                 return -0.2
-            elif arg1 == 'theta':
+            elif column_name == 'theta':
                 return 139.5371
 
         alg = EVSCalibrationFit()
         alg._spec_list = [22]
-        alg._read_param_column = MagicMock()
-        alg._read_param_column.side_effect = side_effect
+        alg._param_table = "param_table"
+        mock_read_table_column.side_effect = side_effect
         alg._d_spacings = np.array([1.75, 2.475, 2.858])
 
         estimated_positions = alg._estimate_bragg_peak_positions()
