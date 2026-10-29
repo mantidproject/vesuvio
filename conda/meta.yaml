@@ -39,15 +39,15 @@ test:
     - mock 
   source_files:
     - tests/unit/
-    - tests/data/analysis/unit/                                         # Data used by several unit tests
-    - src/mvesuvio/default_config/experiment_template/run_fitting.py    # Used to run basic mvesuvio run
-    - src/mvesuvio/default_config/experiment_template/fitting_inputs    # Inputs needed to run mvesuvio
-    - src/mvesuvio/default_config/experiment_template/run_reduction.py  # Used to run basic mvesuvio run
-    - src/mvesuvio/default_config/experiment_template/reduction_inputs  # Inputs needed to run mvesuvio
+    - tests/data/analysis/unit/                           # Data used by several unit tests
+    - src/mvesuvio/default_config/experiment_template/    # Used to test the individual scripts
   commands:
     - pytest
     - mvesuvio version
+    - python src/mvesuvio/default_config/experiment_template/run_reduction.py
     - python src/mvesuvio/default_config/experiment_template/run_fitting.py
+    - python src/mvesuvio/default_config/experiment_template/run_bootstrap.py
+    - python src/mvesuvio/default_config/experiment_template/run_calibration.py
 
 about:
   home: https://github.com/mantidproject/vesuvio
