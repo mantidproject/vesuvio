@@ -163,8 +163,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             }
             t0 = EVSMiscFunctions.read_table_column(column_name="t0", **kwargs)
             L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
-            self._set_table_column(self._current_workspace, "t0", t0)
-            self._set_table_column(self._current_workspace, "L0", L0)
+            EVSMiscFunctions.set_table_column(self._current_workspace, "t0", t0)
+            EVSMiscFunctions.set_table_column(self._current_workspace, "L0", L0)
 
         # repeatedly fit L1, E1 and Theta parameters
         table_group = []
@@ -252,10 +252,10 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
                 L0 = EVSMiscFunctions.read_table_column(column_name="L0", **kwargs)
                 L0_error = EVSMiscFunctions.read_table_column(column_name="L0_Err", **kwargs)
 
-                self._set_table_column(self._current_workspace, "t0", t0)
-                self._set_table_column(self._current_workspace, "L0", L0)
-                self._set_table_column(self._current_workspace, "t0_Err", t0_error)
-                self._set_table_column(self._current_workspace, "L0_Err", L0_error)
+                EVSMiscFunctions.set_table_column(self._current_workspace, "t0", t0)
+                EVSMiscFunctions.set_table_column(self._current_workspace, "L0", L0)
+                EVSMiscFunctions.set_table_column(self._current_workspace, "t0_Err", t0_error)
+                EVSMiscFunctions.set_table_column(self._current_workspace, "L0_Err", L0_error)
 
         GroupWorkspaces(",".join(table_group), OutputWorkspace=self._output_workspace_name)
 
@@ -298,8 +298,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         t0 = np.asarray(mtd[t0_param_table].column("A0"))
         t0_error = np.asarray(mtd[t0_param_table].column("A0_Err"))
 
-        self._set_table_column(self._current_workspace, "t0", t0, spec_list)
-        self._set_table_column(self._current_workspace, "t0_Err", t0_error, spec_list)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "t0", t0, spec_list)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "t0_Err", t0_error, spec_list)
 
         DeleteWorkspace(t0_param_table)
 
@@ -323,8 +323,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         mean_L0.fill(np.mean(L0))
         L0_error.fill(standard_error_mean(L0))
 
-        self._set_table_column(self._current_workspace, "L0", mean_L0)
-        self._set_table_column(self._current_workspace, "L0_Err", L0_error)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "L0", mean_L0)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "L0_Err", L0_error)
 
         DeleteWorkspace(L0_param_table)
 
@@ -333,6 +333,7 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         Calculate the final flight path using the values for energy.
         This also uses the old value for L1 loaded from the parameter file.
 
+        @param peak_table - name of table containing the peaks.
         @param spec_list - spectrum range to calculate t0 for.
         """
         kwargs = {
@@ -357,8 +358,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         L1 = v1 * delta_t - L0 * r_theta
         L1_error = v1 * delta_t_error
 
-        self._set_table_column(self._current_workspace, "L1", L1, spec_list)
-        self._set_table_column(self._current_workspace, "L1_Err", L1_error, spec_list)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "L1", L1, spec_list)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "L1_Err", L1_error, spec_list)
 
     def _calculate_scattering_angle(self, table_name, spec_list):
         """
@@ -401,22 +402,21 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         masked_theta = np.nanmean(theta, axis=0)
         theta_error = np.nanstd(theta, axis=0)
 
-        self._set_table_column(self._current_workspace, "theta", masked_theta, spec_list)
-        self._set_table_column(self._current_workspace, "theta_Err", theta_error, spec_list)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "theta", masked_theta, spec_list)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "theta_Err", theta_error, spec_list)
 
     def _calculate_final_energy(self, peak_table, spec_list, calculate_global):
         """
         Calculate the final energy using the fitted peak centres of a run.
 
-        @param table_name - name of table containing fitted parameters for the peak centres
+        @param peak_table - name of table containing the peaks.
         @param spec_list - spectrum range to calculate t0 for.
+        @param calculate_global - boolean to decide whether to calculate global_E1 and global_E1_Err.
         """
 
         spec_range = EVSGlobals.DETECTOR_RANGE[1] + 1 - EVSGlobals.DETECTOR_RANGE[0]
         mean_E1 = np.empty(spec_range)
         E1_error = np.empty(spec_range)
-        global_E1 = np.empty(spec_range)
-        global_E1_error = np.empty(spec_range)
 
         if not self._E1_value_and_error:
             kwargs = {
@@ -448,10 +448,13 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         mean_E1.fill(mean_E1_val)
         E1_error.fill(E1_error_val)
 
-        self._set_table_column(self._current_workspace, "E1", mean_E1)
-        self._set_table_column(self._current_workspace, "E1_Err", E1_error)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "E1", mean_E1)
+        EVSMiscFunctions.set_table_column(self._current_workspace, "E1_Err", E1_error)
 
         if calculate_global:  # This fn will need updating for the only global option
+            global_E1 = np.empty(spec_range)
+            global_E1_error = np.empty(spec_range)
+
             peak_centre = EVSMiscFunctions.read_table_column(peak_table[1], "f1.LorentzPos", [0])
             peak_centre = [peak_centre] * len(peak_centres)
 
@@ -466,8 +469,8 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             global_E1.fill(global_E1_val)
             global_E1_error.fill(global_E1_error_val)
 
-            self._set_table_column(self._current_workspace, "global_E1", global_E1)
-            self._set_table_column(self._current_workspace, "global_E1_Err", global_E1_error)
+            EVSMiscFunctions.set_table_column(self._current_workspace, "global_E1", global_E1)
+            EVSMiscFunctions.set_table_column(self._current_workspace, "global_E1_Err", global_E1_error)
 
     def _setup(self):
         """
@@ -496,6 +499,11 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
         EVSMiscFunctions.load_instrument_parameters(self._param_file, self._param_table)
 
     def _create_calib_parameter_table(self, ws_name):
+        """
+        Creates table for calculated parameters.
+
+        @param ws_name - name of table to create.
+        """
         # create table for calculated parameters
         CreateEmptyTableWorkspace(OutputWorkspace=ws_name)
         table_ws = mtd[ws_name]
@@ -546,34 +554,6 @@ class EVSCalibrationAnalysis(PythonAlgorithm):
             Input=plot_peak_indicies, Function=func_string, FitType="Individual", CreateOutput=False, OutputWorkspace=output_table
         )
         DeleteWorkspace(peak_workspace)
-
-    def _set_table_column(self, table_name, column_name, data, spec_list=None):
-        """
-        Add a set of data to a table workspace
-
-        @param table_name - name of the table workspace to modify
-        @param column_name - name of the column to add data to
-        @param data - data array to add to the table
-        @param spec_list - range of rows to add the data too
-        """
-        table_ws = mtd[table_name]
-
-        if column_name not in table_ws.getColumnNames():
-            table_ws.addColumn("double", column_name)
-
-        if spec_list is None:
-            offset = 0
-        else:
-            if len(data) < (spec_list[1] + 1 - spec_list[0]):
-                raise ValueError("Not enough data from spectrum range.")
-
-            offset = spec_list[0] - EVSGlobals.DETECTOR_RANGE[0]
-
-        if isinstance(data, np.ndarray):
-            data = data.tolist()
-
-        for i, value in enumerate(data):
-            table_ws.setCell(column_name, offset + i, value)
 
     def _save_instrument_parameter_file(self, ws_name, spec_list):
         """

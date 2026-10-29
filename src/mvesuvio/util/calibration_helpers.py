@@ -208,6 +208,35 @@ class EVSMiscFunctions:
         return np.array(column_values[lower - offset : upper - offset + 1])
 
     @staticmethod
+    def set_table_column(table_name, column_name, data, spec_list=None):
+        """
+        Add a set of data to a table workspace
+
+        @param table_name - name of the table workspace to modify
+        @param column_name - name of the column to add data to
+        @param data - data array to add to the table
+        @param spec_list - range of rows to add the data too
+        """
+        table_ws = mtd[table_name]
+
+        if column_name not in table_ws.getColumnNames():
+            table_ws.addColumn("double", column_name)
+
+        if spec_list is None:
+            offset = 0
+        else:
+            if len(data) < (spec_list[1] - spec_list[0] + 1):
+                raise ValueError("Not enough data from spectrum range.")
+
+            offset = spec_list[0] - EVSGlobals.DETECTOR_RANGE[0]
+
+        if isinstance(data, np.ndarray):
+            data = data.tolist()
+
+        for i, value in enumerate(data):
+            table_ws.setCell(column_name, offset + i, value)
+
+    @staticmethod
     def generate_fit_function_header(function_type, error=False):
         if function_type == FitFunction.VOIGT:
             error_str = "Err" if error else ""

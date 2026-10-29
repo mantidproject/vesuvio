@@ -606,7 +606,7 @@ class EVSCalibrationFit(PythonAlgorithm):
 
         if peak_estimates_list is not None:  # If no peak estimates list, we are doing an unconstrained fit
             # Don't yet understand what this is doing here
-            self._set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
+            EVSMiscFunctions.set_table_column(peak_table, position, peak_estimates_list, spec_list=None)
             unconstrained = False
         else:
             unconstrained = True
@@ -1088,34 +1088,6 @@ class EVSCalibrationFit(PythonAlgorithm):
         fit_func += self._build_peak_function(peak)
 
         return fit_func
-
-    def _set_table_column(self, table_name, column_name, data, spec_list=None):
-        """
-        Add a set of data to a table workspace
-
-        @param table_name - name of the table workspace to modify
-        @param column_name - name of the column to add data to
-        @param data - data array to add to the table
-        @param spec_list - range of rows to add the data too
-        """
-        table_ws = mtd[table_name]
-
-        if column_name not in table_ws.getColumnNames():
-            table_ws.addColumn("double", column_name)
-
-        if spec_list is None:
-            offset = 0
-        else:
-            if len(data) < (spec_list[1] + 1 - spec_list[0]):
-                raise ValueError("Not enough data from spectrum range.")
-
-            offset = spec_list[0] - EVSGlobals.DETECTOR_RANGE[0]
-
-        if isinstance(data, np.ndarray):
-            data = data.tolist()
-
-        for i, value in enumerate(data):
-            table_ws.setCell(column_name, offset + i, value)
 
     def _generate_fit_workspaces(self):
         """
