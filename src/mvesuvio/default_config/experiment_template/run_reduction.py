@@ -218,6 +218,10 @@ def run_reduction(configure_with_main: bool = True):
             ### End of User Editing Section ###
             back_input_ws = BackwardAnalysisInputs.name_of_subtracted_workspace
 
+            # Set sample geometry, used in MS corrections
+            SetSample(InputWorkspace=back_input_ws, Geometry=SAMPLE_SHAPE)
+            reduction_helpers.crop_and_mask_workspace(back_input_ws, BackwardAnalysisInputs)
+
     if ForwardAnalysisInputs.run_this_scattering_type:
         if ForwardAnalysisInputs.overwrite_analysis_input_workspace:
             front_input_ws = general_helpers.load_overwritten_workspace_if_specified(ForwardAnalysisInputs)
@@ -240,12 +244,10 @@ def run_reduction(configure_with_main: bool = True):
             ### End of User Editing Section ###
             front_input_ws = ForwardAnalysisInputs.name_of_subtracted_workspace
 
-    # Set sample shape
-    SetSample(InputWorkspace=back_input_ws, Geometry=SAMPLE_SHAPE)
-    SetSample(InputWorkspace=front_input_ws, Geometry=SAMPLE_SHAPE)
+            ## Set sample geometry, used in MS corrections
+            SetSample(InputWorkspace=front_input_ws, Geometry=SAMPLE_SHAPE)
+            reduction_helpers.crop_and_mask_workspace(front_input_ws, ForwardAnalysisInputs)
 
-    reduction_helpers.crop_and_mask_workspace(back_input_ws, BackwardAnalysisInputs)
-    reduction_helpers.crop_and_mask_workspace(front_input_ws, ForwardAnalysisInputs)
     back_alg = reduction_helpers.init_analysis_algorithm(back_input_ws, BackwardAnalysisInputs)
     front_alg = reduction_helpers.init_analysis_algorithm(front_input_ws, ForwardAnalysisInputs)
 
@@ -275,6 +277,13 @@ def run_reduction(configure_with_main: bool = True):
     general_helpers.make_summarised_log_file()
     reduction_helpers.save_fitting_input_workspaces(BackwardAnalysisInputs)
     reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
+    for analysis_alg in (back_alg, front_alg):
+        if analysis_alg is not None:
+            reduction_helpers.save_plots_from_outputs(
+                output_ncp_group_name=analysis_alg.getPropertyValue("OutputNCPGroup"),
+                output_directory=Path(analysis_alg.getPropertyValue("ResultsPath")),
+                minimal_output=analysis_alg.getProperty("MinimalOutputFiles").value,
+            )
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):

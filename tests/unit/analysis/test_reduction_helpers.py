@@ -19,6 +19,59 @@ class TestReductionHelpers(unittest.TestCase):
         self.mock_y_space_reduction = patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_save_plots_from_outputs_skips_minimal_output(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch.object(reduction_helpers.plt, "subplots") as mock_subplots:
+                reduction_helpers.save_plots_from_outputs("input_0_ncp_group", Path(temp_dir), minimal_output=True)
+
+        mock_subplots.assert_not_called()
+
+    def test_save_plots_from_outputs_saves_sum_plot_and_ascii(self):
+        data_sum = Mock()
+        profile_sum = Mock()
+        total_profile_sum = Mock()
+        ncp_group = Mock()
+        ncp_group.getNames.return_value = ["input_0_H_ncp", "input_0_H_ncp_sum", "input_0_total_ncp"]
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_directory = Path(temp_dir)
+            with (
+                patch.object(
+                    reduction_helpers,
+                    "mtd",
+                    {
+                        "input_0_ncp_group": ncp_group,
+                        "input_0_sum": data_sum,
+                        "input_0_H_ncp_sum": profile_sum,
+                        "input_0_total_ncp_sum": total_profile_sum,
+                    },
+                ),
+                patch.object(reduction_helpers.plt, "subplots", return_value=(Mock(), Mock())) as subplots,
+                patch.object(reduction_helpers, "CloneWorkspace") as clone_workspace,
+                patch.object(reduction_helpers, "AppendSpectra") as append_spectra,
+                patch.object(reduction_helpers.plt, "savefig") as savefig,
+                patch.object(reduction_helpers.plt, "close") as close,
+                patch.object(reduction_helpers, "SaveAscii") as save_ascii,
+            ):
+                reduction_helpers.save_plots_from_outputs("input_0_ncp_group", output_directory)
+
+        subplots.assert_called_once_with(subplot_kw={"projection": "mantid"})
+        clone_workspace.assert_called_once_with(data_sum, OutputWorkspace="input_0_ncp_fits_sum")
+        append_spectra.assert_has_calls(
+            [
+                call("input_0_ncp_fits_sum", profile_sum, OutputWorkspace="input_0_ncp_fits_sum"),
+                call("input_0_ncp_fits_sum", total_profile_sum, OutputWorkspace="input_0_ncp_fits_sum"),
+            ],
+            any_order=False,
+        )
+        savefig.assert_called_once_with(output_directory / "figures/input_0_profiles_sum.pdf", bbox_inches="tight")
+        close.assert_called_once()
+        save_ascii.assert_called_once_with(
+            "input_0_ncp_fits_sum",
+            str(output_directory / "input_0_profiles_sum.txt"),
+            LogList=["Sum of spectra", "Sum of H profile", "Sum of total profile"],
+        )
+
     def test_save_fitting_input_workspaces_uses_helper_module(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             FilesManager.set_experiment_dir(temp_dir)

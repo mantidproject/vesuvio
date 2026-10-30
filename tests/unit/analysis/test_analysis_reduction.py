@@ -20,7 +20,7 @@ class TestAnalysisReduction(unittest.TestCase):
 
     def test_import_continues_when_plot_style_is_unavailable(self):
         with patch("matplotlib.pyplot.style.use", side_effect=OSError("style unavailable")) as style_use:
-            runpy.run_module("mvesuvio.analysis_reduction", run_name="analysis_reduction_import_test")
+            runpy.run_module("mvesuvio.util.reduction_helpers", run_name="reduction_helpers_import_test")
 
         style_use.assert_called_once()
 
@@ -819,7 +819,6 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._update_workspace_data = Mock()
         alg._fit_neutron_compton_profiles = Mock()
         alg._calculate_summed_workspaces = Mock()
-        alg._save_plots = Mock()
         alg._set_means_and_std = Mock()
         alg._replace_zeros_with_ncp_for_corrections = Mock()
         alg._correct_for_gamma_and_multiple_scattering = Mock()
@@ -855,64 +854,6 @@ class TestAnalysisReduction(unittest.TestCase):
 
         with self.assertRaisesRegex(AssertionError, "Need at least one profile"):
             alg.run()
-
-    def test_save_plots_returns_when_minimal_output_is_enabled(self):
-        alg = VesuvioAnalysisRoutine()
-        alg._minimal_output = True
-        alg._save_figures_path = Path("/tmp")
-
-        with patch("mvesuvio.analysis_reduction.plt.subplots") as subplots:
-            alg._save_plots()
-
-        subplots.assert_not_called()
-
-    def test_save_plots_returns_when_figures_directory_is_missing(self):
-        alg = VesuvioAnalysisRoutine()
-        alg._minimal_output = False
-        alg._save_figures_path = Mock()
-        alg._save_figures_path.exists.return_value = False
-
-        with patch("mvesuvio.analysis_reduction.plt.subplots") as subplots:
-            alg._save_plots()
-
-        subplots.assert_not_called()
-
-    def test_save_plots_writes_sum_plot_and_ascii(self):
-        alg = VesuvioAnalysisRoutine()
-        alg._minimal_output = False
-        alg._save_figures_path = Path("/tmp")
-        alg._save_results_path = Path("/tmp")
-        alg._workspace_being_fit = Mock()
-        alg._workspace_being_fit.name.return_value = "input_0"
-        profile_workspace = Mock()
-        profile_workspace.name.return_value = "input_0_h"
-        alg._fit_profiles_workspaces = {"H": profile_workspace}
-        data_sum = Mock()
-        profile_sum = Mock()
-
-        with (
-            patch("mvesuvio.analysis_reduction.mtd", {"input_0_sum": data_sum, "input_0_h_sum": profile_sum}),
-            patch("mvesuvio.analysis_reduction.plt.subplots", return_value=(Mock(), Mock())) as subplots,
-            patch("mvesuvio.analysis_reduction.CloneWorkspace") as clone_workspace,
-            patch("mvesuvio.analysis_reduction.AppendSpectra") as append_spectra,
-            patch("mvesuvio.analysis_reduction.plt.savefig") as savefig,
-            patch("mvesuvio.analysis_reduction.plt.close") as close,
-            patch("mvesuvio.analysis_reduction.SaveAscii") as save_ascii,
-        ):
-            alg._save_plots()
-
-        subplots.assert_called_once_with(subplot_kw={"projection": "mantid"})
-        clone_workspace.assert_called_once_with(data_sum, OutputWorkspace="input_0_ncp_fits_sum")
-        append_spectra.assert_called_once_with(
-            "input_0_ncp_fits_sum", profile_sum, OutputWorkspace="input_0_ncp_fits_sum"
-        )
-        savefig.assert_called_once_with(Path("/tmp/input_0_profiles_sum.pdf"), bbox_inches="tight")
-        close.assert_called_once()
-        save_ascii.assert_called_once_with(
-            "input_0_ncp_fits_sum",
-            "/tmp/input_0_profiles_sum.txt",
-            LogList=["Sum of spectra", "Sum of H profile"],
-        )
 
     def test_remask_columns_with_zeros(self):
         alg = VesuvioAnalysisRoutine()

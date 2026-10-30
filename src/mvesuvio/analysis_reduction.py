@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy
 from pathlib import Path
 from mantid.kernel import (
@@ -32,10 +31,8 @@ from mantid.simpleapi import (
     GroupWorkspaces,
     SaveAscii,
     SaveNexus,
-    AppendSpectra,
 )
 
-from mvesuvio.util import handle_config
 from mvesuvio.util.analysis_helpers import (
     numerical_third_derivative,
     load_resolution,
@@ -49,10 +46,6 @@ from mvesuvio.util.general_helpers import print_table_workspace
 from mvesuvio.globals import ModeRunning, ScatteringType
 from mvesuvio.util.constraints_transport import deserialize_constraints
 
-try:
-    plt.style.use(["ggplot", handle_config.get_plots_config_file()])
-except OSError:
-    pass
 np.set_printoptions(suppress=True, precision=4, linewidth=200)
 
 NEUTRON_MASS = 1.008  # a.m.u.
@@ -156,8 +149,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         # Create paths if not there already
         self._save_results_path.mkdir(parents=True, exist_ok=True)
-        self._save_figures_path = self._save_results_path / "figures"
-        self._save_figures_path.mkdir(parents=True, exist_ok=True)
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
@@ -267,7 +258,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             self._fit_neutron_compton_profiles()
 
             self._calculate_summed_workspaces()
-            self._save_plots()
             self._set_means_and_std()
 
             # When last iteration, skip MS and GC
@@ -336,42 +326,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
         # Swap axis so that first axis selects spectra
         self._y_space_arrays = np.swapaxes(y_spaces, 0, 1)
-        return
-
-    def _save_plots(self):
-        if self._minimal_output or not self._save_figures_path.exists():
-            return
-
-        fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
-
-        ws_data_sum = mtd[self._workspace_being_fit.name() + "_sum"]
-        lab = "Sum of spectra"
-        ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra", elinewidth=1.5)
-
-        label_list = [lab]
-        ws_fig_name = self._workspace_being_fit.name() + "_ncp_fits_sum"
-        CloneWorkspace(ws_data_sum, OutputWorkspace=ws_fig_name)
-
-        for key, ws in self._fit_profiles_workspaces.items():
-            ws_sum = mtd[ws.name() + "_sum"]
-            lab = f"Sum of {key} profile"
-            ax.plot(ws_sum, label=lab)
-            label_list.append(lab)
-            AppendSpectra(ws_fig_name, ws_sum, OutputWorkspace=ws_fig_name)
-
-        ax.set_xlabel("TOF")
-        ax.set_ylabel("Counts")
-        ax.set_title("Sum of NCP fits")
-        ax.legend()
-
-        fileName = self._workspace_being_fit.name() + "_profiles_sum.pdf"
-        savePath = self._save_figures_path / fileName
-        plt.savefig(savePath, bbox_inches="tight")
-        plt.close(fig)
-
-        # TODO: Sort this out into something cleaner
-        file_name = self._workspace_being_fit.name() + "_profiles_sum.txt"
-        SaveAscii(ws_fig_name, str(self._save_results_path / file_name), LogList=label_list)
         return
 
     def _calculate_summed_workspaces(self):

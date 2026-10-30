@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from mantid import AnalysisDataService
+import matplotlib.pyplot as plt
 from mantid.simpleapi import (
     mtd,
     Load,
@@ -21,6 +22,8 @@ from mantid.simpleapi import (
     Integration,
     CloneWorkspace,
     WeightedMean,
+    AppendSpectra,
+    SaveAscii,
 )
 from mantid.kernel import logger
 import numpy as np
@@ -30,7 +33,7 @@ from pathlib import Path
 
 from mvesuvio.globals import ModeRunning, ScatteringType, Tags, Masking
 from mvesuvio.util.files_manager import FilesManager
-from mvesuvio.util import general_helpers
+from mvesuvio.util import general_helpers, handle_config
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
 from mvesuvio.util.constraints_transport import serialize_constraints
 from mvesuvio.util import fitting_helpers
@@ -41,6 +44,11 @@ if TYPE_CHECKING:
     from mvesuvio.default_config.experiment_template.run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
 
 import ntpath
+
+try:
+    plt.style.use(["ggplot", handle_config.get_plots_config_file()])
+except OSError:
+    pass
 
 
 def run_estimate_h_ratio(back_alg, front_alg, back_masses, back_chosen_mass_index, rtol, max_iter):
@@ -259,6 +267,46 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
     alg.initialize()
     alg.setProperties(kwargs)
     return alg
+
+
+def save_plots_from_outputs(output_ncp_group_name: str, output_directory: Path, minimal_output: bool = False):
+    if minimal_output:
+        return
+
+    data_workspace_name = output_ncp_group_name.removesuffix("_ncp_group")
+    if data_workspace_name == output_ncp_group_name:
+        raise ValueError(f"Expected an NCP output group, got {output_ncp_group_name!r}")
+
+    output_ncp_group = mtd[output_ncp_group_name]
+    ws_data_sum = mtd[data_workspace_name + "_sum"]
+    figure_directory = output_directory / "figures"
+    figure_directory.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "mantid"})
+    ax.errorbar(ws_data_sum, fmt="k.", label="Sum of spectra", elinewidth=1.5)
+
+    label_list = ["Sum of spectra"]
+    ws_fig_name = data_workspace_name + "_ncp_fits_sum"
+    CloneWorkspace(ws_data_sum, OutputWorkspace=ws_fig_name)
+
+    for ws_name in output_ncp_group.getNames():
+        if not ws_name.startswith(data_workspace_name + "_") or not ws_name.endswith("_ncp"):
+            continue
+
+        label = ws_name[len(data_workspace_name) + 1 : -len("_ncp")]
+        ws_sum = mtd[ws_name + "_sum"]
+        ax.plot(ws_sum, label=f"Sum of {label} profile")
+        label_list.append(f"Sum of {label} profile")
+        AppendSpectra(ws_fig_name, ws_sum, OutputWorkspace=ws_fig_name)
+
+    ax.set_xlabel("TOF")
+    ax.set_ylabel("Counts")
+    ax.set_title("Sum of NCP fits")
+    ax.legend()
+
+    plt.savefig(figure_directory / f"{data_workspace_name}_profiles_sum.pdf", bbox_inches="tight")
+    plt.close(fig)
+    SaveAscii(ws_fig_name, str(output_directory / f"{data_workspace_name}_profiles_sum.txt"), LogList=label_list)
 
 
 def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
