@@ -257,8 +257,6 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
         "MultipleScatteringOrder": int(inputs_class.multiple_scattering_order),
         "NumberOfEvents": int(inputs_class.multiple_scattering_number_of_events),
         "Constraints": serialize_constraints(inputs_class.constraints),
-        "ResultsPath": str(FilesManager.get_reduction_outputs_dir().absolute()),
-        "MinimalOutputFiles": inputs_class.minimal_output,
         "OutputMeansTable": " Final_Means",
     }
 
@@ -307,6 +305,35 @@ def save_plots_from_outputs(output_ncp_group_name: str, output_directory: Path, 
     plt.savefig(figure_directory / f"{data_workspace_name}_profiles_sum.pdf", bbox_inches="tight")
     plt.close(fig)
     SaveAscii(ws_fig_name, str(output_directory / f"{data_workspace_name}_profiles_sum.txt"), LogList=label_list)
+
+
+def save_results_from_outputs(
+    input_workspace_name: str,
+    output_ncp_group_name: str,
+    output_directory: Path,
+    minimal_output: bool = False,
+):
+    final_iteration_workspace_name = output_ncp_group_name.removesuffix("_ncp_group")
+    if final_iteration_workspace_name == output_ncp_group_name or not final_iteration_workspace_name.startswith(input_workspace_name + "_"):
+        raise ValueError(f"Expected an NCP output group for input workspace {input_workspace_name!r}, got {output_ncp_group_name!r}")
+
+    output_directory.mkdir(parents=True, exist_ok=True)
+    all_workspaces = [name for name in mtd.getObjectNames() if name.startswith(input_workspace_name + "_")]
+
+    if minimal_output:
+        final_prefix = final_iteration_workspace_name + "_"
+        for ws_name in all_workspaces:
+            if ws_name in (final_iteration_workspace_name + "_total_ncp", final_iteration_workspace_name + "_total_fse"):
+                SaveAscii(ws_name, str(output_directory / ws_name) + ".txt")
+            elif ws_name.startswith(final_prefix) and ws_name.endswith(("_fit_results", "_means")):
+                SaveAscii(ws_name, str(output_directory / ws_name) + ".txt")
+        return
+
+    for ws_name in all_workspaces:
+        if ws_name.endswith(("ncp", "fse", "initial_parameters", "means", "fit_results")):
+            SaveAscii(ws_name, str(output_directory / ws_name) + ".txt")
+        if ws_name.endswith(tuple(str(i) for i in range(10))):
+            SaveNexus(ws_name, str(output_directory / ws_name) + ".nxs")
 
 
 def crop_and_mask_workspace(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):

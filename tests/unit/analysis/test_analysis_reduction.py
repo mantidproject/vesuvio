@@ -55,8 +55,7 @@ class TestAnalysisReduction(unittest.TestCase):
             "MultipleScatteringOrder": 2,
             "NumberOfEvents": 2,
             "Constraints": "()",
-            "ResultsPath": "some-path",
-            "OutputMeansTable":"output-table"
+            "OutputMeansTable": "output-table",
         }
         alg = VesuvioAnalysisRoutine()
         alg.PyInit()
@@ -99,7 +98,7 @@ class TestAnalysisReduction(unittest.TestCase):
                     return MagicMock(value=mock_table_profiles)
                 if key == "InputWorkspace":
                     return MagicMock(value=MagicMock(getSpectrumNumbers=MagicMock(return_value=3)))
-                if key == "InstrumentParametersFile" or key == "ResultsPath":
+                if key == "InstrumentParametersFile":
                     return MagicMock(value="")
                 if key == "Constraints":
                     return MagicMock(value=str(dill.dumps(({'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }, {'type': 'eq', 'fun': lambda par:  par[0] - 2.7527*par[3] }))))
@@ -111,7 +110,6 @@ class TestAnalysisReduction(unittest.TestCase):
             mock_get_prop.side_effect = mock_properties
 
             alg = VesuvioAnalysisRoutine()
-            alg._save_results_path = MagicMock()
             alg._setup()
 
             self.assertEqual(alg._initial_fit_parameters, [1.0, 5, 0.0, 1.1, 10, 0.1, 1.2, 12, 0.2])
@@ -823,7 +821,6 @@ class TestAnalysisReduction(unittest.TestCase):
         alg._replace_zeros_with_ncp_for_corrections = Mock()
         alg._correct_for_gamma_and_multiple_scattering = Mock()
         alg._remask_columns_with_zeros = Mock()
-        alg._save_results = Mock()
         workspaces = {"input_0": Mock(), "input_1": Mock()}
 
         with (
@@ -846,7 +843,6 @@ class TestAnalysisReduction(unittest.TestCase):
                 call(InputWorkspace="corrections", OutputWorkspace="next_iteration"),
             ]
         )
-        alg._save_results.assert_called_once_with()
 
     def test_run_requires_at_least_one_profile(self):
         alg = VesuvioAnalysisRoutine()
@@ -870,70 +866,6 @@ class TestAnalysisReduction(unittest.TestCase):
 
         np.testing.assert_array_equal(data_y, [[1, 0, 1, 0], [1, 0, 1, 0]])
         np.testing.assert_array_equal(data_e, [[2, 0, 2, 0], [2, 0, 2, 0]])
-
-    def test_save_results_writes_all_outputs(self):
-        alg = VesuvioAnalysisRoutine()
-        alg._minimal_output = False
-        alg._save_results_path = Path("/tmp/results")
-        workspaces = [
-            "input_0",
-            "input_ncp",
-            "input_fse",
-            "input_initial_parameters",
-            "input_means",
-            "input_fit_results",
-            "unrelated",
-        ]
-        ads = Mock()
-        ads.getObjectNames.return_value = workspaces
-
-        with (
-            patch("mvesuvio.analysis_reduction.mtd", ads),
-            patch("mvesuvio.analysis_reduction.SaveAscii") as save_ascii,
-            patch("mvesuvio.analysis_reduction.SaveNexus") as save_nexus,
-        ):
-            alg._save_results()
-
-        self.assertEqual(
-            save_ascii.call_args_list,
-            [
-                call(name, f"/tmp/results/{name}.txt")
-                for name in workspaces[1:6]
-            ],
-        )
-        save_nexus.assert_called_once_with("input_0", "/tmp/results/input_0.nxs")
-
-    def test_save_results_writes_only_last_iteration_in_minimal_mode(self):
-        alg = VesuvioAnalysisRoutine()
-        alg._minimal_output = True
-        alg._save_results_path = Path("/tmp/results")
-        workspaces = [
-            "input_0_total_ncp",
-            "input_1_total_ncp",
-            "input_1_total_fse",
-            "input_1_fit_results",
-            "input_1_means",
-            "input_0_means",
-        ]
-        ads = Mock()
-        ads.getObjectNames.return_value = workspaces
-
-        with (
-            patch("mvesuvio.analysis_reduction.mtd", ads),
-            patch("mvesuvio.analysis_reduction.SaveAscii") as save_ascii,
-            patch("mvesuvio.analysis_reduction.SaveNexus") as save_nexus,
-        ):
-            alg._save_results()
-
-        self.assertEqual(
-            save_ascii.call_args_list,
-            [
-                call(name, f"/tmp/results/{name}.txt")
-                for name in workspaces[1:5]
-            ],
-        )
-        save_nexus.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

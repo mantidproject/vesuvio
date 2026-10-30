@@ -72,6 +72,67 @@ class TestReductionHelpers(unittest.TestCase):
             LogList=["Sum of spectra", "Sum of H profile", "Sum of total profile"],
         )
 
+    def test_save_results_from_outputs_saves_all_matching_outputs(self):
+        workspaces = [
+            "input_0",
+            "input_0_ncp",
+            "input_0_fse",
+            "input_initial_parameters",
+            "input_means",
+            "input_fit_results",
+            "unrelated",
+        ]
+        ads = Mock()
+        ads.getObjectNames.return_value = workspaces
+        output_directory = Path("/tmp/results")
+
+        with (
+            patch.object(reduction_helpers, "mtd", ads),
+            patch.object(reduction_helpers, "SaveAscii") as save_ascii,
+            patch.object(reduction_helpers, "SaveNexus") as save_nexus,
+        ):
+            reduction_helpers.save_results_from_outputs(
+                "input", "input_0_ncp_group", output_directory
+            )
+
+        self.assertEqual(
+            save_ascii.call_args_list,
+            [call(name, str(output_directory / f"{name}.txt")) for name in workspaces[1:6]],
+        )
+        save_nexus.assert_called_once_with("input_0", str(output_directory / "input_0.nxs"))
+
+    def test_save_results_from_outputs_writes_only_final_iteration_in_minimal_mode(self):
+        workspaces = [
+            "input_0_total_ncp",
+            "input_1_total_ncp",
+            "input_1_total_fse",
+            "input_1_fit_results",
+            "input_1_means",
+            "input_0_means",
+            "unrelated_1_total_ncp",
+        ]
+        ads = Mock()
+        ads.getObjectNames.return_value = workspaces
+        output_directory = Path("/tmp/results")
+
+        with (
+            patch.object(reduction_helpers, "mtd", ads),
+            patch.object(reduction_helpers, "SaveAscii") as save_ascii,
+            patch.object(reduction_helpers, "SaveNexus") as save_nexus,
+        ):
+            reduction_helpers.save_results_from_outputs(
+                "input", "input_1_ncp_group", output_directory, minimal_output=True
+            )
+
+        self.assertEqual(
+            save_ascii.call_args_list,
+            [
+                call(name, str(output_directory / f"{name}.txt"))
+                for name in workspaces[1:5]
+            ],
+        )
+        save_nexus.assert_not_called()
+
     def test_save_fitting_input_workspaces_uses_helper_module(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             FilesManager.set_experiment_dir(temp_dir)

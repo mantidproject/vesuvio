@@ -1,6 +1,5 @@
 import numpy as np
 import scipy
-from pathlib import Path
 from mantid.kernel import (
     StringListValidator,
     Direction,
@@ -29,8 +28,6 @@ from mantid.simpleapi import (
     DeleteWorkspaces,
     CreateWorkspace,
     GroupWorkspaces,
-    SaveAscii,
-    SaveNexus,
 )
 
 from mvesuvio.util.analysis_helpers import (
@@ -101,13 +98,10 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             doc="Whether running backward or forward scattering.",
         )
 
-        self.declareProperty(name="OutputDirectory", defaultValue="", doc="Directory where to save analysis results.")
         self.declareProperty(name="Constraints", defaultValue="", doc="Constraints to use during fitting profiles.")
         self.declareProperty(name="TransmissionGuess", defaultValue=-1.0, validator=FloatBoundedValidator(lower=0, upper=1))
         self.declareProperty(name="MultipleScatteringOrder", defaultValue=-1, validator=IntBoundedValidator(lower=0))
         self.declareProperty(name="NumberOfEvents", defaultValue=-1, validator=IntBoundedValidator(lower=0))
-        self.declareProperty(name="ResultsPath", defaultValue="", doc="Directory to store results, to be deleted later.")
-        self.declareProperty(name="MinimalOutputFiles", defaultValue=False, doc="Flag to set number of output files to minimum.")
         # Outputs
         self.declareProperty(
             TableWorkspaceProperty(name="OutputMeansTable", defaultValue="", direction=Direction.Output),
@@ -137,18 +131,13 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
         self._mode_running = self.getProperty("ModeRunning").value
         self._multiple_scattering_correction = self.getProperty("MultipleScatteringCorrection").value
         self._gamma_correction = self.getProperty("GammaCorrection").value
-        self._save_results_path = Path(self.getProperty("ResultsPath").value).absolute()
         self._chosen_index_for_h_ratio = self.getProperty("ChosenMassIndex").value
         self._h_ratio = self.getProperty("HRatioToChosenMass").value
         self._constraints = deserialize_constraints(self.getProperty("Constraints").value)
         self._profiles_table = self.getProperty("InputProfiles").value
-        self._minimal_output = self.getProperty("MinimalOutputFiles").value
 
         self._instrument_params = load_instrument_params(self._ip_file, self.getProperty("InputWorkspace").value.getSpectrumNumbers())
         self._resolution_params = load_resolution(self._instrument_params)
-
-        # Create paths if not there already
-        self._save_results_path.mkdir(parents=True, exist_ok=True)
 
         # Need to transform profiles table into parameter array for optimize.minimize()
         self._initial_fit_parameters = []
@@ -276,7 +265,6 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
 
             RenameWorkspace(InputWorkspace="next_iteration", OutputWorkspace=self._name + "_" + str(iteration + 1))
 
-        self._save_results()
         return self
 
     def _fit_neutron_compton_profiles(self):
@@ -674,20 +662,3 @@ class VesuvioAnalysisRoutine(PythonAlgorithm):
             Operation="Multiply",
         )
         return mtd[ws_corrections_name + "_gamma_backgr"]
-
-    def _save_results(self):
-        all_workspaces = mtd.getObjectNames()
-        if self._minimal_output:
-            last_iteration = max([ws.replace("_total_ncp", "")[-1] for ws in all_workspaces if ws.endswith("_total_ncp")])
-            for ws_name in all_workspaces:
-                if ws_name.endswith((f"{last_iteration}_total_ncp", f"{last_iteration}_total_fse")):
-                    SaveAscii(ws_name, str(self._save_results_path / ws_name) + ".txt")
-                if ws_name.endswith((f"{last_iteration}_fit_results", f"{last_iteration}_means")):
-                    SaveAscii(ws_name, str(self._save_results_path / ws_name) + ".txt")
-            return
-
-        for ws_name in all_workspaces:
-            if ws_name.endswith(("ncp", "fse", "initial_parameters", "means", "fit_results")):
-                SaveAscii(ws_name, str(self._save_results_path / ws_name) + ".txt")
-            if ws_name.endswith(tuple([str(i) for i in range(10)])):
-                SaveNexus(ws_name, str(self._save_results_path / ws_name) + ".nxs")

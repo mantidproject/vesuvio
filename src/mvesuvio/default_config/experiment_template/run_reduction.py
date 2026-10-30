@@ -277,12 +277,23 @@ def run_reduction(configure_with_main: bool = True):
     general_helpers.make_summarised_log_file()
     reduction_helpers.save_fitting_input_workspaces(BackwardAnalysisInputs)
     reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
-    for analysis_alg in (back_alg, front_alg):
+    for analysis_alg, input_workspace_name, inputs_class in (
+        (back_alg, back_input_ws, BackwardAnalysisInputs),
+        (front_alg, front_input_ws, ForwardAnalysisInputs),
+    ):
         if analysis_alg is not None:
+            output_ncp_group_name = analysis_alg.getPropertyValue("OutputNCPGroup")
+            output_directory = FilesManager.get_reduction_outputs_dir()
+            reduction_helpers.save_results_from_outputs(
+                input_workspace_name=input_workspace_name,
+                output_ncp_group_name=output_ncp_group_name,
+                output_directory=output_directory,
+                minimal_output=inputs_class.minimal_output,
+            )
             reduction_helpers.save_plots_from_outputs(
-                output_ncp_group_name=analysis_alg.getPropertyValue("OutputNCPGroup"),
-                output_directory=Path(analysis_alg.getPropertyValue("ResultsPath")),
-                minimal_output=analysis_alg.getProperty("MinimalOutputFiles").value,
+                output_ncp_group_name=output_ncp_group_name,
+                output_directory=output_directory,
+                minimal_output=inputs_class.minimal_output,
             )
 
 
