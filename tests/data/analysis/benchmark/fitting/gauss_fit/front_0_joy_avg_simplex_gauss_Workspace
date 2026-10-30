@@ -6,7 +6,7 @@ sigma=5.37 $\pm$ 0.02
 ,Not defined,
 Residuals,Not defined,
 
-# X , Y , E Distribution=false
+# X , Y , E Distribution=true
 1
 -24.75,-0.000170906,0.000264195
 -24.25,-5.85582e-05,0.000390835

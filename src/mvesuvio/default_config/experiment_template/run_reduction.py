@@ -1,5 +1,5 @@
 import mvesuvio
-from mantid.simpleapi import Rebin, Scale, Minus, SetSample, SaveAscii
+from mantid.simpleapi import Rebin, Scale, Minus, SetSample, SaveAscii, mtd
 from pathlib import Path
 import math
 from typing import Dict
@@ -218,9 +218,9 @@ def run_reduction(configure_with_main: bool = True):
             ### End of User Editing Section ###
             back_input_ws = BackwardAnalysisInputs.name_of_subtracted_workspace
 
-            # Set sample geometry, used in MS corrections
-            SetSample(InputWorkspace=back_input_ws, Geometry=SAMPLE_SHAPE)
-            reduction_helpers.crop_and_mask_workspace(back_input_ws, BackwardAnalysisInputs)
+        # Set sample geometry, used in MS corrections
+        SetSample(InputWorkspace=back_input_ws, Geometry=SAMPLE_SHAPE)
+        reduction_helpers.crop_and_mask_workspace(back_input_ws, BackwardAnalysisInputs)
 
     if ForwardAnalysisInputs.run_this_scattering_type:
         if ForwardAnalysisInputs.overwrite_analysis_input_workspace:
@@ -244,9 +244,9 @@ def run_reduction(configure_with_main: bool = True):
             ### End of User Editing Section ###
             front_input_ws = ForwardAnalysisInputs.name_of_subtracted_workspace
 
-            ## Set sample geometry, used in MS corrections
-            SetSample(InputWorkspace=front_input_ws, Geometry=SAMPLE_SHAPE)
-            reduction_helpers.crop_and_mask_workspace(front_input_ws, ForwardAnalysisInputs)
+        ## Set sample geometry, used in MS corrections
+        SetSample(InputWorkspace=front_input_ws, Geometry=SAMPLE_SHAPE)
+        reduction_helpers.crop_and_mask_workspace(front_input_ws, ForwardAnalysisInputs)
 
     back_alg = reduction_helpers.init_analysis_algorithm(back_input_ws, BackwardAnalysisInputs)
     front_alg = reduction_helpers.init_analysis_algorithm(front_input_ws, ForwardAnalysisInputs)
@@ -290,11 +290,16 @@ def run_reduction(configure_with_main: bool = True):
                 output_directory=output_directory,
                 minimal_output=inputs_class.minimal_output,
             )
-            reduction_helpers.save_plots_from_outputs(
-                output_ncp_group_name=output_ncp_group_name,
-                output_directory=output_directory,
-                minimal_output=inputs_class.minimal_output,
+            # Plots are saved for every iteration, not only the final one
+            iteration_ncp_groups = sorted(
+                name for name in mtd.getObjectNames() if name.startswith(input_workspace_name + "_") and name.endswith("_ncp_group")
             )
+            for iteration_ncp_group in iteration_ncp_groups:
+                reduction_helpers.save_plots_from_outputs(
+                    output_ncp_group_name=iteration_ncp_group,
+                    output_directory=output_directory,
+                    minimal_output=inputs_class.minimal_output,
+                )
 
 
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
