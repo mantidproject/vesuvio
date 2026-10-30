@@ -40,6 +40,10 @@ class TestReduction(unittest.TestCase):
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 1
         namespace["ForwardAnalysisInputs"].mask_of_time_of_flight_range = "110-140"
         namespace["BackwardAnalysisInputs"].chosen_mass_index = 0
+        namespace["BackwardAnalysisInputs"].do_symmetrisation = False
+        namespace["ForwardAnalysisInputs"].do_symmetrisation = False
+        namespace["BackwardAnalysisInputs"].mask_time_of_flight_range = None
+        namespace["ForwardAnalysisInputs"].mask_time_of_flight_range = None
         namespace["run_reduction"]()
 
         AnalysisDataService.clear()

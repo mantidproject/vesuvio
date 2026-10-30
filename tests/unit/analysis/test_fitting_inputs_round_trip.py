@@ -78,7 +78,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
 
         with patch("mvesuvio.util.fitting_helpers.calculate_resolution", side_effect=self._mock_calculate_resolution):
             with patch("mvesuvio.util.fitting_helpers.VesuvioResolution") as resolution_mock:
-                with patch.object(reduction_helpers, "ySpaceReduction", side_effect=fake_y_space_reduction):
+                with patch.object(reduction_helpers, "y_space_reduction", side_effect=fake_y_space_reduction):
                     reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
         resolution_mock.assert_called_once()

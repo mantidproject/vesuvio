@@ -450,15 +450,21 @@ def mask_time_of_flight_bins_with_zeros(ws_name, inputs_class: type[BackwardAnal
     """
 
     if inputs_class.mask_time_of_flight_range:
-        match = re.fullmatch(r"\s*(\d+(?:\.\d*)?)\s*-\s*(\d+(?:\.\d*)?)\s*", inputs_class.mask_time_of_flight_range)
-        if match is None:
-            raise ValueError(f"Invalid mask_time_of_flight_range: {inputs_class.mask_time_of_flight_range!r}")
-        x_min, x_max = map(float, match.groups())
+        ranges = []
+        for mask_range in inputs_class.mask_time_of_flight_range.split(","):
+            match = re.fullmatch(r"\s*(\d+(?:\.\d*)?)\s*(?:-\s*(\d+(?:\.\d*)?))?\s*", mask_range)
+            if match is None:
+                raise ValueError(f"Invalid mask_time_of_flight_range: {inputs_class.mask_time_of_flight_range!r}")
+            x_min, x_max = match.groups()
+            ranges.append((float(x_min), float(x_max) if x_max is not None else float(x_min)))
 
         ws = mtd[ws_name]
         for i in range(ws.getNumberHistograms()):
             x = ws.dataX(i)
-            ws.mutableY(i)[(x >= x_min) & (x <= x_max)] = 0
+            masked = np.zeros(x.shape, dtype=bool)
+            for x_min, x_max in ranges:
+                masked |= (x >= x_min) & (x <= x_max)
+            ws.mutableY(i)[masked] = 0
     return
 
 

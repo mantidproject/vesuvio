@@ -2,20 +2,20 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, Mock, MagicMock, call
+from unittest.mock import MagicMock, Mock, call, patch
 
 import numpy as np
-from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, Integration, Rebin, RenameWorkspace
 
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
-from mvesuvio.globals import Tags, Mode, ScatteringType
+from mvesuvio.globals import Masking, Mode, ScatteringType, Tags
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
 
 class TestReductionHelpers(unittest.TestCase):
     def setUp(self):
-        patcher = patch.object(reduction_helpers, "ySpaceReduction", return_value=(MagicMock(), MagicMock()))
+        patcher = patch.object(reduction_helpers, "y_space_reduction", return_value=(MagicMock(), MagicMock()))
         self.mock_y_space_reduction = patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -149,20 +149,16 @@ class TestReductionHelpers(unittest.TestCase):
         data_y = np.ones((3, 10))
         data_e = np.ones((3, 10))
         workspace_mock = MagicMock()
-        workspace_mock.extractX.return_value = data_x
-        workspace_mock.extractY.return_value = data_y
-        workspace_mock.extractE.return_value = data_e
+        actual_data_x = data_x.copy()
+        actual_data_y = data_y.copy()
+        actual_data_e = data_e.copy()
 
-        actual_data_x = np.zeros((3, 10))
-        actual_data_y = np.zeros((3, 10))
-        actual_data_e = np.zeros((3, 10))
-
-        workspace_mock.dataY.side_effect = lambda i: actual_data_y[i]
         workspace_mock.dataX.side_effect = lambda i: actual_data_x[i]
-        workspace_mock.dataE.side_effect = lambda i: actual_data_e[i]
-
+        workspace_mock.mutableY.side_effect = lambda i: actual_data_y[i]
         workspace_mock.getNumberHistograms.return_value = 3
-        reduction_helpers.mask_time_of_flight_bins_with_zeros(workspace_mock, '4.5-7.3')
+        inputs_class = Mock(mask_time_of_flight_range='4.5-7.3')
+        with patch.object(reduction_helpers, "mtd", {"workspace": workspace_mock}):
+            reduction_helpers.mask_time_of_flight_bins_with_zeros("workspace", inputs_class)
 
         np.testing.assert_allclose(actual_data_x, data_x)
         np.testing.assert_allclose(actual_data_e, data_e)
@@ -176,21 +172,17 @@ class TestReductionHelpers(unittest.TestCase):
         data_y = np.ones_like(data_x)
         data_e = np.ones_like(data_x)
         workspace_mock = MagicMock()
-        workspace_mock.extractX.return_value = data_x
-        workspace_mock.extractY.return_value = data_y
-        workspace_mock.extractE.return_value = data_e
+        actual_data_x = data_x.copy()
+        actual_data_y = data_y.copy()
+        actual_data_e = data_e.copy()
 
-        actual_data_x = np.zeros_like(data_x)
-        actual_data_y = np.zeros_like(data_x)
-        actual_data_e = np.zeros_like(data_x)
-
-        workspace_mock.dataY.side_effect = lambda i: actual_data_y[i]
         workspace_mock.dataX.side_effect = lambda i: actual_data_x[i]
-        workspace_mock.dataE.side_effect = lambda i: actual_data_e[i]
-
+        workspace_mock.mutableY.side_effect = lambda i: actual_data_y[i]
         workspace_mock.getNumberHistograms.return_value = 3
 
-        reduction_helpers.mask_time_of_flight_bins_with_zeros(workspace_mock, '1.1-3,3.5,  4.5-7.3, 9')
+        inputs_class = Mock(mask_time_of_flight_range='1.1-3,3.5,  4.5-7.3, 9')
+        with patch.object(reduction_helpers, "mtd", {"workspace": workspace_mock}):
+            reduction_helpers.mask_time_of_flight_bins_with_zeros("workspace", inputs_class)
 
         np.testing.assert_allclose(actual_data_x, data_x)
         np.testing.assert_allclose(actual_data_e, data_e)
@@ -477,6 +469,260 @@ class TestReductionHelpers(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(reduction_helpers.convert_to_list_of_spectrum_numbers(value), expected)
 
+
+
+class TestRebinMaskedWeighted(unittest.TestCase):
+    def tearDown(self):
+        AnalysisDataService.clear()
+
+    def test_matches_rebin_when_no_points_are_masked(self):
+        data_x = np.tile([0.5, 1.5, 2.5, 3.5], 2)
+        data_y = [1.0, 3.0, 5.0, 7.0, 2.0, 4.0, 6.0, 8.0]
+        data_e = np.full(len(data_y), 0.2)
+        ws = CreateWorkspace(
+            DataX=data_x, DataY=data_y, DataE=data_e, NSpec=2, Distribution=True, OutputWorkspace="unmasked_input"
+        )
+
+        expected = Rebin(InputWorkspace=ws, Params=[0, 2, 4], OutputWorkspace="ordinary_rebin")
+        actual = reduction_helpers.rebin_masked_weighted(ws, [0, 2, 4], "_weighted_rebin")
+
+        np.testing.assert_allclose(actual.extractY(), expected.extractY())
+        np.testing.assert_allclose(actual.extractE(), expected.extractE())
+
+    def test_masked_points_do_not_contribute_to_rebinned_values(self):
+        data_x = np.tile([0.5, 1.5, 2.5, 3.5], 2)
+        data_y = np.array([1.0, 3.0, 5.0, 7.0, 2.0, 4.0, 6.0, 8.0])
+        data_e = np.full(len(data_y), 0.2)
+        masked = [1, 3, 6]
+        data_y[masked] = 0
+        data_e[masked] = 0
+        ws = CreateWorkspace(
+            DataX=data_x, DataY=data_y, DataE=data_e, NSpec=2, Distribution=True, OutputWorkspace="masked_input"
+        )
+
+        actual = reduction_helpers.rebin_masked_weighted(ws, [0, 2, 4], "_weighted_rebin")
+
+        np.testing.assert_allclose(actual.extractY(), [[1.0, 5.0], [3.0, 8.0]])
+        expected_e = [[0.2, 0.2], [0.2 / np.sqrt(2), 0.2]]
+        np.testing.assert_allclose(actual.extractE(), expected_e)
+
+
+class TestReplaceZerosWithNcp(unittest.TestCase):
+    def tearDown(self):
+        AnalysisDataService.clear()
+
+    def test_replaces_only_fully_zero_columns_and_returns_summed_workspace(self):
+        data_x = np.tile([0.5, 1.5, 2.5, 3.5], 2)
+        data_y = np.array([[1.0, 0.0, 3.0, 0.0], [2.0, 0.0, 0.0, 0.0]])
+        data_e = np.full(data_y.shape, 0.25)
+        ncp_y = np.array([[10.0, 20.0, 30.0, 40.0]])
+        ws = CreateWorkspace(
+            DataX=data_x, DataY=data_y, DataE=data_e, NSpec=2, OutputWorkspace="replace_input"
+        )
+        ncp = CreateWorkspace(
+            DataX=[0.5, 1.5, 2.5, 3.5], DataY=ncp_y[0], DataE=np.ones(4), NSpec=1, OutputWorkspace="replace_ncp"
+        )
+
+        actual = reduction_helpers.replace_zeros_with_ncp(ws, ncp.extractY())
+
+        expected_y = [[1.0, 20.0, 3.0, 40.0], [2.0, 20.0, 0.0, 40.0]]
+        np.testing.assert_allclose(actual.extractY(), expected_y)
+        np.testing.assert_allclose(actual.extractE(), data_e)
+        np.testing.assert_allclose(actual.extractX(), ws.extractX())
+        np.testing.assert_allclose(ws.extractY(), data_y)
+        self.assertEqual(actual.name(), "replace_input_ncpmask")
+
+        summed = AnalysisDataService.retrieve("replace_input_ncpmask_sum")
+        np.testing.assert_allclose(summed.extractY(), [[3.0, 40.0, 3.0, 80.0]])
+
+
+class TestYSpaceReduction(unittest.TestCase):
+    def tearDown(self):
+        AnalysisDataService.clear()
+
+    @staticmethod
+    def _inputs(mask_time_of_flight_range=None, mask_zeros_with=Masking.NAN, do_symmetrisation=False):
+        return Mock(
+            masses=[1.0],
+            range_for_rebinning_in_y_space=[0, 2, 4],
+            mask_time_of_flight_range=mask_time_of_flight_range,
+            mask_zeros_with=mask_zeros_with,
+            do_symmetrisation=do_symmetrisation,
+        )
+
+    @staticmethod
+    def _run_with_mocks(inputs):
+        ws_tof = Mock()
+        ws_tof.name.return_value = "tof"
+        ws_ncp = Mock()
+        joy = Mock()
+        joy.name.return_value = "tof_joy"
+        rebinned = Mock()
+        rebinned.name.return_value = "tof_joy_rebin"
+        normalised = Mock()
+        normalised.name.return_value = "tof_joy_rebin_norm"
+        averaged = Mock()
+        replaced = Mock()
+        replaced.name.return_value = "tof_replaced"
+
+        with (
+            patch.object(reduction_helpers, "ConvertToYSpace", return_value=joy) as convert,
+            patch.object(reduction_helpers, "Rebin", return_value=rebinned) as rebin,
+            patch.object(reduction_helpers, "rebin_masked_weighted", return_value=rebinned) as masked_rebin,
+            patch.object(reduction_helpers, "Integration") as integrate,
+            patch.object(reduction_helpers, "Divide", return_value=normalised) as divide,
+            patch.object(reduction_helpers, "SumSpectra", return_value=averaged) as sum_spectra,
+            patch.object(reduction_helpers, "replace_zeros_with_ncp", return_value=replaced) as replace_zeros,
+            patch.object(reduction_helpers, "symmetrize_weighted_mean") as symmetrize,
+            patch.object(reduction_helpers, "DeleteWorkspace") as delete,
+        ):
+            result = reduction_helpers.y_space_reduction(ws_tof, ws_ncp, inputs)
+
+        return (
+            result,
+            ws_tof,
+            ws_ncp,
+            joy,
+            rebinned,
+            normalised,
+            averaged,
+            convert,
+            rebin,
+            masked_rebin,
+            integrate,
+            divide,
+            sum_spectra,
+            replace_zeros,
+            symmetrize,
+            delete,
+        )
+
+    def test_unmasked_path_uses_mantid_rebin_without_replacement_or_symmetrisation(self):
+        (
+            result,
+            ws_tof,
+            ws_ncp,
+            joy,
+            rebinned,
+            normalised,
+            averaged,
+            convert,
+            rebin,
+            masked_rebin,
+            integrate,
+            divide,
+            sum_spectra,
+            replace_zeros,
+            symmetrize,
+            delete,
+        ) = self._run_with_mocks(self._inputs())
+
+        ws_ncp.extractY.assert_called_once_with()
+        convert.assert_called_once_with(ws_tof, Mass=1.0, OutputWorkspace="tof_joy")
+        masked_rebin.assert_not_called()
+        rebin.assert_called_once_with(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin")
+        integrate.assert_called_once_with(rebinned, OutputWorkspace="temp_integral")
+        divide.assert_called_once_with(
+            LHSWorkspace=rebinned, RHSWorkspace="temp_integral", OutputWorkspace="tof_joy_rebin_norm"
+        )
+        sum_spectra.assert_called_once_with(
+            InputWorkspace=normalised,
+            WeightedSum=True,
+            MultiplyBySpectra=False,
+            OutputWorkspace="tof_joy_rebin_norm_avg",
+        )
+        replace_zeros.assert_not_called()
+        symmetrize.assert_not_called()
+        delete.assert_called_once_with("temp_integral")
+        self.assertEqual(result, (normalised, averaged))
+
+    def test_ncp_masking_replaces_zeros_before_convert_and_uses_standard_rebin(self):
+        inputs = self._inputs(mask_time_of_flight_range="100-200", mask_zeros_with=Masking.NCP)
+        (
+            _,
+            ws_tof,
+            ws_ncp,
+            joy,
+            _,
+            _,
+            _,
+            convert,
+            rebin,
+            masked_rebin,
+            _,
+            _,
+            _,
+            replace_zeros,
+            _,
+            _,
+        ) = self._run_with_mocks(inputs)
+
+        replace_zeros.assert_called_once_with(ws_tof, ws_ncp.extractY.return_value)
+        convert.assert_called_once_with(replace_zeros.return_value, Mass=1.0, OutputWorkspace="tof_replaced_joy")
+        rebin.assert_called_once_with(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin")
+        masked_rebin.assert_not_called()
+
+    def test_nan_masking_uses_weighted_rebin_and_symmetrises_average(self):
+        inputs = self._inputs(mask_time_of_flight_range="100-200", mask_zeros_with=Masking.NAN, do_symmetrisation=True)
+        (
+            result,
+            _,
+            _,
+            joy,
+            rebinned,
+            normalised,
+            averaged,
+            _,
+            rebin,
+            masked_rebin,
+            _,
+            _,
+            _,
+            replace_zeros,
+            symmetrize,
+            _,
+        ) = self._run_with_mocks(inputs)
+
+        replace_zeros.assert_not_called()
+        rebin.assert_not_called()
+        masked_rebin.assert_called_once_with(joy, [0, 2, 4], "_rebin")
+        symmetrize.assert_called_once_with(averaged)
+        self.assertEqual(result, (normalised, symmetrize.return_value))
+
+    def _run_with_y_space_workspace(self):
+        ws_tof = CreateWorkspace(
+            DataX=[1, 2, 3, 4, 5],
+            DataY=[1, 2, 3, 4],
+            DataE=[1, 1, 1, 1],
+            NSpec=1,
+            OutputWorkspace="normalisation_tof",
+        )
+        ws_joy = CreateWorkspace(
+            DataX=[0, 1, 2, 3, 4],
+            DataY=[2, 3, 4, 5, 6, 4, 3, 2],
+            DataE=[0.2] * 8,
+            NSpec=2,
+            Distribution=True,
+            OutputWorkspace="normalisation_joy",
+        )
+        inputs = self._inputs()
+
+        with patch.object(reduction_helpers, "ConvertToYSpace", return_value=ws_joy):
+            per_spectrum, average = reduction_helpers.y_space_reduction(ws_tof, ws_joy, inputs)
+
+        return per_spectrum, average
+
+    def test_average_workspace_contains_one_spectrum(self):
+        _, average = self._run_with_y_space_workspace()
+
+        self.assertEqual(average.getNumberHistograms(), 1)
+
+    def test_each_rebinned_spectrum_is_normalised_to_unit_integral(self):
+        per_spectrum, _ = self._run_with_y_space_workspace()
+
+        integrated = Integration(per_spectrum, OutputWorkspace="normalisation_check")
+
+        np.testing.assert_allclose(integrated.extractY(), np.ones((2, 1)), atol=1e-4)
 
 
 class TestSymmetrizeWeightedMean(unittest.TestCase):
