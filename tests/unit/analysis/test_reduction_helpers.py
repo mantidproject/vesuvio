@@ -479,3 +479,84 @@ class TestReductionHelpers(unittest.TestCase):
 
 
 
+class TestSymmetrizeWeightedMean(unittest.TestCase):
+    def tearDown(self):
+        AnalysisDataService.clear()
+
+    @staticmethod
+    def _create_ws(dataY, dataE):
+        dataX = np.linspace(-5, 5, len(dataY))
+        return CreateWorkspace(DataX=dataX, DataY=dataY, DataE=dataE, NSpec=1, OutputWorkspace="avg_ws")
+
+    @staticmethod
+    def _expected(dataY, dataE):
+        """Inverse variance weighting of each point with its mirror point, masked points are ignored."""
+        yFlip, eFlip = dataY[::-1], dataE[::-1]
+        wY = np.where(dataE > 0, 1 / np.where(dataE > 0, dataE, 1) ** 2, 0)
+        wF = np.where(eFlip > 0, 1 / np.where(eFlip > 0, eFlip, 1) ** 2, 0)
+        total = wY + wF
+        safe = np.where(total > 0, total, 1)
+        expY = np.where(total > 0, (wY * dataY + wF * yFlip) / safe, 0)
+        expE = np.where(total > 0, 1 / np.sqrt(safe), 0)
+        return expY, expE
+
+    def _assert_symmetrised(self, dataY, dataE):
+        ws = self._create_ws(dataY, dataE)
+        sym = reduction_helpers.symmetrize_weighted_mean(ws)
+        symY, symE = sym.extractY()[0], sym.extractE()[0]
+        expY, expE = self._expected(dataY, dataE)
+        np.testing.assert_allclose(symY, expY, atol=1e-12)
+        np.testing.assert_allclose(symE, expE, atol=1e-12)
+        np.testing.assert_allclose(symY, symY[::-1])
+        np.testing.assert_allclose(symE, symE[::-1])
+        np.testing.assert_allclose(sym.extractX()[0], ws.extractX()[0])
+        return symY, symE
+
+    def test_output_workspace_name_and_temporary_workspaces_removed(self):
+        ws = self._create_ws(np.arange(1.0, 22), np.full(21, 0.1))
+        sym = reduction_helpers.symmetrize_weighted_mean(ws)
+        self.assertEqual(sym.name(), "avg_ws_sym")
+        self.assertNotIn("temp_lhs_reflected", AnalysisDataService.getObjectNames())
+        self.assertNotIn("temp_rhs_reflected", AnalysisDataService.getObjectNames())
+
+    def test_no_masked_points(self):
+        rng = np.random.default_rng(0)
+        for nbins in (21, 20):
+            with self.subTest(nbins=nbins):
+                self._assert_symmetrised(rng.random(nbins) + 1, rng.random(nbins) * 0.1 + 0.05)
+
+    def test_masked_points_on_one_side_take_value_of_mirror_point(self):
+        rng = np.random.default_rng(1)
+        for nbins in (21, 20):
+            with self.subTest(nbins=nbins):
+                dataY = rng.random(nbins) + 1
+                dataE = rng.random(nbins) * 0.1 + 0.05
+                dataY[:3] = 0
+                dataE[:3] = 0
+                symY, symE = self._assert_symmetrised(dataY, dataE)
+                np.testing.assert_allclose(symY[:3], dataY[::-1][:3])
+                np.testing.assert_allclose(symE[:3], dataE[::-1][:3])
+
+    def test_masked_points_on_both_sides(self):
+        rng = np.random.default_rng(2)
+        dataY = rng.random(21) + 1
+        dataE = rng.random(21) * 0.1 + 0.05
+        for idx in (0, 1, 19, 20, 7):  # Includes mirrored masked pairs (0, 20) and (1, 19)
+            dataY[idx] = 0
+            dataE[idx] = 0
+        symY, symE = self._assert_symmetrised(dataY, dataE)
+        np.testing.assert_array_equal(symY[[0, 1, 19, 20]], 0)
+        np.testing.assert_array_equal(symE[[0, 1, 19, 20]], 0)
+
+    def test_central_point_masked(self):
+        rng = np.random.default_rng(3)
+        dataY = rng.random(21) + 1
+        dataE = rng.random(21) * 0.1 + 0.05
+        dataY[10] = 0
+        dataE[10] = 0
+        self._assert_symmetrised(dataY, dataE)
+
+    def test_raises_for_asymmetric_x(self):
+        ws = CreateWorkspace(DataX=np.linspace(-4, 5, 11), DataY=np.ones(11), DataE=np.ones(11), NSpec=1)
+        with self.assertRaises(AssertionError):
+            reduction_helpers.symmetrize_weighted_mean(ws)

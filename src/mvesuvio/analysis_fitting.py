@@ -25,8 +25,7 @@ from mantid.kernel import logger
 
 from mvesuvio.globals import FitModels, Masking
 from mvesuvio.util import handle_config
-from mvesuvio.util.general_helpers import print_table_workspace
-from mvesuvio.util.reduction_helpers import weightedAvgArr, weightedAvgXBinsArr
+from mvesuvio.util.general_helpers import print_table_workspace, extractWS
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
@@ -1204,6 +1203,44 @@ def avgGroupsOverCols(dataX, dataY, dataE, dataRes, idxList):
     return wDataX, wDataY, wDataE, wDataRes
 
 
+def weightedAvgArr(dataYO, dataEO):
+    """
+    Weighted average over columns of 2D arrays.
+    Ignores any zero or NaN value.
+    """
+
+    # Run some tests
+    assert dataYO.shape == dataEO.shape, "Y and E arrays should have same shape for weighted average."
+    assert np.all((dataYO == 0) == (dataEO == 0)), (
+        f"Masked zeros should match in DataY and DataE: {np.argwhere((dataYO == 0) != (dataEO == 0))}"
+    )
+    assert np.all(np.isnan(dataYO) == np.isnan(dataEO)), "Masked nans should match in DataY and DataE."
+    assert len(dataYO) > 1, "Weighted average needs more than one element to be performed."
+
+    dataY = dataYO.copy()  # Copy arrays not to change original data
+    dataE = dataEO.copy()
+
+    # Ignore invalid data by changing zeros to nans
+    # If data is already masked with nans, it remains unaltered
+    zerosMask = dataY == 0
+    dataY[zerosMask] = np.nan
+    dataE[zerosMask] = np.nan
+
+    meanY = np.nansum(dataY / np.square(dataE), axis=0) / np.nansum(1 / np.square(dataE), axis=0)
+    meanE = np.sqrt(1 / np.nansum(1 / np.square(dataE), axis=0))
+
+    # Change invalid data back to original masking format with zeros
+    nanInfMask = (meanE == np.inf) | (meanE == np.nan) | (meanY == np.nan)
+    meanY[nanInfMask] = 0
+    meanE[nanInfMask] = 0
+
+    # Test that columns of zeros are left unchanged
+    assert np.all((meanY == 0) == (meanE == 0)), "Weighted avg output should have masks in the same DataY and DataE."
+    assert np.all((np.all(dataYO == 0, axis=0) | np.all(np.isnan(dataYO), axis=0)) == (meanY == 0)), "Masked cols should be ignored."
+
+    return meanY, meanE
+
+
 def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
     """
     Performed only when mask with NaNs and Bins is turned on.
@@ -1229,6 +1266,103 @@ def avgGroupsWithBins(dataX, dataY, dataE, dataRes, idxList, yFitIC):
             wsData[i] = mean
 
     return wDataX, wDataY, wDataE, wDataRes
+
+
+def weightedAvgXBins(wsXBins, xp):
+    """Weighted average on ws where dataY points are grouped per dataX bin centers."""
+    dataX, dataY, dataE = extractWS(wsXBins)
+
+    meansY, meansE = weightedAvgXBinsArr(dataX, dataY, dataE, xp)
+
+    wsYSpaceAvg = CreateWorkspace(
+        DataX=xp,
+        DataY=meansY,
+        DataE=meansE,
+        NSpec=1,
+        OutputWorkspace=wsXBins.name() + "_wavg",
+    )
+    return wsYSpaceAvg
+
+
+def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
+    """
+    Weighted Average on arrays where several dataY points correspond to a single dataX point.
+    xp is the range over which to perform the average.
+    dataX points can only take values in xp.
+    Ignores any zero or NaN value.
+    """
+    meansY = np.zeros(len(xp))
+    meansE = np.zeros(len(xp))
+
+    for i in range(len(xp)):
+        # Perform weighted average over all dataY and dataE values with the same xp[i]
+        # Change shape to column to match weighted average function
+        pointMask = dataX == xp[i]
+        allY = dataY[pointMask][:, np.newaxis]
+        allE = dataE[pointMask][:, np.newaxis]
+
+        # If no points were found for a given abcissae
+        if np.sum(pointMask) == 0:
+            mY, mE = 0, 0  # Mask with zeros
+
+        # If one point was found, set to that point
+        elif np.sum(pointMask) == 1:
+            mY, mE = allY.flatten(), allE.flatten()
+
+        # Weighted avg over all spectra and several points per spectra
+        else:
+            # Case of bootstrap replica with no errors
+            if np.all(dataE == 0):
+                mY = avgArr(allY)
+                mE = 0
+
+            # Default for most cases
+            else:
+                mY, mE = weightedAvgArr(allY, allE)  # Outputs masked values as zeros
+
+        # DataY and DataE should never reach NaN, but safeguard in case they do
+        if (mE == np.nan) | (mY == np.nan):
+            mY, mE = 0, 0
+
+        meansY[i] = mY
+        meansE[i] = mE
+
+    return meansY, meansE
+
+
+def weightedAvgCols(wsYSpace):
+    """Returns ws with weighted avg of columns of input ws"""
+    dataX, dataY, dataE = extractWS(wsYSpace)
+    if np.all(dataE == 0):  # Bootstrap case where errors are not used
+        meanY = avgArr(dataY)
+        meanE = np.zeros(meanY.shape)
+    else:
+        meanY, meanE = weightedAvgArr(dataY, dataE)
+    wsYSpaceAvg = CreateWorkspace(
+        DataX=dataX[0, :],
+        DataY=meanY,
+        DataE=meanE,
+        NSpec=1,
+        OutputWorkspace=wsYSpace.name() + "_wavg",
+    )
+    return wsYSpaceAvg
+
+
+def avgArr(dataYO):
+    """
+    Average over columns of 2D dataY.
+    Ignores any zero values as being masked.
+    """
+
+    assert len(dataYO) > 1, "Averaging needs more than one element."
+
+    dataY = dataYO.copy()
+    dataY[dataY == 0] = np.nan
+    meanY = np.nanmean(dataY, axis=0)
+    meanY[meanY == np.nan] = 0
+
+    assert np.all(np.all(dataYO == 0, axis=0) == (meanY == 0)), "Columns of zeros should give zero."
+    return meanY
 
 
 def initiateZeroArr(shape):

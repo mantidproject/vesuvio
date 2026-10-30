@@ -19,8 +19,8 @@ from mantid.simpleapi import (
     Rebin,
     ConvertToYSpace,
     Integration,
-    CreateWorkspace,
     CloneWorkspace,
+    WeightedMean,
 )
 from mantid.kernel import logger
 import numpy as np
@@ -436,9 +436,7 @@ def save_fitting_input_workspaces(
         analysis_inputs.subtract_calculated_fse_from_data,
     )
 
-    ws_joy, ws_joy_avg = ySpaceReduction(ws_lighest_data, ws_lighest_ncp, analysis_inputs)
-    if analysis_inputs.do_symmetrisation:
-        ws_joy_avg = symmetrizeWs(ws_joy_avg)
+    ws_joy, ws_joy_avg = y_space_reduction(ws_lighest_data, ws_lighest_ncp, analysis_inputs)
 
     SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
     SaveNexus(ws_joy, str(fitting_inputs_dir / f"{workspace_name}_joy.nxs"))
@@ -513,23 +511,23 @@ def create_profiles_table(name, ai):
     return table
 
 
-def ySpaceReduction(wsTOF, ws_ncp, ic: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
+def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
     """Seperate procedures depending on masking specified."""
-    mass0 = ic.masses[0]
+    mass0 = inputs.masses[0]
     ncp = ws_ncp.extractY()
 
-    rebin_pars = ic.range_for_rebinning_in_y_space
+    rebin_pars = inputs.range_for_rebinning_in_y_space
 
-    if ic.mask_time_of_flight_range and ic.mask_zeros_with == Masking.NCP:
-        wsTOF = replaceZerosWithNCP(wsTOF, ncp)
+    if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NCP:
+        wsTOF = replace_zeros_with_ncp(wsTOF, ncp)
 
     ws_joy = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
 
-    if ic.mask_time_of_flight_range and ic.mask_zeros_with == Masking.NAN:
+    if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NAN:
         # NOTE: Technically this rebin is general and gives the same result as Rebin when
         # no zeros are present in dataY, but I didn't make this the default path
         # because it can be confusing.
-        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars)
+        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars, "_rebin")
     else:
         ws_joy_rebin = Rebin(InputWorkspace=ws_joy, Params=rebin_pars, OutputWorkspace=ws_joy.name() + "_rebin")
 
@@ -541,28 +539,14 @@ def ySpaceReduction(wsTOF, ws_ncp, ic: type[BackwardAnalysisInputs] | type[Forwa
         InputWorkspace=ws_joy_rebin, WeightedSum=True, MultiplyBySpectra=False, OutputWorkspace=ws_joy_rebin.name() + "_avg"
     )
 
+    if inputs.do_symmetrisation:
+        ws_joy_rebin_avg = symmetrize_weighted_mean(ws_joy_rebin_avg)
+
     DeleteWorkspace("temp_integral")
     return ws_joy_rebin, ws_joy_rebin_avg
 
 
-def convertToYSpace(wsTOF, mass0):
-    wsJoY = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
-    return wsJoY
-
-
-def rebinAndNorm(wsJoY, rebinPars):
-    wsJoYR = Rebin(
-        InputWorkspace=wsJoY,
-        Params=rebinPars,
-        FullBinsOnly=True,
-        OutputWorkspace=wsJoY.name() + "_rebin",
-    )
-    wsJoYInt = Integration(wsJoYR, OutputWorkspace=wsJoYR.name() + "_integrated")
-    wsJoYNorm = Divide(wsJoYR, wsJoYInt, OutputWorkspace=wsJoYR.name() + "_norm")
-    return wsJoYNorm, wsJoYInt
-
-
-def rebin_masked_weighted(ws_joy, rebin_pars):
+def rebin_masked_weighted(ws_joy, rebin_pars, suffix):
     """
     Rebins y-space data with masked (zero) points using Mantid Rebin on weighted sums.
     With w=1/E^2 (w=0 for masked points), Rebin gives sum(f*w*Y) and sum(f*w), where f is the
@@ -574,7 +558,6 @@ def rebin_masked_weighted(ws_joy, rebin_pars):
     This is exact for f=1 and slightly conservative for partially overlapping bins, where f^2 < f.
     Returns the per spectrum workspace and the workspace averaged over spectra.
     """
-    name = ws_joy.name() + "_mantid"
     dataX, dataY, dataE = extractWS(ws_joy)
 
     # Masked points can be 0 or NaN, in either dataY, dataE or dataX
@@ -599,25 +582,21 @@ def rebin_masked_weighted(ws_joy, rebin_pars):
     w = mtd["temp_w"].extractY()
     dataX_rebin = mtd["temp_wy"].extractX()
 
-    def weighted_mean_and_error(sum_w, sum_wy, var_wy):
-        non_empty = sum_w > 0
-        safe = np.where(non_empty, sum_w, 1)
-        mean_y = np.where(non_empty, sum_wy / safe, 0)
-        mean_e = np.where(non_empty, np.sqrt(var_wy) / safe, 0)
-        return mean_y, mean_e
-
     # Spectra in y space, one dataY point per bin of each spectrum
-    specY, specE = weighted_mean_and_error(w, wy, var)
+    non_empty = w > 0
+    safe = np.where(non_empty, w, 1)
+    specY = np.where(non_empty, wy / safe, 0)
+    specE = np.where(non_empty, np.sqrt(var) / safe, 0)
 
     # Use CloneWokspace to copy correct metadata
-    ws_rebin = CloneWorkspace(InputWorkspace="temp_wy", OutputWorkspace=name + "_rebin")
+    ws_rebin = CloneWorkspace(InputWorkspace="temp_wy", OutputWorkspace=ws_joy.name() + suffix)
     pass_data_into_ws(dataX_rebin, specY, specE, ws_rebin)
 
     DeleteWorkspaces(["temp_wy", "temp_w"])
     return ws_rebin
 
 
-def replaceZerosWithNCP(ws, ncp):
+def replace_zeros_with_ncp(ws, ncp):
     """
     Replaces columns of bins with zeros on dataY with NCP provided.
     """
@@ -626,265 +605,42 @@ def replaceZerosWithNCP(ws, ncp):
 
     dataY[:, mask] = ncp[:, mask[: ncp.shape[1]]]  # mask of ncp adjusted for last col present or not
 
-    wsMasked = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_NCPMasked")
-    pass_data_into_ws(dataX, dataY, dataE, wsMasked)
-    SumSpectra(wsMasked, OutputWorkspace=wsMasked.name() + "_Sum")
-    return wsMasked
+    ws_mask = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_ncpmask")
+    pass_data_into_ws(dataX, dataY, dataE, ws_mask)
+    SumSpectra(ws_mask, OutputWorkspace=ws_mask.name() + "_sum")
+    return ws_mask
 
 
-def buildXRangeFromRebinPars(yFitIC):
-    # Range used in case mask is set to NAN
-    first, step, last = [float(s) for s in yFitIC.range_for_rebinning_in_y_space.split(",")]
-    xp = np.arange(first, last, step) + step / 2  # Correction to match Mantid range
-    return xp
-
-
-def dataXBining(ws, xp):
+def symmetrize_weighted_mean(ws):
     """
-    Changes dataX of a workspace to values in range of bin centers xp.
-    Same as shifting dataY values to closest bin center.
-    Output ws has several dataY values per dataX point.
-    """
-
-    assert np.min(xp[:-1] - xp[1:]) == np.max(xp[:-1] - xp[1:]), "Bin widths need to be the same."
-    step = xp[1] - xp[0]  # Calculate step from first two numbers
-    # Form bins with xp being the centers
-    bins = np.append(xp, [xp[-1] + step]) - step / 2
-
-    dataX, dataY, dataE = extractWS(ws)
-    # Loop below changes only the values of DataX
-    for i, x in enumerate(dataX):
-        # Select only valid range xr
-        mask = (x < np.min(bins)) | (x > np.max(bins))
-        xr = x[~mask]
-
-        idxs = np.digitize(xr, bins)
-        newXR = np.array([xp[idx] for idx in idxs - 1])  # Bin idx 1 refers to first bin ie idx 0 of centers
-
-        # Pad invalid values with nans
-        newX = x
-        newX[mask] = np.nan  # Cannot use 0 as to not be confused with a dataX value
-        newX[~mask] = newXR
-        dataX[i] = newX  # Update DataX
-
-    # Mask DataE values in same places as DataY values
-    dataE[dataY == 0] = 0
-
-    wsXBins = CloneWorkspace(ws, OutputWorkspace=ws.name() + "_XBinned")
-    wsXBins = pass_data_into_ws(dataX, dataY, dataE, wsXBins)
-    return wsXBins
-
-
-def weightedAvgXBins(wsXBins, xp):
-    """Weighted average on ws where dataY points are grouped per dataX bin centers."""
-    dataX, dataY, dataE = extractWS(wsXBins)
-
-    meansY, meansE = weightedAvgXBinsArr(dataX, dataY, dataE, xp)
-
-    wsYSpaceAvg = CreateWorkspace(
-        DataX=xp,
-        DataY=meansY,
-        DataE=meansE,
-        NSpec=1,
-        OutputWorkspace=wsXBins.name() + "_wavg",
-    )
-    return wsYSpaceAvg
-
-
-def weightedAvgXBinsArr(dataX, dataY, dataE, xp):
-    """
-    Weighted Average on arrays where several dataY points correspond to a single dataX point.
-    xp is the range over which to perform the average.
-    dataX points can only take values in xp.
-    Ignores any zero or NaN value.
-    """
-    meansY = np.zeros(len(xp))
-    meansE = np.zeros(len(xp))
-
-    for i in range(len(xp)):
-        # Perform weighted average over all dataY and dataE values with the same xp[i]
-        # Change shape to column to match weighted average function
-        pointMask = dataX == xp[i]
-        allY = dataY[pointMask][:, np.newaxis]
-        allE = dataE[pointMask][:, np.newaxis]
-
-        # If no points were found for a given abcissae
-        if np.sum(pointMask) == 0:
-            mY, mE = 0, 0  # Mask with zeros
-
-        # If one point was found, set to that point
-        elif np.sum(pointMask) == 1:
-            mY, mE = allY.flatten(), allE.flatten()
-
-        # Weighted avg over all spectra and several points per spectra
-        else:
-            # Case of bootstrap replica with no errors
-            if np.all(dataE == 0):
-                mY = avgArr(allY)
-                mE = 0
-
-            # Default for most cases
-            else:
-                mY, mE = weightedAvgArr(allY, allE)  # Outputs masked values as zeros
-
-        # DataY and DataE should never reach NaN, but safeguard in case they do
-        if (mE == np.nan) | (mY == np.nan):
-            mY, mE = 0, 0
-
-        meansY[i] = mY
-        meansE[i] = mE
-
-    return meansY, meansE
-
-
-def weightedAvgCols(wsYSpace):
-    """Returns ws with weighted avg of columns of input ws"""
-    dataX, dataY, dataE = extractWS(wsYSpace)
-    if np.all(dataE == 0):  # Bootstrap case where errors are not used
-        meanY = avgArr(dataY)
-        meanE = np.zeros(meanY.shape)
-    else:
-        meanY, meanE = weightedAvgArr(dataY, dataE)
-    wsYSpaceAvg = CreateWorkspace(
-        DataX=dataX[0, :],
-        DataY=meanY,
-        DataE=meanE,
-        NSpec=1,
-        OutputWorkspace=wsYSpace.name() + "_wavg",
-    )
-    return wsYSpaceAvg
-
-
-def avgArr(dataYO):
-    """
-    Average over columns of 2D dataY.
-    Ignores any zero values as being masked.
-    """
-
-    assert len(dataYO) > 1, "Averaging needs more than one element."
-
-    dataY = dataYO.copy()
-    dataY[dataY == 0] = np.nan
-    meanY = np.nanmean(dataY, axis=0)
-    meanY[meanY == np.nan] = 0
-
-    assert np.all(np.all(dataYO == 0, axis=0) == (meanY == 0)), "Columns of zeros should give zero."
-    return meanY
-
-
-def weightedAvgArr(dataYO, dataEO):
-    """
-    Weighted average over columns of 2D arrays.
-    Ignores any zero or NaN value.
-    """
-
-    # Run some tests
-    assert dataYO.shape == dataEO.shape, "Y and E arrays should have same shape for weighted average."
-    assert np.all((dataYO == 0) == (dataEO == 0)), (
-        f"Masked zeros should match in DataY and DataE: {np.argwhere((dataYO == 0) != (dataEO == 0))}"
-    )
-    assert np.all(np.isnan(dataYO) == np.isnan(dataEO)), "Masked nans should match in DataY and DataE."
-    assert len(dataYO) > 1, "Weighted average needs more than one element to be performed."
-
-    dataY = dataYO.copy()  # Copy arrays not to change original data
-    dataE = dataEO.copy()
-
-    # Ignore invalid data by changing zeros to nans
-    # If data is already masked with nans, it remains unaltered
-    zerosMask = dataY == 0
-    dataY[zerosMask] = np.nan
-    dataE[zerosMask] = np.nan
-
-    meanY = np.nansum(dataY / np.square(dataE), axis=0) / np.nansum(1 / np.square(dataE), axis=0)
-    meanE = np.sqrt(1 / np.nansum(1 / np.square(dataE), axis=0))
-
-    # Change invalid data back to original masking format with zeros
-    nanInfMask = (meanE == np.inf) | (meanE == np.nan) | (meanY == np.nan)
-    meanY[nanInfMask] = 0
-    meanE[nanInfMask] = 0
-
-    # Test that columns of zeros are left unchanged
-    assert np.all((meanY == 0) == (meanE == 0)), "Weighted avg output should have masks in the same DataY and DataE."
-    assert np.all((np.all(dataYO == 0, axis=0) | np.all(np.isnan(dataYO), axis=0)) == (meanY == 0)), "Masked cols should be ignored."
-
-    return meanY, meanE
-
-
-def symmetrizeWs(avgYSpace):
-    """
-    Symmetrizes workspace after weighted average.
+    Symmetrizes workspace using Mantid WeightedMean on two workspaces:
+    one with the lhs of zero reflected onto the rhs and one with the rhs reflected onto the lhs.
     Needs to have symmetric binning.
     """
+    dataX, dataY, dataE = extractWS(ws)
+    np.testing.assert_allclose(dataX, -np.flip(dataX, axis=1), atol=1e-8, err_msg="symmetrisatino range is not symmetric around zero.")
 
-    dataX, dataY, dataE = extractWS(avgYSpace)
+    nbins = dataY.shape[1]
+    half = nbins // 2
+    right = slice(nbins - half, nbins)  # Excludes central point when odd
+    left = slice(0, half)
 
-    if np.all(dataE == 0):
-        dataYS = symArr(dataY)
-        dataES = np.zeros(dataYS.shape)
-    else:
-        dataYS, dataES = weightedSymArr(dataY, dataE)
+    # lhs reflected onto rhs
+    yL, eL = dataY.copy(), dataE.copy()
+    yL[:, right] = np.flip(dataY, axis=1)[:, right]
+    eL[:, right] = np.flip(dataE, axis=1)[:, right]
 
-    wsSym = CloneWorkspace(avgYSpace, OutputWorkspace=avgYSpace.name() + "_sym")
-    wsSym = pass_data_into_ws(dataX, dataYS, dataES, wsSym)
-    return wsSym
+    # rhs reflected onto lhs
+    yR, eR = dataY.copy(), dataE.copy()
+    yR[:, left] = np.flip(dataY, axis=1)[:, left]
+    eR[:, left] = np.flip(dataE, axis=1)[:, left]
 
+    ws_lhs = CloneWorkspace(ws, OutputWorkspace="temp_lhs_reflected")
+    pass_data_into_ws(dataX, yL, eL, ws_lhs)
+    ws_rhs = CloneWorkspace(ws, OutputWorkspace="temp_rhs_reflected")
+    pass_data_into_ws(dataX, yR, eR, ws_rhs)
 
-def symArr(dataYO):
-    """
-    Performs averaging between two oposite points.
-    Takes only one 2D array.
-    Any zero gets assigned the oposite value.
-    """
-
-    assert len(dataYO.shape) == 2, "Symmetrization is written for 2D arrays."
-    dataY = dataYO.copy()  # Copy arrays not to risk changing original data
-    coMask = dataY == 0
-    dataY[coMask] = np.nan
-
-    yFlip = np.flip(dataY, axis=1)
-
-    dataYS = np.nanmean(np.stack((dataY, yFlip)), axis=0)  # Normal avg between two numbers, cut-offs get ignored
-
-    dataYS[dataYS == np.nan] = 0
-    np.testing.assert_array_equal(dataYS, np.flip(dataYS, axis=1)), f"Symmetrisation failed in {np.argwhere(dataYS != np.flip(dataYS))}"
-    np.testing.assert_allclose(dataYS[coMask], np.flip(dataYO, axis=1)[coMask])
-    return dataYS
-
-
-def weightedSymArr(dataYO, dataEO):
-    """
-    Performs Inverse variance weighting between two oposite points.
-    When one of the points is a cut-off and the other is a valid point,
-    the final value will be the valid point.
-    """
-    assert len(dataYO.shape) == 2, "Symmetrization is written for 2D arrays."
-    assert np.all((dataYO == 0) == (dataEO == 0)), "Masked values should have zeros on both dataY and dataE."
-
-    dataY = dataYO.copy()  # Copy arrays not to risk changing original data
-    dataE = dataEO.copy()
-
-    cutOffMask = dataY == 0
-    # Change values of yerr to leave cut-offs unchanged during symmetrisation
-    dataE[cutOffMask] = np.full(np.sum(cutOffMask), np.inf)
-
-    yFlip = np.flip(dataY, axis=1)
-    eFlip = np.flip(dataE, axis=1)
-
-    # Inverse variance weighting
-    dataYS = (dataY / dataE**2 + yFlip / eFlip**2) / (1 / dataE**2 + 1 / eFlip**2)
-    dataES = 1 / np.sqrt(1 / dataE**2 + 1 / eFlip**2)
-
-    # Deal with effects from previously changing dataE=np.inf
-    nanInfMask = (dataES == np.inf) | (dataES == np.nan) | (dataYS == np.nan)
-    dataYS[nanInfMask] = 0
-    dataES[nanInfMask] = 0
-
-    # Test that arrays are symmetrised
-    np.testing.assert_array_equal(dataYS, np.flip(dataYS, axis=1)), f"Symmetrisation failed in {np.argwhere(dataYS != np.flip(dataYS))}"
-    np.testing.assert_array_equal(dataES, np.flip(dataES, axis=1)), f"Symmetrisation failed in {np.argwhere(dataES != np.flip(dataES))}"
-
-    # Test that cut-offs were not included in the symmetrisation
-    np.testing.assert_allclose(dataYS[cutOffMask], np.flip(dataYO, axis=1)[cutOffMask])
-    np.testing.assert_allclose(dataES[cutOffMask], np.flip(dataEO, axis=1)[cutOffMask])
-
-    return dataYS, dataES
+    # Weighted mean of lhs and rhs
+    ws_sym = WeightedMean(InputWorkspace1=ws_lhs, InputWorkspace2=ws_rhs, OutputWorkspace=ws.name() + "_sym")
+    DeleteWorkspaces(["temp_lhs_reflected", "temp_rhs_reflected"])
+    return ws_sym
