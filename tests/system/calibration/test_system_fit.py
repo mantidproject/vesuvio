@@ -10,7 +10,7 @@ from tests.testhelpers.calibration.system_test_base import EVSCalibrationTest, T
 from tests.testhelpers.calibration.system_test_misc_functions import assert_allclose_excluding_bad_detectors
 from mvesuvio.util.calibration_helpers import EVSMiscFunctions, EVSGlobals
 from mvesuvio.calibrate_fit import EVSCalibrationFit
-from mvesuvio.globals import Mode
+from mvesuvio.globals import Mode, PeakType
 from os import path
 
 
@@ -46,7 +46,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._output_workspace = "copper_bragg_peak_fit"
 
         expected_values = self._calculate_theta_peak_positions()
-        params_table = self._run_evs_calibration_fit("Bragg")
+        params_table = self._run_evs_calibration_fit(PeakType.BRAGG.value)
         self._assert_fitted_positions_match_expected(expected_values, params_table, {15: TestConstants.IGNORE_DETECTOR})
 
     def test_fit_bragg_peaks_lead(self):
@@ -55,7 +55,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._output_workspace = "lead_bragg_peak_fit"
 
         expected_values = self._calculate_theta_peak_positions()
-        params_table = self._run_evs_calibration_fit("Bragg")
+        params_table = self._run_evs_calibration_fit(PeakType.BRAGG.value)
         self._assert_fitted_positions_match_expected(expected_values, params_table, {145: 0.27, 158: 0.15, 190:
                                                                                     TestConstants.IGNORE_DETECTOR})
 
@@ -68,7 +68,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._mode = [Mode.SINGLE_DIFFERENCE]
 
         expected_values = self._calculate_energy_peak_positions()
-        params_table = self._run_evs_calibration_fit("Recoil")
+        params_table = self._run_evs_calibration_fit(PeakType.RECOIL.value)
         self._assert_fitted_positions_match_expected(expected_values, params_table, {38:  0.12})
 
     def test_fit_peaks_lead_E1(self):
@@ -80,7 +80,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._mode = [Mode.SINGLE_DIFFERENCE]
 
         expected_values = self._calculate_energy_peak_positions()
-        params_table = self._run_evs_calibration_fit("Recoil")
+        params_table = self._run_evs_calibration_fit(PeakType.RECOIL.value)
         self._assert_fitted_positions_match_expected(expected_values, params_table, {38:  0.12})
 
     def test_fit_frontscattering_uranium(self):
@@ -94,7 +94,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._output_workspace = 'uranium_peak_fit_front'
 
         expected_values = self._calculate_energy_peak_positions()
-        params_table = self._run_evs_calibration_fit("Recoil")
+        params_table = self._run_evs_calibration_fit(PeakType.RECOIL.value)
         self._assert_fitted_positions_match_expected(expected_values, params_table)
 
     def test_fit_backscattering_uranium(self):
@@ -108,7 +108,7 @@ class TestEVSCalibrationFit(EVSCalibrationTest):
         self._output_workspace = 'uranium_peak_fit_back'
 
         expected_values = self._calculate_energy_peak_positions()
-        params_table = self._run_evs_calibration_fit("Recoil")
+        params_table = self._run_evs_calibration_fit(PeakType.RECOIL.value)
         self._assert_fitted_positions_match_expected(expected_values, params_table, default_rel_tol=0.01)
 
     def _assert_fitted_positions_match_expected(self, expected_positions, params_table, rel_tolerance=None,

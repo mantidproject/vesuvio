@@ -146,7 +146,7 @@ class TestGeneralHelpers(unittest.TestCase):
             with patch("mvesuvio.util.general_helpers.FilesManager.get_summarised_log_file", return_value=mock_summary_file_path):
                 general_helpers.make_summarised_log_file()
 
-        with open(mock_summary_file_path, "rb") as summary_file:
+        with open(mock_summary_file_path, "r", encoding="utf-8") as summary_file:
             current_log_file_content = summary_file.read()
 
         self.assertEqual(
@@ -167,7 +167,7 @@ class TestGeneralHelpers(unittest.TestCase):
                 2025-01-08 10:48:49,391 [0] Notice Python -
                 Unshared Parameters: ['A', 'x0']
                              """
-            ).encode(),
+            ),
             current_log_file_content,
         )
 

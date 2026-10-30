@@ -12,7 +12,7 @@ from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
 from copy import copy, deepcopy
 from os import path
-from mvesuvio.globals import Mode, PeakType
+from mvesuvio.globals import Mode, PeakType, SharedParameterFitType
 
 
 class TestEVSCalibrationAnalysis(EVSCalibrationTest):
@@ -35,10 +35,6 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
         self._E1_fit_active = None
         self._current_run = None
 
-        # Lists in order of call of EVSCalibrationFit in the EVSCalibrationAnalysis function
-        self._mode = [Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
-        self._spec_range = [EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
-        self._E1_fit = [False, True, True]
         self._L0_fit = [False]
         self._run_calibration_fit = EVSCalibrationAnalysis._run_calibration_fit
         self._run_calibration_fit_patcher = patch.object(
@@ -133,10 +129,10 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
     def test_copper_with_multiple_iterations(self):
         self._setup_copper_test()
         self._iterations = 2
+        self._mode = [Mode.FOIL_OUT, Mode.SINGLE_DIFFERENCE, Mode.SINGLE_DIFFERENCE]
+        self._spec_range = [EVSGlobals.DETECTOR_RANGE, EVSGlobals.BACKSCATTERING_RANGE, EVSGlobals.FRONTSCATTERING_RANGE]
+        self._E1_fit = [False, True, True]
         self._output_workspace = "copper_analysis_test"
-        self._mode = self._mode + self._mode
-        self._spec_range = self._spec_range + self._spec_range
-        self._E1_fit = self._E1_fit + self._E1_fit
 
         params_table = self._run_evs_calibration_analysis()
 
@@ -239,11 +235,11 @@ class TestEVSCalibrationAnalysis(EVSCalibrationTest):
                                                        np.ma.masked_array(L1, mask=invalid_detector_mask), rel_tolerance)
 
     def _assert_E1_parameters_match_expected(self, params_table, rel_tolerance, fit_type):
-        if fit_type != "Shared":
+        if fit_type != SharedParameterFitType.SHARED.value:
             E1 = params_table.column('E1')[0]
             self.assertAlmostEqual(E1, EVSGlobals.ENERGY_ESTIMATE, delta=EVSGlobals.ENERGY_ESTIMATE*rel_tolerance)
 
-        if fit_type != "Individual":
+        if fit_type != SharedParameterFitType.INDIVIDUAL.value:
             global_E1 = params_table.column('global_E1')[0]
             self.assertAlmostEqual(global_E1, EVSGlobals.ENERGY_ESTIMATE, delta=EVSGlobals.ENERGY_ESTIMATE*rel_tolerance)
 
