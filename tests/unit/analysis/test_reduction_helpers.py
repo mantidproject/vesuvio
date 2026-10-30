@@ -499,7 +499,7 @@ class TestReductionHelpers(unittest.TestCase):
             patch.object(reduction_helpers.FilesManager, "get_backward_raw_filename", return_value=raw_filename), \
             patch.object(reduction_helpers.FilesManager, "get_backward_empty_filename", return_value=empty_filename), \
             patch.object(reduction_helpers.FilesManager, "get_instrument_parameters_dir", return_value=Path("/tmp/ip")), \
-            patch.object(reduction_helpers, "ws_history_matches_inputs", side_effect=[False, True]) as mock_matches, \
+            patch.object(reduction_helpers, "ws_history_matches_inputs", side_effect=[False, False]) as mock_matches, \
             patch.object(reduction_helpers, "save_ws_from_load_vesuvio") as mock_save_ws:
             result_raw_path, result_empty_path = reduction_helpers.store_input_ws_if_not_on_path(BackwardInputs)
 
@@ -511,7 +511,18 @@ class TestReductionHelpers(unittest.TestCase):
         ])
         mock_save_ws.assert_has_calls([
             call("1234", Mode.SINGLE_DIFFERENCE, "/tmp/ip/ipfile.txt", raw_path),
+            call("5678", Mode.SINGLE_DIFFERENCE, "/tmp/ip/ipfile.txt", empty_path),
         ])
+
+    def test_store_input_ws_if_not_on_path_rejects_unknown_scattering_type(self):
+        class InvalidInputs:
+            pass
+
+        with (
+            patch.object(reduction_helpers.general_helpers, "_get_scattering_type", return_value=None),
+            self.assertRaisesRegex(ValueError, "Input class for workspace not valid: InvalidInputs"),
+        ):
+            reduction_helpers.store_input_ws_if_not_on_path(InvalidInputs)
 
 
     def test_load_and_save_input_ws_if_not_on_path_forward_uses_cached_files(self):
@@ -582,6 +593,224 @@ class TestReductionHelpers(unittest.TestCase):
         for value, expected in cases:
             with self.subTest(value=value):
                 self.assertEqual(reduction_helpers.convert_to_list_of_spectrum_numbers(value), expected)
+
+    def test_convert_to_list_of_spectrum_numbers_rejects_unsupported_type(self):
+        with self.assertRaisesRegex(ValueError, "Masked detectors should be string, list or array"):
+            reduction_helpers.convert_to_list_of_spectrum_numbers(3)
+
+    def test_calculate_h_ratio_returns_none_without_hydrogen(self):
+        means_table = Mock()
+        means_table.column.side_effect = lambda name: [12, 16] if name == "mass" else [0.2, 0.8]
+
+        self.assertIsNone(reduction_helpers.calculate_h_ratio(means_table, 12))
+
+    def test_h_ratio_is_zero_only_for_active_backward_inputs_with_hydrogen(self):
+        back_inputs = Mock(run_this_scattering_type=True, intensity_ratio_of_hydrogen_to_chosen_mass=0)
+        front_inputs = Mock(masses=[1, 12])
+
+        with patch.object(reduction_helpers, "is_hydrogen_present", return_value=True):
+            self.assertTrue(reduction_helpers.h_ratio_is_zero_when_h_present(back_inputs, front_inputs))
+            back_inputs.intensity_ratio_of_hydrogen_to_chosen_mass = 0.5
+            self.assertFalse(reduction_helpers.h_ratio_is_zero_when_h_present(back_inputs, front_inputs))
+
+        back_inputs.intensity_ratio_of_hydrogen_to_chosen_mass = 2
+        with (
+            patch.object(reduction_helpers, "is_hydrogen_present", return_value=False),
+            patch.object(reduction_helpers.logger, "warning") as warning,
+        ):
+            self.assertFalse(reduction_helpers.h_ratio_is_zero_when_h_present(back_inputs, front_inputs))
+            self.assertEqual(back_inputs.intensity_ratio_of_hydrogen_to_chosen_mass, 0)
+            warning.assert_called_once()
+
+        back_inputs.run_this_scattering_type = False
+        self.assertFalse(reduction_helpers.h_ratio_is_zero_when_h_present(back_inputs, front_inputs))
+
+    def test_run_estimate_h_ratio_stops_when_input_is_not_empty(self):
+        back_alg = Mock()
+        back_alg.getPropertyValue.return_value = "BACKWARD"
+        front_alg = Mock()
+        front_alg.getPropertyValue.return_value = "FORWARD"
+
+        with patch("builtins.input", return_value="cancel"), patch.object(reduction_helpers.logger, "error") as error:
+            result = reduction_helpers.run_estimate_h_ratio(back_alg, front_alg, [1, 12], 1, 0.01, 3)
+
+        self.assertIsNone(result)
+        error.assert_called_once()
+        front_alg.execute.assert_not_called()
+
+    def test_run_estimate_h_ratio_stops_after_converging(self):
+        back_alg = Mock()
+        back_alg.getPropertyValue.return_value = "BACKWARD"
+        front_alg = Mock()
+        front_alg.getPropertyValue.side_effect = lambda name: {
+            "ModeRunning": "FORWARD",
+            "OutputMeansTable": "means",
+        }[name]
+        ratio_table = Mock()
+
+        with (
+            patch("builtins.input", return_value=""),
+            patch.object(reduction_helpers, "CreateEmptyTableWorkspace", return_value=ratio_table),
+            patch.object(reduction_helpers, "mtd", {"means": Mock()}),
+            patch.object(reduction_helpers, "calculate_h_ratio", side_effect=[0.5, 0.5]),
+            patch.object(reduction_helpers, "execute_joint_algorithms") as execute_joint,
+            patch.object(reduction_helpers, "print_table_workspace") as print_table,
+        ):
+            result = reduction_helpers.run_estimate_h_ratio(back_alg, front_alg, [1, 12], 1, 0.01, 3)
+
+        self.assertIs(result, ratio_table)
+        ratio_table.addRow.assert_has_calls([call([0.5]), call([0.5])])
+        back_alg.setProperty.assert_called_once_with("HRatioToChosenMass", 0.5)
+        execute_joint.assert_called_once_with(back_alg, front_alg)
+        print_table.assert_called_once_with(ratio_table)
+
+    def test_execute_joint_algorithms_updates_profiles_and_executes_forward_algorithm(self):
+        back_alg = Mock()
+        back_alg.getPropertyValue.return_value = "BACKWARD"
+        back_alg.getProperty.return_value.value = 0.5
+        front_alg = Mock()
+        front_alg.getPropertyValue.return_value = "FORWARD"
+        front_alg.getPropertyValue.side_effect = lambda name: {
+            "ModeRunning": "FORWARD",
+            "InputProfiles": "profiles",
+        }[name]
+        incoming_means = Mock()
+        receiving_profiles = Mock()
+        receiving_profiles.name.return_value = "profiles"
+        fixed_profiles = Mock()
+        with (
+            patch.object(reduction_helpers, "mtd", {"means": incoming_means, "profiles": receiving_profiles}),
+            patch.object(reduction_helpers, "fix_profile_parameters", return_value=fixed_profiles) as fix_profiles,
+            patch.object(reduction_helpers, "RenameWorkspace") as rename_workspace,
+            patch.object(reduction_helpers, "print_table_workspace") as print_table,
+        ):
+            back_alg.getPropertyValue.side_effect = lambda name: {
+                "ModeRunning": "BACKWARD",
+                "OutputMeansTable": "means",
+            }[name]
+            reduction_helpers.execute_joint_algorithms(back_alg, front_alg)
+
+        fix_profiles.assert_called_once_with(incoming_means, receiving_profiles, 0.5)
+        rename_workspace.assert_called_once_with(fixed_profiles, "profiles")
+        print_table.assert_called_once_with(receiving_profiles)
+        front_alg.setPropertyValue.assert_called_once_with("InputProfiles", "profiles")
+        back_alg.execute.assert_called_once()
+        front_alg.execute.assert_called_once()
+
+    def test_init_analysis_algorithm_skips_missing_workspace(self):
+        with (
+            patch.object(reduction_helpers.AnalysisDataService, "doesExist", return_value=False),
+            patch.object(reduction_helpers.logger, "warning") as warning,
+        ):
+            result = reduction_helpers.init_analysis_algorithm("missing", Mock())
+
+        self.assertIsNone(result)
+        warning.assert_called_once()
+
+    def test_init_analysis_algorithm_sets_forward_algorithm_properties(self):
+        class ForwardTestInputs:
+            mode = Mode.SINGLE_DIFFERENCE
+            instrument_parameters_file = "ip_file.par"
+            chosen_mass_index = 2
+            intensity_ratio_of_hydrogen_to_chosen_mass = 0.5
+            number_of_iterations_for_corrections = 4
+            mask_detectors = "3-4"
+            do_multiple_scattering_correction = True
+            do_gamma_correction = False
+            transmission_guess = 0.9
+            multiple_scattering_order = 2
+            multiple_scattering_number_of_events = 100
+            constraints = ()
+
+        profiles_table = Mock()
+        profiles_table.name.return_value = "profiles"
+        algorithm = Mock()
+        with (
+            patch.object(reduction_helpers, "AnalysisDataService", Mock(doesExist=Mock(return_value=True))),
+            patch.object(reduction_helpers, "create_profiles_table", return_value=profiles_table),
+            patch.object(reduction_helpers.FilesManager, "get_instrument_parameters_dir", return_value=Path("/tmp/ip")),
+            patch.object(reduction_helpers.AlgorithmFactory, "subscribe"),
+            patch.object(reduction_helpers, "AlgorithmManager", Mock(createUnmanaged=Mock(return_value=algorithm))),
+        ):
+            result = reduction_helpers.init_analysis_algorithm("input", ForwardTestInputs)
+
+        self.assertIs(result, algorithm)
+        self.assertEqual(ForwardTestInputs.chosen_mass_index, 0)
+        self.assertEqual(ForwardTestInputs.intensity_ratio_of_hydrogen_to_chosen_mass, 0)
+        algorithm.setProperties.assert_called_once()
+        properties = algorithm.setProperties.call_args.args[0]
+        self.assertEqual(properties["InputWorkspace"], "input")
+        self.assertEqual(properties["InputProfiles"], "profiles")
+        self.assertEqual(properties["InstrumentParametersFile"], "/tmp/ip/ip_file.par")
+        self.assertEqual(properties["InvalidDetectors"], [3, 4])
+        self.assertEqual(properties["ModeRunning"], "FORWARD")
+
+    def test_save_plots_from_outputs_rejects_non_group_name(self):
+        with self.assertRaisesRegex(ValueError, "Expected an NCP output group"):
+            reduction_helpers.save_plots_from_outputs("input", Path("/tmp"))
+
+    def test_save_results_from_outputs_rejects_unrelated_group(self):
+        with self.assertRaisesRegex(ValueError, "Expected an NCP output group"):
+            reduction_helpers.save_results_from_outputs("input", "other_0_ncp_group", Path("/tmp"))
+
+    def test_crop_and_mask_workspace_crops_masks_and_applies_tof_masking(self):
+        workspace = Mock()
+        workspace.getIndexFromSpectrumNumber.side_effect = {3: 0, 4: 1}.__getitem__
+        inputs = Mock(detectors=" 3 - 4 ", mask_detectors=[4], mask_time_of_flight_range="")
+
+        with (
+            patch.object(reduction_helpers, "mtd", {"input": workspace}),
+            patch.object(reduction_helpers, "CropWorkspace") as crop_workspace,
+            patch.object(reduction_helpers, "MaskDetectors") as mask_detectors,
+            patch.object(reduction_helpers, "mask_time_of_flight_bins_with_zeros") as mask_tof,
+        ):
+            reduction_helpers.crop_and_mask_workspace("input", inputs)
+
+        crop_workspace.assert_called_once_with(
+            InputWorkspace="input",
+            StartWorkspaceIndex=0,
+            EndWorkspaceIndex=1,
+            OutputWorkspace="input",
+        )
+        mask_detectors.assert_called_once_with(Workspace="input", SpectraList=[4])
+        mask_tof.assert_called_once_with("input", inputs)
+
+    def test_crop_and_mask_workspace_rejects_invalid_detector_range(self):
+        with self.assertRaisesRegex(ValueError, "Invalid detectors range"):
+            reduction_helpers.crop_and_mask_workspace("input", Mock(detectors="3,4"))
+
+    def test_save_ws_from_load_vesuvio_rejects_unrecognized_path(self):
+        with self.assertRaisesRegex(ValueError, "Invalid name to save workspace"):
+            reduction_helpers.save_ws_from_load_vesuvio("1234", Mode.SINGLE_DIFFERENCE, "ipfile.txt", Path("raw.nxs"))
+
+    def test_save_fitting_input_workspaces_skips_inactive_inputs(self):
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch.object(reduction_helpers.FilesManager, "get_fitting_inputs_dir", return_value=Path(temp_dir)),
+        ):
+            reduction_helpers.save_fitting_input_workspaces(Mock(run_this_scattering_type=False))
+
+    def test_save_fitting_input_workspaces_warns_when_outputs_are_missing(self):
+        inputs = Mock(
+            run_this_scattering_type=True,
+            number_of_iterations_for_corrections=0,
+            overwrite_analysis_input_workspace="",
+            name_of_subtracted_workspace="input",
+        )
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch.object(reduction_helpers.FilesManager, "get_fitting_inputs_dir", return_value=Path(temp_dir)),
+            patch.object(reduction_helpers.AnalysisDataService, "doesExist", return_value=False),
+            patch.object(reduction_helpers.logger, "warning") as warning,
+        ):
+            reduction_helpers.save_fitting_input_workspaces(inputs)
+
+        warning.assert_called_once()
+
+    def test_mask_time_of_flight_bins_with_zeros_rejects_invalid_range(self):
+        inputs = Mock(mask_time_of_flight_range="1-2,invalid")
+        with self.assertRaisesRegex(ValueError, "Invalid mask_time_of_flight_range"):
+            reduction_helpers.mask_time_of_flight_bins_with_zeros("workspace", inputs)
 
 
 

@@ -1,8 +1,9 @@
 import os
 import tempfile
 import unittest
+from pathlib import Path
 from textwrap import dedent
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, DeleteWorkspace, RenameWorkspace, SaveNexus
@@ -24,6 +25,13 @@ class TestGeneralHelpers(unittest.TestCase):
             mode = Mode.SINGLE_DIFFERENCE.value
 
         self.assertIs(general_helpers._get_scattering_type(ForwardInputs), ScatteringType.FORWARD)
+
+    def test_get_scattering_type_rejects_unrecognized_inputs(self):
+        class UnknownInputs:
+            mode = "unknown"
+
+        with self.assertRaisesRegex(ValueError, "Could not infer scattering type"):
+            general_helpers._get_scattering_type(UnknownInputs)
 
     def test_load_overwritten_workspace_if_specified(self):
         class Inputs:
@@ -67,6 +75,16 @@ class TestGeneralHelpers(unittest.TestCase):
         result = general_helpers.load_overwritten_workspace_if_specified(Inputs)
 
         self.assertEqual(result, "")
+
+    def test_load_overwritten_workspace_if_specified_rejects_missing_override(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_path = str(Path(temp_dir) / "missing.nxs")
+            inputs = Mock(overwrite_analysis_input_workspace=missing_path)
+            with (
+                patch.object(general_helpers, "AnalysisDataService", Mock(doesExist=Mock(return_value=False))),
+                self.assertRaisesRegex(ValueError, f"Override workspace not in ADS and not a path: {missing_path}"),
+            ):
+                general_helpers.load_overwritten_workspace_if_specified(inputs)
 
     def test_extract_ws(self):
         data = [1, 2, 3]
@@ -155,3 +173,14 @@ class TestGeneralHelpers(unittest.TestCase):
 
         os.remove(mock_mantid_log_file_path)
         os.remove(mock_summary_file_path)
+
+    def test_make_summarised_log_file_logs_when_mantid_log_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            missing_log = Path(temp_dir) / "missing.log"
+            with (
+                patch.object(general_helpers.FilesManager, "get_mantid_log_file", return_value=missing_log),
+                patch.object(general_helpers.logger, "error") as error,
+            ):
+                general_helpers.make_summarised_log_file()
+
+        error.assert_called_once_with("Mantid log file not available. Unable to produce a summarized log file for this routine.")
