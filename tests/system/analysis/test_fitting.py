@@ -51,6 +51,10 @@ class TestFitting(unittest.TestCase):
         namespace["ForwardFittingInputs"].fitting_model = FitModels.GAUSS
         namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
+        namespace["BackwardAnalysisInputs"].do_symmetrisation = False
+        namespace["ForwardAnalysisInputs"].do_symmetrisation = False
+        namespace["BackwardAnalysisInputs"].mask_time_of_flight_range = None
+        namespace["ForwardAnalysisInputs"].mask_time_of_flight_range = None
         with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
             namespace["run_fitting"]()
 
