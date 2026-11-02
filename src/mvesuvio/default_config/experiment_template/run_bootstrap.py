@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from mantid.api import AnalysisDataService
 from mantid.kernel import logger
 
+import mvesuvio
+from mvesuvio import ConfigArgInputs
 from mvesuvio.util import bootstrap_helpers
 from mvesuvio.util.files_manager import FilesManager
 
@@ -36,7 +38,7 @@ def _run_fitting_with_injected_workspaces(back_ws_path: str = "", front_ws_path:
     fitting_namespace["BackwardFittingInputs"].minimal_output = True
     fitting_namespace["ForwardFittingInputs"].overwrite_analysis_input_workspace = front_ws_path
     fitting_namespace["ForwardFittingInputs"].minimal_output = True
-    fitting_namespace["run_fitting"]()
+    fitting_namespace["run_fitting"](configure_with_main=False)
 
 
 def _find_workspace_path_for_sample_index(directory: Path, sample_index: int) -> Path | None:
@@ -51,7 +53,10 @@ def _find_workspace_path_for_sample_index(directory: Path, sample_index: int) ->
     )
 
 
-def run_bootstrap():
+def run_bootstrap(configure_with_main: bool = True):
+    if configure_with_main:
+        mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
+
     bootstrap_inputs_directory = FilesManager.get_bootstrap_inputs_dir()
     input_dirs = bootstrap_helpers.get_bootstrap_input_directories(bootstrap_inputs_directory)
     if not input_dirs:

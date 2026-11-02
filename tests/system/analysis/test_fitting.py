@@ -51,7 +51,7 @@ class TestFitting(unittest.TestCase):
         namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
-            namespace["run_fitting"]()
+            namespace["run_fitting"](configure_with_main=False)
 
         AnalysisDataService.clear()
 

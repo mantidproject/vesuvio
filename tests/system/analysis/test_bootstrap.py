@@ -37,7 +37,7 @@ class TestBootstrap(unittest.TestCase):
         namespace = runpy.run_path(str(bootstrap_script), run_name="test_bootstrap_run_bootstrap")
 
         with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
-            namespace["run_bootstrap"]()
+            namespace["run_bootstrap"](configure_with_main=False)
 
         for sample_index in range(1, 4):
             sample_output_dir = self.bootstrap_output_path / f"boot_{sample_index}"
