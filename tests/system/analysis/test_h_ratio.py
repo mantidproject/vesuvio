@@ -13,7 +13,7 @@ from mvesuvio.util.files_manager import FilesManager
 class TestHRatioRoutine(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        FilesManager._experiment_dir = None
+        FilesManager.reset_experiment_dir()
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         mvesuvio.main(ConfigArgInputs(experiment_dir="", ip_dir=""))

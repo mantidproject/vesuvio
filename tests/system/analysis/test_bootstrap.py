@@ -16,7 +16,7 @@ BOOTSTRAP_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "bootstrap
 class TestBootstrap(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        FilesManager._experiment_dir = None
+        FilesManager.reset_experiment_dir()
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         cls.bootstrap_inputs_path = FilesManager.get_bootstrap_inputs_dir()
@@ -29,7 +29,7 @@ class TestBootstrap(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         # NOTE: Very important to reset experiment directory, otherwise subsequent tests may be affected.
-        FilesManager._experiment_dir = None
+        FilesManager.reset_experiment_dir()
         AnalysisDataService.clear()
 
     def test_bootstrap_routine(self):

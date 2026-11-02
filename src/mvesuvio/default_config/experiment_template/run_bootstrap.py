@@ -12,11 +12,11 @@ from mvesuvio.util.files_manager import FilesManager
 
 # WARNING: Not ready to be used yet, contains basic functionality but lots of details still left to be sorted out.
 # How to use this script:
-# 1. Place your bootstrap workspaces under FilesManager.get_bootstrap_inputs_dir().
-# 2. Inside that directory, provide a parent folder containing two subdirectories: one for backward files called "backward" and one for forward files called "forward".
-# 3. Fill the "backward" and "forward" subdirectories with bootstrap workspaces, each workspace needs to end with a sample index!
-# 3. Run this script from inside Manitd editor; it will load the matching workspaces for sample 1, 2, 3, ... by looking for filenames that end with the sample index.
-# 4. The reduction step is then run once per sample using those loaded workspaces and writing results under a sibling "*_outputs" folder.
+# 1. Create bootstrap samples with CreateBootstrapWorkspaces algorithm.
+# 2. Save your bootstrap workspaces to boot_inputs directory:
+# 3. Inside that directory, there's two subdirectories: one for backward files called "backward" and one for forward files called "forward".
+# 4. Fill the "backward" and "forward" subdirectories with bootstrap workspaces, each workspace needs to end with a sample index eg. boot_1.nxs, boot_2.nxs, ...
+# 5. Run this script from inside Manitd editor; it will load the matching workspaces for sample 1, 2, 3, ... by looking for filenames that end with the sample index.
 # This is intended as a bootstrap workflow for sample-by-sample reduction, not a fully polished user-facing CLI.
 
 RUN_REDUCTION_PATH = Path(__file__).with_name("run_reduction.py")
