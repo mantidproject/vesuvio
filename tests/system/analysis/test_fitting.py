@@ -24,7 +24,7 @@ FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
 class TestFitting(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        FilesManager._experiment_dir = None
+        FilesManager.reset_experiment_dir()
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
@@ -51,7 +51,7 @@ class TestFitting(unittest.TestCase):
         namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
-            namespace["run_fitting"]()
+            namespace["run_fitting"](configure_with_main=False)
 
         AnalysisDataService.clear()
 

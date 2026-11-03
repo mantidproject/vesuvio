@@ -48,6 +48,46 @@ class TestSetupConfig(unittest.TestCase):
 
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
+    def test_setup_config_with_empty_args_sets_defaults_when_not_configured(self, mock_config_service, mock_handle_config):
+        mock_handle_config.is_cache_set.return_value = False
+        mock_handle_config.read_cached_var.side_effect = ["/default/inputs", "/default/ip_folder"]
+
+        mock_args = MagicMock()
+        mock_args.experiment_dir = ""
+        mock_args.ip_dir = ""
+
+        _setup_config(mock_args)
+
+        mock_handle_config.set_default_config_vars.assert_called_once_with()
+        mock_handle_config.set_config_vars.assert_called_once_with(
+            {
+                "caching.inputs": "/default/inputs",
+                "caching.ipfolder": "/default/ip_folder",
+            }
+        )
+
+    @patch("mvesuvio.main.handle_config")
+    @patch("mantid.kernel.ConfigService")
+    def test_setup_config_with_empty_args_preserves_existing_config(self, mock_config_service, mock_handle_config):
+        mock_handle_config.is_cache_set.return_value = True
+        mock_handle_config.read_cached_var.side_effect = ["/configured/inputs", "/configured/ip_folder"]
+
+        mock_args = MagicMock()
+        mock_args.experiment_dir = ""
+        mock_args.ip_dir = ""
+
+        _setup_config(mock_args)
+
+        mock_handle_config.set_default_config_vars.assert_not_called()
+        mock_handle_config.set_config_vars.assert_called_once_with(
+            {
+                "caching.inputs": "/configured/inputs",
+                "caching.ipfolder": "/configured/ip_folder",
+            }
+        )
+
+    @patch("mvesuvio.main.handle_config")
+    @patch("mantid.kernel.ConfigService")
     def test_setup_config_with_args_but_no_custom_paths(self, mock_config_service, mock_handle_config):
         mock_handle_config.is_cache_set.return_value = True
         mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
@@ -66,9 +106,9 @@ class TestSetupConfig(unittest.TestCase):
     @patch("mvesuvio.main.Path")
     @patch("mvesuvio.main.handle_config")
     @patch("mantid.kernel.ConfigService")
-    def test_setup_config_with_custom_inputs_path(self, mock_config_service, mock_handle_config, mock_path):
+    def test_setup_config_overwrites_existing_experiment_dir(self, mock_config_service, mock_handle_config, mock_path):
         mock_handle_config.is_cache_set.return_value = True
-        mock_handle_config.read_cached_var.side_effect = ["/default/inputs.py", "/default/ip_folder"]
+        mock_handle_config.read_cached_var.side_effect = ["/existing/experiment", "/default/ip_folder"]
 
         mock_path_obj = MagicMock()
         mock_path_obj.absolute.return_value = "/absolute/custom/inputs.py"
@@ -266,5 +306,3 @@ class TestRunBootstrap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

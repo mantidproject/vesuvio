@@ -1,3 +1,6 @@
+import mvesuvio
+from pathlib import Path
+from mvesuvio import ConfigArgInputs
 from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.globals import FitModels, Masking
 from mvesuvio.util import general_helpers
@@ -16,7 +19,6 @@ else:
     except ImportError:
         # Fallback for direct/script execution: load sibling run_reduction.py by file path.
         import importlib.util
-        from pathlib import Path
 
         _run_reduction_path = Path(__file__).resolve().parent / "run_reduction.py"
         _module_name = "mvesuvio.default_config.experiment_template._local_run_reduction"
@@ -156,7 +158,10 @@ def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | 
     return False
 
 
-def run_fitting() -> None:
+def run_fitting(configure_with_main: bool = True) -> None:
+    if configure_with_main:
+        mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
+
     load_saved_fitting_input_workspaces()
     if BackwardFittingInputs.run_this_fitting_type:
         run_y_space_reduction_and_fit(BackwardFittingInputs)

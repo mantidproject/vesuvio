@@ -26,6 +26,10 @@ class FilesManager:
         return cls._experiment_dir
 
     @classmethod
+    def reset_experiment_dir(cls) -> None:
+        cls._experiment_dir = None
+
+    @classmethod
     def _get_experiment_subdir(cls, name: str) -> Path:
         subdir = cls.get_experiment_dir() / name
         subdir.mkdir(parents=True, exist_ok=True)
@@ -38,6 +42,7 @@ class FilesManager:
     get_calibration_inputs_dir = partialmethod(_get_experiment_subdir, "calibration_inputs")
     get_bootstrap_inputs_dir = partialmethod(_get_experiment_subdir, "boot_inputs")
     get_bootstrap_outputs_dir = partialmethod(_get_experiment_subdir, "boot_outputs")
+    get_bootstrap_results_dir = partialmethod(_get_experiment_subdir, "boot_outputs_results")
 
     @staticmethod
     def _get_detector_filename(tag: str, kind: str) -> str:

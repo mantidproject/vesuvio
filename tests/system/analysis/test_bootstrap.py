@@ -16,7 +16,7 @@ BOOTSTRAP_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "bootstrap
 class TestBootstrap(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        FilesManager._experiment_dir = None
+        FilesManager.reset_experiment_dir()
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         cls.bootstrap_inputs_path = FilesManager.get_bootstrap_inputs_dir()
@@ -29,7 +29,7 @@ class TestBootstrap(unittest.TestCase):
     @classmethod
     def tearDownClass(cls) -> None:
         # NOTE: Very important to reset experiment directory, otherwise subsequent tests may be affected.
-        FilesManager._experiment_dir = None
+        FilesManager.reset_experiment_dir()
         AnalysisDataService.clear()
 
     def test_bootstrap_routine(self):
@@ -37,7 +37,7 @@ class TestBootstrap(unittest.TestCase):
         namespace = runpy.run_path(str(bootstrap_script), run_name="test_bootstrap_run_bootstrap")
 
         with patch("matplotlib.pyplot.show"), patch("matplotlib.pyplot.savefig"), patch("matplotlib.figure.Figure.savefig"):
-            namespace["run_bootstrap"]()
+            namespace["run_bootstrap"](configure_with_main=False)
 
         for sample_index in range(1, 4):
             sample_output_dir = self.bootstrap_output_path / f"boot_{sample_index}"

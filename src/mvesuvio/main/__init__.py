@@ -65,6 +65,8 @@ def _setup_config(args):
         experiment_dir = Path(args.experiment_dir)
         if experiment_dir.is_dir():
             inputs = str(experiment_dir.absolute())
+            # An explicitly configured experiment dir takes precedence over any override set earlier in the session
+            FilesManager.reset_experiment_dir()
         else:
             print(f"\nError setting directory: {args.experiment_dir}\nUsing default.")
 
