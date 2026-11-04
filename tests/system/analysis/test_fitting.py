@@ -13,7 +13,7 @@ import matplotlib
 matplotlib.use("Agg", force=True)
 
 from mvesuvio.util import handle_config
-from mvesuvio.globals import FitModels
+from mvesuvio.util.model_manager import model_manager
 from shutil import copytree, rmtree
 from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
@@ -28,7 +28,7 @@ class TestFitting(unittest.TestCase):
         handle_config.refresh_config_dir_and_contents()
         handle_config.set_default_config_vars()
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
-        cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "gauss_fit"
+        cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "GAUSS"
         rmtree(cls.results_path, ignore_errors=True)
         copytree(
             FITTING_INPUTS_PATH,
@@ -48,7 +48,7 @@ class TestFitting(unittest.TestCase):
         namespace = runpy.run_path(str(fitting_script), run_name="test_fitting_run_fitting")
         namespace["BackwardFittingInputs"].run_this_fitting_type = False
         namespace["ForwardFittingInputs"].run_this_fitting_type = True
-        namespace["ForwardFittingInputs"].fitting_model = FitModels.GAUSS
+        namespace["ForwardFittingInputs"].fitting_model = model_manager.name("GAUSS")
         namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["BackwardAnalysisInputs"].do_symmetrisation = False

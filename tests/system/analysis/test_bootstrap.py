@@ -43,7 +43,7 @@ class TestBootstrap(unittest.TestCase):
             sample_output_dir = self.bootstrap_output_path / f"boot_{sample_index}"
             self.assertTrue(sample_output_dir.is_dir(), f"Bootstrap output missing for sample {sample_index}")
 
-            expected_dirs = {"fitting_inputs", "fitting_outputs", "reduction_outputs"}
+            expected_dirs = {"fitting_inputs", "fitting_outputs", "reduction_outputs", "fse_correction_inputs"}
             actual_dirs = {path.name for path in sample_output_dir.iterdir() if path.is_dir()}
             self.assertSetEqual(expected_dirs, actual_dirs, f"Bootstrap output for sample {sample_index} should contain exactly the expected folders: {sorted(expected_dirs)}")
 

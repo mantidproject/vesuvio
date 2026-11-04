@@ -23,9 +23,10 @@ import jacobi
 import time
 from mantid.kernel import logger
 
-from mvesuvio.globals import FitModels, Masking
+from mvesuvio.globals import Masking
 from mvesuvio.util import handle_config
 from mvesuvio.util.general_helpers import print_table_workspace, extractWS
+from mvesuvio.util.model_manager import model_manager
 
 try:
     plt.style.use(["ggplot", handle_config.get_plots_config_file()])
@@ -110,11 +111,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     m = Minuit(costFun, **defaultPars)
 
     m.limits["A"] = (0, None)
-    if yFitIC.fitting_model == FitModels.DOUBLEWELL:
+    if yFitIC.fitting_model == model_manager.name("DOUBLEWELL"):
         m.limits["d"] = (0, None)
         m.limits["R"] = (0, None)
 
-    if yFitIC.fitting_model == FitModels.GAUSS:
+    if yFitIC.fitting_model == model_manager.name("GAUSS"):
         m.simplex()
         m.migrad()
 
@@ -176,232 +177,15 @@ def extractFirstSpectra(ws):
 
 def selectModelAndPars(modelFlag):
     """
-    Selects the function to fit.
-    Specifies the starting parameters of that function as default parameters.
-    The shared parameters are used in the global fit.
-    The defaultPars should be in the same order as the signature of the function
+    Return a subscribed model, its default parameters, and its shared parameters.
     """
-
-    if modelFlag == FitModels.GAUSS:
-
-        def model(x, A, x0, sigma):
-            return A / (2 * np.pi) ** 0.5 / sigma * np.exp(-((x - x0) ** 2) / 2 / sigma**2)
-
-        defaultPars = {"A": 1, "x0": 0, "sigma": 5}
-        sharedPars = ["sigma"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GAUSS_CNTR:
-
-        def model(x, A, sigma):
-            return A / (2 * np.pi) ** 0.5 / sigma * np.exp(-(x**2) / 2 / sigma**2)
-
-        defaultPars = {"A": 1, "sigma": 5}
-        sharedPars = ["sigma"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GCC4C6:
-
-        def model(x, A, x0, sigma1, c4, c6):
-            return (
-                A
-                * np.exp(-((x - x0) ** 2) / 2 / sigma1**2)
-                / (np.sqrt(2 * np.pi * sigma1**2))
-                * (
-                    1
-                    + c4 / 32 * (16 * ((x - x0) / np.sqrt(2) / sigma1) ** 4 - 48 * ((x - x0) / np.sqrt(2) / sigma1) ** 2 + 12)
-                    + c6
-                    / 384
-                    * (
-                        64 * ((x - x0) / np.sqrt(2) / sigma1) ** 6
-                        - 480 * ((x - x0) / np.sqrt(2) / sigma1) ** 4
-                        + 720 * ((x - x0) / np.sqrt(2) / sigma1) ** 2
-                        - 120
-                    )
-                )
-            )
-
-        defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0}
-        sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GCC4C6_CNTR:
-
-        def model(x, A, sigma1, c4, c6):
-            return (
-                A
-                * np.exp(-(x**2) / 2 / sigma1**2)
-                / (np.sqrt(2 * np.pi * sigma1**2))
-                * (
-                    1
-                    + c4 / 32 * (16 * (x / np.sqrt(2) / sigma1) ** 4 - 48 * (x / np.sqrt(2) / sigma1) ** 2 + 12)
-                    + c6
-                    / 384
-                    * (
-                        64 * (x / np.sqrt(2) / sigma1) ** 6
-                        - 480 * (x / np.sqrt(2) / sigma1) ** 4
-                        + 720 * (x / np.sqrt(2) / sigma1) ** 2
-                        - 120
-                    )
-                )
-            )
-
-        defaultPars = {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}
-        sharedPars = ["sigma1", "c4", "c6"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GCC4:
-
-        def model(x, A, x0, sigma1, c4):
-            return (
-                A
-                * np.exp(-((x - x0) ** 2) / 2 / sigma1**2)
-                / (np.sqrt(2 * np.pi * sigma1**2))
-                * (1 + c4 / 32 * (16 * ((x - x0) / np.sqrt(2) / sigma1) ** 4 - 48 * ((x - x0) / np.sqrt(2) / sigma1) ** 2 + 12))
-            )
-
-        defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}
-        sharedPars = ["sigma1", "c4"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GCC4_CNTR:
-
-        def model(x, A, sigma1, c4):
-            return (
-                A
-                * np.exp(-(x**2) / 2 / sigma1**2)
-                / (np.sqrt(2 * np.pi * sigma1**2))
-                * (1 + c4 / 32 * (16 * (x / np.sqrt(2) / sigma1) ** 4 - 48 * (x / np.sqrt(2) / sigma1) ** 2 + 12))
-            )
-
-        defaultPars = {"A": 1, "sigma1": 6, "c4": 0}
-        sharedPars = ["sigma1", "c4"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GCC6:
-
-        def model(x, A, x0, sigma1, c6):
-            return (
-                A
-                * np.exp(-((x - x0) ** 2) / 2 / sigma1**2)
-                / (np.sqrt(2 * np.pi * sigma1**2))
-                * (
-                    1
-                    + +c6
-                    / 384
-                    * (
-                        64 * ((x - x0) / np.sqrt(2) / sigma1) ** 6
-                        - 480 * ((x - x0) / np.sqrt(2) / sigma1) ** 4
-                        + 720 * ((x - x0) / np.sqrt(2) / sigma1) ** 2
-                        - 120
-                    )
-                )
-            )
-
-        defaultPars = {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}
-        sharedPars = ["sigma1", "c6"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.GCC6_CNTR:
-
-        def model(x, A, sigma1, c6):
-            return (
-                A
-                * np.exp(-(x**2) / 2 / sigma1**2)
-                / (np.sqrt(2 * np.pi * sigma1**2))
-                * (
-                    1
-                    + +c6
-                    / 384
-                    * (
-                        64 * (x / np.sqrt(2) / sigma1) ** 6
-                        - 480 * (x / np.sqrt(2) / sigma1) ** 4
-                        + 720 * (x / np.sqrt(2) / sigma1) ** 2
-                        - 120
-                    )
-                )
-            )
-
-        defaultPars = {"A": 1, "sigma1": 6, "c6": 0}
-        sharedPars = ["sigma1", "c6"]  # Used only in Global fit
-
-    elif modelFlag == FitModels.DOUBLEWELL:
-
-        def model(x, A, d, R, sig1, sig2):
-            # h = 2.04
-            theta = np.linspace(0, np.pi, 300)[:, np.newaxis]  # 300 points seem like a good estimate for ~10 examples
-            y = x[np.newaxis, :]
-
-            sigTH = np.sqrt(sig1**2 * np.cos(theta) ** 2 + sig2**2 * np.sin(theta) ** 2)
-            alpha = 2 * (d * sig2 * sig1 * np.sin(theta) / sigTH) ** 2
-            beta = (2 * sig1**2 * d * np.cos(theta) / sigTH**2) * y
-            denom = 2.506628 * sigTH * (1 + R**2 + 2 * R * np.exp(-2 * d**2 * sig1**2))
-            jp = np.exp(-(y**2) / (2 * sigTH**2)) * (1 + R**2 + 2 * R * np.exp(-alpha) * np.cos(beta)) / denom
-            jp *= np.sin(theta)
-
-            JBest = np.trapezoid(jp, x=theta, axis=0)
-            JBest /= np.abs(np.trapezoid(JBest, x=y))
-            JBest *= A
-            return JBest
-
-        defaultPars = {
-            "A": 1,
-            "d": 1,
-            "R": 1,
-            "sig1": 3,
-            "sig2": 5,
-        }  # TODO: Starting parameters and bounds?
-        sharedPars = ["d", "R", "sig1", "sig2"]  # Only varying parameter is amplitude A
-
-    elif modelFlag == FitModels.GAUSS2D:
-        # Anisotropic case
-        def model(x, A, sig1, sig2):
-            # h = 2.04
-            theta = np.linspace(0, np.pi, 300)[:, np.newaxis]
-            y = x[np.newaxis, :]
-
-            sigTH = np.sqrt(sig1**2 * np.cos(theta) ** 2 + sig2**2 * np.sin(theta) ** 2)
-            jp = np.exp(-(y**2) / (2 * sigTH**2)) / (2.506628 * sigTH)
-            jp *= np.sin(theta)
-
-            JBest = np.trapezoid(jp, x=theta, axis=0)
-            JBest /= np.abs(np.trapezoid(JBest, x=y))
-            JBest *= A
-            return JBest
-
-        defaultPars = {"A": 1, "sig1": 3, "sig2": 5}
-        sharedPars = ["sig1", "sig2"]
-
-    elif modelFlag == FitModels.GAUSS3D:
-
-        def model(x, A, sig_x, sig_y, sig_z):
-            y = x[:, np.newaxis, np.newaxis]
-            n_steps = 50  # Low number of integration steps because otherwise too slow
-            theta = np.linspace(0, np.pi / 2, n_steps)[np.newaxis, :, np.newaxis]
-            phi = np.linspace(0, np.pi / 2, n_steps)[np.newaxis, np.newaxis, :]
-
-            S2_inv = (
-                np.sin(theta) ** 2 * np.cos(phi) ** 2 / sig_x**2
-                + np.sin(theta) ** 2 * np.sin(phi) ** 2 / sig_y**2
-                + np.cos(theta) ** 2 / sig_z**2
-            )
-
-            J = np.sin(theta) / S2_inv * np.exp(-(y**2) / 2 * S2_inv)
-
-            J = np.trapezoid(J, x=phi, axis=2)[:, :, np.newaxis]  # Keep shape
-            J = np.trapezoid(J, x=theta, axis=1)
-
-            J *= A * 2 / np.pi * 1 / np.sqrt(2 * np.pi) * 1 / (sig_x * sig_y * sig_z)  # Normalisation
-            J = J.squeeze()
-            return J
-
-        defaultPars = {"A": 1, "sig_x": 5, "sig_y": 5, "sig_z": 5}
-        sharedPars = ["sig_x", "sig_y", "sig_z"]
-
-    else:
-        options = [fit.value for fit in FitModels]
-        raise ValueError(f"Fitting Model not recognized, available options: {', '.join(options)}")
+    definition = model_manager.get_model(modelFlag)
+    model = definition.function
+    defaultPars = dict(definition.default_parameters)
+    sharedPars = list(definition.shared_parameters)
 
     logger.notice(f"\nShared Parameters: {[key for key in sharedPars]}")
     logger.notice(f"\nUnshared Parameters: {[key for key in defaultPars if key not in sharedPars]}")
-
-    assert all(isinstance(item, str) for item in sharedPars), "Parameters in list must be strings."
-    assert describe(model)[-len(sharedPars) :] == sharedPars, (
-        "Function signature needs to have shared parameters at the end: model(*unsharedPars, *sharedPars)"
-    )
 
     return model, defaultPars, sharedPars
 
@@ -509,7 +293,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         bestFitVals[p] = v
         bestFitErrs[p] = e
 
-    if yFitIC.fitting_model == FitModels.GAUSS:  # Case with no positivity constraint, can use automatic minos()
+    if yFitIC.fitting_model == model_manager.name("GAUSS"):  # Case with no positivity constraint, can use automatic minos()
         mObj.minos()
         me = mObj.merrors
 
@@ -787,13 +571,13 @@ def oddPointsRes(x, res):
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     logger.notice("\nFitting on the sum of spectra in the West domain ...\n")
     for minimizer in ["Levenberg-Marquardt", "Simplex"]:
-        if yFitIC.fitting_model == FitModels.GAUSS:
+        if yFitIC.fitting_model == model_manager.name("GAUSS"):
             function = f"""composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()"""
 
-        elif yFitIC.fitting_model == FitModels.GCC4C6:
+        elif yFitIC.fitting_model == model_manager.name("GCC4C6"):
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -802,7 +586,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
             """
-        elif yFitIC.fitting_model == FitModels.GCC4:
+        elif yFitIC.fitting_model == model_manager.name("GCC4"):
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -810,7 +594,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,ties=()
             """
-        elif yFitIC.fitting_model == FitModels.GCC6:
+        elif yFitIC.fitting_model == model_manager.name("GCC6"):
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -819,18 +603,21 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
         elif (
-            (yFitIC.fitting_model == FitModels.DOUBLEWELL)
-            | (yFitIC.fitting_model == FitModels.GAUSS2D)
-            | (yFitIC.fitting_model == FitModels.GAUSS3D)
-            | (yFitIC.fitting_model == FitModels.GAUSS_CNTR)
-            | (yFitIC.fitting_model == FitModels.GCC4C6_CNTR)
-            | (yFitIC.fitting_model == FitModels.GCC4_CNTR)
-            | (yFitIC.fitting_model == FitModels.GCC6_CNTR)
+            (yFitIC.fitting_model == model_manager.name("DOUBLEWELL"))
+            | (yFitIC.fitting_model == model_manager.name("GAUSS2D"))
+            | (yFitIC.fitting_model == model_manager.name("GAUSS3D"))
+            | (yFitIC.fitting_model == model_manager.name("GAUSS_CNTR"))
+            | (yFitIC.fitting_model == model_manager.name("GCC4C6_CNTR"))
+            | (yFitIC.fitting_model == model_manager.name("GCC4_CNTR"))
+            | (yFitIC.fitting_model == model_manager.name("GCC6_CNTR"))
         ):
             logger.warning("Fitting model recognized but not currently implemented in Mantid Fit. Skipping Mantid Fit ...")
             return
         else:
-            options = [fit.value for fit in FitModels]
+            if model_manager.has_model(yFitIC.fitting_model):
+                logger.warning("Custom fitting model is not implemented in Mantid Fit. Skipping Mantid Fit ...")
+                return
+            options = model_manager.get_model_names()
             raise ValueError(f"Fitting Model not recognized, available options: {', '.join(options)}")
 
         suffix = "lm" if minimizer == "Levenberg-Marquardt" else minimizer.lower()
@@ -892,12 +679,12 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     for i in range(len(dataY)):  # Set limits for unshared parameters
         m.limits["A" + str(i)] = (0, np.inf)
 
-    if IC.fitting_model == FitModels.DOUBLEWELL:
+    if IC.fitting_model == model_manager.name("DOUBLEWELL"):
         m.limits["d"] = (0, np.inf)  # Shared parameters
         m.limits["R"] = (0, np.inf)
 
     t0 = time.time()
-    if IC.fitting_model == FitModels.GAUSS:
+    if IC.fitting_model == model_manager.name("GAUSS"):
         m.simplex()
         m.migrad()
 
@@ -1542,7 +1329,7 @@ def save_result_of_global_fit(data_x, data_y, data_e, m, total_cost_fun, ws_name
 
 def save_workspaces(yFitIC):
     for ws_name in mtd.getObjectNames():
-        save_path = yFitIC.outputs_dir / f"{yFitIC.fitting_model}_fit" / ws_name
+        save_path = yFitIC.outputs_dir / f"{yFitIC.fitting_model}" / ws_name
         if ws_name.endswith("Parameters") or ws_name.endswith("CovarianceMatrix"):
             save_path.parent.mkdir(exist_ok=True, parents=True)
             SaveAscii(ws_name, str(save_path))

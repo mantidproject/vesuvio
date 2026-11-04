@@ -5,9 +5,12 @@ from mantid.kernel import logger
 from mantid.simpleapi import SaveAscii, mtd
 
 from mvesuvio.analysis_fitting import FitInYSpace
-from mvesuvio.globals import FitModels
+from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
 from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util.model_manager import model_manager
+
+register_fitting_models()
 
 if TYPE_CHECKING:
     from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
@@ -37,18 +40,18 @@ class BackwardFittingInputs(BackwardAnalysisInputs):
     run_this_fitting_type = False
     show_plots = True
     # Fitting model options
-    # FitModels.GAUSS: Single Gaussian
-    # FitModels.GAUSS_CNTR: Single Gaussian with fixed center at zero
-    # FitModels.GCC4: Gram-Charlier with C4 parameter
-    # FitModels.GCC4_CNTR: Gram-Charlier with C4 parameter with fixed center at zero
-    # FitModels.GCC6: Gram-Charlier with C6 parameter
-    # FitModels.GCC6_CNTR: Gram-Charlier with C6 parameter with fixed center at zero
-    # FitModels.GCC4C6: Gram-Charlier with C4 and C6 parameter
-    # FitModels.GCC4C6_CNTR: Gram-Charlier with C4 and C6 parameter and fixed center at zero
-    # FitModels.DOUBLEWELL: Double Well function
-    # FitModels.GAUSS2D: Anisotropic Gaussian
-    # FitModels.GAUSS3D: 3-Dimensional Gaussian
-    fitting_model = FitModels.GAUSS
+    # "GAUSS": Single Gaussian
+    # "GAUSS_CNTR": Single Gaussian with fixed center at zero
+    # "GCC4": Gram-Charlier with C4 parameter
+    # "GCC4_CNTR": Gram-Charlier with C4 parameter with fixed center at zero
+    # "GCC6": Gram-Charlier with C6 parameter
+    # "GCC6_CNTR": Gram-Charlier with C6 parameter with fixed center at zero
+    # "GCC4C6": Gram-Charlier with C4 and C6 parameter
+    # "GCC4C6_CNTR": Gram-Charlier with C4 and C6 parameter and fixed center at zero
+    # "DOUBLEWELL": Double Well function
+    # "GAUSS2D": Anisotropic Gaussian
+    # "GAUSS3D": 3-Dimensional Gaussian
+    fitting_model = model_manager.name("GAUSS")
     run_minos = True
     do_global_fit = True  # Performs global fit with Minuit by default
     # Number of groups of detectors to perform global (simultaneous) fit on
@@ -61,18 +64,18 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     run_this_fitting_type = True
     show_plots = True
     # Fitting model options
-    # FitModels.GAUSS: Single Gaussian
-    # FitModels.GAUSS_CNTR: Single Gaussian with fixed center at zero
-    # FitModels.GCC4: Gram-Charlier with C4 parameter
-    # FitModels.GCC4_CNTR: Gram-Charlier with C4 parameter with fixed center at zero
-    # FitModels.GCC6: Gram-Charlier with C6 parameter
-    # FitModels.GCC6_CNTR: Gram-Charlier with C6 parameter with fixed center at zero
-    # FitModels.GCC4C6: Gram-Charlier with C4 and C6 parameter
-    # FitModels.GCC4C6_CNTR: Gram-Charlier with C4 and C6 parameter and fixed center at zero
-    # FitModels.DOUBLEWELL: Double Well function
-    # FitModels.GAUSS2D: Anisotropic Gaussian
-    # FitModels.GAUSS3D: 3-Dimensional Gaussian
-    fitting_model = FitModels.GAUSS
+    # "GAUSS": Single Gaussian
+    # "GAUSS_CNTR": Single Gaussian with fixed center at zero
+    # "GCC4": Gram-Charlier with C4 parameter
+    # "GCC4_CNTR": Gram-Charlier with C4 parameter with fixed center at zero
+    # "GCC6": Gram-Charlier with C6 parameter
+    # "GCC6_CNTR": Gram-Charlier with C6 parameter with fixed center at zero
+    # "GCC4C6": Gram-Charlier with C4 and C6 parameter
+    # "GCC4C6_CNTR": Gram-Charlier with C4 and C6 parameter and fixed center at zero
+    # "DOUBLEWELL": Double Well function
+    # "GAUSS2D": Anisotropic Gaussian
+    # "GAUSS3D": 3-Dimensional Gaussian
+    fitting_model = model_manager.name("GAUSS")
     run_minos = True
     do_global_fit = True  # Performs global fit with Minuit by default
     # Number of groups of detectors to perform global (simultaneous) fit on

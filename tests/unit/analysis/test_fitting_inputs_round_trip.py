@@ -8,13 +8,13 @@ from mvesuvio.default_config.experiment_template.run_fitting import load_saved_f
 from mvesuvio.default_config.experiment_template.run_fse_correction import (
     BackwardFSEFittingInputs,
     ForwardFSEFittingInputs,
-    run_fse_correction_for_inputs,
     run_fse_correction,
+    run_fse_correction_for_inputs,
 )
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
-from mvesuvio.globals import FitModels
 from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util.model_manager import model_manager
 
 
 class TestFittingInputsRoundTrip(unittest.TestCase):
@@ -39,8 +39,8 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         )
         self.assertFalse(BackwardFSEFittingInputs.run_this_fitting_type)
         self.assertTrue(ForwardFSEFittingInputs.run_this_fitting_type)
-        self.assertIs(BackwardFSEFittingInputs.fitting_model, FitModels.GAUSS)
-        self.assertIs(ForwardFSEFittingInputs.fitting_model, FitModels.GAUSS)
+        self.assertEqual(BackwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
+        self.assertEqual(ForwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
 
     @staticmethod
     def _create_resolution_workspace(output_workspace):

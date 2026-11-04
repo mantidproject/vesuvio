@@ -4,9 +4,12 @@ from mantid.api import AnalysisDataService
 from mantid.kernel import logger
 from mantid.simpleapi import mtd
 
-from mvesuvio.globals import FitModels
+from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
 from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util.model_manager import model_manager
+
+register_fitting_models()
 
 if TYPE_CHECKING:
     from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
@@ -32,12 +35,12 @@ else:
 
 class BackwardFSEFittingInputs(BackwardAnalysisInputs):
     run_this_fitting_type = False
-    fitting_model = FitModels.GAUSS
+    fitting_model = model_manager.name("GAUSS")
 
 
 class ForwardFSEFittingInputs(ForwardAnalysisInputs):
     run_this_fitting_type = True
-    fitting_model = FitModels.GAUSS
+    fitting_model = model_manager.name("GAUSS")
 
 
 def run_fse_fitting(ws_resolution: Any, ws_joy: Any) -> None:
