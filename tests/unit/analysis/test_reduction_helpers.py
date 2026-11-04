@@ -511,8 +511,8 @@ class TestReductionHelpers(unittest.TestCase):
         ])
         ipfile_path = str(Path("/tmp/ip/ipfile.txt"))
         mock_save_ws.assert_has_calls([
-            call("1234", Mode.SINGLE_DIFFERENCE, "/tmp/ip/ipfile.txt", raw_path),
-            call("5678", Mode.SINGLE_DIFFERENCE, "/tmp/ip/ipfile.txt", empty_path),
+            call("1234", Mode.SINGLE_DIFFERENCE, ipfile_path, raw_path),
+            call("5678", Mode.SINGLE_DIFFERENCE, ipfile_path, empty_path),
         ])
 
     def test_store_input_ws_if_not_on_path_rejects_unknown_scattering_type(self):

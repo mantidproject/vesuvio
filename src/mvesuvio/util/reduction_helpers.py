@@ -332,7 +332,7 @@ def save_results_from_outputs(
     for ws_name in all_workspaces:
         if ws_name.endswith(("ncp", "fse", "initial_parameters", "means", "fit_results")):
             SaveAscii(ws_name, str(output_directory / ws_name) + ".txt")
-        if ws_name.endswith(tuple(str(i) for i in range(10))):
+        if ws_name[-1].isdigit():
             SaveNexus(ws_name, str(output_directory / ws_name) + ".nxs")
 
 
