@@ -3,7 +3,7 @@ import runpy
 import numpy as np
 from mock import MagicMock, Mock, patch, call
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
-from mvesuvio.globals import ScatteringType
+from mvesuvio.globals import ModeRunning, ScatteringType
 from mvesuvio.util.analysis_helpers import load_resolution
 from mvesuvio.util import handle_config
 from mantid.simpleapi import CreateWorkspace, CreateSampleWorkspace, CreateEmptyTableWorkspace
@@ -50,7 +50,7 @@ class TestAnalysisReduction(unittest.TestCase):
             "InvalidDetectors": [3],
             "MultipleScatteringCorrection": False,
             "GammaCorrection": True,
-            "ModeRunning": "BACKWARD",
+            "ModeRunning": ModeRunning.BACKWARD,
             "TransmissionGuess": 0,
             "MultipleScatteringOrder": 2,
             "NumberOfEvents": 2,

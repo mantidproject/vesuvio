@@ -8,7 +8,7 @@ import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, Integration, Rebin, RenameWorkspace
 
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
-from mvesuvio.globals import Masking, Mode, ScatteringType, Tags
+from mvesuvio.globals import Masking, Mode, ModeRunning, ScatteringType, Tags
 from mvesuvio.util import reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
@@ -628,9 +628,9 @@ class TestReductionHelpers(unittest.TestCase):
 
     def test_run_estimate_h_ratio_stops_when_input_is_not_empty(self):
         back_alg = Mock()
-        back_alg.getPropertyValue.return_value = "BACKWARD"
+        back_alg.getPropertyValue.return_value = ModeRunning.BACKWARD
         front_alg = Mock()
-        front_alg.getPropertyValue.return_value = "FORWARD"
+        front_alg.getPropertyValue.return_value = ModeRunning.FORWARD
 
         with patch("builtins.input", return_value="cancel"), patch.object(reduction_helpers.logger, "error") as error:
             result = reduction_helpers.run_estimate_h_ratio(back_alg, front_alg, [1, 12], 1, 0.01, 3)
@@ -641,10 +641,10 @@ class TestReductionHelpers(unittest.TestCase):
 
     def test_run_estimate_h_ratio_stops_after_converging(self):
         back_alg = Mock()
-        back_alg.getPropertyValue.return_value = "BACKWARD"
+        back_alg.getPropertyValue.return_value = ModeRunning.BACKWARD
         front_alg = Mock()
         front_alg.getPropertyValue.side_effect = lambda name: {
-            "ModeRunning": "FORWARD",
+            "ModeRunning": ModeRunning.FORWARD,
             "OutputMeansTable": "means",
         }[name]
         ratio_table = Mock()
@@ -667,12 +667,12 @@ class TestReductionHelpers(unittest.TestCase):
 
     def test_execute_joint_algorithms_updates_profiles_and_executes_forward_algorithm(self):
         back_alg = Mock()
-        back_alg.getPropertyValue.return_value = "BACKWARD"
+        back_alg.getPropertyValue.return_value = ModeRunning.BACKWARD
         back_alg.getProperty.return_value.value = 0.5
         front_alg = Mock()
-        front_alg.getPropertyValue.return_value = "FORWARD"
+        front_alg.getPropertyValue.return_value = ModeRunning.FORWARD
         front_alg.getPropertyValue.side_effect = lambda name: {
-            "ModeRunning": "FORWARD",
+            "ModeRunning": ModeRunning.FORWARD,
             "InputProfiles": "profiles",
         }[name]
         incoming_means = Mock()
@@ -686,7 +686,7 @@ class TestReductionHelpers(unittest.TestCase):
             patch.object(reduction_helpers, "print_table_workspace") as print_table,
         ):
             back_alg.getPropertyValue.side_effect = lambda name: {
-                "ModeRunning": "BACKWARD",
+                "ModeRunning": ModeRunning.BACKWARD,
                 "OutputMeansTable": "means",
             }[name]
             reduction_helpers.execute_joint_algorithms(back_alg, front_alg)
@@ -744,7 +744,7 @@ class TestReductionHelpers(unittest.TestCase):
         self.assertEqual(properties["InputProfiles"], "profiles")
         self.assertEqual(properties["InstrumentParametersFile"], "/tmp/ip/ip_file.par")
         self.assertEqual(properties["InvalidDetectors"], [3, 4])
-        self.assertEqual(properties["ModeRunning"], "FORWARD")
+        self.assertEqual(properties["ModeRunning"], ModeRunning.FORWARD)
 
     def test_save_plots_from_outputs_rejects_non_group_name(self):
         with self.assertRaisesRegex(ValueError, "Expected an NCP output group"):
