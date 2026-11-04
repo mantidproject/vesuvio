@@ -161,7 +161,7 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertEqual(mock_save_nexus.call_count, 6)
             self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
 
             AnalysisDataService.clear()
@@ -197,7 +197,7 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertEqual(mock_save_nexus.call_count, 6)
             saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
             self.assertTrue(all("override_front_0" in path for path in saved_paths))
 
@@ -231,7 +231,7 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertEqual(mock_save_nexus.call_count, 6)
             saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
             self.assertTrue(all("front_subtracted_0" in path for path in saved_paths))
 

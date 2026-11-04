@@ -33,6 +33,14 @@ class TestGeneralHelpers(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Could not infer scattering type"):
             general_helpers._get_scattering_type(UnknownInputs)
 
+    def test_get_workspace_name_candidates_returns_unique_names_in_preferred_order(self):
+        class Inputs:
+            number_of_iterations_for_corrections = 2
+            overwrite_analysis_input_workspace = "sample"
+            name_of_subtracted_workspace = "sample"
+
+        self.assertEqual(general_helpers.get_workspace_name_candidates(Inputs), ["sample_2", "sample"])
+
     def test_load_overwritten_workspace_if_specified(self):
         class Inputs:
             overwrite_analysis_input_workspace = "override_front"

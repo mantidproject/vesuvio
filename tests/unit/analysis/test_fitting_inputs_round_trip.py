@@ -1,11 +1,18 @@
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
 
 from mvesuvio.default_config.experiment_template.run_fitting import load_saved_fitting_input_workspaces
+from mvesuvio.default_config.experiment_template.run_fse_correction import (
+    BackwardFSEFittingInputs,
+    ForwardFSEFittingInputs,
+    run_fse_correction_for_inputs,
+    run_fse_correction,
+)
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
+from mvesuvio.globals import FitModels
 from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 
@@ -20,6 +27,20 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
     def tearDown(self):
         AnalysisDataService.clear()
         self.output_dir.cleanup()
+
+    def test_fse_fitting_inputs_only_override_their_two_routine_settings(self):
+        self.assertEqual(
+            {key for key in vars(BackwardFSEFittingInputs) if not key.startswith("__")},
+            {"run_this_fitting_type", "fitting_model"},
+        )
+        self.assertEqual(
+            {key for key in vars(ForwardFSEFittingInputs) if not key.startswith("__")},
+            {"run_this_fitting_type", "fitting_model"},
+        )
+        self.assertFalse(BackwardFSEFittingInputs.run_this_fitting_type)
+        self.assertTrue(ForwardFSEFittingInputs.run_this_fitting_type)
+        self.assertIs(BackwardFSEFittingInputs.fitting_model, FitModels.GAUSS)
+        self.assertIs(ForwardFSEFittingInputs.fitting_model, FitModels.GAUSS)
 
     @staticmethod
     def _create_resolution_workspace(output_workspace):
@@ -88,9 +109,57 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_ws_resolution.nxs").exists())
         self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_joy.nxs").exists())
         self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_joy_avg.nxs").exists())
+        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_ws_resolution.nxs").exists())
+        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_joy.nxs").exists())
+        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_joy_avg.nxs").exists())
 
         load_saved_fitting_input_workspaces()
 
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+
+        AnalysisDataService.clear()
+        with patch(
+            "mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting"
+        ) as fse_fitting:
+            run_fse_correction()
+
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+        fse_fitting.assert_called_once()
+        resolution_workspace, joy_workspace = fse_fitting.call_args.args
+        self.assertEqual(resolution_workspace.name(), f"{ws_name}_ws_resolution")
+        self.assertEqual(joy_workspace.name(), f"{ws_name}_joy")
+
+    def test_fse_correction_runs_for_each_available_candidate(self):
+        workspaces = {
+            "first_ws_resolution": object(),
+            "first_joy": object(),
+            "second_ws_resolution": object(),
+            "second_joy": object(),
+        }
+        with (
+            patch(
+                "mvesuvio.util.general_helpers.get_workspace_name_candidates",
+                return_value=["first", "second"],
+            ),
+            patch(
+                "mvesuvio.default_config.experiment_template.run_fse_correction.AnalysisDataService",
+                Mock(doesExist=workspaces.__contains__),
+            ),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.mtd", workspaces),
+            patch(
+                "mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting"
+            ) as fse_fitting,
+        ):
+            run_fse_correction_for_inputs(ForwardFSEFittingInputs)
+
+        self.assertEqual(
+            fse_fitting.call_args_list,
+            [
+                call(workspaces["first_ws_resolution"], workspaces["first_joy"]),
+                call(workspaces["second_ws_resolution"], workspaces["second_joy"]),
+            ],
+        )
