@@ -133,5 +133,75 @@ class TestGlobalFitBuilder(unittest.TestCase):
             GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, self.initial, ["missing"])
 
 
+class TestGlobalFitBuilderFSE(unittest.TestCase):
+    def setUp(self):
+        self.n_spectra = 3
+        x = np.linspace(-20, 20, 161)
+        self.x = x
+        self.data_x = np.tile(x, (self.n_spectra, 1))
+        self.res_y = np.tile(gauss(x, 1, 0, 1.0), (self.n_spectra, 1))
+        self.sigma = 4.0
+        self.true_fse = 3.0
+        self.amplitudes = [1.0, 2.0, 3.0]
+        def deriv3(a):
+            return a * (3 * x / self.sigma**4 - x**3 / self.sigma**6) * gauss(x, 1, 0, self.sigma)
+        # Analytical third derivative of the gaussian
+        self.expected_fse = np.array([-self.true_fse * deriv3(a) for a in self.amplitudes])
+        data = np.array([gauss(x, a, 0, self.sigma) for a in self.amplitudes]) + self.expected_fse
+        self.data_y = np.array([np.convolve(row, self.res_y[0], mode="same") * (x[1] - x[0]) for row in data])
+        self.data_e = np.full_like(self.data_y, 0.001)
+
+    def build(self, shared, fse_initial=1.0):
+        initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, "fse_intensity": fse_initial}
+        return GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, shared)
+
+    def test_fse_term_is_third_derivative_of_model(self):
+        builder = self.build(["sigma", "fse_intensity"])
+        vector = builder.initial_vector()
+        names = builder.parameter_names
+        vector[names.index("fse_intensity")] = self.true_fse
+        vector[names.index("sigma")] = self.sigma
+        for i, a in enumerate(self.amplitudes):
+            vector[names.index(f"A{i}")] = a
+        convolved_fse = builder.fse_contribution(vector)
+        for i in range(self.n_spectra):
+            expected = np.convolve(self.expected_fse[i], self.res_y[i], mode="same") * (self.x[1] - self.x[0])
+            np.testing.assert_allclose(convolved_fse[i, 10:-10], expected[10:-10], atol=1e-4)
+
+    def test_zero_intensity_matches_fit_without_fse(self):
+        with_fse = self.build(["sigma", "fse_intensity"], fse_initial=0.0)
+        without = GlobalFitBuilder(
+            self.data_x, self.data_y, self.data_e, self.res_y, gauss, {"A": 1.5, "x0": 0.0, "sigma": self.sigma}, ["sigma"]
+        )
+        np.testing.assert_allclose(with_fse.convolved_model(with_fse.initial_vector()), without.convolved_model(without.initial_vector()))
+
+    def test_fse_intensity_sharing(self):
+        shared = self.build(["sigma", "fse_intensity"])
+        self.assertEqual(shared.parameter_names[:2], ["sigma", "fse_intensity"])
+        unshared = self.build(["sigma"])
+        self.assertEqual(len(unshared.parameter_names), len(shared.parameter_names) + self.n_spectra - 1)
+        self.assertIn("fse_intensity2", unshared.parameter_names)
+
+    def test_fit_recovers_fse_intensity(self):
+        for shared in (["sigma", "fse_intensity"], ["sigma"]):
+            builder = self.build(shared)
+            result = minimize(builder.cost_function, builder.initial_vector(), method="SLSQP", options={"maxiter": 500})
+            fitted = builder.unpack(result.x)["fse_intensity"]
+            np.testing.assert_allclose(fitted, self.true_fse, rtol=0.1)
+
+    def test_fse_contribution_errors(self):
+        builder = self.build(["sigma", "fse_intensity"])
+        result = minimize(builder.cost_function, builder.initial_vector(), method="SLSQP", options={"maxiter": 500})
+        errors = builder.fse_contribution_errors(result.x)
+        self.assertEqual(errors.shape, self.data_y.shape)
+        self.assertTrue(np.all(np.isfinite(errors)))
+        self.assertGreater(errors.max(), 0)
+
+    def test_fse_contribution_without_fse_raises(self):
+        builder = GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, {"A": 1, "x0": 0, "sigma": 4}, ["sigma"])
+        with self.assertRaises(ValueError):
+            builder.fse_contribution(builder.initial_vector())
+
+
 if __name__ == "__main__":
     unittest.main()
