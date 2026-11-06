@@ -3,11 +3,49 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from mantid.api import AnalysisDataService
 from mantid.kernel import logger
-from mantid.simpleapi import AnalysisDataService, Load, SumSpectra
+from mantid.simpleapi import Load, SumSpectra
 
 from mvesuvio.globals import Mode, ModeRunning, ScatteringType, Tags
 from mvesuvio.util.files_manager import FilesManager
+
+
+def load_saved_fitting_input_workspaces(input_directory: Path | None = None) -> None:
+    """Load saved fitting input workspaces from the requested directory."""
+    if input_directory is None:
+        input_directory = FilesManager.get_fitting_inputs_dir()
+    if not input_directory.exists():
+        logger.notice(f"No saved fitting input workspaces found in {input_directory}. Skipping workspace reload.")
+        return
+
+    workspace_files = sorted(input_directory.glob("*.nxs"))
+    logger.notice(f"Loading saved fitting input workspaces from {input_directory} ({len(workspace_files)} file(s)).")
+    for workspace_file in workspace_files:
+        workspace_name = workspace_file.stem
+        if AnalysisDataService.doesExist(workspace_name):
+            logger.notice(f"Workspace {workspace_name} already loaded in ADS; reusing existing workspace.")
+            continue
+        logger.notice(f"Loading workspace {workspace_name} from {workspace_file.name}.")
+        Load(Filename=str(workspace_file), OutputWorkspace=workspace_name)
+
+
+def get_workspace_name_candidates(analysis_inputs: Any) -> list[str]:
+    """Return unique candidate workspace names in preferred lookup order."""
+    iteration = str(analysis_inputs.number_of_iterations_for_corrections)
+    overwrite_workspace = get_workspace_name_if_path(analysis_inputs.overwrite_analysis_input_workspace)
+    base_workspace_names = [
+        overwrite_workspace,
+        str(analysis_inputs.name_of_subtracted_workspace or "").strip(),
+    ]
+    base_workspace_names = [name for name in base_workspace_names if name]
+
+    candidates: list[str] = []
+    for base_workspace_name in base_workspace_names:
+        for candidate in (f"{base_workspace_name}_{iteration}", base_workspace_name):
+            if candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
 
 
 def _get_scattering_type(inputs_class: Any) -> ScatteringType:

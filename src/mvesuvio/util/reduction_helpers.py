@@ -513,9 +513,11 @@ def save_fitting_input_workspaces(
 
     ws_joy, ws_joy_avg = y_space_reduction(ws_lighest_data, ws_lighest_ncp, analysis_inputs)
 
-    SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
-    SaveNexus(ws_joy, str(fitting_inputs_dir / f"{workspace_name}_joy.nxs"))
-    SaveNexus(ws_joy_avg, str(fitting_inputs_dir / f"{workspace_name}_joy_avg.nxs"))
+    for input_directory in (fitting_inputs_dir, FilesManager.get_fse_correction_inputs_dir()):
+        input_directory.mkdir(parents=True, exist_ok=True)
+        SaveNexus(ws_resolution, str(input_directory / f"{workspace_name}_ws_resolution.nxs"))
+        SaveNexus(ws_joy, str(input_directory / f"{workspace_name}_joy.nxs"))
+        SaveNexus(ws_joy_avg, str(input_directory / f"{workspace_name}_joy_avg.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
