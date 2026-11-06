@@ -28,19 +28,30 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         AnalysisDataService.clear()
         self.output_dir.cleanup()
 
-    def test_fse_fitting_inputs_only_override_their_two_routine_settings(self):
+    def test_fse_fitting_inputs_override_routine_and_fse_settings(self):
+        expected_settings = {
+            "run_this_fitting_type",
+            "fitting_model",
+            "fit_fse_intensity",
+            "fse_intensity_shared",
+            "initial_fse_intensity",
+        }
         self.assertEqual(
             {key for key in vars(BackwardFSEFittingInputs) if not key.startswith("__")},
-            {"run_this_fitting_type", "fitting_model"},
+            expected_settings,
         )
         self.assertEqual(
             {key for key in vars(ForwardFSEFittingInputs) if not key.startswith("__")},
-            {"run_this_fitting_type", "fitting_model"},
+            expected_settings,
         )
         self.assertFalse(BackwardFSEFittingInputs.run_this_fitting_type)
         self.assertTrue(ForwardFSEFittingInputs.run_this_fitting_type)
         self.assertEqual(BackwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
         self.assertEqual(ForwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
+        for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):
+            self.assertTrue(fitting_inputs.fit_fse_intensity)
+            self.assertTrue(fitting_inputs.fse_intensity_shared)
+            self.assertEqual(fitting_inputs.initial_fse_intensity, 0.0)
 
     @staticmethod
     def _create_resolution_workspace(output_workspace):
