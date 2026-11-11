@@ -103,10 +103,12 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         ForwardAnalysisInputs.subtract_calculated_fse_from_data = False
         ForwardAnalysisInputs.do_symmetrisation = False
 
-        def fake_y_space_reduction(ws_data, ws_ncp, inputs):
+        def fake_y_space_reduction(ws_data, ws_ncp, lightest_mass, inputs):
+            self.assertEqual(lightest_mass, 1.0079)
             joy = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF", OutputWorkspace=f"{ws_data.name()}_joy")
             joy_avg = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF", OutputWorkspace=f"{ws_data.name()}_joy_avg")
-            return joy, joy_avg
+            q = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, UnitX="TOF", OutputWorkspace=f"{ws_data.name()}_q_rebin")
+            return joy, joy_avg, q
 
         with patch("mvesuvio.util.fitting_helpers.calculate_resolution", side_effect=self._mock_calculate_resolution):
             with patch("mvesuvio.util.fitting_helpers.VesuvioResolution") as resolution_mock:
@@ -120,15 +122,18 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_ws_resolution.nxs").exists())
         self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_joy.nxs").exists())
         self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_joy_avg.nxs").exists())
+        self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_q.nxs").exists())
         self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_ws_resolution.nxs").exists())
         self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_joy.nxs").exists())
         self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_joy_avg.nxs").exists())
+        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_q.nxs").exists())
 
         load_saved_fitting_input_workspaces()
 
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_q"))
 
         AnalysisDataService.clear()
         with patch(
@@ -139,6 +144,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_q"))
         fse_fitting.assert_called_once()
         resolution_workspace, joy_workspace, _ = fse_fitting.call_args.args
         self.assertEqual(resolution_workspace.name(), f"{ws_name}_ws_resolution")

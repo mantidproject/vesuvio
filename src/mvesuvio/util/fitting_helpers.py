@@ -17,8 +17,9 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
 
     ws_ncp_names = [n for n in ws_group_ncp.getNames() if n.endswith("ncp")]
     masses = [float(n.split("_")[-2]) for n in ws_ncp_names if "total" not in n]
+    lightest_mass = min(masses)
     ws_total_ncp_name = [n for n in ws_ncp_names if n.endswith("_total_ncp")][0]
-    ws_lighest_ncp_name = ws_ncp_names[masses.index(min(masses))]
+    ws_lighest_ncp_name = ws_ncp_names[masses.index(lightest_mass)]
     ws_lighest_ncp = mtd[ws_lighest_ncp_name]
     ws_total_ncp = mtd[ws_total_ncp_name]
     suffix = "_m0"
@@ -45,7 +46,7 @@ def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):
     _write_data_y_into_ws(isolated_data_y, ws_lighest_data)
     SumSpectra(ws_lighest_data.name(), OutputWorkspace=ws_lighest_data.name() + "_sum")
 
-    return ws_lighest_data, ws_lighest_ncp
+    return ws_lighest_data, ws_lighest_ncp, lightest_mass
 
 
 def calculate_resolution(mass, ws, rebin_range):

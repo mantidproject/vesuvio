@@ -505,19 +505,20 @@ def save_fitting_input_workspaces(
         analysis_inputs.range_for_rebinning_in_y_space,
     )
 
-    ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
+    ws_lighest_data, ws_lighest_ncp, lightest_mass = fitting_helpers.isolate_lighest_mass_data(
         ws_to_fit,
         ws_to_fit_ncps,
         analysis_inputs.subtract_calculated_fse_from_data,
     )
 
-    ws_joy, ws_joy_avg = y_space_reduction(ws_lighest_data, ws_lighest_ncp, analysis_inputs)
+    ws_joy, ws_joy_avg, ws_q = y_space_reduction(ws_lighest_data, ws_lighest_ncp, lightest_mass, analysis_inputs)
 
     for input_directory in (fitting_inputs_dir, FilesManager.get_fse_correction_inputs_dir()):
         input_directory.mkdir(parents=True, exist_ok=True)
         SaveNexus(ws_resolution, str(input_directory / f"{workspace_name}_ws_resolution.nxs"))
         SaveNexus(ws_joy, str(input_directory / f"{workspace_name}_joy.nxs"))
         SaveNexus(ws_joy_avg, str(input_directory / f"{workspace_name}_joy_avg.nxs"))
+        SaveNexus(ws_q, str(input_directory / f"{workspace_name}_q.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
@@ -594,9 +595,13 @@ def create_profiles_table(name, ai):
     return table
 
 
-def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
+def y_space_reduction(
+    wsTOF,
+    ws_ncp,
+    lightest_mass: float,
+    inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs],
+):
     """Seperate procedures depending on masking specified."""
-    mass0 = inputs.masses[0]
     ncp = ws_ncp.extractY()
 
     rebin_pars = inputs.range_for_rebinning_in_y_space
@@ -604,7 +609,10 @@ def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs] | type
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NCP:
         wsTOF = replace_zeros_with_ncp(wsTOF, ncp)
 
-    ws_joy = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
+    ws_joy = ConvertToYSpace(wsTOF, Mass=lightest_mass, OutputWorkspace=wsTOF.name() + "_joy", QWorkspace=wsTOF.name() + "_q")
+
+    # Rebin QWorkspace with same parameters as y-space workspace
+    Rebin(InputWorkspace=wsTOF.name() + "_q", Params=rebin_pars, OutputWorkspace=wsTOF.name() + "_q_rebin")
 
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NAN:
         # NOTE: Technically this rebin is general and gives the same result as Rebin when
@@ -626,7 +634,7 @@ def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs] | type
         ws_joy_rebin_avg = symmetrize_weighted_mean(ws_joy_rebin_avg)
 
     DeleteWorkspace("temp_integral")
-    return ws_joy_rebin, ws_joy_rebin_avg
+    return ws_joy_rebin, ws_joy_rebin_avg, mtd[wsTOF.name() + "_q_rebin"]
 
 
 def rebin_masked_weighted(ws_joy, rebin_pars, suffix):

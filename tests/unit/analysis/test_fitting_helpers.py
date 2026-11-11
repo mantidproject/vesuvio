@@ -26,7 +26,7 @@ class TestFittingHelpers(unittest.TestCase):
         ws_data = CreateWorkspace(DataX=data_x, DataY=data, DataE=1.5 * data_e, NSpec=1, UnitX="some_unit")
         ncp_group = GroupWorkspaces([ws_ncp3, ws_ncp2, ws_ncp1, ws_total])
 
-        ws_res, ws_res_ncp = fitting_helpers.isolate_lighest_mass_data(ws_data, ncp_group, False)
+        ws_res, ws_res_ncp, lightest_mass = fitting_helpers.isolate_lighest_mass_data(ws_data, ncp_group, False)
 
         ws_expected = ws_data - ws_ncp2 - ws_ncp3
         ws_expected.dataY(0)[:10] = 0
@@ -37,6 +37,7 @@ class TestFittingHelpers(unittest.TestCase):
         np.testing.assert_allclose(ws_res_ncp.extractY(), ws_ncp1.extractY())
         np.testing.assert_allclose(ws_res_ncp.extractE(), ws_ncp1.extractE())
         np.testing.assert_allclose(ws_res_ncp.extractX(), ws_ncp1.extractX())
+        self.assertEqual(lightest_mass, 1.0)
 
     def test_isolate_lighest_mass_data_with_fse_subtraction(self):
         np.random.seed(0)
@@ -53,7 +54,7 @@ class TestFittingHelpers(unittest.TestCase):
         ncp_group = GroupWorkspaces([ws_ncp3, ws_ncp2, ws_ncp1, ws_total])
         ws_fse1 = CreateWorkspace(DataX=dataX, DataY=0.4*np.sin(dataX)*np.exp(-(dataX-3)**2), DataE=0.5*dataE, NSpec=1, UnitX="some_unit", OutputWorkspace="_1_fse")
 
-        ws_res, ws_res_ncp = fitting_helpers.isolate_lighest_mass_data(ws_data, ncp_group, True)
+        ws_res, ws_res_ncp, lightest_mass = fitting_helpers.isolate_lighest_mass_data(ws_data, ncp_group, True)
 
         ws_expected = ws_data - ws_ncp2 - ws_ncp3 - ws_fse1
         np.testing.assert_allclose(ws_res.extractY(), ws_expected.extractY())
@@ -62,6 +63,7 @@ class TestFittingHelpers(unittest.TestCase):
         np.testing.assert_allclose(ws_res_ncp.extractY(), ws_ncp1.extractY() - ws_fse1.extractY())
         np.testing.assert_allclose(ws_res_ncp.extractE(), ws_ncp1.extractE())
         np.testing.assert_allclose(ws_res_ncp.extractX(), ws_ncp1.extractX())
+        self.assertEqual(lightest_mass, 1.0)
 
     def test_vesuvio_resolution(self):
         ws_data = Load(str(Path(__file__).parent.parent.parent / "data/analysis/unit/analysis_fwd_0.nxs"))
