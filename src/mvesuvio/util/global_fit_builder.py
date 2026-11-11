@@ -23,8 +23,9 @@ class GlobalFitBuilder:
     being compared to the data.
 
     If ``fse_intensity`` is in ``initial_params`` it is not passed to the model. Instead, the third derivative
-    of the model is added to it as a final state effect (FSE) term, ``-fse_intensity * d3 model / dx3``, before
-    the convolution. Like any other parameter, ``fse_intensity`` is shared when listed in ``shared_params``.
+    of the model is added to it as a final state effect (FSE) term, ``-fse_intensity * d3 model / dx3 / q``, before
+    the convolution, where ``q`` is the corresponding row of ``q_y`` (required for the FSE term).
+    Like any other parameter, ``fse_intensity`` is shared when listed in ``shared_params``.
     """
 
     def __init__(
@@ -36,11 +37,13 @@ class GlobalFitBuilder:
         model: Callable[..., Any],
         initial_params: Mapping[str, float],
         shared_params: Iterable[str] = (),
+        q_y: np.ndarray | None = None,
     ) -> None:
         self.data_x = np.asarray(data_x, dtype=float)
         self.data_y = np.asarray(data_y, dtype=float)
         self.data_e = np.asarray(data_e, dtype=float)
         self.res_y = np.asarray(res_y, dtype=float)
+        self.q_y = None if q_y is None else np.asarray(q_y, dtype=float)
         self.model = model
         self.initial_params = dict(initial_params)
         self.shared_params = tuple(shared_params)
@@ -57,6 +60,10 @@ class GlobalFitBuilder:
         self._res_dense = np.stack([res for _, res in grids])
         self._safe_e = np.where(self.valid, self.data_e, 1.0)
         self._safe_y = np.where(self.valid, self.data_y, 0.0)
+        if self.q_y is not None:
+            # Bins where q is zero or not finite (e.g. outside the data range) get no FSE term
+            usable_q = np.isfinite(self.q_y) & (self.q_y != 0)
+            self._inverse_q = np.divide(1.0, self.q_y, out=np.zeros_like(self.q_y), where=usable_q)
 
     def _validate_inputs(self) -> None:
         if self.data_x.ndim != 2:
@@ -68,8 +75,13 @@ class GlobalFitBuilder:
             raise ValueError(f"Shared parameters are not in the initial parameters: {', '.join(missing)}")
         if BACKGROUND_PARAMETER in self.initial_params:
             raise ValueError(f"{BACKGROUND_PARAMETER!r} is reserved for the background of the convolved model.")
-        if FSE_PARAMETER in self.initial_params and self.data_x.shape[1] <= 2 * THIRD_DERIVATIVE_EDGE:
-            raise ValueError("Not enough points to compute the third derivative for the FSE term.")
+        if FSE_PARAMETER in self.initial_params:
+            if self.data_x.shape[1] <= 2 * THIRD_DERIVATIVE_EDGE:
+                raise ValueError("Not enough points to compute the third derivative for the FSE term.")
+            if self.q_y is None:
+                raise ValueError(f"q_y is required when {FSE_PARAMETER!r} is in the initial parameters.")
+            if self.q_y.shape != self.data_y.shape:
+                raise ValueError("q_y must have the same shape as data_y.")
 
     @staticmethod
     def _build_convolution_grid(x: np.ndarray, res: np.ndarray) -> tuple[float, np.ndarray]:
@@ -130,7 +142,7 @@ class GlobalFitBuilder:
         edge = THIRD_DERIVATIVE_EDGE
         third_derivative[:, edge:-edge] = numerical_third_derivative(self.data_x, model_y)
         intensity = np.reshape(fse_intensity, (-1, 1)) if np.ndim(fse_intensity) else fse_intensity
-        return model_y, -intensity * third_derivative
+        return model_y, -intensity * third_derivative * self._inverse_q
 
     def _convolve(self, model_y: np.ndarray) -> np.ndarray:
         return signal.fftconvolve(model_y, self._res_dense, mode="same", axes=1) * self._x_delta

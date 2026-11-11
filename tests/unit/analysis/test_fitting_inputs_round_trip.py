@@ -146,16 +146,19 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_q"))
         fse_fitting.assert_called_once()
-        resolution_workspace, joy_workspace, _ = fse_fitting.call_args.args
+        resolution_workspace, joy_workspace, q_workspace, _ = fse_fitting.call_args.args
         self.assertEqual(resolution_workspace.name(), f"{ws_name}_ws_resolution")
         self.assertEqual(joy_workspace.name(), f"{ws_name}_joy")
+        self.assertEqual(q_workspace.name(), f"{ws_name}_q")
 
     def test_fse_correction_runs_for_each_available_candidate(self):
         workspaces = {
             "first_ws_resolution": object(),
             "first_joy": object(),
+            "first_q": object(),
             "second_ws_resolution": object(),
             "second_joy": object(),
+            "second_q": object(),
         }
         with (
             patch(
@@ -176,7 +179,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertEqual(
             fse_fitting.call_args_list,
             [
-                call(workspaces["first_ws_resolution"], workspaces["first_joy"], ForwardFSEFittingInputs),
-                call(workspaces["second_ws_resolution"], workspaces["second_joy"], ForwardFSEFittingInputs),
+                call(workspaces["first_ws_resolution"], workspaces["first_joy"], workspaces["first_q"], ForwardFSEFittingInputs),
+                call(workspaces["second_ws_resolution"], workspaces["second_joy"], workspaces["second_q"], ForwardFSEFittingInputs),
             ],
         )

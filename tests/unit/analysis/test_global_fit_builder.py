@@ -151,9 +151,10 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
         self.data_y = np.array([np.convolve(row, self.res_y[0], mode="same") * (x[1] - x[0]) for row in data])
         self.data_e = np.full_like(self.data_y, 0.001)
 
-    def build(self, shared, fse_initial=1.0):
+    def build(self, shared, fse_initial=1.0, q_y=None):
         initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, "fse_intensity": fse_initial}
-        return GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, shared)
+        q_y = np.ones_like(self.data_y) if q_y is None else q_y
+        return GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, shared, q_y)
 
     def test_fse_term_is_third_derivative_of_model(self):
         builder = self.build(["sigma", "fse_intensity"])
@@ -167,6 +168,29 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
         for i in range(self.n_spectra):
             expected = np.convolve(self.expected_fse[i], self.res_y[i], mode="same") * (self.x[1] - self.x[0])
             np.testing.assert_allclose(convolved_fse[i, 10:-10], expected[10:-10], atol=1e-4)
+
+    def test_fse_term_is_divided_by_q_of_each_row(self):
+        q_y = np.array([np.full(self.x.size, factor) for factor in (0.5, 2.0, 3.0)])
+        builder = self.build(["sigma", "fse_intensity"], q_y=q_y)
+        reference = self.build(["sigma", "fse_intensity"])
+        vector = builder.initial_vector()
+        np.testing.assert_allclose(builder.fse_contribution(vector), reference.fse_contribution(vector) / q_y, atol=1e-12)
+
+    def test_fse_term_is_zero_where_q_is_zero(self):
+        q_y = np.ones_like(self.data_y)
+        q_y[:, 80] = 0.0
+        builder = self.build(["sigma", "fse_intensity"], q_y=q_y)
+        fse = builder.fse_contribution(builder.initial_vector())
+        self.assertTrue(np.all(np.isfinite(fse)))
+
+    def test_fse_without_q_or_with_wrong_shape_raises(self):
+        initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, "fse_intensity": 1.0}
+        with self.assertRaises(ValueError):
+            GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, ["sigma"])
+        with self.assertRaises(ValueError):
+            GlobalFitBuilder(
+                self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, ["sigma"], self.data_y[:, :-1]
+            )
 
     def test_zero_intensity_matches_fit_without_fse(self):
         with_fse = self.build(["sigma", "fse_intensity"], fse_initial=0.0)

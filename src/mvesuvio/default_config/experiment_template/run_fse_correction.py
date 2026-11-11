@@ -94,10 +94,12 @@ def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace) -> Workspace
 def run_fse_fitting(
     ws_resolution: Workspace,
     ws_joy: Workspace,
+    ws_q: Workspace,
     fitting_inputs: type[BackwardFSEFittingInputs] | type[ForwardFSEFittingInputs],
 ) -> tuple[GlobalFitBuilder, OptimizeResult]:
     data_x, data_y, data_e = extractWS(ws_joy)
     _, res_y, _ = extractWS(ws_resolution)
+    q_y = ws_q.extractY()
 
     definition = model_manager.get_model(fitting_inputs.fitting_model)
     initial_parameters = dict(definition.default_parameters)
@@ -115,6 +117,7 @@ def run_fse_fitting(
         definition.function,
         initial_parameters,
         shared_parameters,
+        q_y,
     )
 
     result = minimize(
@@ -138,14 +141,15 @@ def run_fse_correction_for_inputs(
     for candidate in workspace_name_candidates:
         resolution_name = f"{candidate}_ws_resolution"
         joy_name = f"{candidate}_joy"
-        if AnalysisDataService.doesExist(resolution_name) and AnalysisDataService.doesExist(joy_name):
+        q_name = f"{candidate}_q"
+        if all(AnalysisDataService.doesExist(name) for name in (resolution_name, joy_name, q_name)):
             found_candidate = True
-            run_fse_fitting(mtd[resolution_name], mtd[joy_name], fitting_inputs)
+            run_fse_fitting(mtd[resolution_name], mtd[joy_name], mtd[q_name], fitting_inputs)
 
     if not found_candidate:
         logger.warning(
             "Could not find expected derived workspaces "
-            + ", ".join(f"({name}_ws_resolution, {name}_joy)" for name in workspace_name_candidates)
+            + ", ".join(f"({name}_ws_resolution, {name}_joy, {name}_q)" for name in workspace_name_candidates)
             + ". Skipping FSE correction."
         )
 
