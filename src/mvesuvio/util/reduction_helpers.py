@@ -609,9 +609,15 @@ def y_space_reduction(
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NCP:
         wsTOF = replace_zeros_with_ncp(wsTOF, ncp)
 
-    ws_joy, ws_q = ConvertToYSpace(wsTOF, Mass=lightest_mass, OutputWorkspace=wsTOF.name() + "_joy", QWorkspace=wsTOF.name() + "_q")
+    ws_joy, ws_q = ConvertToYSpace(
+        wsTOF,
+        Mass=lightest_mass,
+        OutputWorkspace=wsTOF.name() + "_joy",
+        QWorkspace=wsTOF.name() + "_q",
+    )
 
     # Rebin QWorkspace with same parameters as y-space workspace
+    # Not perfect, but it outputs a good approximation
     Rebin(InputWorkspace=ws_q, Params=rebin_pars, OutputWorkspace=ws_q.name() + "_rebin")
 
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NAN:

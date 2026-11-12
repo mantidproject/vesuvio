@@ -909,6 +909,10 @@ class TestYSpaceReduction(unittest.TestCase):
         joy.name.return_value = "tof_joy"
         rebinned = Mock()
         rebinned.name.return_value = "tof_joy_rebin"
+        q_workspace = Mock()
+        q_workspace.name.return_value = "tof_q"
+        q_replaced_workspace = Mock()
+        q_replaced_workspace.name.return_value = "tof_replaced_q"
         q_rebinned = Mock()
         normalised = Mock()
         normalised.name.return_value = "tof_joy_rebin_norm"
@@ -917,7 +921,14 @@ class TestYSpaceReduction(unittest.TestCase):
         replaced.name.return_value = "tof_replaced"
 
         with (
-            patch.object(reduction_helpers, "ConvertToYSpace", return_value=joy) as convert,
+            patch.object(
+                reduction_helpers,
+                "ConvertToYSpace",
+                side_effect=lambda *args, **kwargs: (
+                    joy,
+                    q_replaced_workspace if kwargs["QWorkspace"] == "tof_replaced_q" else q_workspace,
+                ),
+            ) as convert,
             patch.object(reduction_helpers, "Rebin", return_value=rebinned) as rebin,
             patch.object(reduction_helpers, "rebin_masked_weighted", return_value=rebinned) as masked_rebin,
             patch.object(reduction_helpers, "Integration") as integrate,
@@ -929,7 +940,10 @@ class TestYSpaceReduction(unittest.TestCase):
             patch.object(
                 reduction_helpers,
                 "mtd",
-                {"tof_q_rebin": q_rebinned, "tof_replaced_q_rebin": q_rebinned},
+                {
+                    "tof_q_rebin": q_rebinned,
+                    "tof_replaced_q_rebin": q_rebinned,
+                },
             ),
         ):
             result = reduction_helpers.y_space_reduction(ws_tof, ws_ncp, 12.0, inputs)
@@ -952,6 +966,8 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             symmetrize,
             delete,
+            q_workspace,
+            q_replaced_workspace,
         )
 
     def test_unmasked_path_uses_mantid_rebin_without_replacement_or_symmetrisation(self):
@@ -973,14 +989,17 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             symmetrize,
             delete,
+            q_workspace,
+            _,
         ) = self._run_with_mocks(self._inputs())
 
         ws_ncp.extractY.assert_called_once_with()
         convert.assert_called_once_with(ws_tof, Mass=12.0, OutputWorkspace="tof_joy", QWorkspace="tof_q")
         masked_rebin.assert_not_called()
+        self.assertIs(rebin.call_args_list[0].kwargs["InputWorkspace"], q_workspace)
         rebin.assert_has_calls(
             [
-                call(InputWorkspace="tof_q", Params=[0, 2, 4], OutputWorkspace="tof_q_rebin"),
+                call(InputWorkspace=q_workspace, Params=[0, 2, 4], OutputWorkspace="tof_q_rebin"),
                 call(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin"),
             ]
         )
@@ -1019,6 +1038,8 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             _,
             _,
+            q_workspace,
+            q_replaced_workspace,
         ) = self._run_with_mocks(inputs)
 
         replace_zeros.assert_called_once_with(ws_tof, ws_ncp.extractY.return_value)
@@ -1030,7 +1051,7 @@ class TestYSpaceReduction(unittest.TestCase):
         )
         rebin.assert_has_calls(
             [
-                call(InputWorkspace="tof_replaced_q", Params=[0, 2, 4], OutputWorkspace="tof_replaced_q_rebin"),
+                call(InputWorkspace=q_replaced_workspace, Params=[0, 2, 4], OutputWorkspace="tof_replaced_q_rebin"),
                 call(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin"),
             ]
         )
@@ -1056,10 +1077,12 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             symmetrize,
             _,
+            q_workspace,
+            _,
         ) = self._run_with_mocks(inputs)
 
         replace_zeros.assert_not_called()
-        rebin.assert_called_once_with(InputWorkspace="tof_q", Params=[0, 2, 4], OutputWorkspace="tof_q_rebin")
+        rebin.assert_called_once_with(InputWorkspace=q_workspace, Params=[0, 2, 4], OutputWorkspace="tof_q_rebin")
         masked_rebin.assert_called_once_with(joy, [0, 2, 4], "_rebin")
         symmetrize.assert_called_once_with(averaged)
         self.assertEqual(result, (normalised, symmetrize.return_value, q_rebinned))
@@ -1089,7 +1112,8 @@ class TestYSpaceReduction(unittest.TestCase):
         )
         inputs = self._inputs()
 
-        with patch.object(reduction_helpers, "ConvertToYSpace", return_value=ws_joy):
+        ws_q = AnalysisDataService.retrieve("normalisation_tof_q")
+        with patch.object(reduction_helpers, "ConvertToYSpace", return_value=(ws_joy, ws_q)):
             per_spectrum, average, _ = reduction_helpers.y_space_reduction(ws_tof, ws_joy, 1.0, inputs)
 
         return per_spectrum, average
