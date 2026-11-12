@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from scipy.optimize import NonlinearConstraint, minimize
 
-from mvesuvio.util.global_fit_builder import GlobalFitBuilder
+from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitBuilder
 
 
 def gauss(x, A, x0, sigma):
@@ -141,26 +141,40 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
         self.data_x = np.tile(x, (self.n_spectra, 1))
         self.res_y = np.tile(gauss(x, 1, 0, 1.0), (self.n_spectra, 1))
         self.sigma = 4.0
-        self.true_fse = 3.0
+        self.true_fse_intensity = 3.0
+        self.true_width = (3 * self.true_fse_intensity) ** 0.25
         self.amplitudes = [1.0, 2.0, 3.0]
         def deriv3(a):
             return a * (3 * x / self.sigma**4 - x**3 / self.sigma**6) * gauss(x, 1, 0, self.sigma)
         # Analytical third derivative of the gaussian
-        self.expected_fse = np.array([-self.true_fse * deriv3(a) for a in self.amplitudes])
+        self.expected_fse = np.array([-self.true_fse_intensity * deriv3(a) for a in self.amplitudes])
         data = np.array([gauss(x, a, 0, self.sigma) for a in self.amplitudes]) + self.expected_fse
         self.data_y = np.array([np.convolve(row, self.res_y[0], mode="same") * (x[1] - x[0]) for row in data])
         self.data_e = np.full_like(self.data_y, 0.001)
 
-    def build(self, shared, fse_initial=1.0, q_y=None):
-        initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, "fse_intensity": fse_initial}
+    def build(self, shared, width_initial=1.0, q_y=None, fse_width_parameter=None):
+        initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma}
+        if fse_width_parameter is None:
+            initial[FSE_INTENSITY_PARAMETER] = width_initial**4 / 3
+            shared = [FSE_INTENSITY_PARAMETER if name == "width" else name for name in shared]
         q_y = np.ones_like(self.data_y) if q_y is None else q_y
-        return GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, shared, q_y)
+        return GlobalFitBuilder(
+            self.data_x,
+            self.data_y,
+            self.data_e,
+            self.res_y,
+            gauss,
+            initial,
+            shared,
+            q_y,
+            fse_width_parameter,
+        )
 
     def test_fse_term_is_third_derivative_of_model(self):
-        builder = self.build(["sigma", "fse_intensity"])
+        builder = self.build(["sigma", "width"])
         vector = builder.initial_vector()
         names = builder.parameter_names
-        vector[names.index("fse_intensity")] = self.true_fse
+        vector[names.index(FSE_INTENSITY_PARAMETER)] = self.true_fse_intensity
         vector[names.index("sigma")] = self.sigma
         for i, a in enumerate(self.amplitudes):
             vector[names.index(f"A{i}")] = a
@@ -171,20 +185,20 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
 
     def test_fse_term_is_divided_by_q_of_each_row(self):
         q_y = np.array([np.full(self.x.size, factor) for factor in (0.5, 2.0, 3.0)])
-        builder = self.build(["sigma", "fse_intensity"], q_y=q_y)
-        reference = self.build(["sigma", "fse_intensity"])
+        builder = self.build(["sigma", "width"], q_y=q_y)
+        reference = self.build(["sigma", "width"])
         vector = builder.initial_vector()
         np.testing.assert_allclose(builder.fse_contribution(vector), reference.fse_contribution(vector) / q_y, atol=1e-12)
 
     def test_fse_term_is_zero_where_q_is_zero(self):
         q_y = np.ones_like(self.data_y)
         q_y[:, 80] = 0.0
-        builder = self.build(["sigma", "fse_intensity"], q_y=q_y)
+        builder = self.build(["sigma", "width"], q_y=q_y)
         fse = builder.fse_contribution(builder.initial_vector())
         self.assertTrue(np.all(np.isfinite(fse)))
 
     def test_fse_without_q_or_with_wrong_shape_raises(self):
-        initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, "fse_intensity": 1.0}
+        initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, FSE_INTENSITY_PARAMETER: 1.0}
         with self.assertRaises(ValueError):
             GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, ["sigma"])
         with self.assertRaises(ValueError):
@@ -193,28 +207,74 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
             )
 
     def test_zero_intensity_matches_fit_without_fse(self):
-        with_fse = self.build(["sigma", "fse_intensity"], fse_initial=0.0)
+        with_fse = self.build(["sigma", "width"], width_initial=0.0)
         without = GlobalFitBuilder(
             self.data_x, self.data_y, self.data_e, self.res_y, gauss, {"A": 1.5, "x0": 0.0, "sigma": self.sigma}, ["sigma"]
         )
         np.testing.assert_allclose(with_fse.convolved_model(with_fse.initial_vector()), without.convolved_model(without.initial_vector()))
 
-    def test_fse_intensity_sharing(self):
-        shared = self.build(["sigma", "fse_intensity"])
-        self.assertEqual(shared.parameter_names[:2], ["sigma", "fse_intensity"])
+    def test_fse_width_sharing(self):
+        shared = self.build(["sigma", "width"])
+        self.assertEqual(shared.parameter_names[:2], ["sigma", FSE_INTENSITY_PARAMETER])
         unshared = self.build(["sigma"])
         self.assertEqual(len(unshared.parameter_names), len(shared.parameter_names) + self.n_spectra - 1)
         self.assertIn("fse_intensity2", unshared.parameter_names)
 
-    def test_fit_recovers_fse_intensity(self):
-        for shared in (["sigma", "fse_intensity"], ["sigma"]):
+    def test_fse_width_can_be_tied_to_a_model_parameter(self):
+        tied = self.build(["sigma"], fse_width_parameter="sigma")
+        untied = self.build(["sigma", "width"], width_initial=self.sigma)
+        tied_vector = tied.initial_vector()
+        untied_vector = untied.initial_vector()
+        untied_vector[untied.parameter_names.index(FSE_INTENSITY_PARAMETER)] = self.sigma**4 / 3
+
+        self.assertNotIn(FSE_INTENSITY_PARAMETER, tied.parameter_names)
+        np.testing.assert_allclose(tied.fse_contribution(tied_vector), untied.fse_contribution(untied_vector))
+
+    def test_free_fse_intensity_is_reported_as_width_with_propagated_error(self):
+        builder = self.build(["sigma", "width"])
+        vector = builder.initial_vector()
+        intensity_index = builder.parameter_names.index(FSE_INTENSITY_PARAMETER)
+        vector[intensity_index] = self.true_fse_intensity
+        covariance = np.eye(vector.size)
+        covariance[intensity_index, intensity_index] = 0.04
+
+        names, values, errors = builder.reporting_parameters(vector, covariance)
+
+        self.assertEqual(names[intensity_index], "width")
+        self.assertAlmostEqual(values[intensity_index], self.true_width)
+        expected_error = 0.2 * 0.75 * (3 * self.true_fse_intensity) ** (-0.75)
+        self.assertAlmostEqual(errors[intensity_index], expected_error)
+
+    def test_fse_intensity_optimizer_bounds_are_non_negative(self):
+        shared = self.build(["sigma", "width"])
+        shared_index = shared.parameter_names.index(FSE_INTENSITY_PARAMETER)
+        self.assertEqual(shared.optimizer_bounds()[shared_index], (0.0, None))
+
+        unshared = self.build(["sigma"])
+        for index, name in enumerate(unshared.parameter_names):
+            expected = (0.0, None) if name.startswith(FSE_INTENSITY_PARAMETER) else (None, None)
+            self.assertEqual(unshared.optimizer_bounds()[index], expected)
+
+    def test_tied_fse_width_requires_a_model_parameter(self):
+        with self.assertRaisesRegex(ValueError, "is not in the model parameters"):
+            self.build(["sigma"], fse_width_parameter="missing")
+
+    def test_fit_recovers_fse_width(self):
+        for shared in (["sigma", "width"], ["sigma"]):
             builder = self.build(shared)
-            result = minimize(builder.cost_function, builder.initial_vector(), method="SLSQP", options={"maxiter": 500})
-            fitted = builder.unpack(result.x)["fse_intensity"]
-            np.testing.assert_allclose(fitted, self.true_fse, rtol=0.1)
+            result = minimize(
+                builder.cost_function,
+                builder.initial_vector(),
+                method="SLSQP",
+                bounds=builder.optimizer_bounds(),
+                options={"maxiter": 500},
+            )
+            fitted_intensity = builder.unpack(result.x)[FSE_INTENSITY_PARAMETER]
+            fitted_width = (3 * fitted_intensity) ** 0.25
+            np.testing.assert_allclose(fitted_width, self.true_width, rtol=0.1)
 
     def test_fse_contribution_errors(self):
-        builder = self.build(["sigma", "fse_intensity"])
+        builder = self.build(["sigma", "width"])
         result = minimize(builder.cost_function, builder.initial_vector(), method="SLSQP", options={"maxiter": 500})
         errors = builder.fse_contribution_errors(result.x)
         self.assertEqual(errors.shape, self.data_y.shape)

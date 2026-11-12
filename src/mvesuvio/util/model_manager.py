@@ -10,6 +10,14 @@ class FittingModel:
     default_parameters: Mapping[str, Any]
     shared_parameters: tuple[str, ...]
 
+    def parameter(self, name: str) -> Any:
+        """Return a model parameter's default value, raising if it is not defined."""
+        try:
+            return self.default_parameters[name]
+        except KeyError as error:
+            options = ", ".join(self.default_parameters)
+            raise ValueError(f"Parameter {name!r} is not defined for this model. Available parameters: {options}") from error
+
 
 class ModelManager:
     def __init__(self) -> None:

@@ -8,7 +8,8 @@ from scipy import signal
 from mvesuvio.util.analysis_helpers import numerical_third_derivative
 
 BACKGROUND_PARAMETER = "y0"
-FSE_PARAMETER = "fse_intensity"
+FSE_WIDTH_PARAMETER = "width"
+FSE_INTENSITY_PARAMETER = "fse_intensity"
 # The finite difference stencil of the third derivative is not defined on this many points at each edge
 THIRD_DERIVATIVE_EDGE = 6
 
@@ -22,10 +23,10 @@ class GlobalFitBuilder:
     parameter, one value per row. The model is convolved with the resolution of each row before
     being compared to the data.
 
-    If ``fse_intensity`` is in ``initial_params`` it is not passed to the model. Instead, the third derivative
-    of the model is added to it as a final state effect (FSE) term, ``-fse_intensity * d3 model / dx3 / q``, before
-    the convolution, where ``q`` is the corresponding row of ``q_y`` (required for the FSE term).
-    Like any other parameter, ``fse_intensity`` is shared when listed in ``shared_params``.
+    If ``fse_intensity`` is in ``initial_params`` it is not passed to the model. Instead, it scales the third
+    derivative of the model as a final state effect (FSE) term, ``-fse_intensity * d3 model / dx3 / q``,
+    before the convolution, where ``q`` is the corresponding row of ``q_y`` (required for the FSE term).
+    When the FSE width is tied to a model parameter, the width is transformed to intensity using ``width**4 / 3``.
     """
 
     def __init__(
@@ -38,6 +39,7 @@ class GlobalFitBuilder:
         initial_params: Mapping[str, float],
         shared_params: Iterable[str] = (),
         q_y: np.ndarray | None = None,
+        fse_width_parameter: str | None = None,
     ) -> None:
         self.data_x = np.asarray(data_x, dtype=float)
         self.data_y = np.asarray(data_y, dtype=float)
@@ -47,10 +49,11 @@ class GlobalFitBuilder:
         self.model = model
         self.initial_params = dict(initial_params)
         self.shared_params = tuple(shared_params)
+        self.fse_width_parameter = fse_width_parameter
 
         self._validate_inputs()
 
-        self.has_fse = FSE_PARAMETER in self.initial_params
+        self.has_fse = FSE_INTENSITY_PARAMETER in self.initial_params or self.fse_width_parameter is not None
         self.n_spectra = self.data_x.shape[0]
         self.unshared_params = (BACKGROUND_PARAMETER,) + tuple(name for name in self.initial_params if name not in self.shared_params)
         # Points with zero or non finite error (e.g. masked bins where y and e are zero) are ignored
@@ -75,11 +78,13 @@ class GlobalFitBuilder:
             raise ValueError(f"Shared parameters are not in the initial parameters: {', '.join(missing)}")
         if BACKGROUND_PARAMETER in self.initial_params:
             raise ValueError(f"{BACKGROUND_PARAMETER!r} is reserved for the background of the convolved model.")
-        if FSE_PARAMETER in self.initial_params:
+        if self.fse_width_parameter is not None and self.fse_width_parameter not in self.initial_params:
+            raise ValueError(f"FSE width parameter {self.fse_width_parameter!r} is not in the model parameters.")
+        if FSE_INTENSITY_PARAMETER in self.initial_params or self.fse_width_parameter is not None:
             if self.data_x.shape[1] <= 2 * THIRD_DERIVATIVE_EDGE:
                 raise ValueError("Not enough points to compute the third derivative for the FSE term.")
             if self.q_y is None:
-                raise ValueError(f"q_y is required when {FSE_PARAMETER!r} is in the initial parameters.")
+                raise ValueError("q_y is required when an FSE term is in the initial parameters.")
             if self.q_y.shape != self.data_y.shape:
                 raise ValueError("q_y must have the same shape as data_y.")
 
@@ -99,6 +104,41 @@ class GlobalFitBuilder:
         for name in self.unshared_params:
             names.extend(f"{name}{i}" for i in range(self.n_spectra))
         return names
+
+    def reporting_parameters(self, vector: np.ndarray, covariance: np.ndarray) -> tuple[list[str], np.ndarray, np.ndarray]:
+        """Return parameter names, values, and errors with free FSE intensity reported as width."""
+        vector = np.asarray(vector, dtype=float)
+        covariance = np.asarray(covariance, dtype=float)
+        names = self.parameter_names
+        values = vector.copy()
+        errors = np.sqrt(np.clip(np.diag(covariance), 0, None))
+        intensity_name = FSE_INTENSITY_PARAMETER
+
+        if self.fse_width_parameter is None:
+            for index, name in enumerate(names):
+                if name == intensity_name:
+                    names[index] = FSE_WIDTH_PARAMETER
+                elif name.startswith(intensity_name) and name[len(intensity_name) :].isdigit():
+                    names[index] = FSE_WIDTH_PARAMETER + name[len(intensity_name) :]
+                else:
+                    continue
+
+                intensity = vector[index]
+                if intensity < 0:
+                    raise ValueError("FSE intensity must be non-negative to report a real width.")
+                values[index] = (3 * intensity) ** 0.25
+                derivative = np.inf if intensity == 0 else 0.75 * (3 * intensity) ** (-0.75)
+                errors[index] *= derivative
+        return names, values, errors
+
+    def optimizer_bounds(self) -> list[tuple[float | None, float | None]]:
+        """Return bounds that keep free FSE intensity non-negative for a real width transform."""
+        return [
+            (0.0, None)
+            if self.fse_width_parameter is None and (name == FSE_INTENSITY_PARAMETER or name.startswith(FSE_INTENSITY_PARAMETER))
+            else (None, None)
+            for name in self.parameter_names
+        ]
 
     def initial_vector(self) -> np.ndarray:
         """Starting parameter vector for the minimizer."""
@@ -126,7 +166,11 @@ class GlobalFitBuilder:
         """Model and FSE term (None without FSE) of every row, before the convolution."""
         params = dict(params)
         params.pop(BACKGROUND_PARAMETER)
-        fse_intensity = params.pop(FSE_PARAMETER, None)
+        if self.fse_width_parameter is None:
+            intensity = params.pop(FSE_INTENSITY_PARAMETER, None)
+        else:
+            width = params[self.fse_width_parameter]
+            intensity = np.asarray(width) ** 4 / 3
         # The model is evaluated per row because not all models accept array parameters
         model_y = np.stack(
             [
@@ -134,14 +178,14 @@ class GlobalFitBuilder:
                 for i, x in enumerate(self.data_x)
             ]
         )
-        if fse_intensity is None:
+        if intensity is None:
             return model_y, None
 
         # The edges are left at zero, where the third derivative is not defined
         third_derivative = np.zeros_like(model_y)
         edge = THIRD_DERIVATIVE_EDGE
         third_derivative[:, edge:-edge] = numerical_third_derivative(self.data_x, model_y)
-        intensity = np.reshape(fse_intensity, (-1, 1)) if np.ndim(fse_intensity) else fse_intensity
+        intensity = np.reshape(intensity, (-1, 1)) if np.ndim(intensity) else intensity
         return model_y, -intensity * third_derivative * self._inverse_q
 
     def _convolve(self, model_y: np.ndarray) -> np.ndarray:
@@ -158,7 +202,7 @@ class GlobalFitBuilder:
     def fse_contribution(self, vector: np.ndarray) -> np.ndarray:
         """Convolved FSE term of every row, as an array shaped like data_y."""
         if not self.has_fse:
-            raise ValueError(f"The fit has no FSE term, add {FSE_PARAMETER!r} to the initial parameters.")
+            raise ValueError(f"The fit has no FSE term, add {FSE_WIDTH_PARAMETER!r} to the initial parameters.")
         _, fse_y = self._evaluate_rows(self.unpack(vector))
         return self._convolve(fse_y)
 

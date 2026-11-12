@@ -1,19 +1,26 @@
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
+import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
 
 from mvesuvio.default_config.experiment_template.run_fitting import load_saved_fitting_input_workspaces
 from mvesuvio.default_config.experiment_template.run_fse_correction import (
     BackwardFSEFittingInputs,
     ForwardFSEFittingInputs,
+    FSEFitWith,
     run_fse_correction,
     run_fse_correction_for_inputs,
+    run_fse_fitting,
+    save_fse_fit_results,
+    subtract_fse_contribution,
 )
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
 from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
+from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER
 from mvesuvio.util.model_manager import model_manager
 
 
@@ -32,9 +39,9 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         expected_settings = {
             "run_this_fitting_type",
             "fitting_model",
-            "fit_fse_intensity",
-            "fse_intensity_shared",
-            "initial_fse_intensity",
+            "fit_fse_with",
+            "initial_fse_width",
+            "tie_fse_width_to_model_param",
         }
         self.assertEqual(
             {key for key in vars(BackwardFSEFittingInputs) if not key.startswith("__")},
@@ -48,10 +55,118 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue(ForwardFSEFittingInputs.run_this_fitting_type)
         self.assertEqual(BackwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
         self.assertEqual(ForwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
+        self.assertEqual(BackwardFSEFittingInputs.fit_fse_with, FSEFitWith.FREE_SHARED)
+        self.assertEqual(ForwardFSEFittingInputs.fit_fse_with, FSEFitWith.FREE_SHARED)
         for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):
-            self.assertTrue(fitting_inputs.fit_fse_intensity)
-            self.assertTrue(fitting_inputs.fse_intensity_shared)
-            self.assertEqual(fitting_inputs.initial_fse_intensity, 0.0)
+            self.assertGreater(fitting_inputs.initial_fse_width, 0)
+            self.assertEqual(fitting_inputs.tie_fse_width_to_model_param, "sigma")
+
+    def test_fse_fit_modes_configure_width_as_selected(self):
+        x = np.tile(np.linspace(-10, 10, 21), (2, 1))
+        y = np.ones_like(x)
+        errors = np.ones_like(x)
+        ws_joy = Mock()
+        ws_joy.name.return_value = "test_joy"
+        ws_resolution = Mock()
+        ws_q = Mock()
+        ws_q.extractY.return_value = y
+
+        for fit_with in FSEFitWith:
+            expected_suffix = {
+                FSEFitWith.FREE_SHARED: "free_shared",
+                FSEFitWith.FREE_UNSHARED: "free_unshared",
+                FSEFitWith.TIED_TO_MODEL: "tied",
+            }[fit_with]
+            fitting_inputs = SimpleNamespace(
+                fitting_model="GAUSS",
+                fit_fse_with=fit_with,
+                initial_fse_width=1.0,
+                tie_fse_width_to_model_param="sigma",
+            )
+            with (
+                patch(
+                    "mvesuvio.default_config.experiment_template.run_fse_correction.extractWS",
+                    side_effect=[(x, y, errors), (x, y, errors)],
+                ),
+                patch(
+                    "mvesuvio.default_config.experiment_template.run_fse_correction.minimize",
+                    side_effect=lambda _, parameters, **kwargs: SimpleNamespace(x=parameters),
+                ),
+                patch(
+                    "mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_fit_results",
+                    return_value=(None, None, None),
+                ) as save_results,
+                patch(
+                    "mvesuvio.default_config.experiment_template.run_fse_correction."
+                    "fitting_helpers.create_table_for_fse_fit_parameters"
+                ) as create_parameter_table,
+            ):
+                builder, _ = run_fse_fitting(ws_resolution, ws_joy, ws_q, fitting_inputs)
+
+            save_results.assert_called_once()
+            self.assertEqual(save_results.call_args.args[3], expected_suffix)
+            create_parameter_table.assert_called_once()
+            self.assertEqual(create_parameter_table.call_args.args[0], f"test_joy_{expected_suffix}")
+            if fit_with is FSEFitWith.FREE_SHARED:
+                self.assertIn(FSE_INTENSITY_PARAMETER, builder.parameter_names)
+                self.assertNotIn(f"{FSE_INTENSITY_PARAMETER}0", builder.parameter_names)
+            elif fit_with is FSEFitWith.FREE_UNSHARED:
+                self.assertIn(f"{FSE_INTENSITY_PARAMETER}0", builder.parameter_names)
+                self.assertNotIn(FSE_INTENSITY_PARAMETER, builder.parameter_names)
+            else:
+                self.assertEqual(builder.fse_width_parameter, "sigma")
+                self.assertNotIn(FSE_INTENSITY_PARAMETER, builder.parameter_names)
+            table_args = create_parameter_table.call_args.args
+            width_names = [name for name in table_args[2] if name == "width" or name.startswith("width")]
+            self.assertEqual(bool(width_names), fit_with is not FSEFitWith.TIED_TO_MODEL)
+
+    def test_fse_result_workspace_names_include_fit_mode(self):
+        ws_joy = Mock()
+        ws_joy.name.return_value = "test_joy"
+        builder = SimpleNamespace(
+            parameter_covariance=Mock(),
+            convolved_model=Mock(return_value=np.zeros((1, 21))),
+            fit_curve_errors=Mock(return_value=np.zeros((1, 21))),
+            valid=np.ones((1, 21), dtype=bool),
+            data_y=np.zeros((1, 21)),
+            data_x=np.zeros((1, 21)),
+            has_fse=True,
+            fse_contribution=Mock(return_value=np.zeros((1, 21))),
+            fse_contribution_errors=Mock(return_value=np.zeros((1, 21))),
+        )
+        clones = []
+
+        def clone_workspace(_, OutputWorkspace):
+            clone = Mock()
+            clone.name.return_value = OutputWorkspace
+            clones.append(OutputWorkspace)
+            return clone
+
+        corrected = Mock()
+        corrected.name.return_value = "test_joy_free_shared_fse_corrected"
+        with (
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.CloneWorkspace", side_effect=clone_workspace),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.SumSpectra"),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.general_helpers.pass_data_into_ws"),
+            patch(
+                "mvesuvio.default_config.experiment_template.run_fse_correction.Minus",
+                return_value=corrected,
+            ) as minus,
+        ):
+            _, _, ws_fse = save_fse_fit_results(
+                ws_joy, builder, SimpleNamespace(x=np.array([1.0])), "free_shared", np.array([[0.1]])
+            )
+            subtract_fse_contribution(ws_joy, ws_fse, "free_shared")
+
+        self.assertEqual(
+            clones,
+            [
+                "test_joy_free_shared_fse_fit",
+                "test_joy_free_shared_fse_residuals",
+                "test_joy_free_shared_fse_contribution",
+            ],
+        )
+        self.assertEqual(minus.call_args.kwargs["OutputWorkspace"], "test_joy_free_shared_fse_corrected")
 
     @staticmethod
     def _create_resolution_workspace(output_workspace):

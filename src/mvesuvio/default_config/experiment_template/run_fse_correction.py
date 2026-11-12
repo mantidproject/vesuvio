@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -7,13 +8,20 @@ from mantid.simpleapi import CloneWorkspace, Minus, SumSpectra, mtd
 from scipy.optimize import NonlinearConstraint, OptimizeResult, minimize
 
 from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
-from mvesuvio.util import general_helpers
+from mvesuvio.util import fitting_helpers, general_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.general_helpers import extractWS
-from mvesuvio.util.global_fit_builder import FSE_PARAMETER, GlobalFitBuilder
+from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitBuilder
 from mvesuvio.util.model_manager import model_manager
 
 register_fitting_models()
+
+
+class FSEFitWith(StrEnum):
+    FREE_SHARED = "FREE_SHARED"
+    FREE_UNSHARED = "FREE_UNSHARED"
+    TIED_TO_MODEL = "TIED_TO_MODEL"
+
 
 if TYPE_CHECKING:
     from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
@@ -40,38 +48,37 @@ else:
 class BackwardFSEFittingInputs(BackwardAnalysisInputs):
     run_this_fitting_type = False
     fitting_model = model_manager.name("GAUSS")
-    fit_fse_intensity = True  # Add a free third derivative (FSE) term to the model
-    fse_intensity_shared = True  # One fse_intensity for all detectors if True, otherwise one per detector
-    initial_fse_intensity = 0.0
+    fit_fse_with = FSEFitWith.FREE_SHARED
+    initial_fse_width = 5.0
+    tie_fse_width_to_model_param = "sigma"
 
 
 class ForwardFSEFittingInputs(ForwardAnalysisInputs):
     run_this_fitting_type = True
     fitting_model = model_manager.name("GAUSS")
-    fit_fse_intensity = True  # Add a free third derivative (FSE) term to the model
-    fse_intensity_shared = True  # One fse_intensity for all detectors if True, otherwise one per detector
-    initial_fse_intensity = 0.0
+    fit_fse_with = FSEFitWith.TIE_TO_MODEL
+    initial_fse_width = 3.0
+    tie_fse_width_to_model_param = "sigma"
 
 
 def save_fse_fit_results(
-    ws_joy: Workspace, builder: GlobalFitBuilder, result: OptimizeResult
+    ws_joy: Workspace, builder: GlobalFitBuilder, result: OptimizeResult, workspace_suffix: str, covariance: np.ndarray
 ) -> tuple[Workspace, Workspace, Workspace | None]:
     """Store the fitted curves, the FSE contribution (both with errors) and the residuals (without errors) in clones of ws_joy."""
-    covariance = builder.parameter_covariance(result.x)
     fit_y = builder.convolved_model(result.x)
     fit_e = builder.fit_curve_errors(result.x, covariance)
     # Masked points were not fitted, so they carry no residual
     residuals = np.where(builder.valid, builder.data_y - fit_y, 0.0)
 
-    ws_fit = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + "_fse_fit")
+    ws_fit = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + f"_{workspace_suffix}_fse_fit")
     general_helpers.pass_data_into_ws(builder.data_x, fit_y, fit_e, ws_fit)
 
-    ws_residuals = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + "_fse_residuals")
+    ws_residuals = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + f"_{workspace_suffix}_fse_residuals")
     general_helpers.pass_data_into_ws(builder.data_x, residuals, np.zeros_like(residuals), ws_residuals)
 
     ws_fse = None
     if builder.has_fse:
-        ws_fse = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + "_fse_contribution")
+        ws_fse = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + f"_{workspace_suffix}_fse_contribution")
         fse_y = builder.fse_contribution(result.x)
         fse_e = builder.fse_contribution_errors(result.x, covariance)
         general_helpers.pass_data_into_ws(builder.data_x, fse_y, fse_e, ws_fse)
@@ -84,9 +91,13 @@ def save_fse_fit_results(
     return ws_fit, ws_residuals, ws_fse
 
 
-def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace) -> Workspace:
+def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace, workspace_suffix: str) -> Workspace:
     """Subtract the fitted FSE contribution from the data, errors are added in quadrature."""
-    ws_corrected = Minus(LHSWorkspace=ws_joy, RHSWorkspace=ws_fse, OutputWorkspace=ws_joy.name() + "_fse_corrected")
+    ws_corrected = Minus(
+        LHSWorkspace=ws_joy,
+        RHSWorkspace=ws_fse,
+        OutputWorkspace=ws_joy.name() + f"_{workspace_suffix}_fse_corrected",
+    )
     SumSpectra(InputWorkspace=ws_corrected, OutputWorkspace=ws_corrected.name() + "_sum")
     return ws_corrected
 
@@ -104,10 +115,20 @@ def run_fse_fitting(
     definition = model_manager.get_model(fitting_inputs.fitting_model)
     initial_parameters = dict(definition.default_parameters)
     shared_parameters = tuple(definition.shared_parameters)
-    if fitting_inputs.fit_fse_intensity:
-        initial_parameters[FSE_PARAMETER] = fitting_inputs.initial_fse_intensity
-        if fitting_inputs.fse_intensity_shared:
-            shared_parameters += (FSE_PARAMETER,)
+    fit_fse_with = FSEFitWith(fitting_inputs.fit_fse_with)
+    workspace_suffix = {
+        FSEFitWith.FREE_SHARED: "free_shared",
+        FSEFitWith.FREE_UNSHARED: "free_unshared",
+        FSEFitWith.TIED_TO_MODEL: "tied",
+    }[fit_fse_with]
+    fse_width_parameter = None
+    if fit_fse_with in (FSEFitWith.FREE_SHARED, FSEFitWith.FREE_UNSHARED):
+        initial_parameters[FSE_INTENSITY_PARAMETER] = fitting_inputs.initial_fse_width**4 / 3
+        if fit_fse_with is FSEFitWith.FREE_SHARED:
+            shared_parameters += (FSE_INTENSITY_PARAMETER,)
+    elif fit_fse_with is FSEFitWith.TIED_TO_MODEL:
+        definition.parameter(fitting_inputs.tie_fse_width_to_model_param)
+        fse_width_parameter = fitting_inputs.tie_fse_width_to_model_param
 
     builder = GlobalFitBuilder(
         data_x,
@@ -118,6 +139,7 @@ def run_fse_fitting(
         initial_parameters,
         shared_parameters,
         q_y,
+        fse_width_parameter,
     )
 
     result = minimize(
@@ -125,11 +147,24 @@ def run_fse_fitting(
         builder.initial_vector(),
         method="SLSQP",
         constraints=[NonlinearConstraint(builder.constraint_function, 0, np.inf)],
+        bounds=builder.optimizer_bounds(),
         options={"maxiter": 2000, "ftol": 1e-10, "disp": True},
     )
-    _, _, ws_fse = save_fse_fit_results(ws_joy, builder, result)
+    covariance = builder.parameter_covariance(result.x)
+    degrees_of_freedom = max(int(np.count_nonzero(builder.valid)) - result.x.size, 1)
+    reduced_chi2 = builder.cost_function(result.x) / degrees_of_freedom
+    parameter_names, parameter_values, parameter_errors = builder.reporting_parameters(result.x, covariance)
+    fitting_helpers.create_table_for_fse_fit_parameters(
+        ws_joy.name() + f"_{workspace_suffix}",
+        fitting_inputs.fitting_model,
+        parameter_names,
+        parameter_values,
+        parameter_errors,
+        reduced_chi2,
+    )
+    _, _, ws_fse = save_fse_fit_results(ws_joy, builder, result, workspace_suffix, covariance)
     if ws_fse is not None:
-        subtract_fse_contribution(ws_joy, ws_fse)
+        subtract_fse_contribution(ws_joy, ws_fse, workspace_suffix)
     return builder, result
 
 

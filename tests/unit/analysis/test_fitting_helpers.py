@@ -2,15 +2,32 @@ import unittest
 from pathlib import Path
 
 import numpy as np
-from mantid.simpleapi import CreateWorkspace, GroupWorkspaces, Load, RenameWorkspace
+from mantid.simpleapi import CreateWorkspace, DeleteWorkspace, GroupWorkspaces, Load, RenameWorkspace
 
 from mvesuvio.util import fitting_helpers
-
 
 np.set_printoptions(suppress=True, precision=6, linewidth=200)
 
 
 class TestFittingHelpers(unittest.TestCase):
+    def test_create_table_for_fse_fit_parameters(self):
+        table = fitting_helpers.create_table_for_fse_fit_parameters(
+            "test_fse_free_shared",
+            "GAUSS",
+            ["sigma", "width", "A0"],
+            [5.0, 3.0, 1.5],
+            [0.2, 0.3, 0.1],
+            1.25,
+        )
+        self.addCleanup(lambda: DeleteWorkspace(Workspace=table))
+
+        self.assertEqual(table.name(), "test_fse_free_shared_globalfit_GAUSS_Parameters")
+        self.assertEqual(table.getTitle(), "Global Fit Parameters")
+        self.assertEqual(table.rowCount(), 4)
+        self.assertEqual([table.cell(row, 0) for row in range(table.rowCount())], ["sigma", "width", "A0", "Cost function"])
+        np.testing.assert_allclose([table.cell(row, 1) for row in range(4)], [5.0, 3.0, 1.5, 1.25])
+        np.testing.assert_allclose([table.cell(row, 2) for row in range(4)], [0.2, 0.3, 0.1, 0.0])
+
     def test_isolate_lighest_mass_data_no_fse_subtraction(self):
         np.random.seed(0)
 

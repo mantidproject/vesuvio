@@ -1,15 +1,39 @@
+from collections.abc import Sequence
+
+import numpy as np
 from mantid.simpleapi import (
-    Rebin,
-    SumSpectra,
-    DeleteWorkspace,
-    VesuvioResolution,
     AppendSpectra,
-    RenameWorkspace,
     CloneWorkspace,
+    CreateEmptyTableWorkspace,
+    DeleteWorkspace,
     MaskDetectors,
+    Rebin,
+    RenameWorkspace,
+    SumSpectra,
+    VesuvioResolution,
     mtd,
 )
-import numpy as np
+
+
+def create_table_for_fse_fit_parameters(
+    workspace_name: str,
+    model: str,
+    parameter_names: Sequence[str],
+    values: Sequence[float],
+    errors: Sequence[float],
+    chi2: float,
+):
+    """Create a table workspace containing global-fit parameter values, errors, and reduced chi-squared."""
+    table = CreateEmptyTableWorkspace(OutputWorkspace=workspace_name + f"_globalfit_{model}_Parameters")
+    table.setTitle("Global Fit Parameters")
+    table.addColumn(type="str", name="Name")
+    table.addColumn(type="float", name="Value")
+    table.addColumn(type="float", name="Error")
+
+    for name, value, error in zip(parameter_names, values, errors, strict=True):
+        table.addRow([name, float(value), float(error)])
+    table.addRow(["Cost function", chi2, 0.0])
+    return table
 
 
 def isolate_lighest_mass_data(initial_ws, ws_group_ncp, subtract_fse=True):

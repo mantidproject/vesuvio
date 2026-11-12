@@ -46,10 +46,15 @@ class TestModelManager(unittest.TestCase):
         registered_model = model_manager.get_model(model_name)
 
         self.assertEqual(registered_model.default_parameters["sigma"], 5)
+        self.assertEqual(registered_model.parameter("sigma"), 5)
         np.testing.assert_allclose(
             registered_model.function(np.array([0.0]), **registered_model.default_parameters),
             [1 / np.sqrt(2 * np.pi * 25)],
         )
+
+    def test_model_parameter_lookup_rejects_unknown_parameters(self):
+        with self.assertRaisesRegex(ValueError, "is not defined for this model"):
+            model_manager.get_model("GAUSS").parameter("missing")
 
     def test_name_rejects_unsubscribed_models(self):
         with self.assertRaisesRegex(ValueError, "is not subscribed"):
