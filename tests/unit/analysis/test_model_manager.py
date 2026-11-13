@@ -30,6 +30,9 @@ class TestModelManager(unittest.TestCase):
                 "GCC6_CNTR",
             ),
         )
+        self.assertTrue(model_manager.get_model("GAUSS").VECTORISED)
+        self.assertFalse(model_manager.get_model("DOUBLEWELL").VECTORISED)
+        self.assertFalse(model_manager.get_model("GAUSS2D").VECTORISED)
         for model_name in model_names:
             model, default_parameters, shared_parameters = selectModelAndPars(model_name)
             self.assertEqual(list(default_parameters), list(inspect.signature(model).parameters)[1:])
@@ -52,6 +55,22 @@ class TestModelManager(unittest.TestCase):
             [1 / np.sqrt(2 * np.pi * 25)],
         )
 
+    def test_vectorised_models_accept_2d_x_and_match_row_evaluation(self):
+        x = np.tile(np.linspace(-10, 10, 21), (2, 1))
+        for model_name in model_manager.get_model_names():
+            definition = model_manager.get_model(model_name)
+            if not definition.VECTORISED:
+                continue
+            row_parameters = {
+                name: value if name in definition.shared_parameters else np.full((2, 1), value)
+                for name, value in definition.default_parameters.items()
+            }
+
+            actual = definition.function(x, **row_parameters)
+            expected = np.stack([definition.function(x[row], **definition.default_parameters) for row in range(x.shape[0])])
+
+            np.testing.assert_allclose(actual, expected)
+
     def test_model_parameter_lookup_rejects_unknown_parameters(self):
         with self.assertRaisesRegex(ValueError, "is not defined for this model"):
             model_manager.get_model("GAUSS").parameter("missing")
@@ -66,10 +85,20 @@ class TestModelManager(unittest.TestCase):
         def custom_model(x, A, scale):
             return A * x / scale
 
-        model_name = manager.subscribe("UNIT_TEST_CUSTOM_MODEL", custom_model, {"A": 1, "scale": 2}, ("scale",))
+        model_name = manager.subscribe("UNIT_TEST_CUSTOM_MODEL", custom_model, {"A": 1, "scale": 2}, ("scale",), VECTORISED=False)
 
         self.assertEqual(model_name, "UNIT_TEST_CUSTOM_MODEL")
         self.assertEqual(manager.get_model(model_name).shared_parameters, ("scale",))
+        self.assertFalse(manager.get_model(model_name).VECTORISED)
+
+    def test_subscription_requires_a_boolean_vectorisation_flag(self):
+        manager = ModelManager()
+
+        def model(x, A):
+            return A * x
+
+        with self.assertRaisesRegex(TypeError, "VECTORISED must be a bool"):
+            manager.subscribe("UNIT_TEST_INVALID_VECTORISED_MODEL", model, {"A": 1}, VECTORISED=1)
 
     def test_subscription_rejects_duplicate_model_names(self):
         manager = ModelManager()
@@ -77,10 +106,10 @@ class TestModelManager(unittest.TestCase):
         def model(x, A):
             return A * x
 
-        manager.subscribe("UNIT_TEST_DUPLICATE_MODEL", model, {"A": 1})
+        manager.subscribe("UNIT_TEST_DUPLICATE_MODEL", model, {"A": 1}, VECTORISED=False)
 
         with self.assertRaisesRegex(ValueError, "already subscribed"):
-            manager.subscribe("UNIT_TEST_DUPLICATE_MODEL", model, {"A": 1})
+            manager.subscribe("UNIT_TEST_DUPLICATE_MODEL", model, {"A": 1}, VECTORISED=False)
 
     def test_subscription_rejects_unknown_shared_parameters(self):
         manager = ModelManager()
@@ -89,7 +118,7 @@ class TestModelManager(unittest.TestCase):
             return A * x
 
         with self.assertRaisesRegex(ValueError, "not in the default parameters"):
-            manager.subscribe("UNIT_TEST_INVALID_SHARED_MODEL", model, {"A": 1}, ("missing",))
+            manager.subscribe("UNIT_TEST_INVALID_SHARED_MODEL", model, {"A": 1}, ("missing",), VECTORISED=False)
 
     def test_subscription_requires_an_unshared_amplitude_parameter(self):
         manager = ModelManager()
@@ -98,19 +127,19 @@ class TestModelManager(unittest.TestCase):
             return x / scale
 
         with self.assertRaisesRegex(ValueError, "include an 'A' amplitude parameter"):
-            manager.subscribe("UNIT_TEST_NO_AMPLITUDE_MODEL", model_without_amplitude, {"scale": 1})
+            manager.subscribe("UNIT_TEST_NO_AMPLITUDE_MODEL", model_without_amplitude, {"scale": 1}, VECTORISED=False)
 
         def model_with_shared_amplitude(x, A):
             return A * x
 
         with self.assertRaisesRegex(ValueError, "cannot be shared"):
-            manager.subscribe("UNIT_TEST_SHARED_AMPLITUDE_MODEL", model_with_shared_amplitude, {"A": 1}, ("A",))
+            manager.subscribe("UNIT_TEST_SHARED_AMPLITUDE_MODEL", model_with_shared_amplitude, {"A": 1}, ("A",), VECTORISED=False)
 
     def test_custom_model_uses_registry_and_skips_mantid_fit(self):
         def custom_model(x, A):
             return A * x
 
-        model_name = model_manager.subscribe("UNIT_TEST_MINUIT_ONLY_MODEL", custom_model, {"A": 1})
+        model_name = model_manager.subscribe("UNIT_TEST_MINUIT_ONLY_MODEL", custom_model, {"A": 1}, VECTORISED=False)
         self.addCleanup(model_manager._models.pop, model_name, None)
 
         model, parameters, shared_parameters = selectModelAndPars(model_name)

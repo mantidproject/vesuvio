@@ -23,7 +23,7 @@ class TestGlobalFitBuilder(unittest.TestCase):
         self.data_e = np.full_like(self.data_y, 0.01)
         self.initial = {"A": 1.5, "x0": 0.0, "sigma": 4.0}
 
-    def build(self, data_y=None, data_e=None):
+    def build(self, data_y=None, data_e=None, VECTORISED=False):
         return GlobalFitBuilder(
             self.data_x,
             self.data_y if data_y is None else data_y,
@@ -32,6 +32,7 @@ class TestGlobalFitBuilder(unittest.TestCase):
             gauss,
             self.initial,
             ["sigma"],
+            VECTORISED=VECTORISED,
         )
 
     def test_parameter_layout(self):
@@ -47,7 +48,7 @@ class TestGlobalFitBuilder(unittest.TestCase):
         self.assertEqual(params_dict["sigma"], 0.0)
         np.testing.assert_array_equal(params_dict["y"], [1.0, 2.0, 3.0])
 
-    def test_convolution_matches_row_by_row(self):
+    def test_convolution_matches_row_by_row_direct_convolution(self):
         from scipy import signal
 
         builder = self.build()
@@ -55,8 +56,29 @@ class TestGlobalFitBuilder(unittest.TestCase):
         expected = []
         for i in range(self.n_spectra):
             model_y = gauss(self.data_x[i], 1.5, 0.0, 4.0)
-            expected.append(signal.convolve(model_y, builder._res_dense[i], mode="same") * builder._x_delta[i, 0])
+            expected.append(
+                signal.convolve(model_y, builder._res_dense[i], mode="same", method="direct") * builder._x_delta[i, 0]
+            )
         np.testing.assert_allclose(builder.convolved_model(vector), np.array(expected), atol=1e-10)
+
+    def test_cached_convolution_matches_fftconvolve_for_even_and_odd_lengths(self):
+        from scipy import signal
+
+        for n_points in (80, 81):
+            x = np.tile(np.linspace(-20, 20, n_points), (self.n_spectra, 1))
+            resolution = np.array([gauss(row, 1.0, 0.0, sigma) for row, sigma in zip(x, (0.8, 1.0, 1.2))])
+            builder = GlobalFitBuilder(
+                x,
+                np.zeros_like(x),
+                np.ones_like(x),
+                resolution,
+                gauss,
+                self.initial,
+            )
+            model_y = np.array([gauss(row, amplitude, 0.0, 4.0) for row, amplitude in zip(x, self.amplitudes)])
+            expected = signal.fftconvolve(model_y, builder._res_dense, mode="same", axes=1) * builder._x_delta
+
+            np.testing.assert_allclose(builder._convolve(model_y), expected, rtol=2e-13, atol=2e-13)
 
     def test_evaluate_rows_preserves_background_and_excludes_it_from_model(self):
         builder = self.build()
@@ -66,6 +88,16 @@ class TestGlobalFitBuilder(unittest.TestCase):
         np.testing.assert_array_equal(params_dict["y"], [1.0, 2.0, 3.0])
         for i in range(self.n_spectra):
             np.testing.assert_allclose(rows[i], gauss(self.data_x[i], 1.5, 0.0, 4.0))
+
+    def test_evaluate_rows_vectorises_x_and_row_parameters(self):
+        builder = self.build(VECTORISED=True)
+        params_dict = builder.unpack(builder.initial_vector())
+        params_dict["A"][:] = self.amplitudes
+
+        rows = builder._evaluate_rows(params_dict)
+
+        for i in range(self.n_spectra):
+            np.testing.assert_allclose(rows[i], gauss(self.data_x[i], self.amplitudes[i], 0.0, 4.0))
 
     def test_cost_is_zero_at_true_parameters(self):
         builder = self.build()
@@ -145,9 +177,7 @@ class TestGlobalFitBuilder(unittest.TestCase):
         def model(x, fse_intensity):
             return np.full_like(x, fse_intensity)
 
-        builder = GlobalFitBuilder(
-            self.data_x, self.data_y, self.data_e, self.res_y, model, {"fse_intensity": -2.0}, ["fse_intensity"]
-        )
+        builder = GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, model, {"fse_intensity": -2.0}, ["fse_intensity"])
         vector = builder.initial_vector()
         names, values, errors = builder.reporting_parameters(vector, np.eye(vector.size))
         self.assertEqual(names[0], "fse_intensity")
@@ -168,15 +198,17 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
         self.true_fse_intensity = 3.0
         self.true_width = (3 * self.true_fse_intensity) ** 0.25
         self.amplitudes = [1.0, 2.0, 3.0]
+
         def deriv3(a):
             return a * (3 * x / self.sigma**4 - x**3 / self.sigma**6) * gauss(x, 1, 0, self.sigma)
+
         # Analytical third derivative of the gaussian
         self.expected_fse = np.array([-self.true_fse_intensity * deriv3(a) for a in self.amplitudes])
         data = np.array([gauss(x, a, 0, self.sigma) for a in self.amplitudes]) + self.expected_fse
         self.data_y = np.array([np.convolve(row, self.res_y[0], mode="same") * (x[1] - x[0]) for row in data])
         self.data_e = np.full_like(self.data_y, 0.001)
 
-    def build(self, shared, width_initial=1.0, q=None, model_width_parameter=None):
+    def build(self, shared, width_initial=1.0, q=None, model_width_parameter=None, VECTORISED=False):
         initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma}
         if model_width_parameter is None:
             initial[FSE_INTENSITY_PARAMETER] = width_initial**4 / 3
@@ -192,6 +224,18 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
             shared,
             q=q,
             model_width_parameter=model_width_parameter,
+            VECTORISED=VECTORISED,
+        )
+
+    def test_vectorised_fse_cost_matches_sequential(self):
+        sequential = self.build(["sigma", "fse_width"])
+        vectorised = self.build(["sigma", "fse_width"], VECTORISED=True)
+
+        np.testing.assert_allclose(
+            vectorised.cost_function(vectorised.initial_vector()),
+            sequential.cost_function(sequential.initial_vector()),
+            rtol=1e-14,
+            atol=1e-14,
         )
 
     def test_fse_term_is_third_derivative_of_model(self):
@@ -227,14 +271,18 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "q is required"):
             GlobalFitWithFSEBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, ["sigma"])
         with self.assertRaisesRegex(ValueError, "q must have the same shape"):
-            GlobalFitWithFSEBuilder(
-                self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, ["sigma"], self.data_y[:, :-1]
-            )
+            GlobalFitWithFSEBuilder(self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, ["sigma"], self.data_y[:, :-1])
         tied_initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma}
         with self.assertRaisesRegex(ValueError, "q is required"):
             GlobalFitWithFSEBuilder(
-                self.data_x, self.data_y, self.data_e, self.res_y, gauss, tied_initial,
-                ["sigma"], model_width_parameter="sigma",
+                self.data_x,
+                self.data_y,
+                self.data_e,
+                self.res_y,
+                gauss,
+                tied_initial,
+                ["sigma"],
+                model_width_parameter="sigma",
             )
 
     def test_fse_requires_enough_points(self):
@@ -253,8 +301,13 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
     def test_fit_is_model_plus_convolved_fse_and_background(self):
         builder = self.build(["sigma", "fse_width"])
         without = GlobalFitBuilder(
-            self.data_x, self.data_y, self.data_e, self.res_y, gauss,
-            {"A": 1.5, "x0": 0.0, "sigma": self.sigma}, ["sigma"],
+            self.data_x,
+            self.data_y,
+            self.data_e,
+            self.res_y,
+            gauss,
+            {"A": 1.5, "x0": 0.0, "sigma": self.sigma},
+            ["sigma"],
         )
         vector = builder.initial_vector()
         base_vector = without.initial_vector()
@@ -303,17 +356,29 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
                 initial = {"A": 1.5, "x0": 0.0, "sigma": self.sigma, FSE_INTENSITY_PARAMETER: 1.0}
                 shared = ["sigma"] + ([FSE_INTENSITY_PARAMETER] if is_shared else [])
                 builder = GlobalFitWithFSEBuilder(
-                    self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, shared,
-                    q=np.ones_like(self.data_y), model_width_parameter="sigma",
+                    self.data_x,
+                    self.data_y,
+                    self.data_e,
+                    self.res_y,
+                    gauss,
+                    initial,
+                    shared,
+                    q=np.ones_like(self.data_y),
+                    model_width_parameter="sigma",
                 )
                 reference = GlobalFitWithFSEBuilder(
-                    self.data_x, self.data_y, self.data_e, self.res_y, gauss, initial, shared,
+                    self.data_x,
+                    self.data_y,
+                    self.data_e,
+                    self.res_y,
+                    gauss,
+                    initial,
+                    shared,
                     q=np.ones_like(self.data_y),
                 )
                 vector = builder.initial_vector()
                 intensity_names = (
-                    [FSE_INTENSITY_PARAMETER] if is_shared
-                    else [f"{FSE_INTENSITY_PARAMETER}{i}" for i in range(self.n_spectra)]
+                    [FSE_INTENSITY_PARAMETER] if is_shared else [f"{FSE_INTENSITY_PARAMETER}{i}" for i in range(self.n_spectra)]
                 )
                 for i, name in enumerate(intensity_names):
                     vector[builder.parameter_names.index(name)] = i + 2.0
@@ -357,8 +422,13 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
             return np.full_like(x, fse_intensity_extra)
 
         builder = GlobalFitWithFSEBuilder(
-            self.data_x, self.data_y, self.data_e, self.res_y, model,
-            {"fse_intensity_extra": -2.0, FSE_INTENSITY_PARAMETER: 1.0}, ["fse_intensity_extra"],
+            self.data_x,
+            self.data_y,
+            self.data_e,
+            self.res_y,
+            model,
+            {"fse_intensity_extra": -2.0, FSE_INTENSITY_PARAMETER: 1.0},
+            ["fse_intensity_extra"],
             np.ones_like(self.data_y),
         )
         vector = builder.initial_vector()

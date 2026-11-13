@@ -1,4 +1,9 @@
-"""Default model definitions; add custom subscriptions in register_fitting_models."""
+"""Default model definitions; add custom subscriptions in register_fitting_models.
+
+Set ``VECTORISED=True`` when subscribing a model that accepts 2D ``x`` arrays
+and row-wise parameters shaped as ``(n_rows, 1)``. Set it to ``False`` for
+models that must be evaluated one row at a time.
+"""
 
 import numpy as np
 
@@ -150,25 +155,29 @@ def register_fitting_models() -> None:
     if _registered:
         return
 
-    model_manager.subscribe("GAUSS", _gauss, {"A": 1, "x0": 0, "sigma": 5}, ("sigma",))
-    model_manager.subscribe("GAUSS_CNTR", _gauss_cntr, {"A": 1, "sigma": 5}, ("sigma",))
+    model_manager.subscribe("GAUSS", _gauss, {"A": 1, "x0": 0, "sigma": 5}, ("sigma",), VECTORISED=True)
+    model_manager.subscribe("GAUSS_CNTR", _gauss_cntr, {"A": 1, "sigma": 5}, ("sigma",), VECTORISED=True)
     model_manager.subscribe(
         "GCC4C6",
         _gcc4c6,
         {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0},
         ("sigma1", "c4", "c6"),
+        VECTORISED=True,
     )
-    model_manager.subscribe("GCC4C6_CNTR", _gcc4c6_cntr, {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}, ("sigma1", "c4", "c6"))
-    model_manager.subscribe("GCC4", _gcc4, {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}, ("sigma1", "c4"))
-    model_manager.subscribe("GCC4_CNTR", _gcc4_cntr, {"A": 1, "sigma1": 6, "c4": 0}, ("sigma1", "c4"))
-    model_manager.subscribe("GCC6", _gcc6, {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}, ("sigma1", "c6"))
-    model_manager.subscribe("GCC6_CNTR", _gcc6_cntr, {"A": 1, "sigma1": 6, "c6": 0}, ("sigma1", "c6"))
+    model_manager.subscribe("GCC4C6_CNTR", _gcc4c6_cntr, {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}, ("sigma1", "c4", "c6"), VECTORISED=True)
+    model_manager.subscribe("GCC4", _gcc4, {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}, ("sigma1", "c4"), VECTORISED=True)
+    model_manager.subscribe("GCC4_CNTR", _gcc4_cntr, {"A": 1, "sigma1": 6, "c4": 0}, ("sigma1", "c4"), VECTORISED=True)
+    model_manager.subscribe("GCC6", _gcc6, {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}, ("sigma1", "c6"), VECTORISED=True)
+    model_manager.subscribe("GCC6_CNTR", _gcc6_cntr, {"A": 1, "sigma1": 6, "c6": 0}, ("sigma1", "c6"), VECTORISED=True)
     model_manager.subscribe(
         "DOUBLEWELL",
         _doublewell,
         {"A": 1, "d": 1, "R": 1, "sig1": 3, "sig2": 5},
         ("d", "R", "sig1", "sig2"),
+        VECTORISED=False,
     )
-    model_manager.subscribe("GAUSS2D", _gauss2d, {"A": 1, "sig1": 3, "sig2": 5}, ("sig1", "sig2"))
-    model_manager.subscribe("GAUSS3D", _gauss3d, {"A": 1, "sig_x": 5, "sig_y": 5, "sig_z": 5}, ("sig_x", "sig_y", "sig_z"))
+    model_manager.subscribe("GAUSS2D", _gauss2d, {"A": 1, "sig1": 3, "sig2": 5}, ("sig1", "sig2"), VECTORISED=False)
+    model_manager.subscribe(
+        "GAUSS3D", _gauss3d, {"A": 1, "sig_x": 5, "sig_y": 5, "sig_z": 5}, ("sig_x", "sig_y", "sig_z"), VECTORISED=False
+    )
     _registered = True

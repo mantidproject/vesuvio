@@ -9,6 +9,7 @@ class FittingModel:
     function: Callable[..., Any]
     default_parameters: Mapping[str, Any]
     shared_parameters: tuple[str, ...]
+    VECTORISED: bool
 
     def parameter(self, name: str) -> Any:
         """Return a model parameter's default value, raising if it is not defined."""
@@ -29,10 +30,14 @@ class ModelManager:
         function: Callable[..., Any],
         default_parameters: Mapping[str, Any],
         shared_parameters: Sequence[str] = (),
+        *,
+        VECTORISED: bool,
     ) -> str:
-        """Register a string-named model with x first, an A amplitude, ordered defaults, and shared parameters last."""
+        """Register a model; VECTORISED indicates whether it accepts 2D x and row-wise parameters."""
         if not callable(function):
             raise TypeError("Fitting model must be callable.")
+        if not isinstance(VECTORISED, bool):
+            raise TypeError("VECTORISED must be a bool.")
         if not isinstance(name, str):
             raise TypeError("Fitting model name must be a string.")
         if not name.strip():
@@ -70,7 +75,7 @@ class ModelManager:
         if shared and model_parameter_names[-len(shared) :] != list(shared):
             raise ValueError("Shared parameters must be the final model parameters.")
 
-        self._models[name] = FittingModel(function, parameters, shared)
+        self._models[name] = FittingModel(function, parameters, shared, VECTORISED)
         return name
 
     def name(self, model_name: str) -> str:
@@ -84,7 +89,7 @@ class ModelManager:
     def get_model(self, model_name: str) -> FittingModel:
         self.name(model_name)
         model = self._models[model_name]
-        return FittingModel(model.function, dict(model.default_parameters), model.shared_parameters)
+        return FittingModel(model.function, dict(model.default_parameters), model.shared_parameters, model.VECTORISED)
 
     def has_model(self, model_name: str) -> bool:
         return model_name in self._models

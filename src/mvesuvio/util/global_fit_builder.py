@@ -3,7 +3,7 @@ from typing import Any
 
 import jacobi
 import numpy as np
-from scipy import signal
+from scipy import fft
 
 from mvesuvio.util.analysis_helpers import numerical_third_derivative
 
@@ -21,7 +21,8 @@ class GlobalFitBuilder:
     parameters (plus a ``y`` constant background) are fitted independently for each row.
     The parameter vector is laid out as the shared parameters, followed by, for each unshared
     parameter, one value per row. The model is convolved with the resolution of each row before
-    being compared to the data.
+    being compared to the data. ``VECTORISED`` selects models that accept 2D x arrays and
+    row-wise parameters shaped as ``(n_rows, 1)``.
 
     """
 
@@ -34,12 +35,16 @@ class GlobalFitBuilder:
         model: Callable[..., Any],
         initial_params: Mapping[str, float],
         shared_params: Iterable[str] = (),
+        VECTORISED: bool = False,
     ) -> None:
         self.data_x = np.asarray(data_x, dtype=float)
         self.data_y = np.asarray(data_y, dtype=float)
         self.data_e = np.asarray(data_e, dtype=float)
         self.res_y = np.asarray(res_y, dtype=float)
         self.model = model
+        if not isinstance(VECTORISED, bool):
+            raise TypeError("VECTORISED must be a bool.")
+        self.VECTORISED = VECTORISED
         self.initial_params = dict(initial_params)
         self.shared_params = tuple(shared_params)
         self._validate_inputs()
@@ -51,6 +56,10 @@ class GlobalFitBuilder:
         grids = [self._build_convolution_grid(x, res) for x, res in zip(self.data_x, self.res_y)]
         self._x_delta = np.array([delta for delta, _ in grids])[:, np.newaxis]
         self._res_dense = np.stack([res for _, res in grids])
+        self._convolution_full_length = self.data_x.shape[1] + self._res_dense.shape[1] - 1
+        self._convolution_fft_length = fft.next_fast_len(self._convolution_full_length, real=True)
+        self._convolution_same_start = (self._res_dense.shape[1] - 1) // 2
+        self._res_fft = fft.rfft(self._res_dense, n=self._convolution_fft_length, axis=1)
         self._safe_e = np.where(self.valid, self.data_e, 1.0)
         self._safe_y = np.where(self.valid, self.data_y, 0.0)
 
@@ -118,20 +127,31 @@ class GlobalFitBuilder:
 
     def _evaluate_rows(self, params_dict: dict[str, Any]) -> np.ndarray:
         """Evaluate the model for every row, before convolution."""
-        # The model is evaluated per row because not all models accept array parameters
         # Background is added after convolution; keep it in params_dict for the caller.
+        model_params = {name: value for name, value in params_dict.items() if name != BACKGROUND_PARAMETER}
+        if self.VECTORISED:
+            row_parameters = {name: np.asarray(value)[:, np.newaxis] if np.ndim(value) else value for name, value in model_params.items()}
+            return self.model(self.data_x, **row_parameters)
+
         return np.stack(
             [
                 self.model(
                     x,
-                    **{name: value[i] if np.ndim(value) else value for name, value in params_dict.items() if name != BACKGROUND_PARAMETER},
+                    **{name: value[i] if np.ndim(value) else value for name, value in model_params.items()},
                 )
                 for i, x in enumerate(self.data_x)
             ]
         )
 
     def _convolve(self, model_y: np.ndarray) -> np.ndarray:
-        return signal.fftconvolve(model_y, self._res_dense, mode="same", axes=1) * self._x_delta
+        # Reuse the fixed resolution FFT, then crop the inverse transform to "same" length.
+        # This cached-FFT path was fastest in a benchmarked 132x161 workload.
+        model_fft = fft.rfft(model_y, n=self._convolution_fft_length, axis=1)
+        full = fft.irfft(model_fft * self._res_fft, n=self._convolution_fft_length, axis=1)
+        full = full[:, : self._convolution_full_length]
+        start = self._convolution_same_start
+        convolved = full[:, start : start + self.data_x.shape[1]]
+        return convolved * self._x_delta
 
     def convolved_model(self, params_vector: np.ndarray) -> np.ndarray:
         """Model of every row convolved with its resolution, as an array shaped like data_y."""
@@ -211,10 +231,13 @@ class GlobalFitWithFSEBuilder(GlobalFitBuilder):
         shared_params: Iterable[str] = (),
         q: np.ndarray | None = None,
         model_width_parameter: str | None = None,
+        VECTORISED: bool = False,
     ) -> None:
         self.q = None if q is None else np.asarray(q, dtype=float)
         self.model_width_parameter = model_width_parameter
-        super().__init__(data_x, data_y, data_e, res_y, model, initial_params, shared_params)
+        super().__init__(data_x, data_y, data_e, res_y, model, initial_params, shared_params, VECTORISED=VECTORISED)
+        spacing = self.data_x[:, 7:-5] - self.data_x[:, 6:-6]
+        self._third_derivative_scale = 1.0 / (np.power(spacing, 3) * 12**3)
         assert self.q is not None  # Validated by _validate_inputs.
         # Bins where q is zero or not finite get no FSE term.
         usable_q = np.isfinite(self.q) & (self.q != 0)
@@ -274,7 +297,7 @@ class GlobalFitWithFSEBuilder(GlobalFitBuilder):
         # The edges are left at zero, where the third derivative is not defined.
         third_derivative = np.zeros_like(model_y)
         edge = THIRD_DERIVATIVE_EDGE
-        third_derivative[:, edge:-edge] = numerical_third_derivative(self.data_x, model_y)
+        third_derivative[:, edge:-edge] = numerical_third_derivative(self.data_x, model_y, self._third_derivative_scale)
         intensity = np.reshape(intensity, (-1, 1)) if np.ndim(intensity) else intensity
         return model_y, -intensity * third_derivative * self._inverse_q
 
