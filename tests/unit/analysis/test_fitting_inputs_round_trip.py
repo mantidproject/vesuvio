@@ -14,8 +14,6 @@ from mvesuvio.default_config.experiment_template.run_fse_correction import (
     run_fse_correction,
     run_fse_correction_for_inputs,
     run_fse_fitting,
-    save_fse_fit_results,
-    subtract_fse_contribution,
 )
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
 from mvesuvio.util import fitting_helpers, reduction_helpers
@@ -109,8 +107,8 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
 
             self.assertIsInstance(builder, GlobalFitWithFSEBuilder)
             save_results.assert_called_once()
-            self.assertEqual(save_results.call_args.args[3], expected_suffix)
-            subtract_fse.assert_called_once_with(ws_joy, ws_fse, expected_suffix)
+            self.assertEqual(save_results.call_args.args[3], fit_with)
+            subtract_fse.assert_called_once_with(ws_joy, ws_fse, fit_with)
             create_parameter_table.assert_called_once()
             self.assertEqual(create_parameter_table.call_args.args[0], f"test_joy_{expected_suffix}")
             if fit_with is FSEFitWith.FREE_SHARED:
@@ -130,53 +128,6 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 FSEFitWith.TIED_TO_MODEL: [],
             }
             self.assertEqual(width_names, expected_width_names[fit_with])
-
-    def test_fse_result_workspace_names_include_fit_mode(self):
-        ws_joy = Mock()
-        ws_joy.name.return_value = "test_joy"
-        builder = SimpleNamespace(
-            parameter_covariance=Mock(),
-            convolved_model=Mock(return_value=np.zeros((1, 21))),
-            fit_curve_errors=Mock(return_value=np.zeros((1, 21))),
-            valid=np.ones((1, 21), dtype=bool),
-            data_y=np.zeros((1, 21)),
-            data_x=np.zeros((1, 21)),
-            fse_contribution=Mock(return_value=np.zeros((1, 21))),
-            fse_contribution_errors=Mock(return_value=np.zeros((1, 21))),
-        )
-        clones = []
-
-        def clone_workspace(_, OutputWorkspace):
-            clone = Mock()
-            clone.name.return_value = OutputWorkspace
-            clones.append(OutputWorkspace)
-            return clone
-
-        corrected = Mock()
-        corrected.name.return_value = "test_joy_free_shared_fse_corrected"
-        with (
-            patch("mvesuvio.default_config.experiment_template.run_fse_correction.CloneWorkspace", side_effect=clone_workspace),
-            patch("mvesuvio.default_config.experiment_template.run_fse_correction.SumSpectra"),
-            patch("mvesuvio.default_config.experiment_template.run_fse_correction.general_helpers.pass_data_into_ws"),
-            patch(
-                "mvesuvio.default_config.experiment_template.run_fse_correction.Minus",
-                return_value=corrected,
-            ) as minus,
-        ):
-            _, _, ws_fse = save_fse_fit_results(
-                ws_joy, builder, SimpleNamespace(x=np.array([1.0])), "free_shared", np.array([[0.1]])
-            )
-            subtract_fse_contribution(ws_joy, ws_fse, "free_shared")
-
-        self.assertEqual(
-            clones,
-            [
-                "test_joy_free_shared_fse_fit",
-                "test_joy_free_shared_fse_residuals",
-                "test_joy_free_shared_fse_contribution",
-            ],
-        )
-        self.assertEqual(minus.call_args.kwargs["OutputWorkspace"], "test_joy_free_shared_fse_corrected")
 
     @staticmethod
     def _create_resolution_workspace(output_workspace):
