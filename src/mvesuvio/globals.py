@@ -1,6 +1,32 @@
 from enum import StrEnum
 
 
+RESOLUTION_WORKSPACE_SUFFIX = "_ws_resolution"
+JOY_WORKSPACE_SUFFIX = "_joy"
+JOY_AVG_WORKSPACE_SUFFIX = "_joy_avg"
+Q_WORKSPACE_SUFFIX = "_q"
+REBIN_WORKSPACE_SUFFIX = "_rebin"
+CORRECTED_WORKSPACE_SUFFIX = "_corr"
+
+SUM_WORKSPACE_SUFFIX = "_sum"
+FSE_FIT_WORKSPACE_SUFFIX = "_fse_fit"
+FSE_RESIDUALS_WORKSPACE_SUFFIX = "_fse_residuals"
+FSE_CONTRIBUTION_WORKSPACE_SUFFIX = "_fse_contribution"
+
+
+class FSEFitWith(StrEnum):
+    FREE_SHARED = "FREE_SHARED"
+    FREE_UNSHARED = "FREE_UNSHARED"
+    TIED_TO_MODEL = "TIED_TO_MODEL"
+
+
+WORKSPACE_FSE_SUFFIX = {
+    FSEFitWith.FREE_SHARED: "free_shared",
+    FSEFitWith.FREE_UNSHARED: "free_unshared",
+    FSEFitWith.TIED_TO_MODEL: "tied",
+}
+
+
 class Tags(StrEnum):
     BACKWARD = "back"
     FORWARD = "front"
@@ -9,20 +35,6 @@ class Tags(StrEnum):
 class ScatteringType(StrEnum):
     BACKWARD = "backward"
     FORWARD = "forward"
-
-
-class FitModels(StrEnum):
-    GAUSS = "gauss"
-    GAUSS_CNTR = "gauss_cntr"
-    GCC4 = "gcc4"
-    GCC4_CNTR = "gcc4_cntr"
-    GCC6 = "gcc6"
-    GCC6_CNTR = "gcc6_cntr"
-    GCC4C6 = "gcc4c6"
-    GCC4C6_CNTR = "gcc4c6_cntr"
-    DOUBLEWELL = "doublewell"
-    GAUSS2D = "gauss2d"
-    GAUSS3D = "gauss3d"
 
 
 class Masking(StrEnum):

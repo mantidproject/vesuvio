@@ -53,6 +53,19 @@ class TestAnalysisHelpers(unittest.TestCase):
         numerical_derivative = numerical_third_derivative(x, y)
         expected_derivative = np.array([np.gradient(np.gradient(np.gradient(y_i, x_i), x_i), x_i)[6: -6] for y_i, x_i in zip(y, x) ])
         np.testing.assert_allclose(numerical_derivative, expected_derivative, atol=1e-6)
+        spacing = x[:, 7:-5] - x[:, 6:-6]
+        cached_scale = 1.0 / (np.power(spacing, 3) * 12**3)
+        np.testing.assert_allclose(numerical_third_derivative(x, y, cached_scale), numerical_derivative)
+
+    def test_numerical_third_derivative_matches_scipy_for_2d_input(self):
+        from scipy.interpolate import CubicSpline
+
+        x_row = np.linspace(-1, 1, 100)
+        x = np.vstack([x_row, 2 * x_row])
+        y = x**3
+        expected = np.array([CubicSpline(row_x, row_y).derivative(3)(row_x)[6:-6] for row_x, row_y in zip(x, y)])
+
+        np.testing.assert_allclose(numerical_third_derivative(x, y), expected, atol=1e-10)
 
 
     def test_make_gamma_correction_input_string(self):

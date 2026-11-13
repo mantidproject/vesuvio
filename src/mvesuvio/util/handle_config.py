@@ -6,11 +6,16 @@ USER_CONFIG_PATH = Path.home() / "mvesuvio"
 VESUVIO_PROPERTIES_PATH = PACKAGE_CONFIG_PATH / "vesuvio.user.properties"
 PLOTS_CONFIG_PATH = PACKAGE_CONFIG_PATH / "vesuvio.plots.mplstyle"
 
-COPY_IF_NOT_PRESENT = {"ip_files": "dir", "experiment_template/script_to_create_figures.py": "file", "vesuvio.plots.mplstyle": "file"}
+COPY_IF_NOT_PRESENT = {
+    "ip_files": "dir",
+    "experiment_template/script_to_create_figures.py": "file",
+    "vesuvio.plots.mplstyle": "file",
+}
 
 ALWAYS_COPY = {
     "experiment_template/run_reduction.py": "file",
     "experiment_template/run_fitting.py": "file",
+    "experiment_template/run_fse_correction.py": "file",
 }
 
 
