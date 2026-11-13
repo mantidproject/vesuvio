@@ -108,7 +108,7 @@ class BackwardAnalysisInputs:
     constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[0] - RECOIL_WEIGHT["O"] * par[3])}
 
     number_of_iterations_for_corrections = 0  # 4
-    # Y-space reduction is performed at the end of reduction and its outputs are used by run_fitting.py
+    # Y-space reduction is performed at the end of reduction and its outputs are used by run_fse_correction.py
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     subtract_calculated_fse_from_data = False
     do_symmetrisation = False
@@ -169,7 +169,7 @@ class ForwardAnalysisInputs:
     constraints = {"type": "eq", "fun": lambda par: (RECOIL_WEIGHT["C"] * par[3] - RECOIL_WEIGHT["O"] * par[6])}
 
     number_of_iterations_for_corrections = 1  # 4
-    # Y-space reduction is performed at the end of reduction and its outputs are used by run_fitting.py
+    # Y-space reduction is performed at the end of reduction and its outputs are used by run_fse_correction.py
     range_for_rebinning_in_y_space = "-25, 0.5, 25"  # Needs to be symetric, usually bounds = 10 x lowest mass (a.m.u.)
     subtract_calculated_fse_from_data = False
     do_symmetrisation = False

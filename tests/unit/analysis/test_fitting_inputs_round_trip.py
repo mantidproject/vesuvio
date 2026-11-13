@@ -4,18 +4,18 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 import numpy as np
-from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace, mtd
 
 from mvesuvio.default_config.experiment_template.run_fitting import load_saved_fitting_input_workspaces
 from mvesuvio.default_config.experiment_template.run_fse_correction import (
     BackwardFSEFittingInputs,
     ForwardFSEFittingInputs,
-    FSEFitWith,
     run_fse_correction,
     run_fse_correction_for_inputs,
     run_fse_fitting,
 )
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
+from mvesuvio.globals import FSEFitWith, WORKSPACE_FSE_SUFFIX
 from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitWithFSEBuilder
@@ -23,14 +23,14 @@ from mvesuvio.util.model_manager import model_manager
 
 
 class TestFittingInputsRoundTrip(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.output_dir = tempfile.TemporaryDirectory()
-        FilesManager.set_experiment_dir(cls.output_dir.name)
+    def setUp(self):
+        self.output_dir = tempfile.TemporaryDirectory()
+        FilesManager.set_experiment_dir(self.output_dir.name)
         AnalysisDataService.clear()
 
     def tearDown(self):
         AnalysisDataService.clear()
+        FilesManager._experiment_dir = None
         self.output_dir.cleanup()
 
     def test_fse_fitting_inputs_override_routine_and_fse_settings(self):
@@ -54,7 +54,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertEqual(BackwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
         self.assertEqual(ForwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
         self.assertEqual(BackwardFSEFittingInputs.fit_fse_with, FSEFitWith.FREE_SHARED)
-        self.assertEqual(ForwardFSEFittingInputs.fit_fse_with, FSEFitWith.FREE_SHARED)
+        self.assertEqual(ForwardFSEFittingInputs.fit_fse_with, FSEFitWith.TIED_TO_MODEL)
         for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):
             self.assertGreater(fitting_inputs.initial_fse_width, 0)
             self.assertEqual(fitting_inputs.tie_fse_width_to_model_param, "sigma")
@@ -76,12 +76,12 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 FSEFitWith.FREE_UNSHARED: "free_unshared",
                 FSEFitWith.TIED_TO_MODEL: "tied",
             }[fit_with]
-            fitting_inputs = SimpleNamespace(
-                fitting_model="GAUSS",
-                fit_fse_with=fit_with,
-                initial_fse_width=1.0,
-                tie_fse_width_to_model_param="sigma",
-            )
+            self.assertEqual(WORKSPACE_FSE_SUFFIX[fit_with], expected_suffix)
+            class FittingInputs(ForwardFSEFittingInputs):
+                fitting_model = "GAUSS"
+                fit_fse_with = fit_with
+                initial_fse_width = 1.0
+                tie_fse_width_to_model_param = "sigma"
             with (
                 patch(
                     "mvesuvio.default_config.experiment_template.run_fse_correction.extractWS",
@@ -103,12 +103,12 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                     "fitting_helpers.create_table_for_fse_fit_parameters"
                 ) as create_parameter_table,
             ):
-                builder, _ = run_fse_fitting(ws_resolution, ws_joy, ws_q, fitting_inputs)
+                builder, _ = run_fse_fitting(ws_resolution, ws_joy, ws_q, FittingInputs, "test_corr_joy")
 
             self.assertIsInstance(builder, GlobalFitWithFSEBuilder)
             save_results.assert_called_once()
             self.assertEqual(save_results.call_args.args[3], fit_with)
-            subtract_fse.assert_called_once_with(ws_joy, ws_fse, fit_with)
+            subtract_fse.assert_called_once_with(ws_joy, ws_fse, "test_corr_joy")
             create_parameter_table.assert_called_once()
             self.assertEqual(create_parameter_table.call_args.args[0], f"test_joy_{expected_suffix}")
             if fit_with is FSEFitWith.FREE_SHARED:
@@ -195,46 +195,89 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertEqual(resolution_mock.call_args.kwargs["Workspace"].name(), ws_name)
 
         AnalysisDataService.clear()
-        self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_ws_resolution.nxs").exists())
-        self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_joy.nxs").exists())
-        self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_joy_avg.nxs").exists())
-        self.assertTrue((FilesManager.get_fitting_inputs_dir() / f"{ws_name}_q.nxs").exists())
-        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_ws_resolution.nxs").exists())
-        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_joy.nxs").exists())
-        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_joy_avg.nxs").exists())
-        self.assertTrue((FilesManager.get_fse_correction_inputs_dir() / f"{ws_name}_q.nxs").exists())
+        self.assertFalse((FilesManager.get_experiment_dir() / "fitting_inputs").exists())
+        self.assertFalse((FilesManager.get_experiment_dir() / "fse_correction_inputs").exists())
+        reduction_outputs = FilesManager.get_reduction_outputs_dir()
+        self.assertTrue((reduction_outputs / f"{ws_name}_ws_resolution.nxs").exists())
+        self.assertTrue((reduction_outputs / f"{ws_name}_joy.nxs").exists())
+        self.assertTrue((reduction_outputs / f"{ws_name}_joy_avg.nxs").exists())
+        self.assertTrue((reduction_outputs / f"{ws_name}_q.nxs").exists())
+        (reduction_outputs / f"{ws_name}.nxs").write_text("not a derived workspace")
 
         load_saved_fitting_input_workspaces()
 
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy"))
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_q"))
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_joy"))
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_q"))
 
         AnalysisDataService.clear()
+        fse_workspace_names = []
+        fse_joy_values = []
         with patch(
             "mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting"
         ) as fse_fitting:
+            def create_corrected_joy(ws_resolution, ws_joy, ws_q, _, output_workspace):
+                fse_workspace_names.append((ws_resolution.name(), ws_joy.name(), ws_q.name()))
+                fse_joy_values.append(ws_joy.extractY().copy())
+                self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+                np.testing.assert_array_equal(mtd[f"{ws_name}_joy_avg"].extractY(), [[1, 2, 3]])
+                self.assertEqual(output_workspace, f"{ws_name}_corr_joy")
+                CreateWorkspace(
+                    DataX=[0, 1, 2],
+                    DataY=[9, 8, 7],
+                    DataE=[1, 1, 1],
+                    NSpec=1,
+                    UnitX="TOF",
+                    OutputWorkspace=output_workspace,
+                )
+
+            fse_fitting.side_effect = create_corrected_joy
+            run_fse_correction()
             run_fse_correction()
 
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy"))
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
-        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_q"))
-        fse_fitting.assert_called_once()
-        resolution_workspace, joy_workspace, q_workspace, _ = fse_fitting.call_args.args
-        self.assertEqual(resolution_workspace.name(), f"{ws_name}_ws_resolution")
-        self.assertEqual(joy_workspace.name(), f"{ws_name}_joy")
-        self.assertEqual(q_workspace.name(), f"{ws_name}_q")
+        output_directory = FilesManager.get_fse_correction_outputs_dir()
+        self.assertEqual(
+            {path.name for path in output_directory.glob("*.nxs")},
+            {f"{ws_name}_corr_ws_resolution.nxs", f"{ws_name}_corr_joy.nxs", f"{ws_name}_corr_joy_avg.nxs"},
+        )
+        self.assertEqual(fse_fitting.call_count, 2)
+        self.assertEqual(fse_workspace_names, [(f"{ws_name}_ws_resolution", f"{ws_name}_joy", f"{ws_name}_q")] * 2)
+        for values in fse_joy_values:
+            np.testing.assert_array_equal(values, [[1, 2, 3]])
+
+        np.testing.assert_array_equal(mtd[f"{ws_name}_joy"].extractY(), [[1, 2, 3]])
+        np.testing.assert_array_equal(mtd[f"{ws_name}_joy_avg"].extractY(), [[1, 2, 3]])
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_joy_tied_fse_corrected"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_corr_ws_resolution"))
+        np.testing.assert_array_equal(mtd[f"{ws_name}_corr_joy"].extractY(), [[9, 8, 7]])
+        np.testing.assert_array_equal(
+            mtd[f"{ws_name}_corr_ws_resolution"].extractY(), mtd[f"{ws_name}_ws_resolution"].extractY()
+        )
+        AnalysisDataService.clear()
+        self.assertEqual(
+            load_saved_fitting_input_workspaces(),
+            {f"{ws_name}_corr_ws_resolution", f"{ws_name}_corr_joy", f"{ws_name}_corr_joy_avg"},
+        )
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_joy"))
+        self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_joy_avg"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_corr_ws_resolution"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_corr_joy"))
+        self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_corr_joy_avg"))
+        np.testing.assert_array_equal(mtd[f"{ws_name}_corr_joy"].extractY(), [[9, 8, 7]])
+        np.testing.assert_array_equal(mtd[f"{ws_name}_corr_joy_avg"].extractY(), [[9, 8, 7]])
 
     def test_fse_correction_runs_for_each_available_candidate(self):
         workspaces = {
             "first_ws_resolution": object(),
             "first_joy": object(),
             "first_q": object(),
+            "first_corr_joy": object(),
             "second_ws_resolution": object(),
             "second_joy": object(),
             "second_q": object(),
+            "second_corr_joy": object(),
         }
         with (
             patch(
@@ -249,13 +292,53 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             patch(
                 "mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting"
             ) as fse_fitting,
+            patch(
+                "mvesuvio.default_config.experiment_template.run_fse_correction.save_corrected_fitting_inputs"
+            ) as save_corrected,
         ):
             run_fse_correction_for_inputs(ForwardFSEFittingInputs)
 
         self.assertEqual(
             fse_fitting.call_args_list,
             [
-                call(workspaces["first_ws_resolution"], workspaces["first_joy"], workspaces["first_q"], ForwardFSEFittingInputs),
-                call(workspaces["second_ws_resolution"], workspaces["second_joy"], workspaces["second_q"], ForwardFSEFittingInputs),
+                call(workspaces["first_ws_resolution"], workspaces["first_joy"], workspaces["first_q"], ForwardFSEFittingInputs, "first_corr_joy"),
+                call(workspaces["second_ws_resolution"], workspaces["second_joy"], workspaces["second_q"], ForwardFSEFittingInputs, "second_corr_joy"),
             ],
         )
+        self.assertEqual(
+            save_corrected.call_args_list,
+            [
+                call("first", workspaces["first_ws_resolution"], workspaces["first_corr_joy"]),
+                call("second", workspaces["second_ws_resolution"], workspaces["second_corr_joy"]),
+            ],
+        )
+        with (
+            patch("mvesuvio.util.general_helpers.get_workspace_name_candidates", return_value=["first"]),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.AnalysisDataService", Mock(doesExist=workspaces.__contains__)),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.mtd", workspaces),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_corrected_fitting_inputs"),
+        ):
+            run_fse_correction_for_inputs(
+                ForwardFSEFittingInputs, {"first_ws_resolution", "first_joy", "first_q"}
+            )
+        fse_fitting.assert_called_once()
+
+    def test_fse_correction_does_not_use_workspaces_missing_from_reduction_outputs(self):
+        for suffix in ("ws_resolution", "joy", "q"):
+            CreateWorkspace(
+                DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, OutputWorkspace=f"front_0_{suffix}"
+            )
+        with (
+            patch.object(ForwardFSEFittingInputs, "name_of_subtracted_workspace", "front"),
+            patch.object(ForwardFSEFittingInputs, "overwrite_analysis_input_workspace", ""),
+            patch.object(ForwardFSEFittingInputs, "number_of_iterations_for_corrections", 0),
+            patch.object(ForwardFSEFittingInputs, "run_this_fitting_type", True),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.logger") as logger,
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.general_helpers.make_summarised_log_file"),
+        ):
+            run_fse_correction()
+
+        fse_fitting.assert_not_called()
+        logger.warning.assert_called_once()

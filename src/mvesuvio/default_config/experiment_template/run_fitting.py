@@ -6,6 +6,7 @@ from mantid.simpleapi import SaveAscii, mtd
 
 from mvesuvio.analysis_fitting import FitInYSpace
 from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
+from mvesuvio.globals import CORRECTED_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, RESOLUTION_WORKSPACE_SUFFIX
 from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.model_manager import model_manager
@@ -84,21 +85,26 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     number_of_global_fit_groups = 4
 
 
-def load_saved_fitting_input_workspaces() -> None:
-    general_helpers.load_saved_fitting_input_workspaces()
+def load_saved_fitting_input_workspaces() -> set[str]:
+    return general_helpers.load_saved_fitting_input_workspaces(
+        FilesManager.get_fse_correction_outputs_dir(), (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX)
+    )
 
 
-def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | type[ForwardFittingInputs]) -> bool:
+def run_y_space_reduction_and_fit(
+    fitting_inputs: type[BackwardFittingInputs] | type[ForwardFittingInputs],
+    available_workspace_names: set[str] | None = None,
+) -> bool:
     ws_name_candidates = general_helpers.get_workspace_name_candidates(fitting_inputs)
 
     for candidate in ws_name_candidates:
-        resolution_name = f"{candidate}_ws_resolution"
-        joy_name = f"{candidate}_joy"
-        joy_avg_name = f"{candidate}_joy_avg"
-        if (
-            AnalysisDataService.doesExist(resolution_name)
-            and AnalysisDataService.doesExist(joy_name)
-            and AnalysisDataService.doesExist(joy_avg_name)
+        candidate += CORRECTED_WORKSPACE_SUFFIX
+        resolution_name = candidate + RESOLUTION_WORKSPACE_SUFFIX
+        joy_name = candidate + JOY_WORKSPACE_SUFFIX
+        joy_avg_name = candidate + JOY_AVG_WORKSPACE_SUFFIX
+        names = (resolution_name, joy_name, joy_avg_name)
+        if (available_workspace_names is None or all(name in available_workspace_names for name in names)) and all(
+            AnalysisDataService.doesExist(name) for name in names
         ):
             fitting_directory = FilesManager.get_fitting_outputs_dir()
             fitting_directory.mkdir(parents=True, exist_ok=True)
@@ -115,18 +121,23 @@ def run_y_space_reduction_and_fit(fitting_inputs: type[BackwardFittingInputs] | 
 
     logger.warning(
         "Could not find expected derived workspaces "
-        + ", ".join(f"({name}_ws_resolution, {name}_joy, {name}_joy_avg)" for name in ws_name_candidates)
+        + ", ".join(
+            f"({name}{CORRECTED_WORKSPACE_SUFFIX}{RESOLUTION_WORKSPACE_SUFFIX}, "
+            f"{name}{CORRECTED_WORKSPACE_SUFFIX}{JOY_WORKSPACE_SUFFIX}, "
+            f"{name}{CORRECTED_WORKSPACE_SUFFIX}{JOY_AVG_WORKSPACE_SUFFIX})"
+            for name in ws_name_candidates
+        )
         + ". Skipping fitting in Y-Space."
     )
     return False
 
 
 def run_fitting() -> None:
-    load_saved_fitting_input_workspaces()
+    available_workspace_names = load_saved_fitting_input_workspaces()
     if BackwardFittingInputs.run_this_fitting_type:
-        run_y_space_reduction_and_fit(BackwardFittingInputs)
+        run_y_space_reduction_and_fit(BackwardFittingInputs, available_workspace_names)
     if ForwardFittingInputs.run_this_fitting_type:
-        run_y_space_reduction_and_fit(ForwardFittingInputs)
+        run_y_space_reduction_and_fit(ForwardFittingInputs, available_workspace_names)
     general_helpers.make_summarised_log_file()
 
 

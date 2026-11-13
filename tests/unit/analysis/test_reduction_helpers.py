@@ -167,8 +167,10 @@ class TestReductionHelpers(unittest.TestCase):
 
             self.mock_y_space_reduction.assert_called_once()
             self.assertEqual(self.mock_y_space_reduction.call_args.args[2:], (12.0, ForwardAnalysisInputs))
-            self.assertEqual(mock_save_nexus.call_count, 8)
-            self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
+            self.assertEqual(mock_save_nexus.call_count, 4)
+            self.assertTrue(FilesManager.get_reduction_outputs_dir().exists())
+            self.assertFalse((FilesManager.get_experiment_dir() / "fitting_inputs").exists())
+            self.assertFalse((FilesManager.get_experiment_dir() / "fse_correction_inputs").exists())
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -203,9 +205,10 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 8)
+            self.assertEqual(mock_save_nexus.call_count, 4)
             saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
             self.assertTrue(all("override_front_0" in path for path in saved_paths))
+            self.assertTrue(all("reduction_outputs" in path for path in saved_paths))
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -237,9 +240,10 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 8)
+            self.assertEqual(mock_save_nexus.call_count, 4)
             saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
             self.assertTrue(all("front_subtracted_0" in path for path in saved_paths))
+            self.assertTrue(all("reduction_outputs" in path for path in saved_paths))
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -253,7 +257,7 @@ class TestReductionHelpers(unittest.TestCase):
                 reduction_helpers.save_fitting_input_workspaces(None)
 
             mock_save_nexus.assert_not_called()
-            self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
+            self.assertFalse((FilesManager.get_experiment_dir() / "fitting_inputs").exists())
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -793,7 +797,7 @@ class TestReductionHelpers(unittest.TestCase):
     def test_save_fitting_input_workspaces_skips_inactive_inputs(self):
         with (
             tempfile.TemporaryDirectory() as temp_dir,
-            patch.object(reduction_helpers.FilesManager, "get_fitting_inputs_dir", return_value=Path(temp_dir)),
+            patch.object(reduction_helpers.FilesManager, "get_reduction_outputs_dir", return_value=Path(temp_dir)),
         ):
             reduction_helpers.save_fitting_input_workspaces(Mock(run_this_scattering_type=False))
 
@@ -806,7 +810,7 @@ class TestReductionHelpers(unittest.TestCase):
         )
         with (
             tempfile.TemporaryDirectory() as temp_dir,
-            patch.object(reduction_helpers.FilesManager, "get_fitting_inputs_dir", return_value=Path(temp_dir)),
+            patch.object(reduction_helpers.FilesManager, "get_reduction_outputs_dir", return_value=Path(temp_dir)),
             patch.object(reduction_helpers.AnalysisDataService, "doesExist", return_value=False),
             patch.object(reduction_helpers.logger, "warning") as warning,
         ):

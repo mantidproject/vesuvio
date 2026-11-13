@@ -3,13 +3,25 @@ from typing import TYPE_CHECKING
 import numpy as np
 from mantid.api import AnalysisDataService, Workspace
 from mantid.kernel import logger
-from mantid.simpleapi import mtd
+from mantid.simpleapi import CloneWorkspace, SaveNexus, SumSpectra, mtd
 from scipy.optimize import NonlinearConstraint, OptimizeResult, minimize
 
 from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
+from mvesuvio.globals import (
+    CORRECTED_WORKSPACE_SUFFIX,
+    JOY_AVG_WORKSPACE_SUFFIX,
+    JOY_WORKSPACE_SUFFIX,
+    Q_WORKSPACE_SUFFIX,
+    RESOLUTION_WORKSPACE_SUFFIX,
+    WORKSPACE_FSE_SUFFIX,
+    FSEFitWith,
+)
 from mvesuvio.util import fitting_helpers, general_helpers
 from mvesuvio.util.files_manager import FilesManager
-from mvesuvio.util.fse_correction_helpers import WORKSPACE_SUFFIX, FSEFitWith, save_fse_fit_results, subtract_fse_contribution
+from mvesuvio.util.fse_correction_helpers import (
+    save_fse_fit_results,
+    subtract_fse_contribution,
+)
 from mvesuvio.util.general_helpers import extractWS
 from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitWithFSEBuilder
 from mvesuvio.util.model_manager import model_manager
@@ -60,6 +72,7 @@ def run_fse_fitting(
     ws_joy: Workspace,
     ws_q: Workspace,
     fitting_inputs: type[BackwardFSEFittingInputs] | type[ForwardFSEFittingInputs],
+    corrected_joy_name: str,
 ) -> tuple[GlobalFitWithFSEBuilder, OptimizeResult]:
     data_x, data_y, data_e = extractWS(ws_joy)
     _, res_y, _ = extractWS(ws_resolution)
@@ -103,7 +116,7 @@ def run_fse_fitting(
     reduced_chi2 = builder.cost_function(result.x) / degrees_of_freedom
     parameter_names, parameter_values, parameter_errors = builder.reporting_parameters(result.x, covariance)
     fitting_helpers.create_table_for_fse_fit_parameters(
-        ws_joy.name() + f"_{WORKSPACE_SUFFIX[fit_fse_with]}",
+        ws_joy.name() + f"_{WORKSPACE_FSE_SUFFIX[fit_fse_with]}",
         fitting_inputs.fitting_model,
         parameter_names,
         parameter_values,
@@ -111,36 +124,65 @@ def run_fse_fitting(
         reduced_chi2,
     )
     _, _, ws_fse = save_fse_fit_results(ws_joy, builder, result, fit_fse_with, covariance)
-    subtract_fse_contribution(ws_joy, ws_fse, fit_fse_with)
+    subtract_fse_contribution(ws_joy, ws_fse, corrected_joy_name)
     return builder, result
+
+
+def save_corrected_fitting_inputs(candidate: str, ws_resolution: Workspace, ws_corrected_joy: Workspace) -> None:
+    output_directory = FilesManager.get_fse_correction_outputs_dir()
+    corrected_candidate = candidate + CORRECTED_WORKSPACE_SUFFIX
+    ws_corrected_resolution = CloneWorkspace(
+        InputWorkspace=ws_resolution, OutputWorkspace=corrected_candidate + RESOLUTION_WORKSPACE_SUFFIX
+    )
+    ws_joy_avg = SumSpectra(
+        InputWorkspace=ws_corrected_joy,
+        WeightedSum=True,
+        MultiplyBySpectra=False,
+        OutputWorkspace=corrected_candidate + JOY_AVG_WORKSPACE_SUFFIX,
+    )
+
+    for workspace in (ws_corrected_resolution, ws_corrected_joy, ws_joy_avg):
+        SaveNexus(InputWorkspace=workspace, Filename=str(output_directory / f"{workspace.name()}.nxs"))
 
 
 def run_fse_correction_for_inputs(
     fitting_inputs: type[BackwardFSEFittingInputs] | type[ForwardFSEFittingInputs],
+    available_workspace_names: set[str] | None = None,
 ) -> None:
     workspace_name_candidates = general_helpers.get_workspace_name_candidates(fitting_inputs)
     found_candidate = False
     for candidate in workspace_name_candidates:
-        resolution_name = f"{candidate}_ws_resolution"
-        joy_name = f"{candidate}_joy"
-        q_name = f"{candidate}_q"
-        if all(AnalysisDataService.doesExist(name) for name in (resolution_name, joy_name, q_name)):
+        resolution_name = candidate + RESOLUTION_WORKSPACE_SUFFIX
+        joy_name = candidate + JOY_WORKSPACE_SUFFIX
+        q_name = candidate + Q_WORKSPACE_SUFFIX
+        names = (resolution_name, joy_name, q_name)
+        if (available_workspace_names is None or all(name in available_workspace_names for name in names)) and all(
+            AnalysisDataService.doesExist(name) for name in names
+        ):
             found_candidate = True
-            run_fse_fitting(mtd[resolution_name], mtd[joy_name], mtd[q_name], fitting_inputs)
+            corrected_name = candidate + CORRECTED_WORKSPACE_SUFFIX + JOY_WORKSPACE_SUFFIX
+            run_fse_fitting(mtd[resolution_name], mtd[joy_name], mtd[q_name], fitting_inputs, corrected_name)
+            save_corrected_fitting_inputs(candidate, mtd[resolution_name], mtd[corrected_name])
 
     if not found_candidate:
         logger.warning(
             "Could not find expected derived workspaces "
-            + ", ".join(f"({name}_ws_resolution, {name}_joy, {name}_q)" for name in workspace_name_candidates)
+            + ", ".join(
+                f"({name}{RESOLUTION_WORKSPACE_SUFFIX}, {name}{JOY_WORKSPACE_SUFFIX}, {name}{Q_WORKSPACE_SUFFIX})"
+                for name in workspace_name_candidates
+            )
             + ". Skipping FSE correction."
         )
 
 
 def run_fse_correction() -> None:
-    general_helpers.load_saved_fitting_input_workspaces(FilesManager.get_fse_correction_inputs_dir())
+    available_workspace_names = general_helpers.load_saved_fitting_input_workspaces(
+        FilesManager.get_reduction_outputs_dir(),
+        (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX, Q_WORKSPACE_SUFFIX),
+    )
     for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):
         if fitting_inputs.run_this_fitting_type:
-            run_fse_correction_for_inputs(fitting_inputs)
+            run_fse_correction_for_inputs(fitting_inputs, available_workspace_names)
     general_helpers.make_summarised_log_file()
 
 

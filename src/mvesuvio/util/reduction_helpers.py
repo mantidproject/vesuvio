@@ -31,7 +31,17 @@ import math
 import re
 from pathlib import Path
 
-from mvesuvio.globals import ModeRunning, ScatteringType, Tags, Masking
+from mvesuvio.globals import (
+    JOY_AVG_WORKSPACE_SUFFIX,
+    JOY_WORKSPACE_SUFFIX,
+    Q_WORKSPACE_SUFFIX,
+    REBIN_WORKSPACE_SUFFIX,
+    RESOLUTION_WORKSPACE_SUFFIX,
+    Masking,
+    ModeRunning,
+    ScatteringType,
+    Tags,
+)
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util import general_helpers, handle_config
 from mvesuvio.util.general_helpers import pass_data_into_ws, print_table_workspace, extractWS
@@ -474,8 +484,6 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
 def save_fitting_input_workspaces(
     analysis_inputs: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs] | None,
 ) -> None:
-    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
-    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
     if analysis_inputs is None:
         logger.warning("Could not save derived fitting workspaces because the inputs class was not provided.")
         return
@@ -513,12 +521,11 @@ def save_fitting_input_workspaces(
 
     ws_joy, ws_joy_avg, ws_q = y_space_reduction(ws_lighest_data, ws_lighest_ncp, lightest_mass, analysis_inputs)
 
-    for input_directory in (fitting_inputs_dir, FilesManager.get_fse_correction_inputs_dir()):
-        input_directory.mkdir(parents=True, exist_ok=True)
-        SaveNexus(ws_resolution, str(input_directory / f"{workspace_name}_ws_resolution.nxs"))
-        SaveNexus(ws_joy, str(input_directory / f"{workspace_name}_joy.nxs"))
-        SaveNexus(ws_joy_avg, str(input_directory / f"{workspace_name}_joy_avg.nxs"))
-        SaveNexus(ws_q, str(input_directory / f"{workspace_name}_q.nxs"))
+    output_directory = FilesManager.get_reduction_outputs_dir()
+    SaveNexus(ws_resolution, str(output_directory / f"{workspace_name}{RESOLUTION_WORKSPACE_SUFFIX}.nxs"))
+    SaveNexus(ws_joy, str(output_directory / f"{workspace_name}{JOY_WORKSPACE_SUFFIX}.nxs"))
+    SaveNexus(ws_joy_avg, str(output_directory / f"{workspace_name}{JOY_AVG_WORKSPACE_SUFFIX}.nxs"))
+    SaveNexus(ws_q, str(output_directory / f"{workspace_name}{Q_WORKSPACE_SUFFIX}.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws_name, inputs_class: type[BackwardAnalysisInputs] | type[ForwardAnalysisInputs]):
@@ -612,21 +619,21 @@ def y_space_reduction(
     ws_joy, ws_q = ConvertToYSpace(
         wsTOF,
         Mass=lightest_mass,
-        OutputWorkspace=wsTOF.name() + "_joy",
-        QWorkspace=wsTOF.name() + "_q",
+        OutputWorkspace=wsTOF.name() + JOY_WORKSPACE_SUFFIX,
+        QWorkspace=wsTOF.name() + Q_WORKSPACE_SUFFIX,
     )
 
     # Rebin QWorkspace with same parameters as y-space workspace
     # Not perfect, but it outputs a good approximation
-    Rebin(InputWorkspace=ws_q, Params=rebin_pars, OutputWorkspace=ws_q.name() + "_rebin")
+    ws_q_rebin = Rebin(InputWorkspace=ws_q, Params=rebin_pars, OutputWorkspace=ws_q.name() + REBIN_WORKSPACE_SUFFIX)
 
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NAN:
         # NOTE: Technically this rebin is general and gives the same result as Rebin when
         # no zeros are present in dataY, but I didn't make this the default path
         # because it can be confusing.
-        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars, "_rebin")
+        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars, REBIN_WORKSPACE_SUFFIX)
     else:
-        ws_joy_rebin = Rebin(InputWorkspace=ws_joy, Params=rebin_pars, OutputWorkspace=ws_joy.name() + "_rebin")
+        ws_joy_rebin = Rebin(InputWorkspace=ws_joy, Params=rebin_pars, OutputWorkspace=ws_joy.name() + REBIN_WORKSPACE_SUFFIX)
 
     Integration(ws_joy_rebin, OutputWorkspace="temp_integral")
     ws_joy_rebin = Divide(LHSWorkspace=ws_joy_rebin, RHSWorkspace="temp_integral", OutputWorkspace=ws_joy_rebin.name() + "_norm")
@@ -640,7 +647,7 @@ def y_space_reduction(
         ws_joy_rebin_avg = symmetrize_weighted_mean(ws_joy_rebin_avg)
 
     DeleteWorkspace("temp_integral")
-    return ws_joy_rebin, ws_joy_rebin_avg, mtd[wsTOF.name() + "_q_rebin"]
+    return ws_joy_rebin, ws_joy_rebin_avg, ws_q_rebin
 
 
 def rebin_masked_weighted(ws_joy, rebin_pars, suffix):
