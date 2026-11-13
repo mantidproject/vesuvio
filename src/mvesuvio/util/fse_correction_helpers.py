@@ -1,18 +1,39 @@
 import numpy as np
 from mantid.api import Workspace
-from mantid.simpleapi import CloneWorkspace, Minus, SumSpectra
+from mantid.simpleapi import CloneWorkspace, Minus, SaveNexus, SumSpectra
 from scipy.optimize import OptimizeResult
 
 from mvesuvio.globals import (
+    CORRECTED_WORKSPACE_SUFFIX,
     FSE_CONTRIBUTION_WORKSPACE_SUFFIX,
     FSE_FIT_WORKSPACE_SUFFIX,
     FSE_RESIDUALS_WORKSPACE_SUFFIX,
+    JOY_AVG_WORKSPACE_SUFFIX,
+    RESOLUTION_WORKSPACE_SUFFIX,
     SUM_WORKSPACE_SUFFIX,
     WORKSPACE_FSE_SUFFIX,
     FSEFitWith,
 )
+from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util import general_helpers
 from mvesuvio.util.global_fit_builder import GlobalFitWithFSEBuilder
+
+
+def save_fse_corrected_outputs(candidate: str, ws_resolution: Workspace, ws_corrected_joy: Workspace) -> None:
+    output_directory = FilesManager.get_fse_correction_outputs_dir()
+    corrected_candidate = candidate + CORRECTED_WORKSPACE_SUFFIX
+    ws_corrected_resolution = CloneWorkspace(
+        InputWorkspace=ws_resolution, OutputWorkspace=corrected_candidate + RESOLUTION_WORKSPACE_SUFFIX
+    )
+    ws_joy_avg = SumSpectra(
+        InputWorkspace=ws_corrected_joy,
+        WeightedSum=True,
+        MultiplyBySpectra=False,
+        OutputWorkspace=corrected_candidate + JOY_AVG_WORKSPACE_SUFFIX,
+    )
+
+    for workspace in (ws_corrected_resolution, ws_corrected_joy, ws_joy_avg):
+        SaveNexus(InputWorkspace=workspace, Filename=str(output_directory / f"{workspace.name()}.nxs"))
 
 
 def save_fse_fit_results(

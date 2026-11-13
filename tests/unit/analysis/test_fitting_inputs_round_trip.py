@@ -293,7 +293,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 "mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting"
             ) as fse_fitting,
             patch(
-                "mvesuvio.default_config.experiment_template.run_fse_correction.save_corrected_fitting_inputs"
+                "mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_corrected_outputs"
             ) as save_corrected,
         ):
             run_fse_correction_for_inputs(ForwardFSEFittingInputs)
@@ -317,7 +317,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.AnalysisDataService", Mock(doesExist=workspaces.__contains__)),
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.mtd", workspaces),
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
-            patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_corrected_fitting_inputs"),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_corrected_outputs"),
         ):
             run_fse_correction_for_inputs(
                 ForwardFSEFittingInputs, {"first_ws_resolution", "first_joy", "first_q"}

@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
@@ -6,12 +7,52 @@ import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, mtd
 
 from mvesuvio.globals import FSEFitWith
-from mvesuvio.util.fse_correction_helpers import save_fse_fit_results, subtract_fse_contribution
+from mvesuvio.util.fse_correction_helpers import (
+    save_fse_corrected_outputs,
+    save_fse_fit_results,
+    subtract_fse_contribution,
+)
 
 
 class TestFSECorrectionHelpers(unittest.TestCase):
     def tearDown(self):
         AnalysisDataService.clear()
+
+    def test_saves_corrected_fitting_outputs(self):
+        ws_resolution = Mock()
+        ws_corrected_joy = Mock()
+        ws_corrected_resolution = Mock()
+        ws_corrected_resolution.name.return_value = "candidate_corr_ws_resolution"
+        ws_corrected_joy.name.return_value = "candidate_corr_joy"
+        ws_joy_avg = Mock()
+        ws_joy_avg.name.return_value = "candidate_corr_joy_avg"
+        output_directory = Path("/tmp/fse-correction")
+        with (
+            patch("mvesuvio.util.fse_correction_helpers.FilesManager.get_fse_correction_outputs_dir", return_value=output_directory),
+            patch("mvesuvio.util.fse_correction_helpers.CloneWorkspace", return_value=ws_corrected_resolution) as clone,
+            patch("mvesuvio.util.fse_correction_helpers.SumSpectra", return_value=ws_joy_avg) as sum_spectra,
+            patch("mvesuvio.util.fse_correction_helpers.SaveNexus") as save_nexus,
+        ):
+            save_fse_corrected_outputs("candidate", ws_resolution, ws_corrected_joy)
+
+        clone.assert_called_once_with(
+            InputWorkspace=ws_resolution,
+            OutputWorkspace="candidate_corr_ws_resolution",
+        )
+        sum_spectra.assert_called_once_with(
+            InputWorkspace=ws_corrected_joy,
+            WeightedSum=True,
+            MultiplyBySpectra=False,
+            OutputWorkspace="candidate_corr_joy_avg",
+        )
+        self.assertEqual(
+            save_nexus.call_args_list,
+            [
+                call(InputWorkspace=ws_corrected_resolution, Filename=f"{output_directory}/candidate_corr_ws_resolution.nxs"),
+                call(InputWorkspace=ws_corrected_joy, Filename=f"{output_directory}/candidate_corr_joy.nxs"),
+                call(InputWorkspace=ws_joy_avg, Filename=f"{output_directory}/candidate_corr_joy_avg.nxs"),
+            ],
+        )
 
     def test_fse_result_workspace_names_include_fit_mode(self):
         ws_joy = Mock()

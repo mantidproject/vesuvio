@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from mantid.api import AnalysisDataService, Workspace
 from mantid.kernel import logger
-from mantid.simpleapi import CloneWorkspace, SaveNexus, SumSpectra, mtd
+from mantid.simpleapi import mtd
 from scipy.optimize import NonlinearConstraint, OptimizeResult, minimize
 
 from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
@@ -19,6 +19,7 @@ from mvesuvio.globals import (
 from mvesuvio.util import fitting_helpers, general_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.fse_correction_helpers import (
+    save_fse_corrected_outputs,
     save_fse_fit_results,
     subtract_fse_contribution,
 )
@@ -128,23 +129,6 @@ def run_fse_fitting(
     return builder, result
 
 
-def save_corrected_fitting_inputs(candidate: str, ws_resolution: Workspace, ws_corrected_joy: Workspace) -> None:
-    output_directory = FilesManager.get_fse_correction_outputs_dir()
-    corrected_candidate = candidate + CORRECTED_WORKSPACE_SUFFIX
-    ws_corrected_resolution = CloneWorkspace(
-        InputWorkspace=ws_resolution, OutputWorkspace=corrected_candidate + RESOLUTION_WORKSPACE_SUFFIX
-    )
-    ws_joy_avg = SumSpectra(
-        InputWorkspace=ws_corrected_joy,
-        WeightedSum=True,
-        MultiplyBySpectra=False,
-        OutputWorkspace=corrected_candidate + JOY_AVG_WORKSPACE_SUFFIX,
-    )
-
-    for workspace in (ws_corrected_resolution, ws_corrected_joy, ws_joy_avg):
-        SaveNexus(InputWorkspace=workspace, Filename=str(output_directory / f"{workspace.name()}.nxs"))
-
-
 def run_fse_correction_for_inputs(
     fitting_inputs: type[BackwardFSEFittingInputs] | type[ForwardFSEFittingInputs],
     available_workspace_names: set[str] | None = None,
@@ -162,7 +146,7 @@ def run_fse_correction_for_inputs(
             found_candidate = True
             corrected_name = candidate + CORRECTED_WORKSPACE_SUFFIX + JOY_WORKSPACE_SUFFIX
             run_fse_fitting(mtd[resolution_name], mtd[joy_name], mtd[q_name], fitting_inputs, corrected_name)
-            save_corrected_fitting_inputs(candidate, mtd[resolution_name], mtd[corrected_name])
+            save_fse_corrected_outputs(candidate, mtd[resolution_name], mtd[corrected_name])
 
     if not found_candidate:
         logger.warning(
