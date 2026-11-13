@@ -933,7 +933,11 @@ class TestYSpaceReduction(unittest.TestCase):
                     q_replaced_workspace if kwargs["QWorkspace"] == "tof_replaced_q" else q_workspace,
                 ),
             ) as convert,
-            patch.object(reduction_helpers, "Rebin", return_value=rebinned) as rebin,
+            patch.object(
+                reduction_helpers,
+                "Rebin",
+                side_effect=lambda **kwargs: q_rebinned if kwargs["OutputWorkspace"].endswith("_q_rebin") else rebinned,
+            ) as rebin,
             patch.object(reduction_helpers, "rebin_masked_weighted", return_value=rebinned) as masked_rebin,
             patch.object(reduction_helpers, "Integration") as integrate,
             patch.object(reduction_helpers, "Divide", return_value=normalised) as divide,
