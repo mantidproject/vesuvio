@@ -20,7 +20,7 @@ from mvesuvio.default_config.experiment_template.run_fse_correction import (
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
 from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
-from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER
+from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitWithFSEBuilder
 from mvesuvio.util.model_manager import model_manager
 
 
@@ -70,6 +70,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         ws_resolution = Mock()
         ws_q = Mock()
         ws_q.extractY.return_value = y
+        ws_fse = Mock()
 
         for fit_with in FSEFitWith:
             expected_suffix = {
@@ -94,8 +95,11 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 ),
                 patch(
                     "mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_fit_results",
-                    return_value=(None, None, None),
+                    return_value=(None, None, ws_fse),
                 ) as save_results,
+                patch(
+                    "mvesuvio.default_config.experiment_template.run_fse_correction.subtract_fse_contribution"
+                ) as subtract_fse,
                 patch(
                     "mvesuvio.default_config.experiment_template.run_fse_correction."
                     "fitting_helpers.create_table_for_fse_fit_parameters"
@@ -103,8 +107,10 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             ):
                 builder, _ = run_fse_fitting(ws_resolution, ws_joy, ws_q, fitting_inputs)
 
+            self.assertIsInstance(builder, GlobalFitWithFSEBuilder)
             save_results.assert_called_once()
             self.assertEqual(save_results.call_args.args[3], expected_suffix)
+            subtract_fse.assert_called_once_with(ws_joy, ws_fse, expected_suffix)
             create_parameter_table.assert_called_once()
             self.assertEqual(create_parameter_table.call_args.args[0], f"test_joy_{expected_suffix}")
             if fit_with is FSEFitWith.FREE_SHARED:
@@ -114,11 +120,16 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 self.assertIn(f"{FSE_INTENSITY_PARAMETER}0", builder.parameter_names)
                 self.assertNotIn(FSE_INTENSITY_PARAMETER, builder.parameter_names)
             else:
-                self.assertEqual(builder.fse_width_parameter, "sigma")
+                self.assertEqual(builder.model_width_parameter, "sigma")
                 self.assertNotIn(FSE_INTENSITY_PARAMETER, builder.parameter_names)
             table_args = create_parameter_table.call_args.args
-            width_names = [name for name in table_args[2] if name == "width" or name.startswith("width")]
-            self.assertEqual(bool(width_names), fit_with is not FSEFitWith.TIED_TO_MODEL)
+            width_names = [name for name in table_args[2] if name.startswith("fse_width")]
+            expected_width_names = {
+                FSEFitWith.FREE_SHARED: ["fse_width"],
+                FSEFitWith.FREE_UNSHARED: ["fse_width0", "fse_width1"],
+                FSEFitWith.TIED_TO_MODEL: [],
+            }
+            self.assertEqual(width_names, expected_width_names[fit_with])
 
     def test_fse_result_workspace_names_include_fit_mode(self):
         ws_joy = Mock()
@@ -130,7 +141,6 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             valid=np.ones((1, 21), dtype=bool),
             data_y=np.zeros((1, 21)),
             data_x=np.zeros((1, 21)),
-            has_fse=True,
             fse_contribution=Mock(return_value=np.zeros((1, 21))),
             fse_contribution_errors=Mock(return_value=np.zeros((1, 21))),
         )
