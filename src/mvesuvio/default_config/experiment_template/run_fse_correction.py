@@ -56,7 +56,7 @@ class BackwardFSEFittingInputs(BackwardAnalysisInputs):
 class ForwardFSEFittingInputs(ForwardAnalysisInputs):
     run_this_fitting_type = True
     fitting_model = model_manager.name("GAUSS")
-    fit_fse_with = FSEFitWith.TIE_TO_MODEL
+    fit_fse_with = FSEFitWith.TIED_TO_MODEL
     initial_fse_width = 3.0
     tie_fse_width_to_model_param = "sigma"
 
