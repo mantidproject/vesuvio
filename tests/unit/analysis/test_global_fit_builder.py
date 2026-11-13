@@ -386,14 +386,6 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
             fitted_width = (3 * fitted_intensity) ** 0.25
             np.testing.assert_allclose(fitted_width, self.true_width, rtol=0.1)
 
-    def test_fse_contribution_errors(self):
-        builder = self.build(["sigma", "fse_width"])
-        result = minimize(builder.cost_function, builder.initial_vector(), method="SLSQP", options={"maxiter": 500})
-        errors = builder.fse_contribution_errors(result.x)
-        self.assertEqual(errors.shape, self.data_y.shape)
-        self.assertTrue(np.all(np.isfinite(errors)))
-        self.assertGreater(errors.max(), 0)
-
     def test_fse_builder_requires_an_fse_parameter(self):
         initial = {"A": 1, "x0": 0, "sigma": 4}
         with self.assertRaisesRegex(ValueError, "fse_intensity.*model_width_parameter"):

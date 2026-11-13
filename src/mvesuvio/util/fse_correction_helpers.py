@@ -22,7 +22,7 @@ def save_fse_fit_results(
     fit_fse_with: FSEFitWith,
     covariance: np.ndarray,
 ) -> tuple[Workspace, Workspace, Workspace]:
-    """Store the fitted curves, the FSE contribution (both with errors) and the residuals (without errors) in clones of ws_joy."""
+    """Store the fitted curves, zero-error FSE contribution, and residuals in clones of ws_joy."""
     workspace_suffix = WORKSPACE_FSE_SUFFIX[fit_fse_with]
     fit_y = builder.convolved_model(result.x)
     fit_e = builder.fit_curve_errors(result.x, covariance)
@@ -37,7 +37,8 @@ def save_fse_fit_results(
 
     ws_fse = CloneWorkspace(ws_joy, OutputWorkspace=ws_joy.name() + f"_{workspace_suffix}{FSE_CONTRIBUTION_WORKSPACE_SUFFIX}")
     fse_y = builder.fse_contribution(result.x)
-    fse_e = builder.fse_contribution_errors(result.x, covariance)
+    # Keep FSE errors at zero so subtraction leaves the original data errors unchanged.
+    fse_e = np.zeros_like(fse_y)
     general_helpers.pass_data_into_ws(builder.data_x, fse_y, fse_e, ws_fse)
 
     SumSpectra(InputWorkspace=ws_joy, OutputWorkspace=ws_joy.name() + SUM_WORKSPACE_SUFFIX)
@@ -54,5 +55,9 @@ def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace, output_works
         RHSWorkspace=ws_fse,
         OutputWorkspace=output_workspace,
     )
+    corrected_y = ws_corrected.extractY()
+    corrected_y[ws_joy.extractY() == 0] = 0
+    for index in range(ws_corrected.getNumberHistograms()):
+        ws_corrected.dataY(index)[:] = corrected_y[index]
     SumSpectra(InputWorkspace=ws_corrected, OutputWorkspace=ws_corrected.name() + SUM_WORKSPACE_SUFFIX)
     return ws_corrected

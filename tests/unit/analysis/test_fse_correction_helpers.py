@@ -22,8 +22,7 @@ class TestFSECorrectionHelpers(unittest.TestCase):
             valid=np.ones((1, 21), dtype=bool),
             data_y=np.zeros((1, 21)),
             data_x=np.zeros((1, 21)),
-            fse_contribution=Mock(return_value=np.zeros((1, 21))),
-            fse_contribution_errors=Mock(return_value=np.zeros((1, 21))),
+            fse_contribution=Mock(return_value=np.ones((1, 21))),
         )
         clones = []
 
@@ -35,10 +34,15 @@ class TestFSECorrectionHelpers(unittest.TestCase):
 
         corrected = Mock()
         corrected.name.return_value = "test_corr_joy"
+        ws_joy.extractY.return_value = np.ones((1, 21))
+        corrected_data = np.ones((1, 21))
+        corrected.extractY.return_value = corrected_data
+        corrected.getNumberHistograms.return_value = 1
+        corrected.dataY.side_effect = lambda index: corrected_data[index]
         with (
             patch("mvesuvio.util.fse_correction_helpers.CloneWorkspace", side_effect=clone_workspace),
             patch("mvesuvio.util.fse_correction_helpers.SumSpectra") as sum_spectra,
-            patch("mvesuvio.util.fse_correction_helpers.general_helpers.pass_data_into_ws"),
+            patch("mvesuvio.util.fse_correction_helpers.general_helpers.pass_data_into_ws") as pass_data,
             patch("mvesuvio.util.fse_correction_helpers.Minus", return_value=corrected) as minus,
         ):
             ws_fit, ws_residuals, ws_fse = save_fse_fit_results(
@@ -46,6 +50,7 @@ class TestFSECorrectionHelpers(unittest.TestCase):
             )
             ws_corrected = subtract_fse_contribution(ws_joy, ws_fse, "test_corr_joy")
 
+        np.testing.assert_array_equal(pass_data.call_args_list[2].args[2], np.zeros((1, 21)))
         self.assertEqual(
             clones,
             [
@@ -76,13 +81,13 @@ class TestFSECorrectionHelpers(unittest.TestCase):
         self.assertEqual(sum_spectra.call_args_list[-1], call(InputWorkspace=corrected, OutputWorkspace="test_corr_joy_sum"))
 
     def test_subtraction_creates_final_workspace_without_replacing_reduction_data(self):
-        ws_joy = CreateWorkspace(DataX=[0, 1, 2], DataY=[4, 5, 6], DataE=[1, 1, 1], NSpec=1, OutputWorkspace="front_0_joy")
-        ws_fse = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[2, 2, 2], NSpec=1, OutputWorkspace="front_0_fse")
+        ws_joy = CreateWorkspace(DataX=[0, 1, 2], DataY=[4, 0, 6], DataE=[1, 1, 1], NSpec=1, OutputWorkspace="front_0_joy")
+        ws_fse = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[0, 0, 0], NSpec=1, OutputWorkspace="front_0_fse")
         corrected = subtract_fse_contribution(ws_joy, ws_fse, "front_0_corr_joy")
 
         self.assertEqual(corrected.name(), "front_0_corr_joy")
         self.assertTrue(AnalysisDataService.doesExist("front_0_corr_joy_sum"))
         self.assertFalse(AnalysisDataService.doesExist("front_0_joy_tied_fse_corrected"))
-        np.testing.assert_array_equal(corrected.extractY(), [[3, 3, 3]])
-        np.testing.assert_allclose(corrected.extractE(), [[np.sqrt(5)] * 3])
-        np.testing.assert_array_equal(mtd["front_0_joy"].extractY(), [[4, 5, 6]])
+        np.testing.assert_array_equal(corrected.extractY(), [[3, 0, 3]])
+        np.testing.assert_array_equal(corrected.extractE(), [[1, 1, 1]])
+        np.testing.assert_array_equal(mtd["front_0_joy"].extractY(), [[4, 0, 6]])

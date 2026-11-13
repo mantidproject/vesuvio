@@ -286,7 +286,3 @@ class GlobalFitWithFSEBuilder(GlobalFitBuilder):
         """Convolved FSE term of every row, as an array shaped like data_y."""
         _, fse_y = self._model_and_fse_rows(self.unpack(params_vector))
         return self._convolve(fse_y)
-
-    def fse_contribution_errors(self, parameters: np.ndarray, covariance: np.ndarray | None = None) -> np.ndarray:
-        """Uncertainty of the convolved FSE term, shaped like data_y."""
-        return self.curve_errors(self.fse_contribution, parameters, covariance)
