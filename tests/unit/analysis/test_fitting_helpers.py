@@ -21,7 +21,7 @@ class TestFittingHelpers(unittest.TestCase):
         )
         self.addCleanup(lambda: DeleteWorkspace(Workspace=table))
 
-        self.assertEqual(table.name(), "test_fse_free_shared_globalfit_GAUSS_Parameters")
+        self.assertEqual(table.name(), "test_fse_free_shared_Parameters")
         self.assertEqual(table.getTitle(), "Global Fit Parameters")
         self.assertEqual(table.rowCount(), 4)
         self.assertEqual([table.cell(row, 0) for row in range(table.rowCount())], ["sigma", "width", "A0", "Cost function"])
