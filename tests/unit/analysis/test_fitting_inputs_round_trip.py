@@ -108,7 +108,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             self.assertIsInstance(builder, GlobalFitWithFSEBuilder)
             save_results.assert_called_once()
             self.assertEqual(save_results.call_args.args[3], fit_with)
-            subtract_fse.assert_called_once_with(ws_joy, ws_fse, "test_corr_joy")
+            subtract_fse.assert_called_once_with(ws_joy, ws_fse, "test_corr_joy", fit_with)
             create_parameter_table.assert_called_once()
             self.assertEqual(create_parameter_table.call_args.args[0], f"test_joy_{expected_suffix}")
             if fit_with is FSEFitWith.FREE_SHARED:

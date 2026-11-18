@@ -24,7 +24,7 @@ def create_table_for_fse_fit_parameters(
     chi2: float,
 ):
     """Create a table workspace containing global-fit parameter values, errors, and reduced chi-squared."""
-    table = CreateEmptyTableWorkspace(OutputWorkspace=workspace_name + f"_globalfit_{model}_Parameters")
+    table = CreateEmptyTableWorkspace(OutputWorkspace=workspace_name + "_Parameters")
     table.setTitle("Global Fit Parameters")
     table.addColumn(type="str", name="Name")
     table.addColumn(type="float", name="Value")

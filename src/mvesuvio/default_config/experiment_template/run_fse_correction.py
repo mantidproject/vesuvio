@@ -125,7 +125,7 @@ def run_fse_fitting(
         reduced_chi2,
     )
     _, _, ws_fse = save_fse_fit_results(ws_joy, builder, result, fit_fse_with, covariance)
-    subtract_fse_contribution(ws_joy, ws_fse, corrected_joy_name)
+    subtract_fse_contribution(ws_joy, ws_fse, corrected_joy_name, fit_fse_with)
     return builder, result
 
 

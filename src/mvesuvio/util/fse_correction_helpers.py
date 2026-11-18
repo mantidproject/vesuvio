@@ -69,7 +69,7 @@ def save_fse_fit_results(
     return ws_fit, ws_residuals, ws_fse
 
 
-def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace, output_workspace: str) -> Workspace:
+def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace, output_workspace: str, fit_fse_with: FSEFitWith) -> Workspace:
     """Subtract the fitted FSE contribution from the data, errors are added in quadrature."""
     ws_corrected = Minus(
         LHSWorkspace=ws_joy,
@@ -81,4 +81,13 @@ def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace, output_works
     for index in range(ws_corrected.getNumberHistograms()):
         ws_corrected.dataY(index)[:] = corrected_y[index]
     SumSpectra(InputWorkspace=ws_corrected, OutputWorkspace=ws_corrected.name() + SUM_WORKSPACE_SUFFIX)
+    workspace_suffix = WORKSPACE_FSE_SUFFIX[fit_fse_with]
+    ws_corrected_by_fit = CloneWorkspace(
+        InputWorkspace=ws_corrected,
+        OutputWorkspace=ws_corrected.name() + f"_{workspace_suffix}",
+    )
+    SumSpectra(
+        InputWorkspace=ws_corrected_by_fit,
+        OutputWorkspace=ws_corrected_by_fit.name() + SUM_WORKSPACE_SUFFIX,
+    )
     return ws_corrected

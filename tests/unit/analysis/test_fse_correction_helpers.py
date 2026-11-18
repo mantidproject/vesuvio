@@ -66,11 +66,15 @@ class TestFSECorrectionHelpers(unittest.TestCase):
             fse_contribution=Mock(return_value=np.ones((1, 21))),
         )
         clones = []
+        clone_workspaces = []
+        clone_inputs = []
 
-        def clone_workspace(_, OutputWorkspace):
+        def clone_workspace(workspace=None, *, InputWorkspace=None, OutputWorkspace):
             clone = Mock()
             clone.name.return_value = OutputWorkspace
             clones.append(OutputWorkspace)
+            clone_workspaces.append(clone)
+            clone_inputs.append(InputWorkspace if InputWorkspace is not None else workspace)
             return clone
 
         corrected = Mock()
@@ -89,7 +93,9 @@ class TestFSECorrectionHelpers(unittest.TestCase):
             ws_fit, ws_residuals, ws_fse = save_fse_fit_results(
                 ws_joy, builder, SimpleNamespace(x=np.array([1.0])), FSEFitWith.FREE_SHARED, np.array([[0.1]])
             )
-            ws_corrected = subtract_fse_contribution(ws_joy, ws_fse, "test_corr_joy")
+            ws_corrected = subtract_fse_contribution(
+                ws_joy, ws_fse, "test_corr_joy", FSEFitWith.FREE_SHARED
+            )
 
         np.testing.assert_array_equal(pass_data.call_args_list[2].args[2], np.zeros((1, 21)))
         self.assertEqual(
@@ -98,6 +104,7 @@ class TestFSECorrectionHelpers(unittest.TestCase):
                 "test_joy_free_shared_fse_fit",
                 "test_joy_free_shared_fse_residuals",
                 "test_joy_free_shared_fse_contribution",
+                "test_corr_joy_free_shared",
             ],
         )
         self.assertEqual(
@@ -108,27 +115,49 @@ class TestFSECorrectionHelpers(unittest.TestCase):
                 "test_joy_free_shared_fse_residuals_sum",
                 "test_joy_free_shared_fse_contribution_sum",
                 "test_corr_joy_sum",
+                "test_corr_joy_free_shared_sum",
             ],
         )
         self.assertIs(ws_fit, sum_spectra.call_args_list[1].kwargs["InputWorkspace"])
         self.assertIs(ws_residuals, sum_spectra.call_args_list[2].kwargs["InputWorkspace"])
         self.assertIs(ws_fse, sum_spectra.call_args_list[3].kwargs["InputWorkspace"])
+        self.assertIs(clone_inputs[-1], corrected)
+        self.assertEqual(
+            sum_spectra.call_args_list[-1],
+            call(
+                InputWorkspace=clone_workspaces[-1],
+                OutputWorkspace="test_corr_joy_free_shared_sum",
+            ),
+        )
         self.assertIs(ws_corrected, corrected)
         minus.assert_called_once_with(
             LHSWorkspace=ws_joy,
             RHSWorkspace=ws_fse,
             OutputWorkspace="test_corr_joy",
         )
-        self.assertEqual(sum_spectra.call_args_list[-1], call(InputWorkspace=corrected, OutputWorkspace="test_corr_joy_sum"))
+        self.assertEqual(
+            sum_spectra.call_args_list[-2],
+            call(InputWorkspace=corrected, OutputWorkspace="test_corr_joy_sum"),
+        )
 
     def test_subtraction_creates_final_workspace_without_replacing_reduction_data(self):
         ws_joy = CreateWorkspace(DataX=[0, 1, 2], DataY=[4, 0, 6], DataE=[1, 1, 1], NSpec=1, OutputWorkspace="front_0_joy")
         ws_fse = CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[0, 0, 0], NSpec=1, OutputWorkspace="front_0_fse")
-        corrected = subtract_fse_contribution(ws_joy, ws_fse, "front_0_corr_joy")
+        for fit_fse_with, suffix, fse_values in (
+            (FSEFitWith.FREE_SHARED, "free_shared", [1, 2, 3]),
+            (FSEFitWith.FREE_UNSHARED, "free_unshared", [2, 2, 2]),
+            (FSEFitWith.TIED_TO_MODEL, "tied", [3, 2, 1]),
+        ):
+            ws_fse.dataY(0)[:] = fse_values
+            corrected = subtract_fse_contribution(ws_joy, ws_fse, "front_0_corr_joy", fit_fse_with)
+            self.assertTrue(AnalysisDataService.doesExist(f"front_0_corr_joy_{suffix}"))
+            self.assertTrue(AnalysisDataService.doesExist(f"front_0_corr_joy_{suffix}_sum"))
 
         self.assertEqual(corrected.name(), "front_0_corr_joy")
         self.assertTrue(AnalysisDataService.doesExist("front_0_corr_joy_sum"))
-        self.assertFalse(AnalysisDataService.doesExist("front_0_joy_tied_fse_corrected"))
-        np.testing.assert_array_equal(corrected.extractY(), [[3, 0, 3]])
+        np.testing.assert_array_equal(corrected.extractY(), [[1, 0, 5]])
         np.testing.assert_array_equal(corrected.extractE(), [[1, 1, 1]])
+        np.testing.assert_array_equal(mtd["front_0_corr_joy_free_shared"].extractY(), [[3, 0, 3]])
+        np.testing.assert_array_equal(mtd["front_0_corr_joy_free_unshared"].extractY(), [[2, 0, 4]])
+        np.testing.assert_array_equal(mtd["front_0_corr_joy_tied"].extractY(), [[1, 0, 5]])
         np.testing.assert_array_equal(mtd["front_0_joy"].extractY(), [[4, 0, 6]])
