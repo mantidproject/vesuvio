@@ -15,7 +15,7 @@ from mvesuvio.util.files_manager import FilesManager
 
 class TestReductionHelpers(unittest.TestCase):
     def setUp(self):
-        patcher = patch.object(reduction_helpers, "y_space_reduction", return_value=(MagicMock(), MagicMock()))
+        patcher = patch.object(reduction_helpers, "y_space_reduction", return_value=(MagicMock(), MagicMock(), MagicMock()))
         self.mock_y_space_reduction = patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -151,7 +151,11 @@ class TestReductionHelpers(unittest.TestCase):
 
             with patch.object(reduction_helpers, "SaveNexus") as mock_save_nexus:
                 with patch.object(reduction_helpers.fitting_helpers, "calculate_resolution", return_value=MagicMock()):
-                    with patch.object(reduction_helpers.fitting_helpers, "isolate_lighest_mass_data", return_value=(MagicMock(), MagicMock())):
+                    with patch.object(
+                        reduction_helpers.fitting_helpers,
+                        "isolate_lighest_mass_data",
+                        return_value=(MagicMock(), MagicMock(), 12.0),
+                    ):
                         ForwardAnalysisInputs.name = "front"
                         ForwardAnalysisInputs.name_of_subtracted_workspace = "front"
                         ForwardAnalysisInputs.overwrite_analysis_input_workspace = ""
@@ -161,8 +165,12 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 3)
-            self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
+            self.mock_y_space_reduction.assert_called_once()
+            self.assertEqual(self.mock_y_space_reduction.call_args.args[2:], (12.0, ForwardAnalysisInputs))
+            self.assertEqual(mock_save_nexus.call_count, 4)
+            self.assertTrue(FilesManager.get_reduction_outputs_dir().exists())
+            self.assertFalse((FilesManager.get_experiment_dir() / "fitting_inputs").exists())
+            self.assertFalse((FilesManager.get_experiment_dir() / "fse_correction_inputs").exists())
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -187,7 +195,7 @@ class TestReductionHelpers(unittest.TestCase):
                     with patch.object(
                         reduction_helpers.fitting_helpers,
                         "isolate_lighest_mass_data",
-                        return_value=(MagicMock(), MagicMock()),
+                        return_value=(MagicMock(), MagicMock(), 12.0),
                     ):
                         ForwardAnalysisInputs.run_this_scattering_type = True
                         ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
@@ -197,9 +205,10 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertEqual(mock_save_nexus.call_count, 4)
             saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
             self.assertTrue(all("override_front_0" in path for path in saved_paths))
+            self.assertTrue(all("reduction_outputs" in path for path in saved_paths))
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -221,7 +230,7 @@ class TestReductionHelpers(unittest.TestCase):
                     with patch.object(
                         reduction_helpers.fitting_helpers,
                         "isolate_lighest_mass_data",
-                        return_value=(MagicMock(), MagicMock()),
+                        return_value=(MagicMock(), MagicMock(), 12.0),
                     ):
                         ForwardAnalysisInputs.run_this_scattering_type = True
                         ForwardAnalysisInputs.number_of_iterations_for_corrections = 0
@@ -231,9 +240,10 @@ class TestReductionHelpers(unittest.TestCase):
 
                         reduction_helpers.save_fitting_input_workspaces(ForwardAnalysisInputs)
 
-            self.assertEqual(mock_save_nexus.call_count, 3)
+            self.assertEqual(mock_save_nexus.call_count, 4)
             saved_paths = [call_args.args[1] for call_args in mock_save_nexus.call_args_list]
             self.assertTrue(all("front_subtracted_0" in path for path in saved_paths))
+            self.assertTrue(all("reduction_outputs" in path for path in saved_paths))
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -247,7 +257,7 @@ class TestReductionHelpers(unittest.TestCase):
                 reduction_helpers.save_fitting_input_workspaces(None)
 
             mock_save_nexus.assert_not_called()
-            self.assertTrue(FilesManager.get_fitting_inputs_dir().exists())
+            self.assertFalse((FilesManager.get_experiment_dir() / "fitting_inputs").exists())
 
             AnalysisDataService.clear()
             FilesManager._experiment_dir = None
@@ -788,7 +798,7 @@ class TestReductionHelpers(unittest.TestCase):
     def test_save_fitting_input_workspaces_skips_inactive_inputs(self):
         with (
             tempfile.TemporaryDirectory() as temp_dir,
-            patch.object(reduction_helpers.FilesManager, "get_fitting_inputs_dir", return_value=Path(temp_dir)),
+            patch.object(reduction_helpers.FilesManager, "get_reduction_outputs_dir", return_value=Path(temp_dir)),
         ):
             reduction_helpers.save_fitting_input_workspaces(Mock(run_this_scattering_type=False))
 
@@ -801,7 +811,7 @@ class TestReductionHelpers(unittest.TestCase):
         )
         with (
             tempfile.TemporaryDirectory() as temp_dir,
-            patch.object(reduction_helpers.FilesManager, "get_fitting_inputs_dir", return_value=Path(temp_dir)),
+            patch.object(reduction_helpers.FilesManager, "get_reduction_outputs_dir", return_value=Path(temp_dir)),
             patch.object(reduction_helpers.AnalysisDataService, "doesExist", return_value=False),
             patch.object(reduction_helpers.logger, "warning") as warning,
         ):
@@ -904,6 +914,11 @@ class TestYSpaceReduction(unittest.TestCase):
         joy.name.return_value = "tof_joy"
         rebinned = Mock()
         rebinned.name.return_value = "tof_joy_rebin"
+        q_workspace = Mock()
+        q_workspace.name.return_value = "tof_q"
+        q_replaced_workspace = Mock()
+        q_replaced_workspace.name.return_value = "tof_replaced_q"
+        q_rebinned = Mock()
         normalised = Mock()
         normalised.name.return_value = "tof_joy_rebin_norm"
         averaged = Mock()
@@ -911,8 +926,19 @@ class TestYSpaceReduction(unittest.TestCase):
         replaced.name.return_value = "tof_replaced"
 
         with (
-            patch.object(reduction_helpers, "ConvertToYSpace", return_value=joy) as convert,
-            patch.object(reduction_helpers, "Rebin", return_value=rebinned) as rebin,
+            patch.object(
+                reduction_helpers,
+                "ConvertToYSpace",
+                side_effect=lambda *args, **kwargs: (
+                    joy,
+                    q_replaced_workspace if kwargs["QWorkspace"] == "tof_replaced_q" else q_workspace,
+                ),
+            ) as convert,
+            patch.object(
+                reduction_helpers,
+                "Rebin",
+                side_effect=lambda **kwargs: q_rebinned if kwargs["OutputWorkspace"].endswith("_q_rebin") else rebinned,
+            ) as rebin,
             patch.object(reduction_helpers, "rebin_masked_weighted", return_value=rebinned) as masked_rebin,
             patch.object(reduction_helpers, "Integration") as integrate,
             patch.object(reduction_helpers, "Divide", return_value=normalised) as divide,
@@ -920,8 +946,16 @@ class TestYSpaceReduction(unittest.TestCase):
             patch.object(reduction_helpers, "replace_zeros_with_ncp", return_value=replaced) as replace_zeros,
             patch.object(reduction_helpers, "symmetrize_weighted_mean") as symmetrize,
             patch.object(reduction_helpers, "DeleteWorkspace") as delete,
+            patch.object(
+                reduction_helpers,
+                "mtd",
+                {
+                    "tof_q_rebin": q_rebinned,
+                    "tof_replaced_q_rebin": q_rebinned,
+                },
+            ),
         ):
-            result = reduction_helpers.y_space_reduction(ws_tof, ws_ncp, inputs)
+            result = reduction_helpers.y_space_reduction(ws_tof, ws_ncp, 12.0, inputs)
 
         return (
             result,
@@ -929,6 +963,7 @@ class TestYSpaceReduction(unittest.TestCase):
             ws_ncp,
             joy,
             rebinned,
+            q_rebinned,
             normalised,
             averaged,
             convert,
@@ -940,6 +975,8 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             symmetrize,
             delete,
+            q_workspace,
+            q_replaced_workspace,
         )
 
     def test_unmasked_path_uses_mantid_rebin_without_replacement_or_symmetrisation(self):
@@ -949,6 +986,7 @@ class TestYSpaceReduction(unittest.TestCase):
             ws_ncp,
             joy,
             rebinned,
+            q_rebinned,
             normalised,
             averaged,
             convert,
@@ -960,12 +998,20 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             symmetrize,
             delete,
+            q_workspace,
+            _,
         ) = self._run_with_mocks(self._inputs())
 
         ws_ncp.extractY.assert_called_once_with()
-        convert.assert_called_once_with(ws_tof, Mass=1.0, OutputWorkspace="tof_joy")
+        convert.assert_called_once_with(ws_tof, Mass=12.0, OutputWorkspace="tof_joy", QWorkspace="tof_q")
         masked_rebin.assert_not_called()
-        rebin.assert_called_once_with(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin")
+        self.assertIs(rebin.call_args_list[0].kwargs["InputWorkspace"], q_workspace)
+        rebin.assert_has_calls(
+            [
+                call(InputWorkspace=q_workspace, Params=[0, 2, 4], OutputWorkspace="tof_q_rebin"),
+                call(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin"),
+            ]
+        )
         integrate.assert_called_once_with(rebinned, OutputWorkspace="temp_integral")
         divide.assert_called_once_with(
             LHSWorkspace=rebinned, RHSWorkspace="temp_integral", OutputWorkspace="tof_joy_rebin_norm"
@@ -979,7 +1025,7 @@ class TestYSpaceReduction(unittest.TestCase):
         replace_zeros.assert_not_called()
         symmetrize.assert_not_called()
         delete.assert_called_once_with("temp_integral")
-        self.assertEqual(result, (normalised, averaged))
+        self.assertEqual(result, (normalised, averaged, q_rebinned))
 
     def test_ncp_masking_replaces_zeros_before_convert_and_uses_standard_rebin(self):
         inputs = self._inputs(mask_time_of_flight_range="100-200", mask_zeros_with=Masking.NCP)
@@ -988,6 +1034,7 @@ class TestYSpaceReduction(unittest.TestCase):
             ws_tof,
             ws_ncp,
             joy,
+            _,
             _,
             _,
             _,
@@ -1000,11 +1047,23 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             _,
             _,
+            q_workspace,
+            q_replaced_workspace,
         ) = self._run_with_mocks(inputs)
 
         replace_zeros.assert_called_once_with(ws_tof, ws_ncp.extractY.return_value)
-        convert.assert_called_once_with(replace_zeros.return_value, Mass=1.0, OutputWorkspace="tof_replaced_joy")
-        rebin.assert_called_once_with(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin")
+        convert.assert_called_once_with(
+            replace_zeros.return_value,
+            Mass=12.0,
+            OutputWorkspace="tof_replaced_joy",
+            QWorkspace="tof_replaced_q",
+        )
+        rebin.assert_has_calls(
+            [
+                call(InputWorkspace=q_replaced_workspace, Params=[0, 2, 4], OutputWorkspace="tof_replaced_q_rebin"),
+                call(InputWorkspace=joy, Params=[0, 2, 4], OutputWorkspace="tof_joy_rebin"),
+            ]
+        )
         masked_rebin.assert_not_called()
 
     def test_nan_masking_uses_weighted_rebin_and_symmetrises_average(self):
@@ -1015,6 +1074,7 @@ class TestYSpaceReduction(unittest.TestCase):
             _,
             joy,
             rebinned,
+            q_rebinned,
             normalised,
             averaged,
             _,
@@ -1026,13 +1086,15 @@ class TestYSpaceReduction(unittest.TestCase):
             replace_zeros,
             symmetrize,
             _,
+            q_workspace,
+            _,
         ) = self._run_with_mocks(inputs)
 
         replace_zeros.assert_not_called()
-        rebin.assert_not_called()
+        rebin.assert_called_once_with(InputWorkspace=q_workspace, Params=[0, 2, 4], OutputWorkspace="tof_q_rebin")
         masked_rebin.assert_called_once_with(joy, [0, 2, 4], "_rebin")
         symmetrize.assert_called_once_with(averaged)
-        self.assertEqual(result, (normalised, symmetrize.return_value))
+        self.assertEqual(result, (normalised, symmetrize.return_value, q_rebinned))
 
     def _run_with_y_space_workspace(self):
         ws_tof = CreateWorkspace(
@@ -1050,10 +1112,18 @@ class TestYSpaceReduction(unittest.TestCase):
             Distribution=True,
             OutputWorkspace="normalisation_joy",
         )
+        CreateWorkspace(
+            DataX=[0, 1, 2, 3, 4],
+            DataY=[1, 2, 3, 4],
+            DataE=[1, 1, 1, 1],
+            NSpec=1,
+            OutputWorkspace="normalisation_tof_q",
+        )
         inputs = self._inputs()
 
-        with patch.object(reduction_helpers, "ConvertToYSpace", return_value=ws_joy):
-            per_spectrum, average = reduction_helpers.y_space_reduction(ws_tof, ws_joy, inputs)
+        ws_q = AnalysisDataService.retrieve("normalisation_tof_q")
+        with patch.object(reduction_helpers, "ConvertToYSpace", return_value=(ws_joy, ws_q)):
+            per_spectrum, average, _ = reduction_helpers.y_space_reduction(ws_tof, ws_joy, 1.0, inputs)
 
         return per_spectrum, average
 

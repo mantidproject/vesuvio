@@ -152,7 +152,24 @@ class TestHandleConfig(unittest.TestCase):
             self.assertTrue(Path(tempdir, "vesuvio.plots.mplstyle").exists())
             self.assertTrue(Path(tempdir, "experiment_template", "script_to_create_figures.py").exists())
             self.assertTrue(Path(tempdir, "experiment_template", "run_reduction.py").exists())
+            self.assertTrue(Path(tempdir, "experiment_template", "run_fse_correction.py").exists())
             self.assertTrue(Path(tempdir, "experiment_template", "run_fitting.py").exists())
+
+    def test_refresh_config_dir_and_contents_overwrites_fse_correction_file(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            script_path = Path(tempdir, "experiment_template", "run_fse_correction.py")
+            script_path.parent.mkdir()
+            script_path.write_text("custom FSE settings")
+            with patch.object(handle_config, "USER_CONFIG_PATH", Path(tempdir)):
+                handle_config.refresh_config_dir_and_contents()
+            self.assertEqual(
+                script_path.read_text(),
+                Path(
+                    handle_config.PACKAGE_CONFIG_PATH,
+                    "experiment_template",
+                    "run_fse_correction.py",
+                ).read_text(),
+            )
 
 
     def test_refresh_config_dir_and_contents_never_copies_dunder_files(self):

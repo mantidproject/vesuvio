@@ -18,6 +18,7 @@ from mvesuvio.util.files_manager import FilesManager
 # This is intended as a bootstrap workflow for sample-by-sample reduction, not a fully polished user-facing CLI.
 
 RUN_REDUCTION_PATH = Path(__file__).with_name("run_reduction.py")
+RUN_FSE_CORRECTION_PATH = Path(__file__).with_name("run_fse_correction.py")
 RUN_FITTING_PATH = Path(__file__).with_name("run_fitting.py")
 
 
@@ -28,6 +29,13 @@ def _run_reduction_with_injected_workspaces(back_ws_path: str = "", front_ws_pat
     reduction_namespace["ForwardAnalysisInputs"].overwrite_analysis_input_workspace = front_ws_path
     reduction_namespace["ForwardAnalysisInputs"].minimal_output = True
     reduction_namespace["run_reduction"](configure_with_main=False)
+
+
+def _run_fse_correction_with_injected_workspaces(back_ws_path: str = "", front_ws_path: str = ""):
+    fse_namespace = runpy.run_path(str(RUN_FSE_CORRECTION_PATH), run_name="run_bootstrap_fse_correction")
+    fse_namespace["BackwardFSEFittingInputs"].overwrite_analysis_input_workspace = back_ws_path
+    fse_namespace["ForwardFSEFittingInputs"].overwrite_analysis_input_workspace = front_ws_path
+    fse_namespace["run_fse_correction"]()
 
 
 def _run_fitting_with_injected_workspaces(back_ws_path: str = "", front_ws_path: str = ""):
@@ -73,6 +81,7 @@ def run_bootstrap():
         FilesManager.set_experiment_dir(bootstrap_outputs_directory / ("boot_" + str(sample_index)))
         AnalysisDataService.clear()
         _run_reduction_with_injected_workspaces(str(back_ws_path), str(front_ws_path))
+        _run_fse_correction_with_injected_workspaces(str(back_ws_path), str(front_ws_path))
         _run_fitting_with_injected_workspaces(str(back_ws_path), str(front_ws_path))
         plt.close("all")
         sample_index += 1
