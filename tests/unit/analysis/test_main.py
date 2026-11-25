@@ -12,9 +12,9 @@ class TestParser(unittest.TestCase):
         self.parser = _set_up_parser()
 
     def test_set_up_parser_config(self):
-        args = self.parser.parse_args(["config", "--experiment-dir", "analysis_inputs.py", "--ip-dir", "mock_ip_folder"])
+        args = self.parser.parse_args(["config", "--experiment-dir", "mock_experiment_template", "--ip-dir", "mock_ip_folder"])
 
-        self.assertEqual(args.experiment_dir, "analysis_inputs.py")
+        self.assertEqual(args.experiment_dir, "mock_experiment_template")
         self.assertEqual(args.ip_dir, "mock_ip_folder")
 
     def test_set_up_parser_config_defaults(self):

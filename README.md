@@ -10,7 +10,7 @@ This repository contains:
 - `mvesuvio` package containing Neutron Compton Profile (NCP) analysis procedures for Vesuvio, published nightly.
 - Vesuvio calibration scripts, under the `tools` folder
 
-Currently only the NCP analysis is usable, the calibration scripts are not yet ready. 
+Currently, only the NCP analysis is usable, the calibration scripts are not yet ready. 
 
 ## Installing mvesuvio package (Try this option first)
 The `mvesuvio` package is meant to be used inside the [Mantid software](https://www.mantidproject.org/index.html), so you'll need to install Mantid first if you haven't.
@@ -38,7 +38,7 @@ To do all the necessary setup, type:
 
 If you see some output then the package is successfully installed and setup!
 
-**WARNING: This way of installing the package is not officially supported by Mantid, it just so happens to work. As you can see above, a folder *C:\<User Path>\Lib\site-packages* is created after the installation. However, this folder does not contain the analysis_inputs.py script. This script is contained in the .mvesuvio folder that is usually created by the installation under *C:\Users\<fedid>\.mvesuvio*. If after the pip installation the folder .mvesuvio has not been created under *C:\Users\<fedid>\.mvesuvio* you can try to copy it from another computer on which installation was successful. Try to run analysis_inputs.py from the newly copied .mvesuvio folder and check the inputs and outputs created.**
+**WARNING: This way of installing the package is not officially supported by Mantid, it just so happens to work. As you can see above, a folder *C:\<User Path>\Lib\site-packages* is created after the installation. However, this folder does not contain the run scripts. Those scripts are contained in the .mvesuvio folder that is usually created by the installation under *C:\Users\<fedid>\.mvesuvio*. If after the pip installation the folder .mvesuvio has not been created under *C:\Users\<fedid>\.mvesuvio* you can try to copy it from another computer on which installation was successful. Try to open run_fitting.py from the newly copied .mvesuvio folder and check the inputs and outputs are created when the script is run.**
 
 ### Installing mantid and mvesuvio using conda/mamba (If the first option failed)
 
@@ -199,7 +199,8 @@ So for example to set the configuration from a Python script (or from `IPython` 
 import mvesuvio
 mvesuvio.config(experiment_dir='C:\Vesuvio\experiment', ip_dir='C:\IPFolder')
 ```
-In fact, this functionality is what you see at the end of the `analysis_inputs.py` file, which sets the experiment directory based on the currently opened script location:
+
+Use the following to set the experiment directory based on the currently opened script location:
 
 ```
 import mvesuvio
