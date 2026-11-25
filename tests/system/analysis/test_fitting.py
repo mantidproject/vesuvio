@@ -1,4 +1,3 @@
-
 import os
 import runpy
 import unittest
@@ -10,12 +9,15 @@ from mvesuvio.util.files_manager import FilesManager
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 import matplotlib
+
 matplotlib.use("Agg", force=True)
+
+from shutil import copyfile, rmtree
+
+from mantid.simpleapi import AnalysisDataService, CompareWorkspaces, Load, LoadAscii, mtd
 
 from mvesuvio.util import handle_config
 from mvesuvio.util.model_manager import model_manager
-from shutil import copyfile, rmtree
-from mantid.simpleapi import mtd, LoadAscii, AnalysisDataService, CompareWorkspaces, Load
 
 TESTS_ROOT = Path(__file__).resolve().parents[2]
 FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
@@ -64,12 +66,12 @@ class TestFitting(unittest.TestCase):
                 if p.is_dir():
                     continue
                 if p.name.endswith("nxs"):
-                    Load(str(p), OutputWorkspace=prefix+"_"+p.stem)
+                    Load(str(p), OutputWorkspace=prefix + "_" + p.stem)
                     continue
-                LoadAscii(str(p), Separator="CSV", OutputWorkspace=prefix+"_"+p.stem)
+                LoadAscii(str(p), Separator="CSV", OutputWorkspace=prefix + "_" + p.stem)
 
         for ws_name in mtd.getObjectNames():
-            if ws_name.startswith('bench'):
+            if ws_name.startswith("bench"):
                 tol = 1e-3
                 result_name = ws_name.replace("bench_front_0_", "result_front_0_corr_", 1)
                 result, _ = CompareWorkspaces(ws_name, result_name, Tolerance=tol)

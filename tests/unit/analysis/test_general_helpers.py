@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,7 +14,6 @@ from mvesuvio.util import general_helpers
 
 
 class TestGeneralHelpers(unittest.TestCase):
-
     def test_get_scattering_type_returns_backward_enum(self):
         class BackwardInputs:
             mode = Mode.DOUBLE_DIFFERENCE.value
@@ -88,9 +88,10 @@ class TestGeneralHelpers(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             missing_path = str(Path(temp_dir) / "missing.nxs")
             inputs = Mock(overwrite_analysis_input_workspace=missing_path)
+            expected_message = f"Override workspace not in ADS and not a path: {missing_path}"
             with (
                 patch.object(general_helpers, "AnalysisDataService", Mock(doesExist=Mock(return_value=False))),
-                self.assertRaisesRegex(ValueError, f"Override workspace not in ADS and not a path: {missing_path}"),
+                self.assertRaisesRegex(ValueError, re.escape(expected_message)),
             ):
                 general_helpers.load_overwritten_workspace_if_specified(inputs)
 
@@ -120,7 +121,10 @@ class TestGeneralHelpers(unittest.TestCase):
         DeleteWorkspace(ws)
 
     def test_make_summarised_log_file(self):
-        with tempfile.NamedTemporaryFile(delete=False) as mock_mantid_log_file, tempfile.NamedTemporaryFile(delete=False) as mock_summary_file:
+        with (
+            tempfile.NamedTemporaryFile(delete=False) as mock_mantid_log_file,
+            tempfile.NamedTemporaryFile(delete=False) as mock_summary_file,
+        ):
             mock_mantid_log_file.write(
                 dedent(
                     """
@@ -150,9 +154,11 @@ class TestGeneralHelpers(unittest.TestCase):
             mock_mantid_log_file_path = mock_mantid_log_file.name
             mock_summary_file_path = mock_summary_file.name
 
-        with patch("mvesuvio.util.general_helpers.FilesManager.get_mantid_log_file", return_value=mock_mantid_log_file_path):
-            with patch("mvesuvio.util.general_helpers.FilesManager.get_summarised_log_file", return_value=mock_summary_file_path):
-                general_helpers.make_summarised_log_file()
+        with (
+            patch("mvesuvio.util.general_helpers.FilesManager.get_mantid_log_file", return_value=mock_mantid_log_file_path),
+            patch("mvesuvio.util.general_helpers.FilesManager.get_summarised_log_file", return_value=mock_summary_file_path),
+        ):
+            general_helpers.make_summarised_log_file()
 
         with open(mock_summary_file_path, "r", encoding="utf-8") as summary_file:
             current_log_file_content = summary_file.read()

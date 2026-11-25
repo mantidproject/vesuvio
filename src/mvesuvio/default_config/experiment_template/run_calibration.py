@@ -1,76 +1,86 @@
-from mvesuvio.util.files_manager import FilesManager
+import ntpath
+from functools import wraps
+from pathlib import Path
+from typing import ClassVar, Literal
+
+import numpy as np
+from mantid.api import AlgorithmFactory, AlgorithmManager, WorkspaceGroup
+from mantid.kernel import logger
+from mantid.simpleapi import ConvertToDistribution, Load, LoadRaw, LoadVesuvio, SaveNexus, mtd
+from numpy.typing import NDArray
+
+import mvesuvio
+from mvesuvio import ConfigArgInputs
 from mvesuvio.calibrate_analysis import EVSCalibrationAnalysis
 from mvesuvio.calibrate_fit import EVSCalibrationFit
-from mantid.api import AlgorithmManager, AlgorithmFactory, WorkspaceGroup
-from mantid.simpleapi import LoadVesuvio, LoadRaw, ConvertToDistribution, mtd
+from mvesuvio.globals import Mode, SharedParameterFitType
 from mvesuvio.util.calibration_helpers import EVSGlobals
-from mvesuvio.globals import SharedParameterFitType, Mode
-import numpy as np
-from numpy.typing import NDArray
-from typing import Literal
+from mvesuvio.util.files_manager import FilesManager
 
 
 class EVSCalibrationAnalysisInputs:
     # Sample run numbers to fit peaks to (cannot be an empty str)
     # Samples: str = [17087, 17088]
-    Samples: list[int] = [17087]
+    Samples: ClassVar[list[int]] = [17087]
 
     # Run numbers to use as a background (can be empty)
-    Background: list[int] = [17086]
+    Background: ClassVar[list[int]] = [17086]
 
     # Filename of the instrument parameter file.
-    InstrumentParameterFile: str = str(FilesManager.get_instrument_parameters_dir() / "IP0005.par")
+    InstrumentParameterFile: ClassVar[str] = str(FilesManager.get_instrument_parameters_dir() / "IP0005.par")
 
     # Mass of the sample in amu to be used when calculating energy.
     # Default is Pb: 207.19
-    Mass: float = 63.546  # Mass of copper in amu
+    Mass: ClassVar[float] = 63.546  # Mass of copper in amu
 
     # List of d-spacings used to estimate the positions of peaks in TOF.
-    DSpacings: NDArray[np.float64] = np.array([2.0865, 1.807, 1.278, 1.0897])  # d-spacings of a copper samp
+    DSpacings: ClassVar[NDArray[np.float64]] = np.array([2.0865, 1.807, 1.278, 1.0897])  # d-spacings of a copper samp
 
     # Value at which to fix E1 value and E1 error (form: E1 value, E1 Error).
     # If no input is provided, values will be calculated
     # Default is []
-    E1FixedValueAndError: list[float] = []
+    E1FixedValueAndError: ClassVar[list[float]] = []
 
     # List of detectors to be marked as invalid (3-198),
     # to be excluded from analysis calculations.
     # Default is []
-    InvalidDetectors: list[int] = []
+    InvalidDetectors: ClassVar[list[int]] = []
 
     # Number of iterations to perform.
     # Default is 2
-    Iterations: int = 1
+    Iterations: ClassVar[int] = 1
 
     # Calculate shared parameters using an individual and/or global fit
     # Default is SharedParameterFitType.INDIVIDUAL
-    SharedParameterFitType: Literal["Individual", "Shared", "Both"] = SharedParameterFitType.INDIVIDUAL.value
+    SharedParameterFitType: ClassVar[Literal["Individual", "Shared", "Both"]] = SharedParameterFitType.INDIVIDUAL.value
 
     # Whether to create output from fitting.
     # Default is False
-    CreateOutput: bool = False
+    CreateOutput: ClassVar[bool] = False
 
     # Whether to calculate L0 or just use the values from the parameter file.
     # Default is False
-    CalculateL0: bool = False
+    CalculateL0: ClassVar[bool] = False
 
     # Whether to save the output as an IP file. This file will use the
     # same name as the OutputWorkspace and will be saved to the default
     # save directory.
     # Default is False
-    CreateIPFile: bool = False
+    CreateIPFile: ClassVar[bool] = False
 
     # Name to call the output workspace
     # Default is ""
-    OutputWorkspace: str = "copper_analysis_test"
+    OutputWorkspace: ClassVar[str] = "copper_analysis_test"
 
     # Mode to load files with. This is passed to the LoadVesuvio algorithm.
     # Default is FoilOut
-    Mode: Literal["SingleDifference", "DoubleDifference", "ThickDifference", "FoilOut", "FoilIn", "FoilInOut"] = Mode.FOIL_OUT.value
+    Mode: ClassVar[Literal["SingleDifference", "DoubleDifference", "ThickDifference", "FoilOut", "FoilIn", "FoilInOut"]] = (
+        Mode.FOIL_OUT.value
+    )
 
     # Spectrum range to use.
     # EVSGlobals.DETECTOR_RANGE [3, 198]
-    SpectrumRange: list[int] = EVSGlobals.DETECTOR_RANGE
+    SpectrumRange: ClassVar[list[int]] = EVSGlobals.DETECTOR_RANGE
 
 
 ########################
@@ -114,18 +124,26 @@ def _load_files(path, prefix):
     @param path - the path to the files.
     @param prefix - the prefix of files.
     """
-    samples_group = WorkspaceGroup()
-    background_group = WorkspaceGroup()
-
-    for sample in EVSCalibrationAnalysisInputs.Samples:
-        _load_file(path, sample, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode, prefix)
-        samples_group.addWorkspace(mtd[prefix + str(sample)])
-
-    for background in EVSCalibrationAnalysisInputs.Background:
-        _load_file(path, background, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode, prefix)
-        background_group.addWorkspace(mtd[prefix + str(background)])
+    samples_group = _load_group(path, prefix, EVSCalibrationAnalysisInputs.Samples)
+    background_group = _load_group(path, prefix, EVSCalibrationAnalysisInputs.Background)
 
     return samples_group, background_group
+
+
+def _load_group(path, prefix, runs):
+    """
+    Loads the runs into group workspaces.
+
+    @param path - the path to the files.
+    @param prefix - the prefix of files.
+    @param runs - the list of run numbers to load.
+    """
+    group = WorkspaceGroup()
+    for run in runs:
+        _load_file(path, run, EVSCalibrationAnalysisInputs.SpectrumRange, EVSCalibrationAnalysisInputs.Mode, prefix)
+        group.addWorkspace(mtd[prefix + str(run)])
+
+    return group
 
 
 def _load_file(path, run_number, spec_list, mode, prefix):
@@ -140,17 +158,11 @@ def _load_file(path, run_number, spec_list, mode, prefix):
     @param prefix - the prefix of files.
     """
     output = prefix + str(run_number)
-    file = output + ".raw"
-    file_path = str(path / file)
     try:
-        LoadVesuvio(
-            Filename=file_path,
-            Mode=mode,
-            OutputWorkspace=output,
-            SpectrumList=f"{spec_list[0]}-{spec_list[-1]}",
-            EnableLogging=False,
-        )
+        file_path = str(path / (output + ".nxs"))
+        _load_vesuvio(file_path, run_number, spec_list, mode, output)
     except RuntimeError:
+        file_path = str(path / (output + ".raw"))
         LoadRaw(
             file_path,
             OutputWorkspace=output,
@@ -161,5 +173,59 @@ def _load_file(path, run_number, spec_list, mode, prefix):
         ConvertToDistribution(output, EnableLogging=False)
 
 
+def use_local_workspace(func):
+    @wraps(func)
+    def wrapper(file_path, run_number, spec_list, mode, output):
+        if _local_workspace_available(run_number, mode, file_path, output):
+            return
+
+        func(file_path, spec_list, mode, output)
+        SaveNexus(mtd[output], Filename=file_path)
+        logger.notice(f"Workspace saved locally at: {file_path}")
+
+    return wrapper
+
+
+@use_local_workspace
+def _load_vesuvio(file_path, spec_list, mode, output):
+    LoadVesuvio(
+        Filename=file_path,
+        Mode=mode,
+        OutputWorkspace=output,
+        InstrumentParFile=EVSCalibrationAnalysisInputs.InstrumentParameterFile,
+        SpectrumList=f"{spec_list[0]}-{spec_list[-1]}",
+        EnableLogging=False,
+    )
+
+
+def _local_workspace_available(run_number, mode, file_path, output):
+    if not (Path(file_path).is_file()):
+        logger.notice(f"Local workspace not found at {file_path}")
+        return False
+
+    ws = Load(Filename=file_path, OutputWorkspace=output)
+    metadata = ws.getHistory().getAlgorithmHistory(0)
+
+    saved_runs = int(Path(metadata.getPropertyValue("Filename")).stem.removeprefix("EVS"))
+    if saved_runs != run_number:
+        logger.notice(f"Filename in saved workspace did not match: {saved_runs} and {run_number}")
+        return False
+
+    saved_mode = metadata.getPropertyValue("Mode")
+    if saved_mode != mode:
+        logger.notice(f"Mode in saved workspace did not match: {saved_mode} and {mode}")
+        return False
+
+    saved_ipfile_name = ntpath.basename(metadata.getPropertyValue("InstrumentParFile"))
+    requested_ipfile_name = Path(EVSCalibrationAnalysisInputs.InstrumentParameterFile).name
+    if saved_ipfile_name != requested_ipfile_name:
+        logger.notice(f"IP files in saved workspace did not match: {saved_ipfile_name} and {requested_ipfile_name}")
+        return False
+
+    logger.notice("\nLocally saved workspace metadata matched with calibration inputs.\n")
+    return True
+
+
 if (__name__ == "__main__") or (__name__ == "mantidqt.widgets.codeeditor.execution"):
+    mvesuvio.main(ConfigArgInputs(experiment_dir=str(Path(__file__).parent), ip_dir=""))
     main()

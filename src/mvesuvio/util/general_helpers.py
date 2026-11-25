@@ -104,7 +104,6 @@ def print_table_workspace(table, precision=3):
         )
         logger.notice("|" + table_row + "|")
     logger.notice(" " + "-" * (len(header) - 2) + " ")
-    return
 
 
 def make_summarised_log_file() -> None:
@@ -122,7 +121,6 @@ def make_summarised_log_file() -> None:
                     outfile.write(line)
     except OSError:
         logger.error("Mantid log file not available. Unable to produce a summarized log file for this routine.")
-    return
 
 
 def load_overwritten_workspace_if_specified(analysis_inputs: Any) -> str:
