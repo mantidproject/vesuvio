@@ -8,7 +8,7 @@ In this section, it is assumed that the user is familiar with the basic theory o
 
 ## The package 
 
-All parameters and constraints are to be stored in the *analysis_input* script, which is the template for such analysis and fit. **WARNING**: Each mvesuvio routine run should have a unique script. Change the name of the script to the name of your sample (and other relevant information) each time you run it again. This prevents from losing previous results. Also, all the generated workspaces will start by the name given to the script.
+All parameters and constraints are to be stored in the run scripts in the *experiment_template* folder, which is the template for such analysis and fit. **WARNING**: Each mvesuvio routine run should have a unique script. Change the name of the script to the name of your sample (and other relevant information) each time you run it again. This prevents from losing previous results. Also, all the generated workspaces will start by the name given to the script.
 
 An example applied to Barium Titanate Oxyhydride ($BaTiO_{3-x}H_x$) in a Vanadium windows clamped cell will be used for demonstration.
 
