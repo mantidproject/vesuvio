@@ -6,6 +6,7 @@ import numpy as np
 
 from mvesuvio.analysis_fitting import fitProfileMantidFit, selectModelAndPars
 from mvesuvio.default_config.experiment_template.fitting_models import FittingModel, register_fitting_models
+from mvesuvio.util.model_manager import FittingModel as ModelDefinition
 from mvesuvio.util.model_manager import ModelManager, model_manager
 
 register_fitting_models()
@@ -43,8 +44,8 @@ class TestModelManager(unittest.TestCase):
         self.assertEqual(model_name, "GAUSS")
         self.assertIsInstance(model_name, str)
         registered_model = model_manager.get_model(model_name)
-        parameters = dict(registered_model.default_parameters)
-        parameters["sigma"] = 99
+        self.assertIsInstance(registered_model.default_parameters, dict)
+        registered_model.default_parameters["sigma"] = 99
 
         registered_model = model_manager.get_model(model_name)
 
@@ -70,10 +71,6 @@ class TestModelManager(unittest.TestCase):
             expected = np.stack([definition.function(x[row], **definition.default_parameters) for row in range(x.shape[0])])
 
             np.testing.assert_allclose(actual, expected)
-
-    def test_model_parameter_lookup_rejects_unknown_parameters(self):
-        with self.assertRaisesRegex(ValueError, "is not defined for this model"):
-            model_manager.get_model("GAUSS").parameter("missing")
 
     def test_model_lookup_rejects_unsubscribed_models(self):
         with self.assertRaisesRegex(ValueError, "is not subscribed"):
@@ -155,6 +152,123 @@ class TestModelManager(unittest.TestCase):
             fitProfileMantidFit(Inputs, None, None)
 
         warning.assert_called_once_with("Custom fitting model is not implemented in Mantid Fit. Skipping Mantid Fit ...")
+
+
+class TestFittingModelParameter(unittest.TestCase):
+    def setUp(self):
+        self.model = ModelDefinition(lambda x, A, scale: x, {"A": 0, "scale": None}, (), False)
+
+    def test_parameter_returns_the_default_value(self):
+        self.assertEqual(self.model.parameter("A"), 0)
+        self.assertIsNone(self.model.parameter("scale"))
+
+    def test_parameter_rejects_unknown_name_and_lists_available_parameters(self):
+        with self.assertRaises(ValueError) as caught:
+            self.model.parameter("missing")
+
+        self.assertEqual(
+            str(caught.exception),
+            "Parameter 'missing' is not defined for this model. Available parameters: A, scale",
+        )
+        self.assertIsInstance(caught.exception.__cause__, KeyError)
+
+
+class TestModelManagerRegistry(unittest.TestCase):
+    def setUp(self):
+        self.manager = ModelManager()
+
+    @staticmethod
+    def model(x, A, offset, scale):
+        return A * x / scale + offset
+
+    def test_registration_copies_inputs_and_lookup_copies_defaults(self):
+        defaults = {"A": 1, "offset": 0, "scale": 2}
+        shared = ["scale"]
+        self.manager.subscribe("model", self.model, defaults, shared, VECTORISED=True)
+        defaults["scale"] = 10
+        shared.append("offset")
+
+        model = self.manager.get_model("model")
+        self.assertIs(model.function, self.model)
+        self.assertEqual(model.default_parameters, {"A": 1, "offset": 0, "scale": 2})
+        self.assertEqual(model.shared_parameters, ("scale",))
+        self.assertTrue(model.VECTORISED)
+        self.assertIsInstance(model.default_parameters, dict)
+        model.default_parameters["A"] = 99
+        self.assertEqual(self.manager.get_model("model").parameter("A"), 1)
+
+    def test_has_model_reports_registered_names(self):
+        self.assertFalse(self.manager.has_model("beta"))
+        defaults = {"A": 1, "offset": 0, "scale": 2}
+        self.manager.subscribe("beta", self.model, defaults, VECTORISED=False)
+
+        self.assertTrue(self.manager.has_model("beta"))
+        self.assertFalse(self.manager.has_model("Beta"))
+        self.assertFalse(self.manager.has_model("missing"))
+
+    def test_names_are_sorted(self):
+        self.assertEqual(self.manager.get_model_names(), ())
+        defaults = {"A": 1, "offset": 0, "scale": 2}
+        self.manager.subscribe("beta", self.model, defaults, VECTORISED=False)
+        self.manager.subscribe("alpha", self.model, defaults, VECTORISED=False)
+
+        self.assertEqual(self.manager.get_model_names(), ("alpha", "beta"))
+        with self.assertRaisesRegex(ValueError, "Available options: alpha, beta"):
+            self.manager.get_model("missing")
+        with self.assertRaisesRegex(ValueError, "Available parameters: A, offset, scale"):
+            self.manager.get_model("alpha").parameter("missing")
+
+    def test_subscription_rejects_invalid_input_without_registering(self):
+        defaults = {"A": 1, "offset": 0, "scale": 2}
+        cases = (
+            ("not callable", "model", None, defaults, (), TypeError, "must be callable"),
+            ("non-string name", 1, self.model, defaults, (), TypeError, "name must be a string"),
+            ("empty name", "", self.model, defaults, (), ValueError, "name cannot be empty"),
+            ("whitespace name", "  ", self.model, defaults, (), ValueError, "name cannot be empty"),
+            ("string shared", "model", self.model, defaults, "scale", TypeError, "not a string"),
+            ("non-string default", "model", self.model, {"A": 1, 2: 3}, (), TypeError, "parameter names must be strings"),
+            ("non-string shared", "model", self.model, defaults, (1,), TypeError, "parameter names must be strings"),
+            ("duplicate shared", "model", self.model, defaults, ("scale", "scale"), ValueError, "must be unique"),
+        )
+        for label, name, function, parameters, shared, error, message in cases:
+            with self.subTest(label=label):
+                with self.assertRaisesRegex(error, message):
+                    self.manager.subscribe(name, function, parameters, shared, VECTORISED=False)
+                self.assertEqual(self.manager.get_model_names(), ())
+
+    def test_subscription_rejects_invalid_signatures_and_parameter_order(self):
+        def no_parameters():
+            pass
+
+        def wrong_first_parameter(y, A):
+            return A * y
+
+        defaults = {"A": 1, "offset": 0, "scale": 2}
+        cases = (
+            ("empty signature", no_parameters, {"A": 1}, (), "x as its first parameter"),
+            ("wrong first parameter", wrong_first_parameter, {"A": 1}, (), "x as its first parameter"),
+            ("missing default", self.model, {"A": 1, "offset": 0}, (), "match the model signature in order"),
+            ("extra default", self.model, {**defaults, "extra": 1}, (), "match the model signature in order"),
+            ("reordered defaults", self.model, {"A": 1, "scale": 2, "offset": 0}, (), "match the model signature in order"),
+            ("shared not last", self.model, defaults, ("offset",), "final model parameters"),
+            ("shared in wrong order", self.model, defaults, ("scale", "offset"), "final model parameters"),
+        )
+        for label, function, parameters, shared, message in cases:
+            with self.subTest(label=label):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.manager.subscribe("model", function, parameters, shared, VECTORISED=False)
+                self.assertFalse(self.manager.has_model("model"))
+
+    def test_subscription_rejects_uninspectable_callable(self):
+        for error in (TypeError("unsupported callable"), ValueError("invalid signature")):
+            with self.subTest(error=type(error).__name__):
+                with (
+                    patch("mvesuvio.util.model_manager.signature", side_effect=error),
+                    self.assertRaisesRegex(TypeError, "must have an inspectable signature") as caught,
+                ):
+                    self.manager.subscribe("model", self.model, {"A": 1, "offset": 0, "scale": 2}, VECTORISED=False)
+                self.assertIs(caught.exception.__cause__, error)
+                self.assertFalse(self.manager.has_model("model"))
 
 
 if __name__ == "__main__":

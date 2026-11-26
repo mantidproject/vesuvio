@@ -39,12 +39,34 @@ class TestGlobalFitBuilder(unittest.TestCase):
         self.assertEqual(len(builder.parameter_names), 1 + 3 * self.n_spectra)
         self.assertEqual(builder.initial_vector().size, len(builder.parameter_names))
 
+    def test_initial_vector_uses_shared_and_per_row_defaults_in_parameter_order(self):
+        builder = self.build()
+        self.assertEqual(builder.parameter_names, ["sigma", "y0", "y1", "y2", "A0", "A1", "A2", "x00", "x01", "x02"])
+        np.testing.assert_array_equal(builder.initial_vector(), [4, 0, 0, 0, 1.5, 1.5, 1.5, 0, 0, 0])
+
     def test_unpack_shares_parameters(self):
         builder = self.build()
         vector = np.arange(builder.initial_vector().size, dtype=float)
         params_dict = builder.unpack(params_vector=vector)
         self.assertEqual(params_dict["sigma"], 0.0)
         np.testing.assert_array_equal(params_dict["y"], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(params_dict["A"], [4.0, 5.0, 6.0])
+        np.testing.assert_array_equal(params_dict["x0"], [7.0, 8.0, 9.0])
+
+    def test_unpack_rejects_wrong_number_of_parameters(self):
+        builder = self.build()
+        with self.assertRaisesRegex(ValueError, "Expected 10 parameters, got 9"):
+            builder.unpack(np.zeros(9))
+
+    def test_convolution_grid_interpolates_even_length_and_rejects_asymmetry(self):
+        delta, resolution = GlobalFitBuilder._build_convolution_grid(np.array([-3, -1, 1, 3]), np.array([0, 2, 4, 0]))
+        self.assertEqual(delta, 1.5)
+        np.testing.assert_allclose(resolution, [0, 1.5, 3, 3, 0])
+        delta, resolution = GlobalFitBuilder._build_convolution_grid(np.array([-2, -1, 0, 1, 2]), np.array([0, 1, 3, 1, 0]))
+        self.assertEqual(delta, 1)
+        np.testing.assert_array_equal(resolution, [0, 1, 3, 1, 0])
+        with self.assertRaisesRegex(ValueError, "symmetric x range"):
+            GlobalFitBuilder._build_convolution_grid(np.array([-2, 0, 3]), np.ones(3))
 
     def test_convolution_matches_row_by_row_direct_convolution(self):
         builder = self.build()
@@ -150,6 +172,47 @@ class TestGlobalFitBuilder(unittest.TestCase):
         vector = builder.initial_vector()
         self.assertAlmostEqual(np.sum(builder.weighted_residuals(vector) ** 2), builder.cost_function(vector))
 
+    def test_row_costs_and_weighted_residuals_ignore_invalid_points(self):
+        data_y = np.zeros_like(self.data_y)
+        data_e = np.zeros_like(self.data_e)
+        data_y[0, :3] = [5, 3, np.nan]
+        data_e[0, :3] = [2, 1, 1]
+        data_y[1, :3] = [8, -1, 100]
+        data_e[1, :3] = [2, 1, np.inf]
+        data_y[2, 0] = 1
+        data_e[2, 0] = 1
+        builder = self.build(data_y, data_e)
+        vector = builder.initial_vector()
+        for i in range(self.n_spectra):
+            vector[builder.parameter_names.index(f"y{i}")] = i + 1
+            vector[builder.parameter_names.index(f"A{i}")] = 0
+
+        np.testing.assert_allclose(builder.weighted_residuals(vector), [2, 2, 3, -3, -2])
+        np.testing.assert_allclose(builder.row_costs(vector), [8, 18, 4])
+        self.assertAlmostEqual(builder.cost_function(vector), 30)
+
+    def test_parameter_covariance_matches_linear_least_squares(self):
+        x = np.tile(np.arange(-2, 3, dtype=float), (2, 1))
+        resolution = np.tile([0, 0, 1, 0, 0], (2, 1))
+        residual = np.array([1, -2, 2, -2, 1])
+        data_y = np.array([2 * x[0] + 1 + residual, 2 * x[1] + 3 - residual])
+        builder = GlobalFitBuilder(x, data_y, np.ones_like(x), resolution, lambda x, slope: slope * x, {"slope": 2}, ["slope"])
+
+        covariance = builder.parameter_covariance(np.array([2, 1, 3]))
+
+        np.testing.assert_allclose(covariance, np.diag([0.2, 0.8, 0.8]), rtol=1e-6, atol=1e-9)
+
+    def test_curve_errors_propagate_correlated_parameter_uncertainties(self):
+        x = np.tile(np.arange(-2, 3, dtype=float), (2, 1))
+        resolution = np.tile([0, 0, 1, 0, 0], (2, 1))
+        builder = GlobalFitBuilder(x, np.zeros_like(x), np.ones_like(x), resolution, lambda x, slope: slope * x, {"slope": 2}, ["slope"])
+        parameters = np.array([2, 1, 3])
+        covariance = np.array([[4, 1, 0], [1, 9, 0.5], [0, 0.5, 16]])
+        expected = np.sqrt([4 * x[0] ** 2 + 2 * x[0] + 9, 4 * x[1] ** 2 + 16])
+
+        np.testing.assert_allclose(builder.curve_errors(builder.convolved_model, parameters, covariance), expected, rtol=1e-6)
+        np.testing.assert_allclose(builder.fit_curve_errors(parameters, covariance), expected, rtol=1e-6)
+
     def test_fit_curve_errors_are_finite_and_small_for_good_fit(self):
         builder = self.build()
         result = minimize(builder.cost_function, builder.initial_vector(), method="SLSQP")
@@ -164,6 +227,12 @@ class TestGlobalFitBuilder(unittest.TestCase):
             GlobalFitBuilder(self.data_x, self.data_y[:, :-1], self.data_e, self.res_y, _gauss, self.initial, ["sigma"])
         with self.assertRaises(ValueError):
             GlobalFitBuilder(self.data_x, self.data_y, self.data_e, self.res_y, _gauss, self.initial, ["missing"])
+
+    def test_validate_inputs_rejects_reserved_background_parameter(self):
+        builder = self.build()
+        builder.initial_params["y"] = 1.0
+        with self.assertRaisesRegex(ValueError, "'y' is reserved"):
+            builder._validate_inputs()
 
     def test_fse_named_parameter_is_an_ordinary_model_parameter(self):
         def model(x, fse_intensity):
@@ -229,6 +298,55 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
             rtol=1e-14,
             atol=1e-14,
         )
+
+    def test_model_and_fse_rows_match_analytic_gaussian_derivative(self):
+        q = np.tile(np.array([1.0, 2.0, 3.0])[:, np.newaxis], (1, self.x.size))
+        q[:, 60:63] = [0, np.nan, np.inf]
+        expected_model = np.array([_gauss(self.x, a, 0, self.sigma) for a in self.amplitudes])
+
+        for tied in (False, True):
+            for vectorised in (False, True):
+                with self.subTest(tied=tied, vectorised=vectorised):
+                    builder = self.build(["sigma"], q=q, model_width_parameter="sigma" if tied else None, VECTORISED=vectorised)
+                    params = builder.unpack(builder.initial_vector())
+                    params["A"][:] = self.amplitudes
+                    params["y"][:] = [1, 2, 3]
+                    if tied:
+                        expected_fse = self.expected_fse * (self.sigma**4 / 9) / np.array([1, 2, 3])[:, np.newaxis]
+                    else:
+                        params[FSE_INTENSITY_PARAMETER][:] = [3, 6, 9]
+                        expected_fse = self.expected_fse.copy()
+                    original = {name: np.copy(value) for name, value in params.items()}
+                    expected_fse[:, :6] = 0
+                    expected_fse[:, -6:] = 0
+                    expected_fse[:, 60:63] = 0
+
+                    model, fse = builder._model_and_fse_rows(params)
+
+                    np.testing.assert_allclose(model, expected_model)
+                    np.testing.assert_allclose(fse, expected_fse, atol=1e-4)
+                    np.testing.assert_array_equal(fse[:, :6], 0)
+                    np.testing.assert_array_equal(fse[:, -6:], 0)
+                    np.testing.assert_array_equal(fse[:, 60:63], 0)
+                    np.testing.assert_allclose(builder._evaluate_rows(params), expected_model + expected_fse, atol=1e-4)
+                    self.assertEqual(params.keys(), original.keys())
+                    for name in params:
+                        np.testing.assert_array_equal(params[name], original[name])
+
+    def test_free_intensity_indices_follow_parameter_layout(self):
+        shared = self.build(["sigma", "fse_width"])
+        unshared = self.build(["sigma"])
+        tied = self.build(["sigma"], model_width_parameter="sigma")
+
+        self.assertEqual(list(shared._free_intensity_indices()), [1])
+        self.assertEqual(list(unshared._free_intensity_indices()), [10, 11, 12])
+        self.assertEqual(list(tied._free_intensity_indices()), [])
+
+    def test_fse_validate_inputs_checks_q_shape(self):
+        builder = self.build(["sigma", "fse_width"])
+        builder.q = np.ones_like(self.data_y[:, :-1])
+        with self.assertRaisesRegex(ValueError, "q must have the same shape"):
+            builder._validate_inputs()
 
     def test_fse_term_is_third_derivative_of_model(self):
         builder = self.build(["sigma", "fse_width"])
@@ -398,6 +516,22 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
         self.assertAlmostEqual(values[intensity_index], self.true_width)
         expected_error = 0.2 * 0.75 * (3 * self.true_fse_intensity) ** (-0.75)
         self.assertAlmostEqual(errors[intensity_index], expected_error)
+
+    def test_unshared_intensities_are_reported_as_individual_widths(self):
+        builder = self.build(["sigma"])
+        vector = builder.initial_vector()
+        indices = [builder.parameter_names.index(f"{FSE_INTENSITY_PARAMETER}{i}") for i in range(self.n_spectra)]
+        vector[indices] = [1 / 3, 16 / 3, 81 / 3]
+        original = vector.copy()
+        covariance = np.eye(vector.size)
+        covariance[indices, indices] = [0.04, 0.09, 0.16]
+
+        names, values, errors = builder.reporting_parameters(vector, covariance)
+
+        self.assertEqual([names[i] for i in indices], ["fse_width0", "fse_width1", "fse_width2"])
+        np.testing.assert_allclose(values[indices], [1, 2, 3])
+        np.testing.assert_allclose(errors[indices], [0.15, 0.028125, 0.4 / 36])
+        np.testing.assert_array_equal(vector, original)
 
     def test_fse_intensity_optimizer_bounds_are_non_negative(self):
         shared = self.build(["sigma", "fse_width"])
