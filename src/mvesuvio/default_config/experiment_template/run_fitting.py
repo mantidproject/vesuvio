@@ -85,16 +85,12 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
     number_of_global_fit_groups = 4
 
 
-def load_saved_fitting_input_workspaces() -> set[str]:
-    return general_helpers.load_saved_fitting_input_workspaces(
-        FilesManager.get_fse_correction_outputs_dir(), (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX)
-    )
-
-
 def run_y_space_reduction_and_fit(
     fitting_inputs: type[BackwardFittingInputs] | type[ForwardFittingInputs],
-    available_workspace_names: set[str] | None = None,
 ) -> bool:
+    general_helpers.load_saved_fitting_input_workspaces(
+        FilesManager.get_fse_correction_outputs_dir(), (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX)
+    )
     ws_name_candidates = general_helpers.get_workspace_name_candidates(fitting_inputs)
 
     for candidate in ws_name_candidates:
@@ -103,9 +99,7 @@ def run_y_space_reduction_and_fit(
         joy_name = candidate + JOY_WORKSPACE_SUFFIX
         joy_avg_name = candidate + JOY_AVG_WORKSPACE_SUFFIX
         names = (resolution_name, joy_name, joy_avg_name)
-        if (available_workspace_names is None or all(name in available_workspace_names for name in names)) and all(
-            AnalysisDataService.doesExist(name) for name in names
-        ):
+        if all(AnalysisDataService.doesExist(name) for name in names):
             fitting_directory = FilesManager.get_fitting_outputs_dir()
             fitting_directory.mkdir(parents=True, exist_ok=True)
             SaveAscii(resolution_name, str(fitting_directory / resolution_name))
@@ -133,11 +127,10 @@ def run_y_space_reduction_and_fit(
 
 
 def run_fitting() -> None:
-    available_workspace_names = load_saved_fitting_input_workspaces()
     if BackwardFittingInputs.run_this_fitting_type:
-        run_y_space_reduction_and_fit(BackwardFittingInputs, available_workspace_names)
+        run_y_space_reduction_and_fit(BackwardFittingInputs)
     if ForwardFittingInputs.run_this_fitting_type:
-        run_y_space_reduction_and_fit(ForwardFittingInputs, available_workspace_names)
+        run_y_space_reduction_and_fit(ForwardFittingInputs)
     general_helpers.make_summarised_log_file()
 
 

@@ -66,13 +66,15 @@ class TestRunFittingPrecomputedInputs(unittest.TestCase):
 
     @patch("mvesuvio.default_config.experiment_template.run_fitting.FitInYSpace")
     def test_skips_fit_when_precomputed_workspaces_missing(self, mock_fit_class):
-        AnalysisDataService.clear()
+        with tempfile.TemporaryDirectory() as output_dir:
+            FilesManager.set_experiment_dir(output_dir)
+            AnalysisDataService.clear()
 
-        ForwardFittingInputs.name = "front"
-        ForwardFittingInputs.number_of_iterations_for_corrections = 0
+            ForwardFittingInputs.name = "front"
+            ForwardFittingInputs.number_of_iterations_for_corrections = 0
 
-        with patch("mvesuvio.default_config.experiment_template.run_fitting.logger") as mock_logger:
-            result = run_y_space_reduction_and_fit(ForwardFittingInputs)
+            with patch("mvesuvio.default_config.experiment_template.run_fitting.logger") as mock_logger:
+                result = run_y_space_reduction_and_fit(ForwardFittingInputs)
 
         self.assertFalse(result)
         mock_fit_class.assert_not_called()
