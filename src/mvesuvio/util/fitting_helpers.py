@@ -17,7 +17,6 @@ from mantid.simpleapi import (
 
 def create_table_for_fse_fit_parameters(
     workspace_name: str,
-    model: str,
     parameter_names: Sequence[str],
     values: Sequence[float],
     errors: Sequence[float],

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 from mvesuvio.default_config.experiment_template import run_bootstrap
+from mvesuvio.globals import ScatteringType
 from mvesuvio.util.files_manager import FilesManager
 
 
@@ -15,8 +16,8 @@ class TestBootstrapWorkflow(unittest.TestCase):
     def test_runs_correction_between_reduction_and_fitting(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            back_dir = root / "backward"
-            front_dir = root / "forward"
+            back_dir = root / ScatteringType.BACKWARD.value
+            front_dir = root / ScatteringType.FORWARD.value
             back_dir.mkdir()
             front_dir.mkdir()
             back_path = back_dir / "back_1.nxs"

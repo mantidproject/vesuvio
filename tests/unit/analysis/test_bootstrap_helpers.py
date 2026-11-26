@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from mvesuvio.globals import ScatteringType
 from mvesuvio.util import bootstrap_helpers
 from mvesuvio.util.files_manager import FilesManager
 
@@ -25,23 +26,23 @@ class TestBootstrapHelpers(unittest.TestCase):
             result = bootstrap_helpers.get_bootstrap_input_directories(inputs_dir)
 
             self.assertEqual(result, ())
-            self.assertTrue((inputs_dir / "backward").is_dir())
-            self.assertFalse((inputs_dir / "forward").exists())
+            self.assertTrue((inputs_dir / ScatteringType.BACKWARD.value).is_dir())
+            self.assertFalse((inputs_dir / ScatteringType.FORWARD.value).exists())
 
     def test_get_bootstrap_input_directories_creates_missing_forward_directory(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             inputs_dir = Path(temp_dir) / "inputs"
-            (inputs_dir / "backward").mkdir(parents=True)
+            (inputs_dir / ScatteringType.BACKWARD.value).mkdir(parents=True)
             result = bootstrap_helpers.get_bootstrap_input_directories(inputs_dir)
 
             self.assertEqual(result, ())
-            self.assertTrue((inputs_dir / "forward").is_dir())
+            self.assertTrue((inputs_dir / ScatteringType.FORWARD.value).is_dir())
 
     def test_get_bootstrap_input_directories_returns_existing_directories(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             inputs_dir = Path(temp_dir) / "inputs"
-            backward_dir = inputs_dir / "backward"
-            forward_dir = inputs_dir / "forward"
+            backward_dir = inputs_dir / ScatteringType.BACKWARD.value
+            forward_dir = inputs_dir / ScatteringType.FORWARD.value
             backward_dir.mkdir(parents=True)
             forward_dir.mkdir()
 

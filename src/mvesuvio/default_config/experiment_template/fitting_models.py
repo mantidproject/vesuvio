@@ -6,6 +6,7 @@ models that must be evaluated one row at a time.
 """
 
 from enum import StrEnum
+from functools import cache
 
 import numpy as np
 
@@ -174,9 +175,7 @@ def _gauss3d(x, A, sig_x, sig_y, sig_z):
     return result.squeeze()
 
 
-_registered = False
-
-
+@cache
 def register_fitting_models() -> None:
     """Register built-in and user-added fitting models once per process.
 
@@ -192,10 +191,6 @@ def register_fitting_models() -> None:
     The enum member and subscription name must match; both map to the same
     string value, and this manual step keeps the configuration enum explicit.
     """
-    global _registered
-    if _registered:
-        return
-
     model_manager.subscribe(FittingModel.GAUSS, _gauss, {"A": 1, "x0": 0, "sigma": 5}, ("sigma",), VECTORISED=True)
     model_manager.subscribe(FittingModel.GAUSS_CNTR, _gauss_cntr, {"A": 1, "sigma": 5}, ("sigma",), VECTORISED=True)
     model_manager.subscribe(
@@ -240,4 +235,3 @@ def register_fitting_models() -> None:
     #     ("scale",),
     #     VECTORISED=True,
     # )
-    _registered = True

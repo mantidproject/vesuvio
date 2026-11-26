@@ -46,7 +46,7 @@ def get_workspace_name_candidates(analysis_inputs: Any) -> list[str]:
     return candidates
 
 
-def _get_scattering_type(inputs_class: Any) -> ScatteringType:
+def get_scattering_type(inputs_class: Any) -> ScatteringType:
     """Infer scattering type from user inputs."""
     name = str(getattr(inputs_class, "name", "")).lower()
     class_name = getattr(inputs_class, "__name__", "").lower()

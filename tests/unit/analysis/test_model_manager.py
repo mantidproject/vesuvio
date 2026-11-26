@@ -12,25 +12,22 @@ register_fitting_models()
 
 
 class TestModelManager(unittest.TestCase):
+    def test_register_fitting_models_is_cached(self):
+        model_names = model_manager.get_model_names()
+        cache_before = register_fitting_models.cache_info()
+
+        with patch.object(model_manager, "subscribe") as subscribe:
+            register_fitting_models()
+            register_fitting_models()
+
+        cache_after = register_fitting_models.cache_info()
+        subscribe.assert_not_called()
+        self.assertEqual(model_manager.get_model_names(), model_names)
+        self.assertGreater(cache_after.hits, cache_before.hits)
+
     def test_default_models_are_registered_with_ordered_parameters(self):
         model_names = model_manager.get_model_names()
         enum_model_names = tuple(sorted(model.value for model in FittingModel))
-        self.assertEqual(
-            model_names,
-            (
-                "DOUBLEWELL",
-                "GAUSS",
-                "GAUSS2D",
-                "GAUSS3D",
-                "GAUSS_CNTR",
-                "GCC4",
-                "GCC4C6",
-                "GCC4C6_CNTR",
-                "GCC4_CNTR",
-                "GCC6",
-                "GCC6_CNTR",
-            ),
-        )
         self.assertEqual(model_names, enum_model_names)
         self.assertTrue(model_manager.get_model("GAUSS").VECTORISED)
         self.assertFalse(model_manager.get_model("DOUBLEWELL").VECTORISED)

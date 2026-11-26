@@ -13,7 +13,6 @@ class TestFittingHelpers(unittest.TestCase):
     def test_create_table_for_fse_fit_parameters(self):
         table = fitting_helpers.create_table_for_fse_fit_parameters(
             "test_fse_free_shared",
-            "GAUSS",
             ["sigma", "width", "A0"],
             [5.0, 3.0, 1.5],
             [0.2, 0.3, 0.1],

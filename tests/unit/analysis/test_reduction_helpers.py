@@ -617,8 +617,7 @@ class TestReductionHelpers(unittest.TestCase):
                 )
             ]
         )
-        _args, kwargs = mock_save_nexus.call_args
-        self.assertEqual(kwargs["Filename"], str(path.absolute()))
+        self.assertEqual(mock_save_nexus.call_args.kwargs["Filename"], str(path.absolute()))
 
     def test_load_and_save_input_ws_if_not_on_path_backward(self):
         class BackwardInputs:
@@ -665,7 +664,7 @@ class TestReductionHelpers(unittest.TestCase):
             pass
 
         with (
-            patch.object(reduction_helpers.general_helpers, "_get_scattering_type", return_value=None),
+            patch.object(reduction_helpers.general_helpers, "get_scattering_type", return_value=None),
             self.assertRaisesRegex(ValueError, "Input class for workspace not valid: InvalidInputs"),
         ):
             reduction_helpers.store_input_ws_if_not_on_path(InvalidInputs)
@@ -1062,7 +1061,7 @@ class TestYSpaceReduction(unittest.TestCase):
             patch.object(
                 reduction_helpers,
                 "ConvertToYSpace",
-                side_effect=lambda *args, **kwargs: (
+                side_effect=lambda *_args, **kwargs: (
                     joy,
                     q_replaced_workspace if kwargs["QWorkspace"] == "tof_replaced_q" else q_workspace,
                 ),

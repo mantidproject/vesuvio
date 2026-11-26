@@ -14,8 +14,8 @@ from mvesuvio.globals import (
     WORKSPACE_FSE_SUFFIX,
     FSEFitWith,
 )
-from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util import general_helpers
+from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.global_fit_builder import GlobalFitWithFSEBuilder
 
 
@@ -76,10 +76,8 @@ def subtract_fse_contribution(ws_joy: Workspace, ws_fse: Workspace, output_works
         RHSWorkspace=ws_fse,
         OutputWorkspace=output_workspace,
     )
-    corrected_y = ws_corrected.extractY()
-    corrected_y[ws_joy.extractY() == 0] = 0
     for index in range(ws_corrected.getNumberHistograms()):
-        ws_corrected.dataY(index)[:] = corrected_y[index]
+        ws_corrected.dataY(index)[ws_joy.readY(index) == 0] = 0
     SumSpectra(InputWorkspace=ws_corrected, OutputWorkspace=ws_corrected.name() + SUM_WORKSPACE_SUFFIX)
     workspace_suffix = WORKSPACE_FSE_SUFFIX[fit_fse_with]
     ws_corrected_by_fit = CloneWorkspace(

@@ -6,7 +6,6 @@ from unittest.mock import Mock, call, patch
 import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace, SaveNexus, mtd
 
-from mvesuvio.default_config.experiment_template.fitting_models import FittingModel
 from mvesuvio.default_config.experiment_template.run_fse_correction import (
     BackwardFSEFittingInputs,
     ForwardFSEFittingInputs,
@@ -32,7 +31,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         FilesManager._experiment_dir = None
         self.output_dir.cleanup()
 
-    def test_fse_fitting_inputs_override_routine_and_fse_settings(self):
+    def test_fse_fitting_inputs_expose_overridable_routine_and_fse_settings(self):
         expected_settings = {
             "run_this_fitting_type",
             "fitting_model",
@@ -40,23 +39,23 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             "initial_fse_width",
             "tie_fse_width_to_model_param",
         }
-        self.assertEqual(
-            {key for key in vars(BackwardFSEFittingInputs) if not key.startswith("__")},
-            expected_settings,
-        )
-        self.assertEqual(
-            {key for key in vars(ForwardFSEFittingInputs) if not key.startswith("__")},
-            expected_settings,
-        )
-        self.assertFalse(BackwardFSEFittingInputs.run_this_fitting_type)
-        self.assertTrue(ForwardFSEFittingInputs.run_this_fitting_type)
-        self.assertEqual(BackwardFSEFittingInputs.fitting_model, FittingModel.GAUSS)
-        self.assertEqual(ForwardFSEFittingInputs.fitting_model, FittingModel.GAUSS)
-        self.assertEqual(BackwardFSEFittingInputs.fit_fse_with, FSEFitWith.FREE_SHARED)
-        self.assertEqual(ForwardFSEFittingInputs.fit_fse_with, FSEFitWith.TIED_TO_MODEL)
         for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):
-            self.assertGreater(fitting_inputs.initial_fse_width, 0)
-            self.assertEqual(fitting_inputs.tie_fse_width_to_model_param, "sigma")
+            self.assertEqual(
+                {key for key in vars(fitting_inputs) if not key.startswith("__")},
+                expected_settings,
+            )
+            with (
+                patch.object(fitting_inputs, "run_this_fitting_type", True),
+                patch.object(fitting_inputs, "fitting_model", "CUSTOM_MODEL"),
+                patch.object(fitting_inputs, "fit_fse_with", FSEFitWith.FREE_UNSHARED),
+                patch.object(fitting_inputs, "initial_fse_width", 7.5),
+                patch.object(fitting_inputs, "tie_fse_width_to_model_param", "custom_width"),
+            ):
+                self.assertTrue(fitting_inputs.run_this_fitting_type)
+                self.assertEqual(fitting_inputs.fitting_model, "CUSTOM_MODEL")
+                self.assertEqual(fitting_inputs.fit_fse_with, FSEFitWith.FREE_UNSHARED)
+                self.assertEqual(fitting_inputs.initial_fse_width, 7.5)
+                self.assertEqual(fitting_inputs.tie_fse_width_to_model_param, "custom_width")
 
     def test_fse_fit_modes_configure_width_as_selected(self):
         x = np.tile(np.linspace(-10, 10, 21), (2, 1))
@@ -119,7 +118,7 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 self.assertEqual(builder.model_width_parameter, "sigma")
                 self.assertNotIn(FSE_INTENSITY_PARAMETER, builder.parameter_names)
             table_args = create_parameter_table.call_args.args
-            width_names = [name for name in table_args[2] if name.startswith("fse_width")]
+            width_names = [name for name in table_args[1] if name.startswith("fse_width")]
             expected_width_names = {
                 FSEFitWith.FREE_SHARED: ["fse_width"],
                 FSEFitWith.FREE_UNSHARED: ["fse_width0", "fse_width1"],

@@ -6,6 +6,7 @@ import dill
 import numpy as np
 import scipy
 from mantid.simpleapi import AnalysisDataService
+from scipy.interpolate import CubicSpline
 
 from mvesuvio.util.analysis_helpers import (
     extend_range_of_array,
@@ -68,8 +69,6 @@ class TestAnalysisHelpers(unittest.TestCase):
         np.testing.assert_allclose(numerical_third_derivative(x, y, cached_scale), numerical_derivative)
 
     def test_numerical_third_derivative_matches_scipy_for_2d_input(self):
-        from scipy.interpolate import CubicSpline
-
         x_row = np.linspace(-1, 1, 100)
         x = np.vstack([x_row, 2 * x_row])
         y = x**3

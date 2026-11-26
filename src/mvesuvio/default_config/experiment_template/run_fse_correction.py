@@ -118,7 +118,6 @@ def run_fse_fitting(
     parameter_names, parameter_values, parameter_errors = builder.reporting_parameters(result.x, covariance)
     fitting_helpers.create_table_for_fse_fit_parameters(
         ws_joy.name() + f"_{WORKSPACE_FSE_SUFFIX[fit_fse_with]}",
-        fitting_inputs.fitting_model,
         parameter_names,
         parameter_values,
         parameter_errors,

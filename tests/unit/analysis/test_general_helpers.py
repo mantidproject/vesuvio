@@ -18,20 +18,20 @@ class TestGeneralHelpers(unittest.TestCase):
         class BackwardInputs:
             mode = Mode.DOUBLE_DIFFERENCE.value
 
-        self.assertIs(general_helpers._get_scattering_type(BackwardInputs), ScatteringType.BACKWARD)
+        self.assertIs(general_helpers.get_scattering_type(BackwardInputs), ScatteringType.BACKWARD)
 
     def test_get_scattering_type_returns_forward_enum(self):
         class ForwardInputs:
             mode = Mode.SINGLE_DIFFERENCE.value
 
-        self.assertIs(general_helpers._get_scattering_type(ForwardInputs), ScatteringType.FORWARD)
+        self.assertIs(general_helpers.get_scattering_type(ForwardInputs), ScatteringType.FORWARD)
 
     def test_get_scattering_type_rejects_unrecognized_inputs(self):
         class UnknownInputs:
             mode = "unknown"
 
         with self.assertRaisesRegex(ValueError, "Could not infer scattering type"):
-            general_helpers._get_scattering_type(UnknownInputs)
+            general_helpers.get_scattering_type(UnknownInputs)
 
     def test_get_workspace_name_candidates_returns_unique_names_in_preferred_order(self):
         class Inputs:

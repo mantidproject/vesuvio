@@ -243,7 +243,7 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
     profiles_table = create_profiles_table(ws_name + "_initial_parameters", inputs_class)
     instrument_parameters_file = str(FilesManager.get_instrument_parameters_dir() / inputs_class.instrument_parameters_file)
 
-    scattering_type = general_helpers._get_scattering_type(inputs_class)
+    scattering_type = general_helpers.get_scattering_type(inputs_class)
 
     if scattering_type == ScatteringType.FORWARD:
         inputs_class.chosen_mass_index = 0
@@ -386,7 +386,7 @@ def load_input_ws(input_class: type[BackwardAnalysisInputs | ForwardAnalysisInpu
 def store_input_ws_if_not_on_path(
     inputs_class: type[BackwardAnalysisInputs | ForwardAnalysisInputs],
 ) -> tuple[Path, Path]:
-    scattering_type = general_helpers._get_scattering_type(inputs_class)
+    scattering_type = general_helpers.get_scattering_type(inputs_class)
 
     if scattering_type == ScatteringType.BACKWARD:
         raw_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_backward_raw_filename()
