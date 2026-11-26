@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 
 from mvesuvio.analysis_fitting import fitProfileMantidFit, selectModelAndPars
-from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
+from mvesuvio.default_config.experiment_template.fitting_models import FittingModel, register_fitting_models
 from mvesuvio.util.model_manager import ModelManager, model_manager
 
 register_fitting_models()
@@ -14,6 +14,7 @@ register_fitting_models()
 class TestModelManager(unittest.TestCase):
     def test_default_models_are_registered_with_ordered_parameters(self):
         model_names = model_manager.get_model_names()
+        enum_model_names = tuple(sorted(model.value for model in FittingModel))
         self.assertEqual(
             model_names,
             (
@@ -30,6 +31,7 @@ class TestModelManager(unittest.TestCase):
                 "GCC6_CNTR",
             ),
         )
+        self.assertEqual(model_names, enum_model_names)
         self.assertTrue(model_manager.get_model("GAUSS").VECTORISED)
         self.assertFalse(model_manager.get_model("DOUBLEWELL").VECTORISED)
         self.assertFalse(model_manager.get_model("GAUSS2D").VECTORISED)
@@ -40,8 +42,9 @@ class TestModelManager(unittest.TestCase):
                 self.assertEqual(list(inspect.signature(model).parameters)[-len(shared_parameters) :], shared_parameters)
 
     def test_model_lookup_returns_independent_parameter_values(self):
-        model_name = model_manager.name("GAUSS")
+        model_name = FittingModel.GAUSS
         self.assertEqual(model_name, "GAUSS")
+        self.assertIsInstance(model_name, str)
         registered_model = model_manager.get_model(model_name)
         parameters = dict(registered_model.default_parameters)
         parameters["sigma"] = 99
@@ -75,9 +78,9 @@ class TestModelManager(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "is not defined for this model"):
             model_manager.get_model("GAUSS").parameter("missing")
 
-    def test_name_rejects_unsubscribed_models(self):
+    def test_model_lookup_rejects_unsubscribed_models(self):
         with self.assertRaisesRegex(ValueError, "is not subscribed"):
-            model_manager.name("NOT_SUBSCRIBED")
+            model_manager.get_model("NOT_SUBSCRIBED")
 
     def test_subscription_registers_a_string_model_name(self):
         manager = ModelManager()

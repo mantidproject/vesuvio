@@ -78,16 +78,10 @@ class ModelManager:
         self._models[name] = FittingModel(function, parameters, shared, VECTORISED)
         return name
 
-    def name(self, model_name: str) -> str:
-        """Return a subscribed model name, raising an error for unknown names."""
+    def get_model(self, model_name: str) -> FittingModel:
         if model_name not in self._models:
             options = ", ".join(self.get_model_names())
             raise ValueError(f"Fitting model {model_name!r} is not subscribed. Available options: {options}")
-
-        return model_name
-
-    def get_model(self, model_name: str) -> FittingModel:
-        self.name(model_name)
         model = self._models[model_name]
         return FittingModel(model.function, dict(model.default_parameters), model.shared_parameters, model.VECTORISED)
 

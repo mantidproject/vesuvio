@@ -6,7 +6,7 @@ from mantid.kernel import logger
 from mantid.simpleapi import mtd
 from scipy.optimize import NonlinearConstraint, OptimizeResult, minimize
 
-from mvesuvio.default_config.experiment_template.fitting_models import register_fitting_models
+from mvesuvio.default_config.experiment_template.fitting_models import FittingModel, register_fitting_models
 from mvesuvio.globals import (
     CORRECTED_WORKSPACE_SUFFIX,
     JOY_AVG_WORKSPACE_SUFFIX,
@@ -54,7 +54,7 @@ else:
 
 class BackwardFSEFittingInputs(BackwardAnalysisInputs):
     run_this_fitting_type = False
-    fitting_model = model_manager.name("GAUSS")
+    fitting_model = FittingModel.GAUSS
     fit_fse_with = FSEFitWith.FREE_SHARED
     initial_fse_width = 5.0
     tie_fse_width_to_model_param = "sigma"
@@ -62,7 +62,7 @@ class BackwardFSEFittingInputs(BackwardAnalysisInputs):
 
 class ForwardFSEFittingInputs(ForwardAnalysisInputs):
     run_this_fitting_type = True
-    fitting_model = model_manager.name("GAUSS")
+    fitting_model = FittingModel.GAUSS
     fit_fse_with = FSEFitWith.TIED_TO_MODEL
     initial_fse_width = 3.0
     tie_fse_width_to_model_param = "sigma"

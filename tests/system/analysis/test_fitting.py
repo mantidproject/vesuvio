@@ -16,8 +16,8 @@ from shutil import copyfile, rmtree
 
 from mantid.simpleapi import AnalysisDataService, CompareWorkspaces, Load, LoadAscii, mtd
 
+from mvesuvio.default_config.experiment_template.fitting_models import FittingModel
 from mvesuvio.util import handle_config
-from mvesuvio.util.model_manager import model_manager
 
 TESTS_ROOT = Path(__file__).resolve().parents[2]
 FITTING_INPUTS_PATH = TESTS_ROOT / "data" / "analysis" / "inputs" / "fitting"
@@ -49,7 +49,7 @@ class TestFitting(unittest.TestCase):
         namespace = runpy.run_path(str(fitting_script), run_name="test_fitting_run_fitting")
         namespace["BackwardFittingInputs"].run_this_fitting_type = False
         namespace["ForwardFittingInputs"].run_this_fitting_type = True
-        namespace["ForwardFittingInputs"].fitting_model = model_manager.name("GAUSS")
+        namespace["ForwardFittingInputs"].fitting_model = FittingModel.GAUSS
         namespace["BackwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["ForwardAnalysisInputs"].number_of_iterations_for_corrections = 0
         namespace["BackwardAnalysisInputs"].do_symmetrisation = False

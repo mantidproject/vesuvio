@@ -6,6 +6,7 @@ from unittest.mock import Mock, call, patch
 import numpy as np
 from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace, mtd
 
+from mvesuvio.default_config.experiment_template.fitting_models import FittingModel
 from mvesuvio.default_config.experiment_template.run_fitting import load_saved_fitting_input_workspaces
 from mvesuvio.default_config.experiment_template.run_fse_correction import (
     BackwardFSEFittingInputs,
@@ -19,7 +20,6 @@ from mvesuvio.globals import WORKSPACE_FSE_SUFFIX, FSEFitWith
 from mvesuvio.util import fitting_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitWithFSEBuilder
-from mvesuvio.util.model_manager import model_manager
 
 
 class TestFittingInputsRoundTrip(unittest.TestCase):
@@ -51,8 +51,8 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         )
         self.assertFalse(BackwardFSEFittingInputs.run_this_fitting_type)
         self.assertTrue(ForwardFSEFittingInputs.run_this_fitting_type)
-        self.assertEqual(BackwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
-        self.assertEqual(ForwardFSEFittingInputs.fitting_model, model_manager.name("GAUSS"))
+        self.assertEqual(BackwardFSEFittingInputs.fitting_model, FittingModel.GAUSS)
+        self.assertEqual(ForwardFSEFittingInputs.fitting_model, FittingModel.GAUSS)
         self.assertEqual(BackwardFSEFittingInputs.fit_fse_with, FSEFitWith.FREE_SHARED)
         self.assertEqual(ForwardFSEFittingInputs.fit_fse_with, FSEFitWith.TIED_TO_MODEL)
         for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):

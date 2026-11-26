@@ -5,9 +5,37 @@ and row-wise parameters shaped as ``(n_rows, 1)``. Set it to ``False`` for
 models that must be evaluated one row at a time.
 """
 
+from enum import StrEnum
+
 import numpy as np
 
 from mvesuvio.util.model_manager import model_manager
+
+
+class FittingModel(StrEnum):
+    """Available fitting model names.
+
+    When adding a fitting function, add its registration name here and then
+    subscribe the function in ``register_fitting_models`` below. Enum members
+    provide the string value used by fitting configuration; subscriptions
+    provide the implementation and default parameters.
+    """
+
+    GAUSS = "GAUSS"
+    GAUSS_CNTR = "GAUSS_CNTR"
+    GCC4C6 = "GCC4C6"
+    GCC4C6_CNTR = "GCC4C6_CNTR"
+    GCC4 = "GCC4"
+    GCC4_CNTR = "GCC4_CNTR"
+    GCC6 = "GCC6"
+    GCC6_CNTR = "GCC6_CNTR"
+    DOUBLEWELL = "DOUBLEWELL"
+    GAUSS2D = "GAUSS2D"
+    GAUSS3D = "GAUSS3D"
+
+
+# Descriptive alias for code that refers to the enum as a name rather than a model.
+FittingModelName = FittingModel
 
 
 def _gauss(x, A, x0, sigma):
@@ -150,34 +178,66 @@ _registered = False
 
 
 def register_fitting_models() -> None:
-    """Register built-in and user-added fitting models once per process."""
+    """Register built-in and user-added fitting models once per process.
+
+    To add a new fitting model:
+    1. Define a StrEnum member in ``FittingModel`` with the model name.
+    2. Define the fitting function in this file.
+    3. Subscribe the function below using ``FittingModel.<YOUR_MODEL>`` as
+       the name, and add its defaults, shared parameters, and VECTORISED flag.
+       Set VECTORISED=True when the function can act on a 2D NumPy array and
+       calculate the function row-wise. Set it to False for functions that must
+       be evaluated one row at a time.
+
+    The enum member and subscription name must match; both map to the same
+    string value, and this manual step keeps the configuration enum explicit.
+    """
     global _registered
     if _registered:
         return
 
-    model_manager.subscribe("GAUSS", _gauss, {"A": 1, "x0": 0, "sigma": 5}, ("sigma",), VECTORISED=True)
-    model_manager.subscribe("GAUSS_CNTR", _gauss_cntr, {"A": 1, "sigma": 5}, ("sigma",), VECTORISED=True)
+    model_manager.subscribe(FittingModel.GAUSS, _gauss, {"A": 1, "x0": 0, "sigma": 5}, ("sigma",), VECTORISED=True)
+    model_manager.subscribe(FittingModel.GAUSS_CNTR, _gauss_cntr, {"A": 1, "sigma": 5}, ("sigma",), VECTORISED=True)
     model_manager.subscribe(
-        "GCC4C6",
+        FittingModel.GCC4C6,
         _gcc4c6,
         {"A": 1, "x0": 0, "sigma1": 6, "c4": 0, "c6": 0},
         ("sigma1", "c4", "c6"),
         VECTORISED=True,
     )
-    model_manager.subscribe("GCC4C6_CNTR", _gcc4c6_cntr, {"A": 1, "sigma1": 6, "c4": 0, "c6": 0}, ("sigma1", "c4", "c6"), VECTORISED=True)
-    model_manager.subscribe("GCC4", _gcc4, {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}, ("sigma1", "c4"), VECTORISED=True)
-    model_manager.subscribe("GCC4_CNTR", _gcc4_cntr, {"A": 1, "sigma1": 6, "c4": 0}, ("sigma1", "c4"), VECTORISED=True)
-    model_manager.subscribe("GCC6", _gcc6, {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}, ("sigma1", "c6"), VECTORISED=True)
-    model_manager.subscribe("GCC6_CNTR", _gcc6_cntr, {"A": 1, "sigma1": 6, "c6": 0}, ("sigma1", "c6"), VECTORISED=True)
     model_manager.subscribe(
-        "DOUBLEWELL",
+        FittingModel.GCC4C6_CNTR,
+        _gcc4c6_cntr,
+        {"A": 1, "sigma1": 6, "c4": 0, "c6": 0},
+        ("sigma1", "c4", "c6"),
+        VECTORISED=True,
+    )
+    model_manager.subscribe(FittingModel.GCC4, _gcc4, {"A": 1, "x0": 0, "sigma1": 6, "c4": 0}, ("sigma1", "c4"), VECTORISED=True)
+    model_manager.subscribe(FittingModel.GCC4_CNTR, _gcc4_cntr, {"A": 1, "sigma1": 6, "c4": 0}, ("sigma1", "c4"), VECTORISED=True)
+    model_manager.subscribe(FittingModel.GCC6, _gcc6, {"A": 1, "x0": 0, "sigma1": 6, "c6": 0}, ("sigma1", "c6"), VECTORISED=True)
+    model_manager.subscribe(FittingModel.GCC6_CNTR, _gcc6_cntr, {"A": 1, "sigma1": 6, "c6": 0}, ("sigma1", "c6"), VECTORISED=True)
+    model_manager.subscribe(
+        FittingModel.DOUBLEWELL,
         _doublewell,
         {"A": 1, "d": 1, "R": 1, "sig1": 3, "sig2": 5},
         ("d", "R", "sig1", "sig2"),
         VECTORISED=False,
     )
-    model_manager.subscribe("GAUSS2D", _gauss2d, {"A": 1, "sig1": 3, "sig2": 5}, ("sig1", "sig2"), VECTORISED=False)
+    model_manager.subscribe(FittingModel.GAUSS2D, _gauss2d, {"A": 1, "sig1": 3, "sig2": 5}, ("sig1", "sig2"), VECTORISED=False)
     model_manager.subscribe(
-        "GAUSS3D", _gauss3d, {"A": 1, "sig_x": 5, "sig_y": 5, "sig_z": 5}, ("sig_x", "sig_y", "sig_z"), VECTORISED=False
+        FittingModel.GAUSS3D,
+        _gauss3d,
+        {"A": 1, "sig_x": 5, "sig_y": 5, "sig_z": 5},
+        ("sig_x", "sig_y", "sig_z"),
+        VECTORISED=False,
     )
+
+    # Subscribe additional user models here, using a matching enum member:
+    # model_manager.subscribe(
+    #     FittingModel.MY_MODEL,
+    #     _my_model,
+    #     {"A": 1, "scale": 2},
+    #     ("scale",),
+    #     VECTORISED=True,
+    # )
     _registered = True

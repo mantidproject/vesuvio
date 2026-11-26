@@ -24,6 +24,7 @@ from mantid.simpleapi import (
 )
 from scipy import optimize, signal
 
+from mvesuvio.default_config.experiment_template.fitting_models import FittingModel
 from mvesuvio.globals import Masking
 from mvesuvio.util import handle_config
 from mvesuvio.util.general_helpers import extractWS, print_table_workspace
@@ -109,11 +110,11 @@ def fitProfileMinuit(yFitIC, wsYSpaceSym, wsRes):
     m = Minuit(costFun, **defaultPars)
 
     m.limits["A"] = (0, None)
-    if yFitIC.fitting_model == model_manager.name("DOUBLEWELL"):
+    if yFitIC.fitting_model == FittingModel.DOUBLEWELL:
         m.limits["d"] = (0, None)
         m.limits["R"] = (0, None)
 
-    if yFitIC.fitting_model == model_manager.name("GAUSS"):
+    if yFitIC.fitting_model == FittingModel.GAUSS:
         m.simplex()
         m.migrad()
 
@@ -289,7 +290,7 @@ def runMinos(mObj, yFitIC, constrFunc, wsName):
         bestFitVals[p] = v
         bestFitErrs[p] = e
 
-    if yFitIC.fitting_model == model_manager.name("GAUSS"):  # Case with no positivity constraint, can use automatic minos()
+    if yFitIC.fitting_model == FittingModel.GAUSS:  # Case with no positivity constraint, can use automatic minos()
         mObj.minos()
         me = mObj.merrors
 
@@ -563,13 +564,13 @@ def oddPointsRes(x, res):
 def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
     logger.notice("\nFitting on the sum of spectra in the West domain ...\n")
     for minimizer in ["Levenberg-Marquardt", "Simplex"]:
-        if yFitIC.fitting_model == model_manager.name("GAUSS"):
+        if yFitIC.fitting_model == FittingModel.GAUSS:
             function = f"""composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0;
             name=UserFunction,Formula=y0 + A*exp( -(x-x0)^2/2/sigma^2)/(2*3.1415*sigma^2)^0.5,
             y0=0,A=1,x0=0,sigma=5,   ties=()"""
 
-        elif yFitIC.fitting_model == model_manager.name("GCC4C6"):
+        elif yFitIC.fitting_model == FittingModel.GCC4C6:
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -578,7 +579,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             (64*((x-x0)/sqrt(2)/sigma1)^6 - 480*((x-x0)/sqrt(2)/sigma1)^4 + 720*((x-x0)/sqrt(2)/sigma1)^2 - 120)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,c6=0.0,ties=(),constraints=(0<c4,0<c6)
             """
-        elif yFitIC.fitting_model == model_manager.name("GCC4"):
+        elif yFitIC.fitting_model == FittingModel.GCC4:
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -586,7 +587,7 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             *(1.+c4/32.*(16.*((x-x0)/sqrt(2)/sigma1)^4-48.*((x-x0)/sqrt(2)/sigma1)^2+12)),
             y0=0, A=1,x0=0,sigma1=4.0,c4=0.0,ties=()
             """
-        elif yFitIC.fitting_model == model_manager.name("GCC6"):
+        elif yFitIC.fitting_model == FittingModel.GCC6:
             function = f"""
             composite=Convolution,FixResolution=true,NumDeriv=true;
             name=Resolution,Workspace={wsRes.name()},WorkspaceIndex=0,X=(),Y=();
@@ -595,13 +596,13 @@ def fitProfileMantidFit(yFitIC, wsYSpaceSym, wsRes):
             y0=0, A=1,x0=0,sigma1=4.0,c6=0.0,ties=()
             """
         elif (
-            (yFitIC.fitting_model == model_manager.name("DOUBLEWELL"))
-            | (yFitIC.fitting_model == model_manager.name("GAUSS2D"))
-            | (yFitIC.fitting_model == model_manager.name("GAUSS3D"))
-            | (yFitIC.fitting_model == model_manager.name("GAUSS_CNTR"))
-            | (yFitIC.fitting_model == model_manager.name("GCC4C6_CNTR"))
-            | (yFitIC.fitting_model == model_manager.name("GCC4_CNTR"))
-            | (yFitIC.fitting_model == model_manager.name("GCC6_CNTR"))
+            (yFitIC.fitting_model == FittingModel.DOUBLEWELL)
+            | (yFitIC.fitting_model == FittingModel.GAUSS2D)
+            | (yFitIC.fitting_model == FittingModel.GAUSS3D)
+            | (yFitIC.fitting_model == FittingModel.GAUSS_CNTR)
+            | (yFitIC.fitting_model == FittingModel.GCC4C6_CNTR)
+            | (yFitIC.fitting_model == FittingModel.GCC4_CNTR)
+            | (yFitIC.fitting_model == FittingModel.GCC6_CNTR)
         ):
             logger.warning("Fitting model recognized but not currently implemented in Mantid Fit. Skipping Mantid Fit ...")
             return
@@ -671,12 +672,12 @@ def runGlobalFit(wsYSpace, wsRes, IC):
     for i in range(len(dataY)):  # Set limits for unshared parameters
         m.limits["A" + str(i)] = (0, np.inf)
 
-    if IC.fitting_model == model_manager.name("DOUBLEWELL"):
+    if IC.fitting_model == FittingModel.DOUBLEWELL:
         m.limits["d"] = (0, np.inf)  # Shared parameters
         m.limits["R"] = (0, np.inf)
 
     t0 = time.time()
-    if IC.fitting_model == model_manager.name("GAUSS"):
+    if IC.fitting_model == FittingModel.GAUSS:
         m.simplex()
         m.migrad()
 
