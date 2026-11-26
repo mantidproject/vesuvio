@@ -131,18 +131,31 @@ def run_fse_fitting(
 
 def run_fse_correction_for_inputs(
     fitting_inputs: type[BackwardFSEFittingInputs] | type[ForwardFSEFittingInputs],
-    available_workspace_names: set[str] | None = None,
 ) -> None:
     workspace_name_candidates = general_helpers.get_workspace_name_candidates(fitting_inputs)
-    found_candidate = False
+    candidate_names = []
     for candidate in workspace_name_candidates:
-        resolution_name = candidate + RESOLUTION_WORKSPACE_SUFFIX
-        joy_name = candidate + JOY_WORKSPACE_SUFFIX
-        q_name = candidate + Q_WORKSPACE_SUFFIX
-        names = (resolution_name, joy_name, q_name)
-        if (available_workspace_names is None or all(name in available_workspace_names for name in names)) and all(
-            AnalysisDataService.doesExist(name) for name in names
-        ):
+        candidate_names.append(
+            (
+                candidate,
+                (
+                    candidate + RESOLUTION_WORKSPACE_SUFFIX,
+                    candidate + JOY_WORKSPACE_SUFFIX,
+                    candidate + Q_WORKSPACE_SUFFIX,
+                ),
+            )
+        )
+
+    if not any(all(AnalysisDataService.doesExist(name) for name in names) for _, names in candidate_names):
+        general_helpers.load_saved_fitting_input_workspaces(
+            FilesManager.get_reduction_outputs_dir(),
+            (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX, Q_WORKSPACE_SUFFIX),
+        )
+
+    found_candidate = False
+    for candidate, names in candidate_names:
+        resolution_name, joy_name, q_name = names
+        if all(AnalysisDataService.doesExist(name) for name in names):
             found_candidate = True
             corrected_name = candidate + CORRECTED_WORKSPACE_SUFFIX + JOY_WORKSPACE_SUFFIX
             run_fse_fitting(mtd[resolution_name], mtd[joy_name], mtd[q_name], fitting_inputs, corrected_name)
@@ -160,13 +173,9 @@ def run_fse_correction_for_inputs(
 
 
 def run_fse_correction() -> None:
-    available_workspace_names = general_helpers.load_saved_fitting_input_workspaces(
-        FilesManager.get_reduction_outputs_dir(),
-        (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX, Q_WORKSPACE_SUFFIX),
-    )
     for fitting_inputs in (BackwardFSEFittingInputs, ForwardFSEFittingInputs):
         if fitting_inputs.run_this_fitting_type:
-            run_fse_correction_for_inputs(fitting_inputs, available_workspace_names)
+            run_fse_correction_for_inputs(fitting_inputs)
     general_helpers.make_summarised_log_file()
 
 

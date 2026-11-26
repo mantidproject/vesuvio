@@ -87,17 +87,29 @@ class ForwardFittingInputs(ForwardAnalysisInputs):
 def run_y_space_reduction_and_fit(
     fitting_inputs: type[BackwardFittingInputs] | type[ForwardFittingInputs],
 ) -> bool:
-    general_helpers.load_saved_fitting_input_workspaces(
-        FilesManager.get_fse_correction_outputs_dir(), (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX)
-    )
     ws_name_candidates = general_helpers.get_workspace_name_candidates(fitting_inputs)
+    candidate_names = []
+    for base_candidate in ws_name_candidates:
+        candidate = base_candidate + CORRECTED_WORKSPACE_SUFFIX
+        candidate_names.append(
+            (
+                candidate,
+                (
+                    candidate + RESOLUTION_WORKSPACE_SUFFIX,
+                    candidate + JOY_WORKSPACE_SUFFIX,
+                    candidate + JOY_AVG_WORKSPACE_SUFFIX,
+                ),
+            )
+        )
 
-    for candidate in ws_name_candidates:
-        candidate += CORRECTED_WORKSPACE_SUFFIX
-        resolution_name = candidate + RESOLUTION_WORKSPACE_SUFFIX
-        joy_name = candidate + JOY_WORKSPACE_SUFFIX
-        joy_avg_name = candidate + JOY_AVG_WORKSPACE_SUFFIX
-        names = (resolution_name, joy_name, joy_avg_name)
+    if not any(all(AnalysisDataService.doesExist(name) for name in names) for _, names in candidate_names):
+        general_helpers.load_saved_fitting_input_workspaces(
+            FilesManager.get_fse_correction_outputs_dir(),
+            (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX),
+        )
+
+    for candidate, names in candidate_names:
+        resolution_name, joy_name, joy_avg_name = names
         if all(AnalysisDataService.doesExist(name) for name in names):
             fitting_directory = FilesManager.get_fitting_outputs_dir()
             fitting_directory.mkdir(parents=True, exist_ok=True)

@@ -4,10 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 import numpy as np
-from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace, mtd
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, GroupWorkspaces, RenameWorkspace, SaveNexus, mtd
 
 from mvesuvio.default_config.experiment_template.fitting_models import FittingModel
-from mvesuvio.default_config.experiment_template.run_fitting import load_saved_fitting_input_workspaces
 from mvesuvio.default_config.experiment_template.run_fse_correction import (
     BackwardFSEFittingInputs,
     ForwardFSEFittingInputs,
@@ -17,7 +16,7 @@ from mvesuvio.default_config.experiment_template.run_fse_correction import (
 )
 from mvesuvio.default_config.experiment_template.run_reduction import ForwardAnalysisInputs
 from mvesuvio.globals import WORKSPACE_FSE_SUFFIX, FSEFitWith
-from mvesuvio.util import fitting_helpers, reduction_helpers
+from mvesuvio.util import fitting_helpers, general_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitWithFSEBuilder
 
@@ -211,7 +210,10 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue((reduction_outputs / f"{ws_name}_q.nxs").exists())
         (reduction_outputs / f"{ws_name}.nxs").write_text("not a derived workspace")
 
-        load_saved_fitting_input_workspaces()
+        general_helpers.load_saved_fitting_input_workspaces(
+            FilesManager.get_fse_correction_outputs_dir(),
+            ("ws_resolution", "joy", "joy_avg"),
+        )
 
         self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
         self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_joy"))
@@ -260,7 +262,10 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         np.testing.assert_array_equal(mtd[f"{ws_name}_corr_ws_resolution"].extractY(), mtd[f"{ws_name}_ws_resolution"].extractY())
         AnalysisDataService.clear()
         self.assertEqual(
-            load_saved_fitting_input_workspaces(),
+            general_helpers.load_saved_fitting_input_workspaces(
+                FilesManager.get_fse_correction_outputs_dir(),
+                ("ws_resolution", "joy", "joy_avg"),
+            ),
             {f"{ws_name}_corr_ws_resolution", f"{ws_name}_corr_joy", f"{ws_name}_corr_joy_avg"},
         )
         self.assertFalse(AnalysisDataService.doesExist(f"{ws_name}_ws_resolution"))
@@ -271,6 +276,43 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
         self.assertTrue(AnalysisDataService.doesExist(f"{ws_name}_corr_joy_avg"))
         np.testing.assert_array_equal(mtd[f"{ws_name}_corr_joy"].extractY(), [[9, 8, 7]])
         np.testing.assert_array_equal(mtd[f"{ws_name}_corr_joy_avg"].extractY(), [[9, 8, 7]])
+
+    def test_uses_ads_fse_workspaces_without_loading_from_disk(self):
+        candidate = "front_0"
+        for suffix in ("ws_resolution", "joy", "q"):
+            CreateWorkspace(
+                DataX=[0, 1, 2],
+                DataY=[1, 2, 3],
+                DataE=[1, 1, 1],
+                NSpec=1,
+                UnitX="TOF",
+                OutputWorkspace=f"{candidate}_{suffix}",
+            )
+
+        with (
+            patch(
+                "mvesuvio.util.general_helpers.get_workspace_name_candidates",
+                return_value=[candidate],
+            ),
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
+            patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_corrected_outputs") as save_corrected,
+            patch(
+                "mvesuvio.default_config.experiment_template.run_fse_correction.general_helpers.load_saved_fitting_input_workspaces"
+            ) as mock_load,
+        ):
+            fse_fitting.side_effect = lambda _, __, ___, ____, corrected_name: CreateWorkspace(
+                DataX=[0, 1, 2],
+                DataY=[1, 2, 3],
+                DataE=[1, 1, 1],
+                NSpec=1,
+                UnitX="TOF",
+                OutputWorkspace=corrected_name,
+            )
+            run_fse_correction_for_inputs(ForwardFSEFittingInputs)
+
+        mock_load.assert_not_called()
+        fse_fitting.assert_called_once()
+        save_corrected.assert_called_once()
 
     def test_fse_correction_runs_for_each_available_candidate(self):
         workspaces = {
@@ -295,9 +337,13 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.mtd", workspaces),
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_corrected_outputs") as save_corrected,
+            patch(
+                "mvesuvio.default_config.experiment_template.run_fse_correction.general_helpers.load_saved_fitting_input_workspaces"
+            ) as mock_load,
         ):
             run_fse_correction_for_inputs(ForwardFSEFittingInputs)
 
+        mock_load.assert_not_called()
         self.assertEqual(
             fse_fitting.call_args_list,
             [
@@ -334,12 +380,54 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
             patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_corrected_outputs"),
         ):
-            run_fse_correction_for_inputs(ForwardFSEFittingInputs, {"first_ws_resolution", "first_joy", "first_q"})
+            run_fse_correction_for_inputs(ForwardFSEFittingInputs)
         fse_fitting.assert_called_once()
 
+    def test_loads_fse_correction_workspaces_from_disk_when_missing_from_ads(self):
+        with tempfile.TemporaryDirectory() as output_dir:
+            FilesManager.set_experiment_dir(output_dir)
+            AnalysisDataService.clear()
+
+            candidate = "front_0"
+            output_directory = FilesManager.get_reduction_outputs_dir()
+            for suffix in ("ws_resolution", "joy", "q"):
+                workspace = CreateWorkspace(
+                    DataX=[0, 1, 2],
+                    DataY=[1, 2, 3],
+                    DataE=[1, 1, 1],
+                    NSpec=1,
+                    UnitX="TOF",
+                    OutputWorkspace=f"{candidate}_{suffix}",
+                )
+                SaveNexus(workspace, str(output_directory / f"{candidate}_{suffix}.nxs"))
+
+            AnalysisDataService.clear()
+
+            with (
+                patch(
+                    "mvesuvio.util.general_helpers.get_workspace_name_candidates",
+                    return_value=[candidate],
+                ),
+                patch("mvesuvio.default_config.experiment_template.run_fse_correction.run_fse_fitting") as fse_fitting,
+                patch("mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_corrected_outputs") as save_corrected,
+            ):
+                fse_fitting.side_effect = lambda _, __, ___, ____, corrected_name: CreateWorkspace(
+                    DataX=[0, 1, 2],
+                    DataY=[1, 2, 3],
+                    DataE=[1, 1, 1],
+                    NSpec=1,
+                    UnitX="TOF",
+                    OutputWorkspace=corrected_name,
+                )
+                run_fse_correction_for_inputs(ForwardFSEFittingInputs)
+
+            fse_fitting.assert_called_once()
+            save_corrected.assert_called_once()
+            self.assertTrue(AnalysisDataService.doesExist(f"{candidate}_ws_resolution"))
+            self.assertTrue(AnalysisDataService.doesExist(f"{candidate}_joy"))
+            self.assertTrue(AnalysisDataService.doesExist(f"{candidate}_q"))
+
     def test_fse_correction_does_not_use_workspaces_missing_from_reduction_outputs(self):
-        for suffix in ("ws_resolution", "joy", "q"):
-            CreateWorkspace(DataX=[0, 1, 2], DataY=[1, 2, 3], DataE=[1, 1, 1], NSpec=1, OutputWorkspace=f"front_0_{suffix}")
         with (
             patch.object(ForwardFSEFittingInputs, "name_of_subtracted_workspace", "front"),
             patch.object(ForwardFSEFittingInputs, "overwrite_analysis_input_workspace", ""),

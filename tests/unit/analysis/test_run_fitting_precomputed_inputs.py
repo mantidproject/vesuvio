@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from mantid.simpleapi import AnalysisDataService, CreateWorkspace
+from mantid.simpleapi import AnalysisDataService, CreateWorkspace, SaveNexus
 
 from mvesuvio.default_config.experiment_template.run_fitting import ForwardFittingInputs, run_fitting, run_y_space_reduction_and_fit
 from mvesuvio.util.files_manager import FilesManager
@@ -16,7 +16,7 @@ class TestRunFittingPrecomputedInputs(unittest.TestCase):
 
     @patch("mvesuvio.default_config.experiment_template.run_fitting.SaveAscii")
     @patch("mvesuvio.default_config.experiment_template.run_fitting.FitInYSpace")
-    def test_runs_fit_when_precomputed_workspaces_exist(self, mock_fit_class, mock_save_ascii):
+    def test_uses_ads_fitting_workspaces_without_loading_from_disk(self, mock_fit_class, mock_save_ascii):
         with tempfile.TemporaryDirectory() as output_dir:
             FilesManager.set_experiment_dir(output_dir)
             AnalysisDataService.clear()
@@ -49,9 +49,13 @@ class TestRunFittingPrecomputedInputs(unittest.TestCase):
 
             ForwardFittingInputs.number_of_iterations_for_corrections = 0
 
-            result = run_y_space_reduction_and_fit(ForwardFittingInputs)
+            with patch(
+                "mvesuvio.default_config.experiment_template.run_fitting.general_helpers.load_saved_fitting_input_workspaces"
+            ) as mock_load:
+                result = run_y_space_reduction_and_fit(ForwardFittingInputs)
 
             self.assertTrue(result)
+            mock_load.assert_not_called()
             self.assertTrue(FilesManager.get_fse_correction_outputs_dir().exists())
             mock_fit_class.assert_called_once()
             fit_args = mock_fit_class.call_args.args
@@ -63,6 +67,41 @@ class TestRunFittingPrecomputedInputs(unittest.TestCase):
                 f"{ws_prefix}_ws_resolution",
                 str(Path(output_dir) / "fitting_outputs" / f"{ws_prefix}_ws_resolution"),
             )
+
+    @patch("mvesuvio.default_config.experiment_template.run_fitting.SaveAscii")
+    @patch("mvesuvio.default_config.experiment_template.run_fitting.FitInYSpace")
+    def test_loads_fitting_workspaces_from_disk_when_missing_from_ads(self, mock_fit_class, mock_save_ascii):
+        with tempfile.TemporaryDirectory() as output_dir:
+            FilesManager.set_experiment_dir(output_dir)
+            AnalysisDataService.clear()
+
+            ws_prefix = "front_0_corr"
+            output_directory = FilesManager.get_fse_correction_outputs_dir()
+            for suffix in ("ws_resolution", "joy", "joy_avg"):
+                workspace = CreateWorkspace(
+                    DataX=[0, 1, 2],
+                    DataY=[1, 2, 3],
+                    DataE=[1, 1, 1],
+                    NSpec=1,
+                    UnitX="TOF",
+                    OutputWorkspace=f"{ws_prefix}_{suffix}",
+                )
+                SaveNexus(workspace, str(output_directory / f"{ws_prefix}_{suffix}.nxs"))
+
+            AnalysisDataService.clear()
+
+            with patch(
+                "mvesuvio.util.general_helpers.get_workspace_name_candidates",
+                return_value=["front_0"],
+            ):
+                result = run_y_space_reduction_and_fit(ForwardFittingInputs)
+
+            self.assertTrue(result)
+            mock_fit_class.assert_called_once()
+            mock_save_ascii.assert_called_once()
+            self.assertTrue(AnalysisDataService.doesExist(f"{ws_prefix}_ws_resolution"))
+            self.assertTrue(AnalysisDataService.doesExist(f"{ws_prefix}_joy"))
+            self.assertTrue(AnalysisDataService.doesExist(f"{ws_prefix}_joy_avg"))
 
     @patch("mvesuvio.default_config.experiment_template.run_fitting.FitInYSpace")
     def test_skips_fit_when_precomputed_workspaces_missing(self, mock_fit_class):
