@@ -19,6 +19,7 @@ from mvesuvio.globals import WORKSPACE_FSE_SUFFIX, FSEFitWith
 from mvesuvio.util import fitting_helpers, general_helpers, reduction_helpers
 from mvesuvio.util.files_manager import FilesManager
 from mvesuvio.util.global_fit_builder import FSE_INTENSITY_PARAMETER, GlobalFitWithFSEBuilder
+from mvesuvio.util.model_manager import ModelManager
 
 
 class TestFittingInputsRoundTrip(unittest.TestCase):
@@ -126,6 +127,72 @@ class TestFittingInputsRoundTrip(unittest.TestCase):
                 FSEFitWith.TIED_TO_MODEL: [],
             }
             self.assertEqual(width_names, expected_width_names[fit_with])
+
+    def test_fse_fitting_respects_registered_vectorisation(self):
+        x = np.tile(np.linspace(-10, 10, 21), (2, 1))
+        resolution = np.exp(-(x**2))
+        errors = np.ones_like(x)
+        ws_joy = Mock()
+        ws_joy.name.return_value = "test_joy"
+        ws_q = Mock()
+        ws_q.extractY.return_value = np.ones_like(x)
+        ws_fse = Mock()
+
+        def make_model(vectorised):
+            def model(x, A, sigma):
+                self.assertEqual(x.ndim, 2 if vectorised else 1)
+                if vectorised:
+                    x = x - 0 * x[:, 0:1]
+                return A * np.exp(-((x / sigma) ** 2))
+
+            return model
+
+        for vectorised in (False, True):
+            with self.subTest(vectorised=vectorised):
+                model = make_model(vectorised)
+                manager = ModelManager()
+                manager.subscribe("custom", model, {"A": 1.0, "sigma": 2.0}, ("sigma",), VECTORISED=vectorised)
+                expected_builder = GlobalFitWithFSEBuilder(
+                    x,
+                    errors,
+                    errors,
+                    resolution,
+                    model,
+                    {"A": 1.0, "sigma": 2.0},
+                    ("sigma",),
+                    q=np.ones_like(x),
+                    model_width_parameter="sigma",
+                    VECTORISED=vectorised,
+                )
+                y = expected_builder.convolved_model(expected_builder.initial_vector()) + 1
+
+                class FittingInputs(ForwardFSEFittingInputs):
+                    fitting_model = "custom"
+                    fit_fse_with = FSEFitWith.TIED_TO_MODEL
+                    tie_fse_width_to_model_param = "sigma"
+
+                with (
+                    patch("mvesuvio.default_config.experiment_template.run_fse_correction.model_manager", manager),
+                    patch(
+                        "mvesuvio.default_config.experiment_template.run_fse_correction.extractWS",
+                        side_effect=[(x, y, errors), (x, resolution, errors)],
+                    ),
+                    patch(
+                        "mvesuvio.default_config.experiment_template.run_fse_correction.save_fse_fit_results",
+                        return_value=(None, None, ws_fse),
+                    ),
+                    patch("mvesuvio.default_config.experiment_template.run_fse_correction.subtract_fse_contribution") as subtract_fse,
+                    patch(
+                        "mvesuvio.default_config.experiment_template.run_fse_correction.fitting_helpers.create_table_for_fse_fit_parameters"
+                    ),
+                ):
+                    builder, result = run_fse_fitting(Mock(), ws_joy, ws_q, FittingInputs, "test_corr_joy")
+
+                self.assertEqual(builder.VECTORISED, vectorised)
+                self.assertTrue(result.success, result.message)
+                np.testing.assert_allclose(builder.convolved_model(result.x), y, atol=1e-5)
+                self.assertEqual(builder.fse_contribution(result.x).shape, x.shape)
+                subtract_fse.assert_called_once_with(ws_joy, ws_fse, "test_corr_joy", FSEFitWith.TIED_TO_MODEL)
 
     @staticmethod
     def _create_resolution_workspace(output_workspace):

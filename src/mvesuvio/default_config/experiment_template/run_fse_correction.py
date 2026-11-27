@@ -90,6 +90,7 @@ def run_fse_fitting(
         shared_parameters,
         q=q,
         model_width_parameter=model_width_parameter,
+        VECTORISED=definition.VECTORISED,
     )
 
     result = minimize(
