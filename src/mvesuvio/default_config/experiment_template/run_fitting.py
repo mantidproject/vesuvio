@@ -5,35 +5,22 @@ from mantid.kernel import logger
 from mantid.simpleapi import SaveAscii, mtd
 
 from mvesuvio.analysis_fitting import FitInYSpace
-from mvesuvio.default_config.experiment_template.fitting_models import FittingModel, register_fitting_models
 from mvesuvio.globals import CORRECTED_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, RESOLUTION_WORKSPACE_SUFFIX
 from mvesuvio.util import general_helpers
 from mvesuvio.util.files_manager import FilesManager
 
-register_fitting_models()
-
-if TYPE_CHECKING:
+if TYPE_CHECKING or __package__:
+    from .fitting_models import FittingModel, register_fitting_models
     from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
 else:
-    try:
-        # Preferred import path when this module is executed as part of the package.
-        from .run_reduction import BackwardAnalysisInputs, ForwardAnalysisInputs
-    except ImportError:
-        # Fallback for direct/script execution: load sibling run_reduction.py by file path.
-        import importlib.util
-        from pathlib import Path
+    _fitting_models, _run_reduction = general_helpers.load_experiment_modules(__file__)
+    FittingModel = _fitting_models.FittingModel
+    register_fitting_models = _fitting_models.register_fitting_models
+    BackwardAnalysisInputs = _run_reduction.BackwardAnalysisInputs
+    ForwardAnalysisInputs = _run_reduction.ForwardAnalysisInputs
 
-        _run_reduction_path = Path(__file__).resolve().parent / "run_reduction.py"
-        _module_name = "mvesuvio.default_config.experiment_template._local_run_reduction"
-        _spec = importlib.util.spec_from_file_location(_module_name, _run_reduction_path)
-        if _spec is None or _spec.loader is None:
-            raise ImportError(f"Could not load run_reduction module from {_run_reduction_path}")
 
-        _run_reduction = importlib.util.module_from_spec(_spec)
-        _spec.loader.exec_module(_run_reduction)
-
-        BackwardAnalysisInputs = _run_reduction.BackwardAnalysisInputs
-        ForwardAnalysisInputs = _run_reduction.ForwardAnalysisInputs
+register_fitting_models()
 
 
 class BackwardFittingInputs(BackwardAnalysisInputs):

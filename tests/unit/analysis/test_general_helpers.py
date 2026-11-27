@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,41 @@ from mvesuvio.util import general_helpers
 
 
 class TestGeneralHelpers(unittest.TestCase):
+    def test_load_experiment_modules_uses_local_files_and_caches_models_per_directory(self):
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(sys.modules):
+            root = Path(temp_dir)
+            for name in ("first", "second"):
+                directory = root / name
+                directory.mkdir()
+                (directory / "fitting_models.py").write_text(f"model = {name!r}\n")
+                (directory / "run_reduction.py").write_text(f"inputs = {name!r}\n")
+
+            first = root / "first"
+            models, reduction = general_helpers.load_experiment_modules(str(first / "run_fitting.py"))
+            repeated_models, repeated_reduction = general_helpers.load_experiment_modules(str(first / "run_fse_correction.py"))
+            other_models, other_reduction = general_helpers.load_experiment_modules(str(root / "second" / "run_fitting.py"))
+
+            self.assertEqual((models.model, reduction.inputs), ("first", "first"))
+            self.assertIs(models, repeated_models)
+            self.assertIsNot(reduction, repeated_reduction)
+            self.assertIsNot(models, other_models)
+            self.assertEqual((other_models.model, other_reduction.inputs), ("second", "second"))
+
+    def test_load_experiment_modules_propagates_import_errors_and_allows_retry(self):
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(sys.modules):
+            directory = Path(temp_dir)
+            models_path = directory / "fitting_models.py"
+            models_path.write_text('raise ImportError("missing custom dependency")\n')
+            (directory / "run_reduction.py").write_text("inputs = 'local'\n")
+            script = str(directory / "run_fitting.py")
+
+            with self.assertRaisesRegex(ImportError, "missing custom dependency"):
+                general_helpers.load_experiment_modules(script)
+
+            models_path.write_text("model = 'recovered'\n")
+            models, reduction = general_helpers.load_experiment_modules(script)
+            self.assertEqual((models.model, reduction.inputs), ("recovered", "local"))
+
     def test_get_scattering_type_returns_backward_enum(self):
         class BackwardInputs:
             mode = Mode.DOUBLE_DIFFERENCE.value

@@ -1,5 +1,8 @@
+import importlib.util
 import re
+import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import numpy as np
@@ -9,6 +12,31 @@ from mantid.simpleapi import Load, SumSpectra
 
 from mvesuvio.globals import Mode, ModeRunning, ScatteringType, Tags
 from mvesuvio.util.files_manager import FilesManager
+
+
+def load_experiment_modules(script_file: str) -> tuple[ModuleType, ModuleType]:
+    """Load sibling fitting models and reduction inputs when running an experiment script."""
+    directory = Path(script_file).resolve().parent
+
+    def load_module(name: str, path: Path) -> ModuleType:
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load {path.stem} module from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    models_path = directory / "fitting_models.py"
+    models_name = f"_mvesuvio_local_fitting_models:{models_path}"
+    if models_name not in sys.modules:
+        sys.modules[models_name] = load_module(models_name, models_path)
+    models = sys.modules[models_name]
+
+    reduction = load_module(
+        "mvesuvio.default_config.experiment_template._local_run_reduction",
+        directory / "run_reduction.py",
+    )
+    return models, reduction
 
 
 def load_saved_fitting_input_workspaces(

@@ -1,3 +1,5 @@
+import builtins
+import runpy
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +9,25 @@ from mantid.simpleapi import AnalysisDataService, CreateWorkspace, SaveNexus
 
 from mvesuvio.default_config.experiment_template.run_fitting import ForwardFittingInputs, run_fitting, run_y_space_reduction_and_fit
 from mvesuvio.util.files_manager import FilesManager
+
+
+class TestLocalFittingModels(unittest.TestCase):
+    def test_package_import_errors_are_not_retried_as_script_imports(self):
+        real_import = builtins.__import__
+
+        def import_with_missing_dependency(name, globals=None, locals=None, fromlist=(), level=0):
+            if name == "run_reduction" and level == 1:
+                raise ImportError("missing reduction dependency")
+            return real_import(name, globals, locals, fromlist, level)
+
+        for script in ("run_fitting", "run_fse_correction"):
+            with (
+                self.subTest(script=script),
+                patch("builtins.__import__", side_effect=import_with_missing_dependency),
+                patch("importlib.util.spec_from_file_location", side_effect=AssertionError("unexpected script fallback")),
+                self.assertRaisesRegex(ImportError, "missing reduction dependency"),
+            ):
+                runpy.run_module(f"mvesuvio.default_config.experiment_template.{script}", run_name="package_test")
 
 
 class TestRunFittingPrecomputedInputs(unittest.TestCase):
