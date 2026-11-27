@@ -24,6 +24,9 @@ class GlobalFitBuilder:
     being compared to the data. ``VECTORISED`` selects models that accept 2D x arrays and
     row-wise parameters shaped as ``(n_rows, 1)``.
 
+    If all errors are zero, fit unweighted and treat zero-valued signal bins
+    as masks, as in the other y-space fits.
+
     """
 
     def __init__(
@@ -51,8 +54,11 @@ class GlobalFitBuilder:
 
         self.n_spectra = self.data_x.shape[0]
         self.unshared_params = (BACKGROUND_PARAMETER,) + tuple(name for name in self.initial_params if name not in self.shared_params)
-        # Points with zero or non finite error (e.g. masked bins where y and e are zero) are ignored
-        self.valid = np.isfinite(self.data_y) & np.isfinite(self.data_e) & (self.data_e != 0)
+        unweighted = np.all(self.data_e == 0)
+        if unweighted:
+            self.valid = np.isfinite(self.data_y) & (self.data_y != 0)
+        else:
+            self.valid = np.isfinite(self.data_y) & np.isfinite(self.data_e) & (self.data_e != 0)
         grids = [self._build_convolution_grid(x, res) for x, res in zip(self.data_x, self.res_y)]
         self._x_delta = np.array([delta for delta, _ in grids])[:, np.newaxis]
         self._res_dense = np.stack([res for _, res in grids])
@@ -60,7 +66,7 @@ class GlobalFitBuilder:
         self._convolution_fft_length = fft.next_fast_len(self._convolution_full_length, real=True)
         self._convolution_same_start = (self._res_dense.shape[1] - 1) // 2
         self._res_fft = fft.rfft(self._res_dense, n=self._convolution_fft_length, axis=1)
-        self._safe_e = np.where(self.valid, self.data_e, 1.0)
+        self._safe_e = np.ones_like(self.data_e) if unweighted else np.where(self.valid, self.data_e, 1.0)
         self._safe_y = np.where(self.valid, self.data_y, 0.0)
 
     def _validate_inputs(self) -> None:
@@ -165,7 +171,7 @@ class GlobalFitBuilder:
         return np.sum(np.where(self.valid, residuals, 0.0) ** 2, axis=1)
 
     def weighted_residuals(self, params_vector: np.ndarray) -> np.ndarray:
-        """Residuals divided by the errors of all valid points, concatenated into a 1D array."""
+        """Residuals divided by the effective errors of all valid points, concatenated into a 1D array."""
         return ((self._safe_y - self.convolved_model(params_vector)) / self._safe_e)[self.valid]
 
     def cost_function(self, params_vector: np.ndarray) -> float:
@@ -177,9 +183,10 @@ class GlobalFitBuilder:
         return self.convolved_model(params_vector).ravel()
 
     def parameter_covariance(self, parameters: np.ndarray) -> np.ndarray:
-        """Covariance of the fitted parameters, estimated from the Jacobian J of the weighted residuals.
+        """Covariance of the fitted parameters, estimated from the Jacobian J of the residuals.
 
-        Computed as (J^T J)^-1 scaled by the reduced chi2.
+        Computed as the pseudoinverse of J^T J scaled by the residual sum of squares per degree
+        of freedom. For an unweighted fit, this estimates a common variance from the residuals.
         """
         parameters = np.asarray(parameters, dtype=float)
         jacobian_residuals, _ = jacobi.jacobi(self.weighted_residuals, parameters)
@@ -218,6 +225,7 @@ class GlobalFitWithFSEBuilder(GlobalFitBuilder):
     ``model_width_parameter`` to a model parameter used as the FSE width, with
     intensity ``width**4 / 3``. If both are supplied, the free intensity takes
     precedence. One of these parameters and ``q`` are required.
+
     """
 
     def __init__(

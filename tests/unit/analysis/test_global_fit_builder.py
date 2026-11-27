@@ -172,6 +172,23 @@ class TestGlobalFitBuilder(unittest.TestCase):
         vector = builder.initial_vector()
         self.assertAlmostEqual(np.sum(builder.weighted_residuals(vector) ** 2), builder.cost_function(vector))
 
+    def test_all_zero_errors_use_unweighted_residuals(self):
+        data_y = self.data_y.copy()
+        data_y[0, :3] = [0, np.nan, np.inf]
+        data_y[1] = 0
+        data_e = np.zeros_like(data_y)
+        builder = self.build(data_y, data_e)
+        vector = builder.initial_vector()
+        valid = np.isfinite(data_y) & (data_y != 0)
+        residuals = data_y - builder.convolved_model(vector)
+
+        np.testing.assert_array_equal(builder.data_e, data_e)
+        np.testing.assert_array_equal(builder.valid, valid)
+        np.testing.assert_allclose(builder.weighted_residuals(vector), residuals[valid])
+        np.testing.assert_allclose(builder.row_costs(vector), np.sum(np.where(valid, residuals, 0) ** 2, axis=1))
+        self.assertAlmostEqual(builder.cost_function(vector), np.sum(residuals[valid] ** 2))
+        self.assertGreater(builder.cost_function(vector), 0)
+
     def test_row_costs_and_weighted_residuals_ignore_invalid_points(self):
         data_y = np.zeros_like(self.data_y)
         data_e = np.zeros_like(self.data_e)
@@ -201,6 +218,19 @@ class TestGlobalFitBuilder(unittest.TestCase):
         covariance = builder.parameter_covariance(np.array([2, 1, 3]))
 
         np.testing.assert_allclose(covariance, np.diag([0.2, 0.8, 0.8]), rtol=1e-6, atol=1e-9)
+
+    def test_unweighted_covariance_uses_residual_variance(self):
+        x = np.tile(np.arange(-2, 3, dtype=float), (2, 1))
+        resolution = np.tile([0, 0, 1, 0, 0], (2, 1))
+        residual = np.array([1, -2, 2, -2, 1])
+        data_y = np.array([2 * x[0] + 1 + residual, 2 * x[1] + 3 - residual])
+        data_e = np.zeros_like(x)
+        builder = GlobalFitBuilder(x, data_y, data_e, resolution, lambda x, slope: slope * x, {"slope": 2}, ["slope"])
+
+        covariance = builder.parameter_covariance(np.array([2, 1, 3]))
+
+        np.testing.assert_allclose(covariance, np.diag([0.2, 0.8, 0.8]), rtol=1e-6, atol=1e-9)
+        np.testing.assert_array_equal(builder.data_e, data_e)
 
     def test_curve_errors_propagate_correlated_parameter_uncertainties(self):
         x = np.tile(np.arange(-2, 3, dtype=float), (2, 1))
@@ -298,6 +328,53 @@ class TestGlobalFitBuilderFSE(unittest.TestCase):
             rtol=1e-14,
             atol=1e-14,
         )
+
+    def test_all_zero_errors_use_unweighted_residuals_and_ignore_masked_signal(self):
+        self.data_e[:] = 0
+        self.data_y[0, :2] = [0, np.nan]
+        self.data_y[1] = 0
+        builder = self.build(["sigma", "fse_width"])
+        vector = builder.initial_vector()
+        valid = np.isfinite(self.data_y) & (self.data_y != 0)
+        expected = (self.data_y - builder.convolved_model(vector))[valid]
+
+        np.testing.assert_array_equal(builder.valid, valid)
+        np.testing.assert_allclose(builder.weighted_residuals(vector), expected)
+        expected_row_costs = np.sum(np.where(valid, self.data_y - builder.convolved_model(vector), 0) ** 2, axis=1)
+        np.testing.assert_allclose(builder.row_costs(vector), expected_row_costs)
+        self.assertAlmostEqual(builder.cost_function(vector), np.sum(expected**2))
+        self.assertGreater(builder.cost_function(vector), 0)
+
+        background_index = builder.parameter_names.index("y0")
+
+        def cost_with_background(background):
+            params = vector.copy()
+            params[background_index] = background[0]
+            return builder.cost_function(params)
+
+        result = minimize(cost_with_background, [0.0])
+        expected_background = np.mean((self.data_y - builder.convolved_model(vector))[0, valid[0]])
+        self.assertTrue(result.success)
+        self.assertAlmostEqual(result.x[0], expected_background, places=6)
+        self.assertLess(result.fun, builder.cost_function(vector))
+
+        self.data_e = valid.astype(float)
+        reference = self.build(["sigma", "fse_width"])
+        np.testing.assert_array_equal(builder.data_e, np.zeros_like(self.data_y))
+        np.testing.assert_allclose(builder.parameter_covariance(vector), reference.parameter_covariance(vector))
+
+    def test_partially_zero_errors_remain_weighted_and_masked(self):
+        self.data_e[0, :2] = [0, 0.5]
+        self.data_e[0, 2] = np.inf
+        self.data_e[1] = 0
+        builder = self.build(["sigma", "fse_width"])
+        vector = builder.initial_vector()
+        valid = np.isfinite(self.data_y) & np.isfinite(self.data_e) & (self.data_e != 0)
+        expected = (self.data_y - builder.convolved_model(vector))[valid] / self.data_e[valid]
+
+        np.testing.assert_array_equal(builder.valid, valid)
+        np.testing.assert_allclose(builder.weighted_residuals(vector), expected)
+        self.assertAlmostEqual(builder.cost_function(vector), np.sum(expected**2))
 
     def test_model_and_fse_rows_match_analytic_gaussian_derivative(self):
         q = np.tile(np.array([1.0, 2.0, 3.0])[:, np.newaxis], (1, self.x.size))
