@@ -123,7 +123,7 @@ This script is an example of a well-behaved sample and it should run without iss
 
 If the run was successful, you will notice that a new folder was created inside `mvesuvio/experiment_template` containing all sorts of outputs for this script.
 
-You can also see that the folder `mvesuvio/experiment_template` also contains another script `run_fitting.py` to run the fitting routine after the reduction. When you run `run_reduction.py`, some of the outptus will be placed inside a folder `fitting_inputs` to be used by `run_fitting.py`.
+After running `run_reduction.py`, run `run_fse_correction.py` and then `run_fitting.py`. FSE-corrected inputs are saved under `fse_correction_outputs/<candidate>/`, with the corrected resolution, joy, and joy_avg workspaces in separate Nexus files. Fitting uses the first complete candidate in memory, or, if none is available, the first candidate with all three files in its folder.
 
 **IMPORTANT: To run a new sample with different inputs, you should *copy* the example folder `experiment_template` and place it in *any* folder of your choice outside `mvesuvio`. For providing the instrument parameters files, place them inside `mvesuvio/ip_files/`.**
 (You can change the directory of the instrument files too, consult next section).

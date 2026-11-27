@@ -11,21 +11,36 @@ from mvesuvio.globals import Mode, ModeRunning, ScatteringType, Tags
 from mvesuvio.util.files_manager import FilesManager
 
 
-def load_saved_fitting_input_workspaces(input_directory: Path, workspace_suffixes: tuple[str, ...] = ()) -> set[str]:
-    """Load saved workspaces from the requested directory, replacing existing names."""
+def load_saved_fitting_input_workspaces(
+    input_directory: Path,
+    workspace_suffixes: tuple[str, ...] = (),
+    *,
+    required_workspace_names: tuple[str, ...] | None = None,
+    optional_workspace_names: tuple[str, ...] = (),
+) -> bool:
+    """Load matching workspaces, or require an exact set before loading optional names."""
     if not input_directory.exists():
         logger.notice(f"No saved fitting input workspaces found in {input_directory}. Skipping workspace reload.")
-        return set()
+        return False
 
-    workspace_files = sorted(
-        path for path in input_directory.glob("*.nxs") if not workspace_suffixes or path.stem.endswith(workspace_suffixes)
-    )
+    if required_workspace_names is not None:
+        workspace_files = [input_directory / f"{name}.nxs" for name in required_workspace_names]
+        missing_files = [path for path in workspace_files if not path.is_file()]
+        if missing_files:
+            logger.notice(f"Missing fitting input workspaces in {input_directory}: {', '.join(path.name for path in missing_files)}.")
+            return False
+        optional_files = (input_directory / f"{name}.nxs" for name in optional_workspace_names)
+        workspace_files.extend(path for path in optional_files if path.is_file())
+    else:
+        workspace_files = sorted(
+            path for path in input_directory.glob("*.nxs") if not workspace_suffixes or path.stem.endswith(workspace_suffixes)
+        )
     logger.notice(f"Loading saved fitting input workspaces from {input_directory} ({len(workspace_files)} file(s)).")
     for workspace_file in workspace_files:
         workspace_name = workspace_file.stem
         logger.notice(f"Loading workspace {workspace_name} from {workspace_file.name}.")
         Load(Filename=str(workspace_file), OutputWorkspace=workspace_name)
-    return {workspace_file.stem for workspace_file in workspace_files}
+    return bool(workspace_files)
 
 
 def get_workspace_name_candidates(analysis_inputs: Any) -> list[str]:

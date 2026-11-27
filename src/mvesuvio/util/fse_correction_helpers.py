@@ -20,7 +20,8 @@ from mvesuvio.util.global_fit_builder import GlobalFitWithFSEBuilder
 
 
 def save_fse_corrected_outputs(candidate: str, ws_resolution: Workspace, ws_corrected_joy: Workspace) -> None:
-    output_directory = FilesManager.get_fse_correction_outputs_dir()
+    output_directory = FilesManager.get_fse_correction_outputs_dir() / candidate
+    output_directory.mkdir(parents=True, exist_ok=True)
     corrected_candidate = candidate + CORRECTED_WORKSPACE_SUFFIX
     ws_corrected_resolution = CloneWorkspace(
         InputWorkspace=ws_resolution, OutputWorkspace=corrected_candidate + RESOLUTION_WORKSPACE_SUFFIX

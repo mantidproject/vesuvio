@@ -41,6 +41,36 @@ class TestGeneralHelpers(unittest.TestCase):
 
         self.assertEqual(general_helpers.get_workspace_name_candidates(Inputs), ["sample_2", "sample"])
 
+    def test_load_saved_workspaces_requires_all_exact_names_before_loading(self):
+        names = ("sample_corr_ws_resolution", "sample_corr_joy", "sample_corr_joy_avg")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            for name in names[:2]:
+                (directory / f"{name}.nxs").touch()
+            (directory / "other_corr_joy_avg.nxs").touch()
+            with patch.object(general_helpers, "Load") as load:
+                self.assertFalse(general_helpers.load_saved_fitting_input_workspaces(directory, required_workspace_names=names))
+                load.assert_not_called()
+                (directory / f"{names[2]}.nxs").touch()
+                self.assertTrue(general_helpers.load_saved_fitting_input_workspaces(directory, required_workspace_names=names))
+                self.assertEqual(
+                    [item.kwargs for item in load.call_args_list],
+                    [{"Filename": str(directory / f"{name}.nxs"), "OutputWorkspace": name} for name in names],
+                )
+
+    def test_load_saved_workspaces_loads_only_present_optional_names(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            for name in ("required", "optional"):
+                (directory / f"{name}.nxs").touch()
+            with patch.object(general_helpers, "Load") as load:
+                self.assertTrue(
+                    general_helpers.load_saved_fitting_input_workspaces(
+                        directory, required_workspace_names=("required",), optional_workspace_names=("optional", "missing")
+                    )
+                )
+                self.assertEqual([item.kwargs["OutputWorkspace"] for item in load.call_args_list], ["required", "optional"])
+
     def test_load_overwritten_workspace_if_specified(self):
         class Inputs:
             overwrite_analysis_input_workspace = "override_front"

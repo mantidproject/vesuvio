@@ -1,3 +1,4 @@
+import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,14 +27,16 @@ class TestFSECorrectionHelpers(unittest.TestCase):
         ws_corrected_joy.name.return_value = "candidate_corr_joy"
         ws_joy_avg = Mock()
         ws_joy_avg.name.return_value = "candidate_corr_joy_avg"
-        output_directory = Path("/tmp/fse-correction")
         with (
-            patch("mvesuvio.util.fse_correction_helpers.FilesManager.get_fse_correction_outputs_dir", return_value=output_directory),
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch("mvesuvio.util.fse_correction_helpers.FilesManager.get_fse_correction_outputs_dir", return_value=Path(temp_dir)),
             patch("mvesuvio.util.fse_correction_helpers.CloneWorkspace", return_value=ws_corrected_resolution) as clone,
             patch("mvesuvio.util.fse_correction_helpers.SumSpectra", return_value=ws_joy_avg) as sum_spectra,
             patch("mvesuvio.util.fse_correction_helpers.SaveNexus") as save_nexus,
         ):
             save_fse_corrected_outputs("candidate", ws_resolution, ws_corrected_joy)
+            output_directory = Path(temp_dir) / "candidate"
+            self.assertTrue(output_directory.is_dir())
 
         clone.assert_called_once_with(
             InputWorkspace=ws_resolution,
@@ -93,9 +96,7 @@ class TestFSECorrectionHelpers(unittest.TestCase):
             ws_fit, ws_residuals, ws_fse = save_fse_fit_results(
                 ws_joy, builder, SimpleNamespace(x=np.array([1.0])), FSEFitWith.FREE_SHARED, np.array([[0.1]])
             )
-            ws_corrected = subtract_fse_contribution(
-                ws_joy, ws_fse, "test_corr_joy", FSEFitWith.FREE_SHARED
-            )
+            ws_corrected = subtract_fse_contribution(ws_joy, ws_fse, "test_corr_joy", FSEFitWith.FREE_SHARED)
 
         np.testing.assert_array_equal(pass_data.call_args_list[2].args[2], np.zeros((1, 21)))
         self.assertEqual(

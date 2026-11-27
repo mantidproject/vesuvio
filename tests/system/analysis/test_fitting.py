@@ -32,7 +32,7 @@ class TestFitting(unittest.TestCase):
         cls.benchmark_path = Path(__file__).absolute().parent.parent.parent / "data" / "analysis" / "benchmark" / "fitting" / "gauss_fit"
         cls.results_path = handle_config.USER_CONFIG_PATH / "experiment_template" / "fitting_outputs" / "GAUSS"
         rmtree(cls.results_path, ignore_errors=True)
-        correction_outputs = handle_config.USER_CONFIG_PATH / "experiment_template" / "fse_correction_outputs"
+        correction_outputs = handle_config.USER_CONFIG_PATH / "experiment_template" / "fse_correction_outputs" / "front_0"
         correction_outputs.mkdir(parents=True, exist_ok=True)
         for suffix in ("joy", "joy_avg", "ws_resolution"):
             copyfile(FITTING_INPUTS_PATH / f"front_0_{suffix}.nxs", correction_outputs / f"front_0_corr_{suffix}.nxs")

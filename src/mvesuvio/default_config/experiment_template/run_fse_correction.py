@@ -145,15 +145,17 @@ def run_fse_correction_for_inputs(
             )
         )
 
-    if not any(all(AnalysisDataService.doesExist(name) for name in names) for _, names in candidate_names):
-        general_helpers.load_saved_fitting_input_workspaces(
-            FilesManager.get_reduction_outputs_dir(),
-            (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX, Q_WORKSPACE_SUFFIX),
-        )
-
     found_candidate = False
     for candidate, names in candidate_names:
         resolution_name, joy_name, q_name = names
+        if not all(AnalysisDataService.doesExist(name) for name in names) and not (
+            general_helpers.load_saved_fitting_input_workspaces(
+                FilesManager.get_reduction_outputs_dir(),
+                required_workspace_names=names,
+                optional_workspace_names=(candidate + JOY_AVG_WORKSPACE_SUFFIX,),
+            )
+        ):
+            continue
         if all(AnalysisDataService.doesExist(name) for name in names):
             found_candidate = True
             corrected_name = candidate + CORRECTED_WORKSPACE_SUFFIX + JOY_WORKSPACE_SUFFIX

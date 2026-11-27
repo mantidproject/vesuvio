@@ -103,10 +103,11 @@ def run_y_space_reduction_and_fit(
         )
 
     if not any(all(AnalysisDataService.doesExist(name) for name in names) for _, names in candidate_names):
-        general_helpers.load_saved_fitting_input_workspaces(
-            FilesManager.get_fse_correction_outputs_dir(),
-            (RESOLUTION_WORKSPACE_SUFFIX, JOY_WORKSPACE_SUFFIX, JOY_AVG_WORKSPACE_SUFFIX),
-        )
+        output_directory = FilesManager.get_fse_correction_outputs_dir()
+        for base_candidate, (_, names) in zip(ws_name_candidates, candidate_names):
+            candidate_directory = output_directory / base_candidate
+            if general_helpers.load_saved_fitting_input_workspaces(candidate_directory, required_workspace_names=names):
+                break
 
     for candidate, names in candidate_names:
         resolution_name, joy_name, joy_avg_name = names
