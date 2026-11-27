@@ -3,6 +3,7 @@ from pathlib import Path
 
 from mantid.kernel import logger
 
+from mvesuvio.globals import ScatteringType
 from mvesuvio.util.files_manager import FilesManager
 
 
@@ -11,13 +12,13 @@ def get_bootstrap_input_directories(inputs_dir_path: Path):
         logger.error("The inputs directory path provided for bootstrap is not a directory.")
         return ()
 
-    inputs_backward_path = inputs_dir_path / "backward"
+    inputs_backward_path = inputs_dir_path / ScatteringType.BACKWARD.value
     if not inputs_backward_path.exists():
         inputs_backward_path.mkdir(exist_ok=True)
         logger.error(f"Created backward directory. Please place your backward samples here: {inputs_backward_path!s}")
         return ()
 
-    inputs_forward_path = inputs_dir_path / "forward"
+    inputs_forward_path = inputs_dir_path / ScatteringType.FORWARD.value
     if not inputs_forward_path.exists():
         inputs_forward_path.mkdir(exist_ok=True)
         logger.error(f"Created forward directory. Please place your forward samples here: {inputs_forward_path!s}")

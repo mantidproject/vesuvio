@@ -1,16 +1,95 @@
+import importlib.util
 import re
+import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import numpy as np
+from mantid.api import AnalysisDataService
 from mantid.kernel import logger
-from mantid.simpleapi import AnalysisDataService, Load, SumSpectra
+from mantid.simpleapi import Load, SumSpectra
 
 from mvesuvio.globals import Mode, ModeRunning, ScatteringType, Tags
 from mvesuvio.util.files_manager import FilesManager
 
 
-def _get_scattering_type(inputs_class: Any) -> ScatteringType:
+def load_experiment_modules(script_file: str) -> tuple[ModuleType, ModuleType]:
+    """Load sibling fitting models and reduction inputs when running an experiment script."""
+    directory = Path(script_file).resolve().parent
+
+    def load_module(name: str, path: Path) -> ModuleType:
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load {path.stem} module from {path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    models_path = directory / "fitting_models.py"
+    models_name = f"_mvesuvio_local_fitting_models:{models_path}"
+    if models_name not in sys.modules:
+        sys.modules[models_name] = load_module(models_name, models_path)
+    models = sys.modules[models_name]
+
+    reduction = load_module(
+        "mvesuvio.default_config.experiment_template._local_run_reduction",
+        directory / "run_reduction.py",
+    )
+    return models, reduction
+
+
+def load_saved_fitting_input_workspaces(
+    input_directory: Path,
+    workspace_suffixes: tuple[str, ...] = (),
+    *,
+    required_workspace_names: tuple[str, ...] | None = None,
+    optional_workspace_names: tuple[str, ...] = (),
+) -> bool:
+    """Load matching workspaces, or require an exact set before loading optional names."""
+    if not input_directory.exists():
+        logger.notice(f"No saved fitting input workspaces found in {input_directory}. Skipping workspace reload.")
+        return False
+
+    if required_workspace_names is not None:
+        workspace_files = [input_directory / f"{name}.nxs" for name in required_workspace_names]
+        missing_files = [path for path in workspace_files if not path.is_file()]
+        if missing_files:
+            logger.notice(f"Missing fitting input workspaces in {input_directory}: {', '.join(path.name for path in missing_files)}.")
+            return False
+        optional_files = (input_directory / f"{name}.nxs" for name in optional_workspace_names)
+        workspace_files.extend(path for path in optional_files if path.is_file())
+    else:
+        workspace_files = sorted(
+            path for path in input_directory.glob("*.nxs") if not workspace_suffixes or path.stem.endswith(workspace_suffixes)
+        )
+    logger.notice(f"Loading saved fitting input workspaces from {input_directory} ({len(workspace_files)} file(s)).")
+    for workspace_file in workspace_files:
+        workspace_name = workspace_file.stem
+        logger.notice(f"Loading workspace {workspace_name} from {workspace_file.name}.")
+        Load(Filename=str(workspace_file), OutputWorkspace=workspace_name)
+    return bool(workspace_files)
+
+
+def get_workspace_name_candidates(analysis_inputs: Any) -> list[str]:
+    """Return unique candidate workspace names in preferred lookup order."""
+    iteration = str(analysis_inputs.number_of_iterations_for_corrections)
+    overwrite_workspace = get_workspace_name_if_path(analysis_inputs.overwrite_analysis_input_workspace)
+    base_workspace_names = [
+        overwrite_workspace,
+        str(analysis_inputs.name_of_subtracted_workspace or "").strip(),
+    ]
+    base_workspace_names = [name for name in base_workspace_names if name]
+
+    candidates: list[str] = []
+    for base_workspace_name in base_workspace_names:
+        for candidate in (f"{base_workspace_name}_{iteration}", base_workspace_name):
+            if candidate not in candidates:
+                candidates.append(candidate)
+    return candidates
+
+
+def get_scattering_type(inputs_class: Any) -> ScatteringType:
     """Infer scattering type from user inputs."""
     name = str(getattr(inputs_class, "name", "")).lower()
     class_name = getattr(inputs_class, "__name__", "").lower()

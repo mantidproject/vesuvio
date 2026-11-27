@@ -33,7 +33,17 @@ from mantid.simpleapi import (
 )
 
 from mvesuvio.analysis_reduction import VesuvioAnalysisRoutine
-from mvesuvio.globals import Masking, ModeRunning, ScatteringType, Tags
+from mvesuvio.globals import (
+    JOY_AVG_WORKSPACE_SUFFIX,
+    JOY_WORKSPACE_SUFFIX,
+    Q_WORKSPACE_SUFFIX,
+    REBIN_WORKSPACE_SUFFIX,
+    RESOLUTION_WORKSPACE_SUFFIX,
+    Masking,
+    ModeRunning,
+    ScatteringType,
+    Tags,
+)
 from mvesuvio.util import fitting_helpers, general_helpers, handle_config
 from mvesuvio.util.constraints_transport import serialize_constraints
 from mvesuvio.util.files_manager import FilesManager
@@ -233,7 +243,7 @@ def init_analysis_algorithm(ws_name: str, inputs_class: type[BackwardAnalysisInp
     profiles_table = create_profiles_table(ws_name + "_initial_parameters", inputs_class)
     instrument_parameters_file = str(FilesManager.get_instrument_parameters_dir() / inputs_class.instrument_parameters_file)
 
-    scattering_type = general_helpers._get_scattering_type(inputs_class)
+    scattering_type = general_helpers.get_scattering_type(inputs_class)
 
     if scattering_type == ScatteringType.FORWARD:
         inputs_class.chosen_mass_index = 0
@@ -376,7 +386,7 @@ def load_input_ws(input_class: type[BackwardAnalysisInputs | ForwardAnalysisInpu
 def store_input_ws_if_not_on_path(
     inputs_class: type[BackwardAnalysisInputs | ForwardAnalysisInputs],
 ) -> tuple[Path, Path]:
-    scattering_type = general_helpers._get_scattering_type(inputs_class)
+    scattering_type = general_helpers.get_scattering_type(inputs_class)
 
     if scattering_type == ScatteringType.BACKWARD:
         raw_path = FilesManager.get_reduction_inputs_dir() / FilesManager.get_backward_raw_filename()
@@ -471,8 +481,6 @@ def save_ws_from_load_vesuvio(runs, mode, ipfile, ws_path):
 def save_fitting_input_workspaces(
     analysis_inputs: type[BackwardAnalysisInputs | ForwardAnalysisInputs] | None,
 ) -> None:
-    fitting_inputs_dir = FilesManager.get_fitting_inputs_dir()
-    fitting_inputs_dir.mkdir(parents=True, exist_ok=True)
     if analysis_inputs is None:
         logger.warning("Could not save derived fitting workspaces because the inputs class was not provided.")
         return
@@ -502,17 +510,19 @@ def save_fitting_input_workspaces(
         analysis_inputs.range_for_rebinning_in_y_space,
     )
 
-    ws_lighest_data, ws_lighest_ncp = fitting_helpers.isolate_lighest_mass_data(
+    ws_lighest_data, ws_lighest_ncp, lightest_mass = fitting_helpers.isolate_lighest_mass_data(
         ws_to_fit,
         ws_to_fit_ncps,
         analysis_inputs.subtract_calculated_fse_from_data,
     )
 
-    ws_joy, ws_joy_avg = y_space_reduction(ws_lighest_data, ws_lighest_ncp, analysis_inputs)
+    ws_joy, ws_joy_avg, ws_q = y_space_reduction(ws_lighest_data, ws_lighest_ncp, lightest_mass, analysis_inputs)
 
-    SaveNexus(ws_resolution, str(fitting_inputs_dir / f"{workspace_name}_ws_resolution.nxs"))
-    SaveNexus(ws_joy, str(fitting_inputs_dir / f"{workspace_name}_joy.nxs"))
-    SaveNexus(ws_joy_avg, str(fitting_inputs_dir / f"{workspace_name}_joy_avg.nxs"))
+    output_directory = FilesManager.get_reduction_outputs_dir()
+    SaveNexus(ws_resolution, str(output_directory / f"{workspace_name}{RESOLUTION_WORKSPACE_SUFFIX}.nxs"))
+    SaveNexus(ws_joy, str(output_directory / f"{workspace_name}{JOY_WORKSPACE_SUFFIX}.nxs"))
+    SaveNexus(ws_joy_avg, str(output_directory / f"{workspace_name}{JOY_AVG_WORKSPACE_SUFFIX}.nxs"))
+    SaveNexus(ws_q, str(output_directory / f"{workspace_name}{Q_WORKSPACE_SUFFIX}.nxs"))
 
 
 def mask_time_of_flight_bins_with_zeros(ws_name, inputs_class: type[BackwardAnalysisInputs | ForwardAnalysisInputs]):
@@ -588,9 +598,13 @@ def create_profiles_table(name, ai):
     return table
 
 
-def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs | ForwardAnalysisInputs]):
+def y_space_reduction(
+    wsTOF,
+    ws_ncp,
+    lightest_mass: float,
+    inputs: type[BackwardAnalysisInputs | ForwardAnalysisInputs],
+):
     """Seperate procedures depending on masking specified."""
-    mass0 = inputs.masses[0]
     ncp = ws_ncp.extractY()
 
     rebin_pars = inputs.range_for_rebinning_in_y_space
@@ -598,15 +612,24 @@ def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs | Forwa
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NCP:
         wsTOF = replace_zeros_with_ncp(wsTOF, ncp)
 
-    ws_joy = ConvertToYSpace(wsTOF, Mass=mass0, OutputWorkspace=wsTOF.name() + "_joy")
+    ws_joy, ws_q = ConvertToYSpace(
+        wsTOF,
+        Mass=lightest_mass,
+        OutputWorkspace=wsTOF.name() + JOY_WORKSPACE_SUFFIX,
+        QWorkspace=wsTOF.name() + Q_WORKSPACE_SUFFIX,
+    )
+
+    # Rebin QWorkspace with same parameters as y-space workspace
+    # Not perfect, but it outputs a good approximation
+    ws_q_rebin = Rebin(InputWorkspace=ws_q, Params=rebin_pars, OutputWorkspace=ws_q.name() + REBIN_WORKSPACE_SUFFIX)
 
     if inputs.mask_time_of_flight_range and inputs.mask_zeros_with == Masking.NAN:
         # NOTE: Technically this rebin is general and gives the same result as Rebin when
         # no zeros are present in dataY, but I didn't make this the default path
         # because it can be confusing.
-        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars, "_rebin")
+        ws_joy_rebin = rebin_masked_weighted(ws_joy, rebin_pars, REBIN_WORKSPACE_SUFFIX)
     else:
-        ws_joy_rebin = Rebin(InputWorkspace=ws_joy, Params=rebin_pars, OutputWorkspace=ws_joy.name() + "_rebin")
+        ws_joy_rebin = Rebin(InputWorkspace=ws_joy, Params=rebin_pars, OutputWorkspace=ws_joy.name() + REBIN_WORKSPACE_SUFFIX)
 
     Integration(ws_joy_rebin, OutputWorkspace="temp_integral")
     ws_joy_rebin = Divide(LHSWorkspace=ws_joy_rebin, RHSWorkspace="temp_integral", OutputWorkspace=ws_joy_rebin.name() + "_norm")
@@ -620,7 +643,7 @@ def y_space_reduction(wsTOF, ws_ncp, inputs: type[BackwardAnalysisInputs | Forwa
         ws_joy_rebin_avg = symmetrize_weighted_mean(ws_joy_rebin_avg)
 
     DeleteWorkspace("temp_integral")
-    return ws_joy_rebin, ws_joy_rebin_avg
+    return ws_joy_rebin, ws_joy_rebin_avg, ws_q_rebin
 
 
 def rebin_masked_weighted(ws_joy, rebin_pars, suffix):
